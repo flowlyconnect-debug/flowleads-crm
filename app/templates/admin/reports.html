@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}System reports — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>System reports</h1>
+  <p class="ai-meta">Cross-tenant overview. No API key hashes or secrets are shown.</p>
+
+  {% if range_error %}
+  <div class="flash danger">{{ range_error }}</div>
+  {% endif %}
+
+  <form method="get" class="filters" style="margin-top:1rem;">
+    <label>Range
+      <select name="range">
+        <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>This week</option>
+        <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>This month</option>
+        <option value="last_30_days" {% if range_key == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
+        <option value="custom" {% if range_key == 'custom' %}selected{% endif %}>Custom</option>
+      </select>
+    </label>
+    <label>Start <input type="date" name="start" value="{{ start_date }}"></label>
+    <label>End <input type="date" name="end" value="{{ end_date }}"></label>
+    <button type="submit" class="btn">Apply</button>
+  </form>
+
+  {% if stats %}
+  <div class="filters" style="margin-top:1.5rem;">
+    <div class="card" style="padding:1rem;"><strong>Organizations</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_organizations }} ({{ stats.active_organizations }} active)</p></div>
+    <div class="card" style="padding:1rem;"><strong>Total leads</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_leads }}</p></div>
+    <div class="card" style="padding:1rem;"><strong>Monthly active orgs</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.monthly_active_organizations }}</p></div>
+  </div>
+
+  <h2 style="margin-top:2rem;">API usage by organization</h2>
+  <table>
+    <thead><tr><th>Organization</th><th>Key name</th><th>Prefix</th><th>Requests</th><th>Last used</th><th>Active</th></tr></thead>
+    <tbody>
+      {% for row in stats.api_usage %}
+      <tr>
+        <td>{{ row.organization_name }}</td>
+        <td>{{ row.key_name }}</td>
+        <td>{{ row.key_prefix }}…</td>
+        <td>{{ row.request_count }}</td>
+        <td>{{ row.last_used_at or '—' }}</td>
+        <td>{{ 'Yes' if row.is_active else 'No' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No API keys.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:2rem;">AI enrichment cost by organization</h2>
+  <p class="ai-meta">Estimated from activity token metadata; not billed amounts.</p>
+  <table>
+    <thead><tr><th>Organization</th><th>Tokens</th><th>Est. cost (USD)</th></tr></thead>
+    <tbody>
+      {% for row in stats.ai_cost_by_organization %}
+      <tr>
+        <td>{{ row.organization_name }}</td>
+        <td>{{ row.total_tokens }}</td>
+        <td>{{ row.cost_estimate }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">No enrichment activity.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

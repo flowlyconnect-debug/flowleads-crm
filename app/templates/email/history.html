@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Email history — {{ lead.display_name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Email history</h1>
+  <a class="btn" href="{{ url_for('email.compose', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.compose', lead_id=lead.id) }}">Compose</a>
+  <a class="btn secondary" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">Back to lead</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Subject</th>
+        <th>Sent by</th>
+        <th>Sent at</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>
+          <a href="{{ url_for('email.history_detail', lead_id=lead.id, email_log_id=log.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history_detail', lead_id=lead.id, email_log_id=log.id) }}">
+            {{ log.subject }}
+          </a>
+        </td>
+        <td>{{ users[log.user_id].email if log.user_id and log.user_id in users else '—' }}</td>
+        <td>{{ log.sent_at.strftime('%Y-%m-%d %H:%M') if log.sent_at else log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><span class="badge">{{ log.status }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">No emails sent yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

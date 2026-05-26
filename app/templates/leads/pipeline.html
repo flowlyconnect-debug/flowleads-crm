@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge %}
+{% block title %}Pipeline — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="toolbar">
+    <h1 style="margin:0; flex:1;">Pipeline</h1>
+    <a class="btn" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">List view</a>
+    <a class="btn" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">New lead</a>
+  </div>
+
+  <form method="get" class="filters">
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>Assigned to
+      <select name="assigned_to">
+        <option value="">Anyone</option>
+        {% for u in users %}
+        <option value="{{ u.id }}" {% if filters.assigned_to and filters.assigned_to|int == u.id %}selected{% endif %}>{{ u.email }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Source
+      <select name="source">
+        <option value="">All</option>
+        <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Manual</option>
+        <option value="n8n" {% if filters.source == 'n8n' %}selected{% endif %}>n8N</option>
+        <option value="import" {% if filters.source == 'import' %}selected{% endif %}>Import</option>
+      </select>
+    </label>
+    <button type="submit" class="btn secondary">Filter</button>
+  </form>
+
+  <div class="kanban" id="kanban">
+    {% for stage in stages %}
+    <div class="kanban-col" data-stage-id="{{ stage.id }}" style="--stage-color: {{ stage.color }}">
+      <h3 style="border-color: {{ stage.color }}">{{ stage.name }}</h3>
+      <div class="kanban-list" data-stage-id="{{ stage.id }}">
+        {% for item in leads_by_stage[stage.id] %}
+        {% set lead = item.lead %}
+        <div class="lead-card" data-lead-id="{{ lead.id }}">
+          <strong><a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">{{ lead.display_name }}</a></strong>
+          <div>{{ lead.company or '' }}</div>
+          <div style="margin-top:0.35rem;">{{ score_badge(lead.score) }}</div>
+          <div class="meta">
+            {% if lead.assignee %}{{ lead.assignee.email[0]|upper }}{% else %}—{% endif %}
+            {% if item.last_activity %} · {{ item.last_activity.created_at.strftime('%Y-%m-%d') }}{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+  const csrfToken = "{{ csrf_token() }}";
+  const stageUrl = (leadId) => "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=0) }}".replace('/0/', `/${leadId}/`);
+
+  document.querySelectorAll('.kanban-list').forEach(list => {
+    new Sortable(list, {
+      group: 'leads',
+      animation: 150,
+      onEnd: async function(evt) {
+        const leadId = evt.item.dataset.leadId;
+        const stageId = evt.to.dataset.stageId;
+        const prevList = evt.from;
+        const prevIndex = evt.oldIndex;
+        try {
+          const res = await fetch(stageUrl(leadId), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken,
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ stage_id: parseInt(stageId, 10) }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error?.message || 'Stage update failed');
+          }
+        } catch (err) {
+          prevList.insertBefore(evt.item, prevList.children[prevIndex] || null);
+          alert(err.message || 'Could not move lead.');
+        }
+      },
+    });
+  });
+</script>
+{% endblock %}

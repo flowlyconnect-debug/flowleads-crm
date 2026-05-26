@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Verify 2FA — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Verify identity</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label>{{ form.token.label }}{{ form.token() }}</label>
+    <label>{{ form.backup_code.label }}{{ form.backup_code() }}</label>
+    {{ form.submit(class="btn") }}
+  </form>
+</div>
+{% endblock %}

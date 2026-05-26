@@ -1,0 +1,17 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+instance/
+*.egg-info/
+dist/
+build/
+/backups/
+/uploads/
+*.db
+flowleads_dev.db

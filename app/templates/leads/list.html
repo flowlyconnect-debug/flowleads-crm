@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge %}
+{% block title %}Leads — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="toolbar">
+    <h1 style="margin:0; flex:1;">Leads</h1>
+    <a class="btn" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">New lead</a>
+    <a class="btn" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">Pipeline</a>
+    <a class="btn" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">Export CSV</a>
+  </div>
+
+  <form method="get" class="filters">
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    {{ filter_form.search.label }}{{ filter_form.search() }}
+    {{ filter_form.stage_id.label }}{{ filter_form.stage_id() }}
+    {{ filter_form.source.label }}{{ filter_form.source() }}
+    {{ filter_form.assigned_to.label }}{{ filter_form.assigned_to() }}
+    {{ filter_form.status.label }}{{ filter_form.status() }}
+    {{ filter_form.score_min.label }}{{ filter_form.score_min() }}
+    {{ filter_form.score_max.label }}{{ filter_form.score_max() }}
+    {{ filter_form.sort.label }}{{ filter_form.sort() }}
+    {{ filter_form.dir.label }}{{ filter_form.dir() }}
+    <div><label>&nbsp;</label>{{ filter_form.submit(class_="btn") }}</div>
+  </form>
+
+  <form method="post" action="{{ url_for('leads.bulk_action', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.bulk_action') }}">
+    {{ bulk_form.hidden_tag() }}
+    <div class="toolbar">
+      {{ bulk_form.action() }}
+      {% if can_assign_others %}{{ bulk_form.assigned_to() }}{% endif %}
+      {{ bulk_form.stage_id() }}
+      {{ bulk_form.submit(class_="btn secondary") }}
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all"></th>
+          <th><a href="?sort=name&dir={{ 'asc' if filters.dir == 'desc' else 'desc' }}&{{ request.query_string.decode() }}">Name</a></th>
+          <th>Company</th>
+          <th>Stage</th>
+          <th>Score</th>
+          <th>Source</th>
+          <th>Assigned</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td><input type="checkbox" name="lead_ids" value="{{ lead.id }}" class="lead-check"></td>
+          <td><a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">{{ lead.display_name }}</a></td>
+          <td>{{ lead.company or '—' }}</td>
+          <td><span class="badge" style="border-left: 3px solid {{ lead.stage.color }}">{{ lead.stage.name }}</span></td>
+          <td>{{ score_badge(lead.score) }}</td>
+          <td>{{ lead.source }}</td>
+          <td>{{ lead.assignee.email if lead.assignee else '—' }}</td>
+          <td>{{ lead.created_at.strftime('%Y-%m-%d') if lead.created_at else '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">No leads found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <input type="hidden" name="lead_ids" id="bulk-lead-ids" value="">
+  </form>
+
+  {% if pagination.pages > 1 %}
+  <p style="margin-top:1rem;">
+    Page {{ pagination.page }} of {{ pagination.pages }}
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('leads.list_leads', page=pagination.prev_num, organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.prev_num, **filters) }}">Previous</a>
+    {% endif %}
+    {% if pagination.has_next %}
+    <a href="{{ url_for('leads.list_leads', page=pagination.next_num, organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.next_num, **filters) }}">Next</a>
+    {% endif %}
+  </p>
+  {% endif %}
+</div>
+<script>
+  document.getElementById('select-all')?.addEventListener('change', function(e) {
+    document.querySelectorAll('.lead-check').forEach(cb => cb.checked = e.target.checked);
+  });
+  document.querySelector('form[action*="bulk"]')?.addEventListener('submit', function(e) {
+    const ids = [...document.querySelectorAll('.lead-check:checked')].map(cb => cb.value);
+    if (!ids.length) { e.preventDefault(); alert('Select at least one lead.'); return; }
+    document.getElementById('bulk-lead-ids').value = JSON.stringify(ids);
+    document.querySelectorAll('.lead-check').forEach(cb => cb.disabled = true);
+  });
+</script>
+{% endblock %}

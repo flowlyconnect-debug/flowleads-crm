@@ -1,0 +1,29 @@
+{% macro score_badge(score) %}
+{% if score is none %}
+<span class="badge score-none">No score</span>
+{% elif score <= 40 %}
+<span class="badge score-low">{{ score }}</span>
+{% elif score <= 70 %}
+<span class="badge score-mid">{{ score }}</span>
+{% else %}
+<span class="badge score-high">{{ score }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro ai_status_badge(lead) %}
+{% if lead.ai_enrichment_status == 'completed' and lead.ai_enriched %}
+<span class="badge ai-ok">AI Enriched ✓</span>
+{% if lead.ai_enriched_at %}
+<span class="ai-meta">({{ lead.ai_enriched_at.strftime('%Y-%m-%d %H:%M') }} UTC)</span>
+{% endif %}
+{% elif lead.ai_enrichment_status in ('pending', 'processing') %}
+<span class="badge ai-pending">Enriching…</span>
+{% elif lead.ai_enrichment_status == 'failed' %}
+<span class="badge ai-failed">AI failed</span>
+{% if lead.ai_enrichment_error %}<p class="ai-error">{{ lead.ai_enrichment_error }}</p>{% endif %}
+{% elif lead.ai_enrichment_status == 'disabled' %}
+<span class="badge ai-disabled">AI disabled</span>
+{% else %}
+<span class="badge ai-disabled">Not enriched</span>
+{% endif %}
+{% endmacro %}

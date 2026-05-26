@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Backup codes — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Backup codes</h1>
+  <p>Store these codes securely. Each can be used once. They will not be shown again.</p>
+  <ul>
+    {% for code in backup_codes %}
+    <li><code>{{ code }}</code></li>
+    {% endfor %}
+  </ul>
+  <a class="btn" href="{{ url_for('analytics.dashboard') }}">Continue to dashboard</a>
+</div>
+{% endblock %}

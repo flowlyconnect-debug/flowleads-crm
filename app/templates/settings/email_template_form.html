@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{% if template %}Edit{% else %}New{% endif %} email template{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{% if template %}Edit{% else %}New{% endif %} email template</h1>
+  <p style="color:#94a3b8; font-size:0.9rem;">
+    Allowed variables: <code>{{"{{"}}first_name{{"}}"}}</code>,
+    <code>{{"{{"}}last_name{{"}}"}}</code>,
+    <code>{{"{{"}}company{{"}}"}}</code>,
+    <code>{{"{{"}}sender_name{{"}}"}}</code>,
+    <code>{{"{{"}}ai_summary{{"}}"}}</code>
+  </p>
+
+  <form method="post" action="{{ url_for('settings.email_templates_create', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_create') }}">
+    {{ form.hidden_tag() }}
+    <label>{{ form.name.label }}{{ form.name() }}</label>
+    <label>{{ form.subject_template.label }}{{ form.subject_template() }}</label>
+    <label>{{ form.body_html_template.label }}{{ form.body_html_template(rows=12) }}</label>
+    <label>{{ form.body_text_template.label }}{{ form.body_text_template(rows=6) }}</label>
+    {{ form.submit(class_='btn') }}
+    <a class="btn secondary" href="{{ url_for('settings.email_templates_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_list') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

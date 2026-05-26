@@ -1,0 +1,104 @@
+from flask import Flask, redirect, url_for
+from flask_login import current_user
+
+from app.config import get_config
+from app.core.errors import register_error_handlers
+from app.extensions import cache, csrf, db, limiter, login_manager, mail, migrate
+
+
+def create_app(config_object=None):
+    app = Flask(__name__)
+    config = config_object or get_config()
+    app.config.from_object(config)
+
+    if app.config.get("REDIS_URL"):
+        app.config["CACHE_TYPE"] = "RedisCache"
+        app.config["CACHE_REDIS_URL"] = app.config["REDIS_URL"]
+
+    if not app.config.get("SECRET_KEY"):
+        if app.config.get("TESTING"):
+            app.config["SECRET_KEY"] = "test-secret-key"
+        else:
+            raise RuntimeError("SECRET_KEY environment variable is required.")
+
+    if not app.config.get("SQLALCHEMY_DATABASE_URI") and not app.config.get("TESTING"):
+        raise RuntimeError("DATABASE_URL environment variable is required.")
+
+    _init_extensions(app)
+    _register_blueprints(app)
+    register_error_handlers(app)
+    _register_cli(app)
+    _register_root_routes(app)
+    _init_ai_enrichment(app)
+
+    return app
+
+
+def _init_ai_enrichment(app):
+    from app.ai.queue import init_enrichment_queue
+
+    init_enrichment_queue(app)
+
+
+def _init_extensions(app):
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    mail.init_app(app)
+    app.config.setdefault("RATELIMIT_STORAGE_URI", app.config.get("RATELIMIT_STORAGE_URI", "memory://"))
+    limiter.init_app(app)
+    cache.init_app(app)
+
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+    login_manager.login_message_category = "info"
+
+    from app.users.models import User
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
+
+    with app.app_context():
+        from app.api import models as api_models  # noqa: F401
+        from app.auth import models as auth_models  # noqa: F401
+        from app.email import models as email_models  # noqa: F401
+        from app.leads import models as leads_models  # noqa: F401
+        from app.users import models as user_models  # noqa: F401
+
+
+def _register_blueprints(app):
+    from app.admin.routes import admin_bp
+    from app.analytics import analytics_bp
+    from app.api import api_bp
+    from app.auth.routes import auth_bp
+    from app.backups import backups_bp
+    from app.email import email_bp, webhooks_bp
+    from app.leads.routes import leads_bp
+    from app.settings import settings_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(analytics_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(backups_bp, url_prefix="/admin")
+    app.register_blueprint(leads_bp)
+    app.register_blueprint(email_bp)
+    app.register_blueprint(api_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(webhooks_bp)
+    csrf.exempt(api_bp)
+    csrf.exempt(webhooks_bp)
+
+
+def _register_root_routes(app):
+    @app.route("/")
+    def index():
+        if current_user.is_authenticated:
+            return redirect(url_for("analytics.dashboard"))
+        return redirect(url_for("auth.login"))
+
+
+def _register_cli(app):
+    from app.cli import register_cli
+
+    register_cli(app)

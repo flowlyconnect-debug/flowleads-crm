@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Email settings{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Email settings</h1>
+  <p style="color:#94a3b8; font-size:0.9rem;">
+    Make sure this sender is verified in Mailgun before sending.
+  </p>
+
+  <form method="post" action="{{ url_for('settings.email_settings', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_settings') }}">
+    {{ form.hidden_tag() }}
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>{{ form.email_from_name.label }}
+      {{ form.email_from_name(placeholder='Your Company') }}
+    </label>
+    <label>{{ form.email_from_email.label }}
+      {{ form.email_from_email(placeholder='sales@yourdomain.com') }}
+    </label>
+    <label>{{ form.mailgun_domain.label }}
+      {{ form.mailgun_domain(placeholder='mg.yourdomain.com') }}
+    </label>
+  <p style="color:#94a3b8; font-size:0.85rem;">
+    Per-organization Mailgun API keys are not stored until encryption is implemented; the system Mailgun key is used.
+  </p>
+    {{ form.submit(class_='btn') }}
+  </form>
+</div>
+{% endblock %}

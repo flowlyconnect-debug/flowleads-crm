@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sign in — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Sign in</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label>{{ form.email.label }}{{ form.email() }}
+      {% for e in form.email.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+    </label>
+    <label>{{ form.password.label }}{{ form.password() }}
+      {% for e in form.password.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+    </label>
+    {{ form.submit(class="btn") }}
+  </form>
+  <p><a href="{{ url_for('auth.reset_password_request') }}">Forgot password?</a></p>
+</div>
+{% endblock %}

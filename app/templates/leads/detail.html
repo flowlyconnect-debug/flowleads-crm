@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge, ai_status_badge %}
+{% block title %}{{ lead.display_name }} — FlowLeads{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">{{ lead.display_name }}</h1>
+  <a class="btn" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}">Edit</a>
+  <a class="btn" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Back to list</a>
+  {% if can_archive and lead.status != 'archived' %}
+  <form method="post" action="{{ url_for('leads.delete_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.delete_lead', lead_id=lead.id) }}" style="display:inline;" onsubmit="return confirm('Archive this lead?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="_method" value="DELETE">
+    <button type="submit" class="btn secondary">Archive</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Contact</h2>
+    <p><strong>Email:</strong> {{ lead.email or '—' }}</p>
+    <p><strong>Phone:</strong> {{ lead.phone or '—' }}</p>
+    <p><strong>Company:</strong> {{ lead.company or '—' }}</p>
+    <p><strong>Title:</strong> {{ lead.title or '—' }}</p>
+    <p><strong>Website:</strong> {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener">{{ lead.website }}</a>{% else %}—{% endif %}</p>
+    <p><strong>LinkedIn:</strong> {% if lead.linkedin_url %}<a href="{{ lead.linkedin_url }}" target="_blank" rel="noopener">{{ lead.linkedin_url }}</a>{% else %}—{% endif %}</p>
+    <p><strong>Source:</strong> {{ lead.source }}{% if lead.source_ref %} ({{ lead.source_ref }}){% endif %}</p>
+    <p><strong>Score:</strong> {{ score_badge(lead.score) }}</p>
+    {% if lead.score_reason %}<p style="font-size:0.9rem; color:#94a3b8;">{{ lead.score_reason }}</p>{% endif %}
+    <p><strong>Tags:</strong> {{ (lead.tags or [])|join(', ') or '—' }}</p>
+    <p><strong>Notes:</strong> {{ lead.notes or '—' }}</p>
+
+    <h3>Pipeline</h3>
+    <form method="post" action="{{ url_for('leads.move_stage', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=lead.id) }}" id="stage-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="stage_id" onchange="document.getElementById('stage-form').submit()">
+        {% for s in stages %}
+        <option value="{{ s.id }}" {% if s.id == lead.stage_id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <p style="margin-top:1rem;">
+      {% if lead.email %}
+      <a class="btn" href="{{ url_for('email.compose', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.compose', lead_id=lead.id) }}">Send email</a>
+      <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Email history</a>
+      {% else %}
+      <button type="button" class="btn disabled" disabled title="Lead has no email">Send email</button>
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>AI enrichment</h2>
+    <p>{{ ai_status_badge(lead) }}</p>
+
+    {% if lead.ai_summary %}
+    <div class="ai-summary-box">
+      <strong>Summary</strong>
+      <p>{{ lead.ai_summary }}</p>
+    </div>
+    {% endif %}
+
+    {% if lead.ai_company_info or lead.ai_contact_info %}
+    <details class="ai-insights" open>
+      <summary>AI Insights</summary>
+      {% if lead.ai_company_info %}
+      <h3 style="margin-top:1rem; font-size:0.95rem;">Company</h3>
+      <ul style="font-size:0.9rem; padding-left:1.25rem;">
+        {% if lead.ai_company_info.industry %}<li><strong>Industry:</strong> {{ lead.ai_company_info.industry }}</li>{% endif %}
+        {% if lead.ai_company_info.company_size_estimate %}<li><strong>Size:</strong> {{ lead.ai_company_info.company_size_estimate }}</li>{% endif %}
+        {% if lead.ai_company_info.business_model %}<li><strong>Model:</strong> {{ lead.ai_company_info.business_model }}</li>{% endif %}
+        {% if lead.ai_company_info.likely_pain_points %}
+        <li><strong>Pain points:</strong> {{ lead.ai_company_info.likely_pain_points|join(', ') }}</li>
+        {% endif %}
+        {% if lead.ai_company_info.tech_stack_hints %}
+        <li><strong>Tech hints:</strong> {{ lead.ai_company_info.tech_stack_hints|join(', ') }}</li>
+        {% endif %}
+      </ul>
+      {% endif %}
+      {% if lead.ai_contact_info %}
+      <h3 style="margin-top:1rem; font-size:0.95rem;">Contact</h3>
+      <ul style="font-size:0.9rem; padding-left:1.25rem;">
+        {% if lead.ai_contact_info.seniority_level %}<li><strong>Seniority:</strong> {{ lead.ai_contact_info.seniority_level }}</li>{% endif %}
+        <li><strong>Decision maker:</strong> {{ 'Yes' if lead.ai_contact_info.likely_decision_maker else 'No' }}</li>
+        {% if lead.ai_contact_info.best_outreach_angle %}
+        <li><strong>Outreach angle:</strong> {{ lead.ai_contact_info.best_outreach_angle }}</li>
+        {% endif %}
+      </ul>
+      {% endif %}
+    </details>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('leads.enrich_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.enrich_lead', lead_id=lead.id) }}" style="margin-top:1rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn secondary" {% if lead.ai_enrichment_status in ('pending', 'processing') %}disabled{% endif %}>
+        {% if lead.ai_enriched %}Re-enrich{% else %}Enrich with AI{% endif %}
+      </button>
+    </form>
+
+    <h2>Activity</h2>
+    <form method="post" action="{{ url_for('leads.add_note', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.add_note', lead_id=lead.id) }}">
+      {{ note_form.hidden_tag() }}
+      {{ note_form.content(rows=3, placeholder='Quick note…') }}
+      {{ note_form.submit(class_='btn') }}
+    </form>
+    <ul class="timeline">
+      {% for act in activities %}
+      <li>
+        <strong>{{ act.type }}</strong>
+        <span style="color:#94a3b8; font-size:0.85rem;">{{ act.created_at.strftime('%Y-%m-%d %H:%M') if act.created_at else '' }}</span>
+        {% if act.content %}<p>{{ act.content }}</p>{% endif %}
+      </li>
+      {% else %}
+      <li>No activity yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

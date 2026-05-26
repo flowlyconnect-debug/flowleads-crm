@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Restore backup — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Restore backup</h1>
+  <div class="flash danger">
+    <strong>Danger:</strong> Restoring <code>{{ filename }}</code> will overwrite the current database and uploaded files.
+    A safety backup is created automatically before restore begins.
+    This action requires your password and 2FA code.
+  </div>
+
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <label>{{ form.password.label }}
+      {{ form.password() }}
+      {% for e in form.password.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+    </label>
+    <label>{{ form.totp_code.label }}
+      {{ form.totp_code() }}
+      {% for e in form.totp_code.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+    </label>
+    <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+      {{ form.confirm_overwrite() }}
+      {{ form.confirm_overwrite.label.text }}
+    </label>
+    {% for e in form.confirm_overwrite.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+  <button type="submit" style="background: var(--danger); color: #fff;">{{ form.submit.label.text }}</button>
+  <a class="btn secondary" href="{{ url_for('backups.backups_list') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

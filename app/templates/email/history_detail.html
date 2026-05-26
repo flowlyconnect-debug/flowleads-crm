@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ log.subject }} — Email{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">{{ log.subject }}</h1>
+  <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Back to history</a>
+</div>
+
+<div class="card">
+  <p><strong>Status:</strong> <span class="badge">{{ log.status }}</span></p>
+  <p><strong>Sent by:</strong> {{ sender.email if sender else '—' }}</p>
+  <p><strong>Sent at:</strong> {{ log.sent_at or log.created_at }}</p>
+  {% if log.error_message %}
+  <p style="color:#f87171;"><strong>Error:</strong> {{ log.error_message }}</p>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:1rem;">
+  <h2>Content</h2>
+  {% if log.body_html %}
+  <iframe
+    sandbox=""
+    srcdoc="{{ log.body_html|e }}"
+    style="width:100%; min-height:320px; border:1px solid #475569; border-radius:4px; background:#fff;"
+    title="Email content"
+  ></iframe>
+  {% elif log.body_text %}
+  <pre style="white-space:pre-wrap;">{{ log.body_text }}</pre>
+  {% else %}
+  <p>—</p>
+  {% endif %}
+</div>
+{% endblock %}

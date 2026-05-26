@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{% if lead %}Edit lead{% else %}New lead{% endif %} — FlowLeads{% endblock %}
+{% block content %}
+<main class="narrow">
+<div class="card">
+  <h1>{% if lead %}Edit lead{% else %}New lead{% endif %}</h1>
+  <form method="post" action="{% if lead %}{{ url_for('leads.update_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.update_lead', lead_id=lead.id) }}{% else %}{{ url_for('leads.create_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.create_lead') }}{% endif %}">
+    {{ form.hidden_tag() }}
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>{{ form.first_name.label }}{{ form.first_name() }}</label>
+    <label>{{ form.last_name.label }}{{ form.last_name() }}</label>
+    <label>{{ form.email.label }}{{ form.email() }}</label>
+    <label>{{ form.phone.label }}{{ form.phone() }}</label>
+    <label>{{ form.company.label }}{{ form.company() }}</label>
+    <label>{{ form.title.label }}{{ form.title() }}</label>
+    <label>{{ form.website.label }}{{ form.website() }}</label>
+    <label>{{ form.linkedin_url.label }}{{ form.linkedin_url() }}</label>
+    <label>{{ form.stage_id.label }}{{ form.stage_id() }}</label>
+    {% if current_user.role in ('superadmin', 'admin') or not lead %}
+    <label>{{ form.assigned_to.label }}{{ form.assigned_to() }}</label>
+    {% endif %}
+    <label>{{ form.source.label }}{{ form.source() }}</label>
+    <label>{{ form.source_ref.label }}{{ form.source_ref() }}</label>
+    <label>{{ form.score.label }}{{ form.score() }}</label>
+    <label>{{ form.score_reason.label }}{{ form.score_reason() }}</label>
+    <label>{{ form.tags.label }}{{ form.tags() }}</label>
+    <label>{{ form.notes.label }}{{ form.notes(rows=4) }}</label>
+    {% for field, errors in form.errors.items() %}
+      {% for error in errors %}<p class="errors">{{ field }}: {{ error }}</p>{% endfor %}
+    {% endfor %}
+    {{ form.submit(class_='btn') }}
+    <a class="btn secondary" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Cancel</a>
+  </form>
+</div>
+</main>
+{% endblock %}

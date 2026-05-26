@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: flowleads
+      POSTGRES_PASSWORD: flowleads
+      POSTGRES_DB: flowleads
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowleads -d flowleads"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    command: >
+      sh -c "flask db upgrade &&
+             gunicorn run:app --workers 4 --bind 0.0.0.0:8000"
+    env_file:
+      - .env
+    environment:
+      FLASK_APP: run.py
+      FLASK_ENV: ${FLASK_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://flowleads:flowleads@db:5432/flowleads}
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_DIR: ${BACKUP_DIR:-/app/backups}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+    ports:
+      - "8000:8000"
+    volumes:
+      - backup_data:/app/backups
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    command: flask run-scheduler
+    env_file:
+      - .env
+    environment:
+      FLASK_APP: run.py
+      FLASK_ENV: ${FLASK_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://flowleads:flowleads@db:5432/flowleads}
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_DIR: ${BACKUP_DIR:-/app/backups}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+    volumes:
+      - backup_data:/app/backups
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  backup_data:
+  uploads_data:

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Send email — {{ lead.display_name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Send email</h1>
+  <a class="btn secondary" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">Back to lead</a>
+  <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Email history</a>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+  <p><strong>To:</strong> {{ lead.email }}</p>
+  <p><strong>Lead:</strong> {{ lead.display_name }}{% if lead.company %} — {{ lead.company }}{% endif %}</p>
+  {% if ai_summary %}
+  <div class="ai-summary-box">
+    <strong>AI summary (context)</strong>
+    <p>{{ ai_summary }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" action="{{ url_for('email.send', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.send', lead_id=lead.id) }}" id="compose-form">
+  {{ form.hidden_tag() }}
+  <div class="grid-2">
+    <div class="card">
+      <label>Template
+        <select id="template-select" name="template_id">
+          {% for value, label in form.template_id.choices %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Subject
+        {{ form.subject(id='subject-field') }}
+      </label>
+      <label>Body
+        <div id="editor" style="min-height:200px; background:#0f172a; border:1px solid #475569; border-radius:4px;"></div>
+        {{ form.body_html(id='body-html-field') }}
+      </label>
+      <button type="submit" class="btn" id="send-btn" {% if not email_enabled %}disabled title="Email sending is disabled"{% endif %}>Send email</button>
+      {% if not email_enabled %}
+      <p style="color:#f87171; font-size:0.9rem;">Email sending is disabled (EMAIL_SENDING_ENABLED=false).</p>
+      {% endif %}
+    </div>
+    <div class="card">
+      <h2>Preview</h2>
+      <p><strong>Subject:</strong> <span id="preview-subject">{{ preview_subject }}</span></p>
+      <div id="preview-body" class="email-preview-frame" style="background:#fff; color:#111; padding:1rem; border-radius:4px; min-height:120px;">
+        {{ preview_html|safe }}
+      </div>
+    </div>
+  </div>
+</form>
+
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+  const templateData = {
+    {% for t in templates %}
+    {{ t.id }}: {
+      subject: {{ (t.subject_template|tojson) }},
+      body: {{ (t.body_html_template|tojson) }}
+    },
+    {% endfor %}
+  };
+  const leadContext = {
+    first_name: {{ (lead.first_name or 'there')|tojson }},
+    last_name: {{ (lead.last_name or '')|tojson }},
+    company: {{ (lead.company or '')|tojson }},
+    sender_name: {{ sender_name|tojson }},
+    ai_summary: {{ (lead.ai_summary or '')|tojson }}
+  };
+  function renderVars(text) {
+    return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_, key) => {
+      const val = leadContext[key];
+      if (val === undefined || val === null || val === '') {
+        if (key === 'first_name') return 'there';
+        return '';
+      }
+      return val;
+    });
+  }
+  const quill = new Quill('#editor', { theme: 'snow' });
+  {% if preview_html %}
+  quill.root.innerHTML = {{ preview_html|tojson }};
+  {% endif %}
+  function syncBody() {
+    document.getElementById('body-html-field').value = quill.root.innerHTML;
+  }
+  function updatePreview() {
+    syncBody();
+    const subj = document.getElementById('subject-field').value;
+    document.getElementById('preview-subject').textContent = renderVars(subj);
+    document.getElementById('preview-body').innerHTML = renderVars(quill.root.innerHTML);
+  }
+  document.getElementById('template-select').addEventListener('change', function() {
+    const id = parseInt(this.value, 10);
+    if (!id || !templateData[id]) { updatePreview(); return; }
+    const t = templateData[id];
+    document.getElementById('subject-field').value = renderVars(t.subject);
+    quill.root.innerHTML = renderVars(t.body);
+    updatePreview();
+  });
+  document.getElementById('subject-field').addEventListener('input', updatePreview);
+  quill.on('text-change', updatePreview);
+  document.getElementById('compose-form').addEventListener('submit', function() {
+    syncBody();
+  });
+  updatePreview();
+</script>
+{% endblock %}

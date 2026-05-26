@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Set up 2FA — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Two-factor authentication</h1>
+  <p>Scan this QR code with your authenticator app, then enter the verification code.</p>
+  {% if qr_code %}
+  <p><img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR code" width="200" height="200"></p>
+  {% endif %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label>{{ form.token.label }}{{ form.token() }}</label>
+    {{ form.submit(class="btn") }}
+  </form>
+</div>
+{% endblock %}

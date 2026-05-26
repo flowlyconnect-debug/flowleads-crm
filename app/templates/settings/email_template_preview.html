@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Preview — {{ template.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Preview: {{ template.name }}</h1>
+  <p><strong>Subject:</strong> {{ rendered.subject }}</p>
+  <div style="background:#fff; color:#111; padding:1rem; border-radius:4px;">
+    {{ rendered.body_html|safe }}
+  </div>
+  <p style="margin-top:1rem;">
+    <a class="btn secondary" href="{{ url_for('settings.email_templates_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_list') }}">Back</a>
+  </p>
+</div>
+{% endblock %}

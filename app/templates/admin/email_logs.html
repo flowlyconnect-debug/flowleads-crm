@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Email logs — Admin{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="toolbar">
+    <h1 style="margin:0;">Email logs</h1>
+    <form method="post" action="{{ url_for('email.admin_email_test') }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn secondary">Send test email to me</button>
+    </form>
+  </div>
+
+  <form method="get" class="filters" style="margin-bottom:1rem;">
+    <label>Organization
+      <select name="organization_id" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for org in organizations %}
+        <option value="{{ org.id }}" {% if org_filter == org.id %}selected{% endif %}>{{ org.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Subject</th>
+        <th>Status</th>
+        <th>Lead</th>
+        <th>Organization</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.id }}</td>
+        <td>{{ log.subject }}</td>
+        <td><span class="badge">{{ log.status }}</span></td>
+        <td>{{ log.lead_id }}</td>
+        <td>{{ log.organization_id }}</td>
+        <td>{{ log.created_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No email logs.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if pagination.pages > 1 %}
+  <p style="margin-top:1rem;">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('email.admin_email_logs', page=pagination.prev_num, organization_id=org_filter) }}">Previous</a>
+    {% endif %}
+    Page {{ pagination.page }} of {{ pagination.pages }}
+    {% if pagination.has_next %}
+    <a href="{{ url_for('email.admin_email_logs', page=pagination.next_num, organization_id=org_filter) }}">Next</a>
+    {% endif %}
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

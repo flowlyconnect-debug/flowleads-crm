@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Backups — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Backups</h1>
+  <p>Full backups include database dump, email templates, system settings (no secrets), and uploaded files.</p>
+
+  <form method="post" action="{{ url_for('backups.backups_create') }}" style="margin-bottom: 1.5rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Create backup now</button>
+  </form>
+
+  {% if backups %}
+  <table>
+    <thead>
+      <tr>
+        <th>Filename</th>
+        <th>Size</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in backups %}
+      <tr>
+        <td>{{ b.filename }}</td>
+        <td>{{ (b.size / 1024)|round(1) }} KB</td>
+        <td>{{ b.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+        <td>
+          <a class="btn secondary" href="{{ url_for('backups.backups_download', filename=b.filename) }}">Download</a>
+          <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--danger); color: #fff;">Restore</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No backups yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

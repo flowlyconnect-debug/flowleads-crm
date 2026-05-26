@@ -1,0 +1,14 @@
+[run]
+source = app
+omit =
+    app/__init__.py
+    */migrations/*
+    */tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
+# Target 80%+ line coverage; run: pytest --cov=app --cov-report=term-missing
+show_missing = True

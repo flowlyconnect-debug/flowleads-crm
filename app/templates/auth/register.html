@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Register — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Register</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label>{{ form.email.label }}{{ form.email() }}</label>
+    <label>{{ form.password.label }}{{ form.password() }}</label>
+    <label>{{ form.password_confirm.label }}{{ form.password_confirm() }}</label>
+    {{ form.submit(class="btn") }}
+  </form>
+</div>
+{% endblock %}
