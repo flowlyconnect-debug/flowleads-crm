@@ -6,6 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.models import APIKey
 from app.api.schemas import serialize_lead
+from app.custom_fields.services import CustomFieldService, CustomFieldServiceError
 from app.core.audit import log_audit
 from app.core.security import generate_api_key, normalize_email, validate_email
 from app.extensions import db
@@ -203,7 +204,24 @@ def _apply_partial_update(lead: Lead, data: dict) -> bool:
     return changed
 
 
+def _apply_custom_fields_from_payload(
+    lead: Lead, organization_id: int, payload: dict, *, partial: bool = False
+) -> None:
+    custom = payload.get("custom_fields")
+    if not custom:
+        return
+    if not isinstance(custom, dict):
+        raise ApiServiceError("custom_fields must be a JSON object.", "validation_error")
+    try:
+        CustomFieldService.set_values_by_name(
+            lead.id, "lead", custom, organization_id, partial=partial
+        )
+    except CustomFieldServiceError as exc:
+        raise ApiServiceError(exc.message, exc.code) from exc
+
+
 def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
+    raw_payload = payload if isinstance(payload, dict) else {}
     data = validate_api_lead_payload(payload, require_email=True)
     email = data.get("email")
     source = data.get("source", "n8n")
@@ -236,7 +254,10 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
                 content="Updated via API",
             )
             apply_enrichment_on_update(existing, set(data.keys()))
-        return _load_lead(existing.id), "updated"
+        _apply_custom_fields_from_payload(
+            existing, organization_id, raw_payload, partial=True
+        )
+        return _load_lead(existing.id, organization_id), "updated"
 
     stage = get_default_stage(organization_id)
     lead = Lead(
@@ -278,7 +299,10 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
                     dup.id, None, "updated", content="Updated via API"
                 )
                 apply_enrichment_on_update(dup, set(data.keys()))
-            return _load_lead(dup.id), "updated"
+            _apply_custom_fields_from_payload(
+                dup, organization_id, raw_payload, partial=True
+            )
+            return _load_lead(dup.id, organization_id), "updated"
         raise ApiServiceError(
             "A lead with this source and reference already exists.",
             "validation_error",
@@ -292,18 +316,23 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         TaskService.create_auto_tasks(lead, "new_lead")
     except Exception:
         pass
-    return _load_lead(lead.id), "created"
+    _apply_custom_fields_from_payload(lead, organization_id, raw_payload, partial=True)
+    return _load_lead(lead.id, organization_id), "created"
 
 
-def _load_lead(lead_id: int) -> Lead:
-    lead = (
-        Lead.query.options(joinedload(Lead.stage))
-        .filter_by(id=lead_id)
-        .first()
-    )
+def _load_lead(lead_id: int, organization_id: int | None = None) -> Lead:
+    query = Lead.query.options(joinedload(Lead.stage)).filter_by(id=lead_id)
+    if organization_id is not None:
+        query = query.filter_by(organization_id=organization_id)
+    lead = query.first()
     if not lead:
         raise ApiServiceError("Lead not found.", "not_found")
     return lead
+
+
+def _serialize_lead_with_custom_fields(lead: Lead, organization_id: int) -> dict:
+    custom = CustomFieldService.get_values(lead.id, "lead", organization_id)
+    return serialize_lead(lead, custom_fields=custom)
 
 
 def bulk_upsert_leads(organization_id: int, items: list) -> dict:
@@ -402,6 +431,9 @@ def patch_lead(organization_id: int, lead_id: int, payload: dict) -> Lead:
         db.session.flush()
         apply_enrichment_on_update(lead, set(data.keys()))
 
+    if "custom_fields" in payload:
+        _apply_custom_fields_from_payload(lead, organization_id, payload, partial=True)
+
     return lead
 
 
@@ -439,8 +471,10 @@ def list_leads_api(organization_id: int, query_args: dict) -> dict:
             raise ApiServiceError(f"Invalid date format for {param}.", "validation_error")
 
     pagination = LeadService.search(organization_id, filters, page=page, per_page=per_page)
+    lead_ids = [item.id for item in pagination.items]
+    custom_by_lead = CustomFieldService.get_values_bulk(lead_ids, "lead", organization_id)
     leads = [
-        serialize_lead(item)
+        serialize_lead(item, custom_fields=custom_by_lead.get(item.id, {}))
         for item in pagination.items
     ]
     return {

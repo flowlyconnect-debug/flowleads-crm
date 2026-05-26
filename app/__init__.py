@@ -1,7 +1,7 @@
 from flask import Flask, redirect, url_for
 from flask_login import current_user
 
-from app.config import get_config
+from app.config import apply_testing_defaults, get_config
 from app.core.errors import register_error_handlers
 from app.extensions import cache, csrf, db, limiter, login_manager, mail, migrate
 
@@ -10,6 +10,7 @@ def create_app(config_object=None):
     app = Flask(__name__)
     config = config_object or get_config()
     app.config.from_object(config)
+    apply_testing_defaults(app)
 
     if app.config.get("REDIS_URL"):
         app.config["CACHE_TYPE"] = "RedisCache"
@@ -76,6 +77,8 @@ def _init_extensions(app):
         from app.leads import models as leads_models  # noqa: F401
         from app.tasks import models as tasks_models  # noqa: F401
         from app.users import models as user_models  # noqa: F401
+        from app.custom_fields import models as custom_fields_models  # noqa: F401
+        from app.segments import models as segments_models  # noqa: F401
 
 
 def _register_blueprints(app):

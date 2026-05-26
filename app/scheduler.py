@@ -55,6 +55,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("No-contact auto-task job failed")
 
+    def run_segment_count_refresh():
+        with app.app_context():
+            from app.extensions import db
+            from app.segments.services import SegmentService
+
+            try:
+                updated = SegmentService.refresh_counts()
+                db.session.commit()
+                if updated:
+                    logger.info("Refreshed lead_count_cache for %s segment(s)", updated)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Segment count refresh job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -71,6 +85,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_no_contact_auto_tasks,
         CronTrigger(hour=3, minute=0, timezone="UTC"),
         id="no_contact_auto_tasks",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_segment_count_refresh,
+        IntervalTrigger(hours=1),
+        id="segment_count_refresh",
         replace_existing=True,
     )
 
