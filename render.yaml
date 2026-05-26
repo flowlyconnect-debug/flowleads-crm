@@ -1,24 +1,13 @@
-# Render Blueprint — FlowLeads CRM
-# https://render.com/docs/blueprint-spec
-#
-# Deploy: connect this repo in Render and apply the blueprint, or create services manually
-# using the commands in README.md (Deploy on Render).
-
 databases:
   - name: flowleads-db
     plan: free
-    databaseName: flowleads
-    user: flowleads
 
 services:
   - type: web
     name: flowleads-crm
     runtime: python
-    plan: free
     buildCommand: pip install -r requirements.txt
-    releaseCommand: flask db upgrade
     startCommand: gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
-    healthCheckPath: /api/v1/health
     envVars:
       - key: FLASK_APP
         value: run.py
@@ -26,25 +15,10 @@ services:
         value: production
       - key: PYTHON_VERSION
         value: "3.11.9"
-      - key: SECRET_KEY
-        generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: flowleads-db
-          property: connectionString
-      - key: BACKUP_DIR
-        value: ./backups
-      - key: UPLOAD_DIR
-        value: ./uploads
-      - key: EMAIL_SENDING_ENABLED
-        value: "true"
-      - key: PUBLIC_REGISTRATION_ENABLED
-        value: "false"
 
   - type: worker
     name: flowleads-scheduler
     runtime: python
-    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: flask run-scheduler
     envVars:
@@ -54,16 +28,3 @@ services:
         value: production
       - key: PYTHON_VERSION
         value: "3.11.9"
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: flowleads-crm
-          envVarKey: SECRET_KEY
-      - key: DATABASE_URL
-        fromDatabase:
-          name: flowleads-db
-          property: connectionString
-      - key: BACKUP_DIR
-        value: ./backups
-      - key: UPLOAD_DIR
-        value: ./uploads
