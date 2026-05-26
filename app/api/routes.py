@@ -6,6 +6,7 @@ from app.api.schemas import serialize_lead, serialize_stage
 from app.api.services import (
     ApiServiceError,
     bulk_upsert_leads,
+    create_lead_task_api,
     enrich_lead_api,
     get_lead_api,
     list_leads_api,
@@ -130,6 +131,24 @@ def update_lead(lead_id: int):
         return json_error(exc.code, exc.message, status)
 
     return json_success({"lead": serialize_lead(lead)})
+
+
+@api_bp.route("/leads/<int:lead_id>/tasks", methods=["POST"])
+@require_api_key
+@limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
+def create_lead_task(lead_id: int):
+    if not request.is_json:
+        return json_error("validation_error", "JSON body is required.", 400)
+
+    try:
+        task = create_lead_task_api(g.organization_id, lead_id, request.get_json(silent=True))
+        db.session.commit()
+    except ApiServiceError as exc:
+        db.session.rollback()
+        status = 404 if exc.code == "not_found" else 400
+        return json_error(exc.code, exc.message, status)
+
+    return json_success({"task": task}, status=201)
 
 
 @api_bp.route("/leads/<int:lead_id>/enrich", methods=["POST"])

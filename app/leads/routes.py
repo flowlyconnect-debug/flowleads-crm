@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import (
     Blueprint,
@@ -26,6 +26,8 @@ from app.leads.permissions import (
     validate_assignment,
 )
 from app.leads.services import LeadService, LeadServiceError, get_default_stage, get_lead_for_org
+from app.tasks.forms import TaskForm
+from app.tasks.services import TaskService, TaskServiceError
 from app.users.models import User
 
 leads_bp = Blueprint("leads", __name__, url_prefix="/leads")
@@ -220,6 +222,15 @@ def detail(lead_id):
     ).all()
     users = _org_users(organization_id)
     note_form = QuickNoteForm()
+    lead_tasks = TaskService.get_for_lead(lead.id, organization_id)
+    task_form = TaskForm()
+    task_form.assigned_to.choices = [(u.id, u.email) for u in users]
+    if not can_assign_to_others():
+        task_form.assigned_to.data = current_user.id
+    else:
+        task_form.assigned_to.data = lead.assigned_to or current_user.id
+    default_due = datetime.now(timezone.utc) + timedelta(days=1)
+    task_form.due_date.data = default_due.replace(tzinfo=None)
     return render_template(
         "leads/detail.html",
         lead=lead,
@@ -227,6 +238,8 @@ def detail(lead_id):
         stages=stages,
         users=users,
         note_form=note_form,
+        lead_tasks=lead_tasks,
+        task_form=task_form,
         organization_id=organization_id,
         can_archive=can_archive_leads(),
         can_assign_others=can_assign_to_others(),
@@ -426,6 +439,100 @@ def enrich_lead(lead_id):
         url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
         if current_user.is_superadmin()
         else url_for("leads.detail", lead_id=lead_id)
+    )
+
+
+@leads_bp.route("/<int:lead_id>/tasks", methods=["GET"])
+def lead_tasks(lead_id):
+    organization_id = resolve_organization_id()
+    try:
+        get_lead_for_org(lead_id, organization_id)
+    except LeadServiceError:
+        abort(404)
+    tasks = TaskService.get_for_lead(lead_id, organization_id)
+    if request.is_json or wants_json_response():
+        return json_success(
+            {
+                "tasks": [
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "status": t.status,
+                        "type": t.type,
+                        "priority": t.priority,
+                        "due_date": t.due_date.isoformat() if t.due_date else None,
+                        "is_overdue": t.is_overdue,
+                    }
+                    for t in tasks
+                ]
+            }
+        )
+    return redirect(
+        url_for(
+            "leads.detail",
+            lead_id=lead_id,
+            organization_id=organization_id if current_user.is_superadmin() else None,
+        )
+    )
+
+
+@leads_bp.route("/<int:lead_id>/tasks", methods=["POST"])
+def create_lead_task(lead_id):
+    organization_id = resolve_organization_id()
+    try:
+        get_lead_for_org(lead_id, organization_id)
+    except LeadServiceError:
+        abort(404)
+
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        try:
+            task = TaskService.create(
+                payload,
+                organization_id,
+                current_user.id,
+                lead_id=lead_id,
+                actor_role=current_user.role,
+            )
+            db.session.commit()
+            return json_success({"task_id": task.id}, status=201)
+        except TaskServiceError as exc:
+            db.session.rollback()
+            return json_error(exc.code, exc.message, 400)
+
+    form = TaskForm()
+    users = _org_users(organization_id)
+    form.assigned_to.choices = [(u.id, u.email) for u in users]
+    if not form.validate_on_submit():
+        flash("Invalid task data.", "danger")
+        return redirect(
+            url_for(
+                "leads.detail",
+                lead_id=lead_id,
+                organization_id=organization_id if current_user.is_superadmin() else None,
+            )
+        )
+
+    try:
+        TaskService.create(
+            form.to_service_data(),
+            organization_id,
+            current_user.id,
+            lead_id=lead_id,
+            actor_role=current_user.role,
+        )
+        db.session.commit()
+        flash("Task created.", "success")
+    except TaskServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+
+    return redirect(
+        url_for(
+            "leads.detail",
+            lead_id=lead_id,
+            organization_id=organization_id if current_user.is_superadmin() else None,
+        )
     )
 
 

@@ -252,6 +252,14 @@ class LeadService:
         from app.ai.triggers import apply_enrichment_on_create
 
         apply_enrichment_on_create(lead)
+
+        from app.tasks.services import TaskService
+
+        try:
+            TaskService.create_auto_tasks(lead, "new_lead")
+        except Exception:
+            pass
+
         return lead
 
     @staticmethod
@@ -329,6 +337,12 @@ class LeadService:
                         "new_stage_name": new_stage.name,
                     },
                 )
+                from app.tasks.services import TaskService
+
+                try:
+                    TaskService.create_auto_tasks(lead, "stage_change")
+                except Exception:
+                    pass
 
         if "source" in data or "source_ref" in data:
             _check_duplicate_source(
@@ -384,6 +398,14 @@ class LeadService:
             },
         )
         db.session.flush()
+
+        from app.tasks.services import TaskService
+
+        try:
+            TaskService.create_auto_tasks(lead, "stage_change")
+        except Exception:
+            pass
+
         return lead
 
     @staticmethod

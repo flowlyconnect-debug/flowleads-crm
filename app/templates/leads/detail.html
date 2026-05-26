@@ -15,8 +15,14 @@
   {% endif %}
 </div>
 
-<div class="grid-2">
-  <div class="card">
+<div class="tabs">
+  <a href="#contact" class="active" data-tab="contact">Yhteystiedot</a>
+  <a href="#tasks" data-tab="tasks">Tehtävät ({{ lead_tasks|length }})</a>
+  <a href="#activity" data-tab="activity">Aktiviteetti</a>
+</div>
+
+<div class="grid-2" id="lead-main-grid">
+  <div class="card" id="panel-contact">
     <h2>Contact</h2>
     <p><strong>Email:</strong> {{ lead.email or '—' }}</p>
     <p><strong>Phone:</strong> {{ lead.phone or '—' }}</p>
@@ -50,7 +56,7 @@
     </p>
   </div>
 
-  <div class="card">
+  <div class="card" id="panel-ai">
     <h2>AI enrichment</h2>
     <p>{{ ai_status_badge(lead) }}</p>
 
@@ -97,7 +103,46 @@
         {% if lead.ai_enriched %}Re-enrich{% else %}Enrich with AI{% endif %}
       </button>
     </form>
+  </div>
+</div>
 
+<div class="card" id="panel-tasks" style="display:none; margin-top:1rem;">
+    <div class="toolbar" style="margin-bottom:0.5rem;">
+      <h2 style="margin:0;">Tehtävät</h2>
+      <button type="button" class="btn" onclick="document.getElementById('task-modal').classList.add('open')">Lisää tehtävä</button>
+    </div>
+    <ul class="timeline">
+      {% for task in lead_tasks if task.status not in ['completed', 'cancelled'] %}
+      <li class="{% if task.is_overdue %}task-overdue-item{% endif %}">
+        <strong>{{ task.title }}</strong>
+        <span class="badge">{{ task.type }}</span>
+        <span class="badge priority-{{ task.priority }}">{{ task.priority }}</span>
+        <span class="ai-meta">{{ task.due_date.strftime('%Y-%m-%d %H:%M') if task.due_date else '' }}</span>
+        {% if task.status != 'completed' %}
+        <form method="post" action="{{ url_for('tasks.complete_task', task_id=task.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('tasks.complete_task', task_id=task.id) }}" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn secondary" style="margin-top:0.25rem; padding:0.25rem 0.5rem; font-size:0.8rem;">Valmis</button>
+        </form>
+        {% endif %}
+      </li>
+      {% else %}
+      <li>Ei avoimia tehtäviä.</li>
+      {% endfor %}
+    </ul>
+    {% set done_tasks = lead_tasks|selectattr('status', 'equalto', 'completed')|list %}
+    {% if done_tasks %}
+    <details style="margin-top:1rem;">
+      <summary style="cursor:pointer; color:#94a3b8;">Valmiit tehtävät ({{ done_tasks|length }})</summary>
+      <ul class="timeline" style="opacity:0.6;">
+        {% for task in done_tasks %}
+        <li><s>{{ task.title }}</s> <span class="ai-meta">{{ task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '' }}</span></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+</div>
+
+<div class="card" id="panel-activity" style="display:none; margin-top:1rem;">
     <h2>Activity</h2>
     <form method="post" action="{{ url_for('leads.add_note', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.add_note', lead_id=lead.id) }}">
       {{ note_form.hidden_tag() }}
@@ -115,6 +160,62 @@
       <li>No activity yet.</li>
       {% endfor %}
     </ul>
+</div>
+
+<div class="modal-backdrop" id="task-modal">
+  <div class="modal">
+    <h2 style="margin-top:0;">Uusi tehtävä</h2>
+    <form method="post" action="{{ url_for('leads.create_lead_task', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.create_lead_task', lead_id=lead.id) }}">
+      {{ task_form.hidden_tag() }}
+      <label>{{ task_form.title.label }}{{ task_form.title() }}</label>
+      <label>{{ task_form.type.label }}{{ task_form.type() }}</label>
+      <label>{{ task_form.priority.label }}{{ task_form.priority() }}</label>
+      <label>{{ task_form.due_date.label }}{{ task_form.due_date() }}</label>
+      {% if can_assign_others %}
+      <label>{{ task_form.assigned_to.label }}{{ task_form.assigned_to() }}</label>
+      {% endif %}
+      <label>{{ task_form.enable_reminder() }} {{ task_form.enable_reminder.label.text }}</label>
+      <label>{{ task_form.reminder_at.label }}{{ task_form.reminder_at() }}</label>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="btn">Tallenna</button>
+        <button type="button" class="btn secondary" onclick="document.getElementById('task-modal').classList.remove('open')">Peruuta</button>
+      </div>
+    </form>
   </div>
 </div>
+
+<style>
+  .task-overdue-item { border-left: 3px solid var(--danger); padding-left: 0.5rem; }
+  .priority-urgent { background: #7f1d1d; color: #fecaca; }
+  .priority-high { background: #713f12; color: #fde68a; }
+</style>
+<script>
+document.querySelectorAll('.tabs a').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.tabs a').forEach(a => a.classList.remove('active'));
+    link.classList.add('active');
+    const tab = link.dataset.tab;
+    const mainGrid = document.getElementById('lead-main-grid');
+    const tasks = document.getElementById('panel-tasks');
+    const activity = document.getElementById('panel-activity');
+    if (tab === 'contact') {
+      mainGrid.style.display = '';
+      tasks.style.display = 'none';
+      activity.style.display = 'none';
+    } else if (tab === 'tasks') {
+      mainGrid.style.display = 'none';
+      tasks.style.display = '';
+      activity.style.display = 'none';
+    } else {
+      mainGrid.style.display = 'none';
+      tasks.style.display = 'none';
+      activity.style.display = '';
+    }
+  });
+});
+document.getElementById('task-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'task-modal') e.target.classList.remove('open');
+});
+</script>
 {% endblock %}

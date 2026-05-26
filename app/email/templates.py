@@ -10,6 +10,11 @@ FALLBACKS = {
     "last_name": "",
     "company": "",
     "ai_summary": "",
+    "task_title": "",
+    "due_date": "",
+    "lead_name": "",
+    "lead_company": "",
+    "assignee_name": "",
 }
 
 
@@ -35,6 +40,25 @@ def build_template_context(lead, sender_name: str) -> dict[str, str]:
         "company": (lead.company or "").strip(),
         "sender_name": sender_name or "",
         "ai_summary": (lead.ai_summary or "").strip(),
+    }
+
+
+def build_task_reminder_context(task) -> dict[str, str]:
+    lead = task.lead
+    assignee = task.assignee
+    due = task.due_date
+    due_str = due.strftime("%Y-%m-%d %H:%M") if due else ""
+    return {
+        "task_title": (task.title or "").strip(),
+        "due_date": due_str,
+        "lead_name": lead.display_name if lead else "",
+        "lead_company": (lead.company or "").strip() if lead else "",
+        "assignee_name": (assignee.email.split("@")[0] if assignee and assignee.email else ""),
+        "first_name": (assignee.email.split("@")[0] if assignee and assignee.email else "there"),
+        "last_name": "",
+        "company": (lead.company or "").strip() if lead else "",
+        "sender_name": "FlowLeads",
+        "ai_summary": "",
     }
 
 

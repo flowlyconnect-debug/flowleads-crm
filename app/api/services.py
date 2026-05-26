@@ -286,6 +286,12 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
 
     LeadService.log_activity(lead.id, None, "created", content="Created via API")
     apply_enrichment_on_create(lead)
+    from app.tasks.services import TaskService
+
+    try:
+        TaskService.create_auto_tasks(lead, "new_lead")
+    except Exception:
+        pass
     return _load_lead(lead.id), "created"
 
 
@@ -483,6 +489,45 @@ def get_lead_api(organization_id: int, lead_id: int) -> Lead:
         return get_lead_for_org(lead_id, organization_id)
     except LeadServiceError:
         raise ApiServiceError("Lead not found.", "not_found") from None
+
+
+def create_lead_task_api(organization_id: int, lead_id: int, payload: dict) -> dict:
+    from app.tasks.services import TaskService, TaskServiceError
+
+    if not isinstance(payload, dict):
+        raise ApiServiceError("Request body must be a JSON object.", "validation_error")
+
+    try:
+        get_lead_for_org(lead_id, organization_id)
+    except LeadServiceError:
+        raise ApiServiceError("Lead not found.", "not_found") from None
+
+    data = dict(payload)
+    if "due_date" not in data:
+        raise ApiServiceError("due_date is required.", "validation_error")
+    if not (data.get("title") or "").strip():
+        data["title"] = "Follow up"
+
+    try:
+        task = TaskService.create(
+            data,
+            organization_id,
+            None,
+            lead_id=lead_id,
+        )
+    except TaskServiceError as exc:
+        raise ApiServiceError(exc.message, exc.code) from None
+
+    return {
+        "id": task.id,
+        "title": task.title,
+        "type": task.type,
+        "status": task.status,
+        "priority": task.priority,
+        "due_date": task.due_date.isoformat() if task.due_date else None,
+        "lead_id": task.lead_id,
+        "assigned_to": task.assigned_to,
+    }
 
 
 def list_pipeline_stages(organization_id: int) -> list[PipelineStage]:

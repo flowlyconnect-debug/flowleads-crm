@@ -142,5 +142,5 @@ def register_cli(app):
         """Run APScheduler for scheduled backups (blocking)."""
         from app.backups.scheduler import run_scheduler
 
-        click.echo("Starting scheduler (Ctrl+C to stop)...")
+        click.echo("Starting scheduler (backups, reminders every 15m, auto-tasks)...")
         run_scheduler(current_app._get_current_object())

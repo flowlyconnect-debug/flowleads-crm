@@ -30,8 +30,18 @@ def create_app(config_object=None):
     _register_cli(app)
     _register_root_routes(app)
     _init_ai_enrichment(app)
+    _init_scheduler(app)
 
     return app
+
+
+def _init_scheduler(app):
+    """Bind scheduler jobs to this app (executed via `flask run-scheduler`)."""
+    if app.config.get("TESTING"):
+        return
+    from app.scheduler import configure_scheduler_app
+
+    configure_scheduler_app(app)
 
 
 def _init_ai_enrichment(app):
@@ -64,6 +74,7 @@ def _init_extensions(app):
         from app.auth import models as auth_models  # noqa: F401
         from app.email import models as email_models  # noqa: F401
         from app.leads import models as leads_models  # noqa: F401
+        from app.tasks import models as tasks_models  # noqa: F401
         from app.users import models as user_models  # noqa: F401
 
 
@@ -76,12 +87,14 @@ def _register_blueprints(app):
     from app.email import email_bp, webhooks_bp
     from app.leads.routes import leads_bp
     from app.settings import settings_bp
+    from app.tasks import tasks_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(backups_bp, url_prefix="/admin")
     app.register_blueprint(leads_bp)
+    app.register_blueprint(tasks_bp)
     app.register_blueprint(email_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(settings_bp)

@@ -24,7 +24,18 @@ EMAIL_LOG_STATUSES = (
 )
 
 ALLOWED_TEMPLATE_VARIABLES = frozenset(
-    {"first_name", "last_name", "company", "sender_name", "ai_summary"}
+    {
+        "first_name",
+        "last_name",
+        "company",
+        "sender_name",
+        "ai_summary",
+        "task_title",
+        "due_date",
+        "lead_name",
+        "lead_company",
+        "assignee_name",
+    }
 )
 
 

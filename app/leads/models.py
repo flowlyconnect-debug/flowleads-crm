@@ -30,6 +30,9 @@ ACTIVITY_TYPES = (
     "updated",
     "archived",
     "assigned",
+    "task_created",
+    "task_completed",
+    "task_reminder_sent",
 )
 
 DEFAULT_PIPELINE_STAGES = [

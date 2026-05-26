@@ -49,6 +49,34 @@ SYSTEM_TEMPLATES = [
         ),
         "variables": ["first_name", "company", "sender_name"],
     },
+    {
+        "name": "task_reminder",
+        "subject_template": "Muistutus: {{task_title}} — {{lead_company}}",
+        "body_html_template": (
+            "<p>Hei {{assignee_name}},</p>"
+            "<p>Muistutus tehtävästä: <strong>{{task_title}}</strong></p>"
+            "<p>Eräpäivä: {{due_date}}</p>"
+            "<p>Liidi: {{lead_name}} ({{lead_company}})</p>"
+            "<p>— FlowLeads</p>"
+        ),
+        "body_text_template": (
+            "Hei {{assignee_name}},\n\n"
+            "Muistutus tehtävästä: {{task_title}}\n"
+            "Eräpäivä: {{due_date}}\n"
+            "Liidi: {{lead_name}} ({{lead_company}})\n\n"
+            "— FlowLeads"
+        ),
+        "variables": sorted(
+            {
+                "task_title",
+                "due_date",
+                "lead_name",
+                "lead_company",
+                "assignee_name",
+                "first_name",
+            }
+        ),
+    },
 ]
 
 

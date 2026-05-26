@@ -32,6 +32,16 @@
 
 <div class="filters" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-bottom: 1.5rem;">
   <div class="card" style="padding:1rem;">
+    <strong>Tehtäväsi tänään</strong>
+    <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ tasks_today_count }}</p>
+    <a href="{{ url_for('tasks.list_tasks', tab='today', organization_id=organization_id) if current_user.is_superadmin() else url_for('tasks.list_tasks', tab='today') }}" style="font-size:0.85rem;">Näytä tehtävät</a>
+  </div>
+  <div class="card" style="padding:1rem; border: 1px solid #7f1d1d;">
+    <strong style="color:#fecaca;">Myöhässä</strong>
+    <p style="font-size:1.75rem;margin:0.5rem 0 0; color:#f87171;">{{ tasks_overdue_count }}</p>
+    <a href="{{ url_for('tasks.list_tasks', tab='overdue', organization_id=organization_id) if current_user.is_superadmin() else url_for('tasks.list_tasks', tab='overdue') }}" style="font-size:0.85rem;">Näytä myöhässä olevat</a>
+  </div>
+  <div class="card" style="padding:1rem;">
     <strong>Total leads</strong>
     <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ stats.total_leads }}</p>
   </div>
@@ -83,7 +93,25 @@
   </div>
 </div>
 
-<div class="card" style="margin-top:1.5rem;">
+<div class="grid-2" style="margin-top:1.5rem;">
+  <div class="card">
+    <h2>Viimeisimmät tehtävät</h2>
+    {% if recent_tasks %}
+    <ul class="timeline">
+      {% for task in recent_tasks %}
+      <li>
+        <strong>{{ task.title }}</strong>
+        <span class="badge">{{ task.status }}</span>
+        {% if task.lead %}<span class="ai-meta">— {{ task.lead.display_name }}</span>{% endif %}
+        <span class="ai-meta">{{ task.due_date.strftime('%Y-%m-%d %H:%M') if task.due_date else '' }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="ai-meta">Ei tehtäviä.</p>
+    {% endif %}
+  </div>
+  <div class="card">
   <h2>Recent activity</h2>
   {% if activity_feed %}
   <ul class="timeline">
@@ -100,6 +128,7 @@
   {% else %}
   <p class="ai-meta">No recent activity.</p>
   {% endif %}
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
