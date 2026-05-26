@@ -15,16 +15,3 @@ services:
         value: production
       - key: PYTHON_VERSION
         value: "3.11.9"
-
-  - type: worker
-    name: flowleads-scheduler
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: flask run-scheduler
-    envVars:
-      - key: FLASK_APP
-        value: run.py
-      - key: FLASK_ENV
-        value: production
-      - key: PYTHON_VERSION
-        value: "3.11.9"
