@@ -1,6 +1,14 @@
 import os
 
 
+def _env_or_default(key: str, default: str) -> str:
+    """Treat unset or blank env vars as missing (Docker .env often has KEY=)."""
+    value = os.environ.get(key)
+    if value is None or not str(value).strip():
+        return default
+    return str(value).strip()
+
+
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
@@ -80,14 +88,44 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
     SESSION_PROTECTION = None
     LOGIN_RATE_LIMIT = "1000/minute"
-    API_RATE_LIMIT = os.environ.get("TEST_API_RATE_LIMIT", "1000/hour")
-    SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL", "sqlite://")
-    AI_ENRICHMENT_ENABLED = os.environ.get("AI_ENRICHMENT_ENABLED", "false").lower() == "true"
-    AI_AUTO_ENRICH_ON_CREATE = os.environ.get("AI_AUTO_ENRICH_ON_CREATE", "false").lower() == "true"
-    EMAIL_SENDING_ENABLED = os.environ.get("EMAIL_SENDING_ENABLED", "true").lower() == "true"
-    MAILGUN_FROM_EMAIL = os.environ.get("MAILGUN_FROM_EMAIL", "test@example.com")
-    MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "test-key")
-    MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "example.com")
+    API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
+    SQLALCHEMY_DATABASE_URI = _env_or_default("TEST_DATABASE_URL", "sqlite://")
+    AI_ENRICHMENT_ENABLED = _env_or_default("AI_ENRICHMENT_ENABLED", "false").lower() == "true"
+    AI_AUTO_ENRICH_ON_CREATE = _env_or_default("AI_AUTO_ENRICH_ON_CREATE", "false").lower() == "true"
+    EMAIL_SENDING_ENABLED = _env_or_default("EMAIL_SENDING_ENABLED", "true").lower() == "true"
+    MAILGUN_FROM_EMAIL = _env_or_default("MAILGUN_FROM_EMAIL", "test@example.com")
+    MAILGUN_FROM_NAME = _env_or_default("MAILGUN_FROM_NAME", "FlowLeads Test")
+    MAILGUN_API_KEY = _env_or_default("MAILGUN_API_KEY", "test-key")
+    MAILGUN_DOMAIN = _env_or_default("MAILGUN_DOMAIN", "example.com")
+    MAILGUN_WEBHOOK_SIGNING_KEY = _env_or_default("MAILGUN_WEBHOOK_SIGNING_KEY", "test-webhook-key")
+    MAIL_USERNAME = MAILGUN_FROM_EMAIL
+    MAIL_PASSWORD = MAILGUN_API_KEY
+    MAIL_DEFAULT_SENDER = (MAILGUN_FROM_NAME, MAILGUN_FROM_EMAIL)
+
+
+TESTING_EMAIL_DEFAULTS = {
+    "MAILGUN_FROM_EMAIL": "test@example.com",
+    "MAILGUN_FROM_NAME": "FlowLeads Test",
+    "MAILGUN_API_KEY": "test-key",
+    "MAILGUN_DOMAIN": "example.com",
+    "MAILGUN_WEBHOOK_SIGNING_KEY": "test-webhook-key",
+}
+
+
+def apply_testing_defaults(app) -> None:
+    """Ensure blank .env Mailgun values do not break pytest (incl. Docker)."""
+    if not app.config.get("TESTING"):
+        return
+    for key, default in TESTING_EMAIL_DEFAULTS.items():
+        value = app.config.get(key)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            app.config[key] = default
+    app.config["MAIL_USERNAME"] = app.config["MAILGUN_FROM_EMAIL"]
+    app.config["MAIL_PASSWORD"] = app.config["MAILGUN_API_KEY"]
+    app.config["MAIL_DEFAULT_SENDER"] = (
+        app.config.get("MAILGUN_FROM_NAME") or "FlowLeads Test",
+        app.config["MAILGUN_FROM_EMAIL"],
+    )
 
 
 config_by_name = {

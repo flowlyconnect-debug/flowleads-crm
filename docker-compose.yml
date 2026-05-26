@@ -39,6 +39,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - .:/app
       - backup_data:/app/backups
       - uploads_data:/app/uploads
     depends_on:
@@ -61,6 +62,7 @@ services:
       BACKUP_DIR: ${BACKUP_DIR:-/app/backups}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
     volumes:
+      - .:/app
       - backup_data:/app/backups
       - uploads_data:/app/uploads
     depends_on:

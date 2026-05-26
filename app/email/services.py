@@ -86,8 +86,11 @@ def _resolve_sender(organization: Organization) -> tuple[str, str]:
     if from_email and validate_email(from_email):
         name = from_name or current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
         return name, from_email
-    default_email = current_app.config.get("MAILGUN_FROM_EMAIL") or ""
+    default_email = (current_app.config.get("MAILGUN_FROM_EMAIL") or "").strip()
     default_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+    if not default_email and current_app.config.get("TESTING"):
+        default_email = "test@example.com"
+        default_name = default_name or "FlowLeads Test"
     return default_name, default_email
 
 
