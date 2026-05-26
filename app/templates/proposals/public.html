@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarjous {{ proposal_data.reference_number }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1rem; }
+    .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid #334155; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+    .meta { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.5rem; border-bottom: 1px solid #334155; text-align: left; }
+    th { color: #94a3b8; font-size: 0.8rem; }
+    td.num { text-align: right; }
+    .totals { text-align: right; margin-top: 1rem; }
+    .totals .grand { font-size: 1.35rem; color: #22c55e; margin-top: 0.5rem; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+    .btn { padding: 0.65rem 1.25rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+    .btn-primary { background: #22c55e; color: #052e16; font-weight: 600; }
+    .btn-danger { background: #7f1d1d; color: #fecaca; }
+    .btn-secondary { background: #334155; color: #e2e8f0; text-decoration: none; display: inline-block; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 10; }
+    .modal.open { display: flex; }
+    .modal-box { background: #1e293b; padding: 1.5rem; border-radius: 12px; max-width: 400px; width: 90%; }
+    .flash { padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; }
+    .flash.success { background: #14532d; }
+    .flash.danger { background: #7f1d1d; }
+    .flash.info { background: #1e3a5f; }
+    .expired { text-align: center; padding: 3rem; }
+    input, textarea { width: 100%; padding: 0.5rem; margin: 0.5rem 0 1rem; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; }
+    label { font-size: 0.85rem; color: #94a3b8; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="flash {{ category }}">{{ message }}</div>
+  {% endfor %}
+  {% endwith %}
+
+  {% if expired %}
+  <div class="card expired">
+    <h1>Tarjous on vanhentunut</h1>
+    <p>Viite: {{ proposal_data.reference_number }}</p>
+  </div>
+  {% else %}
+  <div class="card">
+    <h1>{{ proposal_data.title }}</h1>
+    <p class="meta">
+      {{ proposal_data.reference_number }}<br>
+      {% if proposal_data.lead_company %}{{ proposal_data.lead_company }} — {% endif %}
+      {{ proposal_data.lead_name }}<br>
+      Voimassa: {{ proposal_data.valid_until or '—' }}
+    </p>
+    <table>
+      <thead>
+        <tr><th>Kuvaus</th><th class="num">Määrä</th><th class="num">Hinta</th><th class="num">Yhteensä</th></tr>
+      </thead>
+      <tbody>
+        {% for li in proposal_data.line_items %}
+        <tr>
+          <td>{{ li.description }}</td>
+          <td class="num">{{ li.quantity }}</td>
+          <td class="num">{{ li.unit_price }}</td>
+          <td class="num">{{ li.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="totals">
+      <p>Välisumma: {{ proposal_data.subtotal }} {{ proposal_data.currency }}</p>
+      {% if proposal_data.discount_amount != '0.00' %}
+      <p>Alennus: {{ proposal_data.discount_amount }} {{ proposal_data.currency }}</p>
+      {% endif %}
+      <p>ALV {{ proposal_data.tax_percent }}%</p>
+      <p class="grand">Yhteensä: {{ proposal_data.total }} {{ proposal_data.currency }}</p>
+    </div>
+    {% if proposal_data.notes %}
+    <div style="margin-top:1.5rem;padding:1rem;background:#0f172a;border-radius:8px;">
+      <strong>Huomautukset</strong>
+      <p>{{ proposal_data.notes }}</p>
+    </div>
+    {% endif %}
+    {% if proposal_data.signature_name %}
+    <p style="margin-top:1rem;color:#22c55e;">Hyväksytty: {{ proposal_data.signature_name }} ({{ proposal_data.accepted_at }})</p>
+    {% endif %}
+  </div>
+
+  {% if not readonly and proposal_data.status not in ('accepted', 'declined', 'expired') %}
+  <div class="actions">
+    <button type="button" class="btn btn-primary" id="open-accept">Hyväksy tarjous</button>
+    <button type="button" class="btn btn-danger" id="open-decline">Hylkää</button>
+    <a class="btn btn-secondary" href="{{ url_for('proposals_public.public_pdf', view_token=view_token) }}" target="_blank">Lataa PDF</a>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="modal" id="accept-modal">
+  <div class="modal-box">
+    <h2>Hyväksy tarjous</h2>
+    <form method="post" action="{{ url_for('proposals_public.accept_proposal', view_token=view_token) }}">
+      {{ accept_form.hidden_tag() }}
+      <label>Allekirjoituksen nimi (koko nimi)</label>
+      {{ accept_form.signature_name() }}
+      <p style="font-size:0.85rem;color:#94a3b8;">Hyväksymällä vahvistat tarjouksen ehdot.</p>
+      <button type="submit" class="btn btn-primary">Vahvista hyväksyntä</button>
+      <button type="button" class="btn btn-secondary modal-close">Peruuta</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="decline-modal">
+  <div class="modal-box">
+    <h2>Hylkää tarjous</h2>
+    <form method="post" action="{{ url_for('proposals_public.decline_proposal', view_token=view_token) }}">
+      {{ decline_form.hidden_tag() }}
+      <label>Syy (valinnainen)</label>
+      {{ decline_form.reason(rows=3) }}
+      <button type="submit" class="btn btn-danger">Hylkää</button>
+      <button type="button" class="btn btn-secondary modal-close">Peruuta</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('open-accept')?.addEventListener('click', () => document.getElementById('accept-modal').classList.add('open'));
+document.getElementById('open-decline')?.addEventListener('click', () => document.getElementById('decline-modal').classList.add('open'));
+document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
+}));
+</script>
+</body>
+</html>

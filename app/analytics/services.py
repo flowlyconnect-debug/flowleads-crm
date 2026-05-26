@@ -245,8 +245,15 @@ class AnalyticsService:
             for uid, cnt in team_rows
         ]
 
+        from app.proposals.services import ProposalService
+
+        open_proposals_count = ProposalService.get_open_count(organization_id)
+        accepted_proposals_month = ProposalService.get_accepted_this_month_total(organization_id)
+
         return {
             "total_leads": total_leads,
+            "open_proposals_count": open_proposals_count,
+            "accepted_proposals_month": str(accepted_proposals_month),
             "leads_this_month": leads_this_month,
             "leads_last_month": leads_last_month,
             "leads_month_pct_change": pct_change(leads_this_month, leads_last_month),

@@ -21,6 +21,7 @@
   <a href="#tasks" data-tab="tasks">Tehtävät ({{ lead_tasks|length }})</a>
   <a href="#sequences" data-tab="sequences">Sekvenssit ({{ sequence_enrollments|selectattr('enrollment.status', 'equalto', 'active')|list|length }})</a>
   <a href="#meetings" data-tab="meetings">Tapaamiset ({{ lead_meetings_upcoming|length }})</a>
+  <a href="#proposals" data-tab="proposals">Tarjoukset ({{ lead_proposals|length }})</a>
   <a href="#activity" data-tab="activity">Aktiviteetti</a>
   <a href="#privacy" data-tab="privacy">Tietosuoja</a>
 </div>
@@ -271,6 +272,38 @@
   {% endif %}
 </div>
 
+<div class="card" id="panel-proposals" style="display:none; margin-top:1rem;">
+  <div class="toolbar" style="margin-bottom:0.5rem;">
+    <h2 style="margin:0;">Tarjoukset</h2>
+    <form method="post" action="{{ url_for('proposals.create_proposal', **org_query) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="lead_id" value="{{ lead.id }}">
+      <input type="hidden" name="title" value="Tarjous — {{ lead.company or lead.display_name }}">
+      <input type="hidden" name="line_items" value='[{"description":"Palvelu","quantity":1,"unit_price":0,"discount_percent":0}]'>
+      <button type="submit" class="btn">Luo tarjous</button>
+    </form>
+  </div>
+  <p><strong>Hyväksytty yhteensä:</strong> {{ lead_proposals_accepted_total }} EUR</p>
+  <table class="data-table">
+    <thead>
+      <tr><th>Viite</th><th>Otsikko</th><th>Status</th><th>Summa</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for p in lead_proposals %}
+      <tr>
+        <td>{{ p.reference_number }}</td>
+        <td>{{ p.title }}</td>
+        <td><span class="badge">{{ p.status }}</span></td>
+        <td>{{ p.total }} {{ p.currency }}</td>
+        <td><a href="{{ url_for('proposals.edit_proposal', proposal_id=p.id, **org_query) }}">Avaa</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">Ei tarjouksia.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <div class="card" id="panel-activity" style="display:none; margin-top:1rem;">
     <h2>Activity</h2>
     <form method="post" action="{{ url_for('leads.add_note', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.add_note', lead_id=lead.id) }}">
@@ -355,6 +388,7 @@ document.querySelectorAll('.tabs a').forEach(link => {
     const tasks = document.getElementById('panel-tasks');
     const sequences = document.getElementById('panel-sequences');
     const meetings = document.getElementById('panel-meetings');
+    const proposals = document.getElementById('panel-proposals');
     const activity = document.getElementById('panel-activity');
     const contact = document.getElementById('panel-contact');
     const ai = document.getElementById('panel-ai');
@@ -367,6 +401,7 @@ document.querySelectorAll('.tabs a').forEach(link => {
     tasks.style.display = tab === 'tasks' ? '' : 'none';
     sequences.style.display = tab === 'sequences' ? '' : 'none';
     if (meetings) meetings.style.display = tab === 'meetings' ? '' : 'none';
+    if (proposals) proposals.style.display = tab === 'proposals' ? '' : 'none';
     activity.style.display = tab === 'activity' ? '' : 'none';
   });
 });

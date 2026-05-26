@@ -84,6 +84,7 @@ def _init_extensions(app):
         from app.notifications import models as notifications_models  # noqa: F401
         from app.gdpr import models as gdpr_models  # noqa: F401
         from app.calendar import models as calendar_models  # noqa: F401
+        from app.proposals import models as proposals_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -100,6 +101,7 @@ def _register_blueprints(app):
     from app.automations import automations_bp
     from app.notifications import notifications_bp
     from app.calendar.routes import calendar_bp
+    from app.proposals import proposals_bp, proposals_public_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -114,10 +116,13 @@ def _register_blueprints(app):
     app.register_blueprint(automations_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(calendar_bp)
+    app.register_blueprint(proposals_bp)
+    app.register_blueprint(proposals_public_bp)
     app.register_blueprint(webhooks_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)
+    csrf.exempt(proposals_public_bp)
 
 
 def _register_root_routes(app):

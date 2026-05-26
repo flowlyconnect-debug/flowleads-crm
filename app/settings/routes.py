@@ -97,3 +97,7 @@ register_settings_gdpr_routes(settings_bp)
 from app.calendar.settings_routes import register_calendar_settings_routes  # noqa: E402
 
 register_calendar_settings_routes(settings_bp)
+
+from app.proposals.routes import register_proposal_settings_routes  # noqa: E402
+
+register_proposal_settings_routes(settings_bp)

@@ -68,6 +68,15 @@
     <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ stats.ai_enrichments_completed }}</p>
     <span class="badge">This month: {{ stats.ai_enrichments_completed_month }}</span>
   </div>
+  <div class="card" style="padding:1rem;">
+    <strong>Avoimet tarjoukset</strong>
+    <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ open_proposals_count }}</p>
+    <a href="{{ url_for('proposals.list_proposals', status='sent', organization_id=organization_id) if current_user.is_superadmin() else url_for('proposals.list_proposals', status='sent') }}" style="font-size:0.85rem;">Näytä tarjoukset</a>
+  </div>
+  <div class="card" style="padding:1rem;">
+    <strong>Hyväksytty tällä kuulla</strong>
+    <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ accepted_proposals_month }} EUR</p>
+  </div>
 </div>
 
 <div class="grid-2">

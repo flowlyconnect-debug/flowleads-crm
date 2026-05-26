@@ -155,6 +155,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("Calendar hourly sync job failed")
 
+    def run_proposal_expiry():
+        with app.app_context():
+            from app.extensions import db
+            from app.proposals.services import ProposalService
+
+            try:
+                count = ProposalService.expire_old_proposals()
+                db.session.commit()
+                if count:
+                    logger.info("Expired %s proposal(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Proposal expiry job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -219,6 +233,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_calendar_sync,
         IntervalTrigger(hours=1),
         id="calendar_sync",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_proposal_expiry,
+        CronTrigger(hour=1, minute=30, timezone="UTC"),
+        id="proposal_expiry",
         replace_existing=True,
     )
 

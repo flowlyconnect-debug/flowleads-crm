@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Tarjousasetukset — FlowLeads{% endblock %}
+{% block content %}
+<h1>Tarjousasetukset</h1>
+<form method="post" class="card" style="max-width:640px;">
+  {{ form.hidden_tag() }}
+  <h2>Organisaatio</h2>
+  <p>{{ form.proposal_move_lead_to_won_on_accept() }} {{ form.proposal_move_lead_to_won_on_accept.label }}</p>
+  <p><label>{{ form.proposal_default_valid_days.label }}</label>{{ form.proposal_default_valid_days() }}</p>
+  <p><label>{{ form.proposal_default_tax_percent.label }}</label>{{ form.proposal_default_tax_percent() }}</p>
+  <p><label>{{ form.proposal_default_notes.label }}</label>{{ form.proposal_default_notes(rows=3) }}</p>
+  <h2>PDF-malli</h2>
+  <p><label>{{ form.header_html.label }}</label>{{ form.header_html(rows=3) }}</p>
+  <p><label>{{ form.footer_html.label }}</label>{{ form.footer_html(rows=3) }}</p>
+  <p>{{ form.submit(class_="btn") }}</p>
+</form>
+{% endblock %}

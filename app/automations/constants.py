@@ -7,6 +7,10 @@ TRIGGER_TYPES = (
     "task_overdue",
     "email_opened",
     "sequence_completed",
+    "proposal_viewed",
+    "proposal_accepted",
+    "proposal_declined",
+    "proposal_expired",
 )
 
 ACTION_TYPES = (
@@ -32,6 +36,10 @@ TRIGGER_LABELS_FI = {
     "task_overdue": "Tehtävä myöhässä",
     "email_opened": "Sähköposti avattu",
     "sequence_completed": "Sekvenssi valmis",
+    "proposal_viewed": "Tarjous avattu",
+    "proposal_accepted": "Tarjous hyväksytty",
+    "proposal_declined": "Tarjous hylätty",
+    "proposal_expired": "Tarjous vanhentunut",
 }
 
 TRIGGER_DESCRIPTIONS_FI = {
@@ -43,6 +51,10 @@ TRIGGER_DESCRIPTIONS_FI = {
     "task_overdue": "Kun tehtävä on myöhässä määritellyn ajan.",
     "email_opened": "Kun liidi avaa lähetetyn sähköpostin.",
     "sequence_completed": "Kun liidi suorittaa sähköpostisekvenssin.",
+    "proposal_viewed": "Kun asiakas avaa lähetetyn tarjouksen ensimmäisen kerran.",
+    "proposal_accepted": "Kun asiakas hyväksyy tarjouksen.",
+    "proposal_declined": "Kun asiakas hylkää tarjouksen.",
+    "proposal_expired": "Kun tarjouksen voimassaolo päättyy.",
 }
 
 ACTION_LABELS_FI = {

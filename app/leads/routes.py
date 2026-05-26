@@ -261,6 +261,9 @@ def detail(lead_id):
         current_user.id, organization_id
     )
     lead_meetings = CalendarService.get_events_for_lead(lead.id, organization_id)
+    from app.proposals.services import ProposalService
+
+    lead_proposals_summary = ProposalService.get_lead_proposals_summary(lead.id, organization_id)
     org_query = (
         {"organization_id": organization_id}
         if current_user.is_superadmin()
@@ -287,6 +290,8 @@ def detail(lead_id):
         calendar_connection=calendar_connection,
         lead_meetings_upcoming=lead_meetings["upcoming"],
         lead_meetings_past=lead_meetings["past"],
+        lead_proposals=lead_proposals_summary["proposals"],
+        lead_proposals_accepted_total=lead_proposals_summary["accepted_total"],
     )
 
 
@@ -671,3 +676,7 @@ register_lead_gdpr_routes(leads_bp)
 from app.calendar.routes import register_calendar_lead_routes  # noqa: E402
 
 register_calendar_lead_routes(leads_bp)
+
+from app.proposals.routes import register_proposal_lead_routes  # noqa: E402
+
+register_proposal_lead_routes(leads_bp)

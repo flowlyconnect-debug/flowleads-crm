@@ -26,3 +26,4 @@ google-auth>=2.29,<3
 google-auth-oauthlib>=1.2,<2
 google-api-python-client>=2.130,<3
 msal>=1.28,<2
+weasyprint>=62.0,<64

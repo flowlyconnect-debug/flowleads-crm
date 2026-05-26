@@ -93,6 +93,8 @@
         &nbsp;|&nbsp;
         <a href="{{ url_for('sequences.list_sequences', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('sequences.list_sequences') }}">Sekvenssit</a>
         &nbsp;|&nbsp;
+        <a href="{{ url_for('proposals.list_proposals', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('proposals.list_proposals') }}">Tarjoukset</a>
+        &nbsp;|&nbsp;
         <a href="{{ url_for('automations.list_automations', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('automations.list_automations') }}">Automaatiot</a>
         &nbsp;|&nbsp;
         <span class="nav-notifications" id="nav-notifications">

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ proposal.reference_number }} — FlowLeads{% endblock %}
+{% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<div class="toolbar">
+  <h1 style="margin:0;">{{ proposal.reference_number }}</h1>
+  <span class="badge" style="background:{{ status_colors.get(proposal.status, '#64748b') }};">{{ proposal.status }}</span>
+  <a class="btn secondary" href="{{ url_for('proposals.list_proposals', **org_query) }}">Takaisin</a>
+  {% if not proposal.is_editable %}
+  <form method="post" action="{{ url_for('proposals.duplicate_proposal', proposal_id=proposal.id, **org_query) }}" style="display:inline;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn">Luo kopio</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if not proposal.is_editable %}
+<div class="flash info" style="margin-bottom:1rem;">Tarjous on lukittu. Luo kopio muokataksesi.</div>
+{% endif %}
+
+<div class="grid-2" id="proposal-editor">
+  <div class="card">
+    <h2>Muokkaa</h2>
+    <form id="proposal-form" method="post" action="{{ url_for('proposals.update_proposal', proposal_id=proposal.id, **org_query) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="line_items" id="line-items-json">
+      <p><label>Otsikko</label>
+        <input type="text" name="title" value="{{ proposal.title }}" {% if not proposal.is_editable %}readonly{% endif %} style="width:100%;"></p>
+      <p><label>Voimassa</label>
+        <input type="date" name="valid_until" value="{{ proposal.valid_until.isoformat() if proposal.valid_until else '' }}" {% if not proposal.is_editable %}readonly{% endif %}></p>
+      <p><label>ALV %</label>
+        <input type="number" step="0.01" name="tax_percent" id="tax-percent" value="{{ proposal.tax_percent }}" {% if not proposal.is_editable %}readonly{% endif %}></p>
+      <p><label>Alennus %</label>
+        <input type="number" step="0.01" name="discount_percent" id="discount-percent" value="{{ proposal.discount_percent }}" {% if not proposal.is_editable %}readonly{% endif %}></p>
+      <p><label>Huomautukset</label>
+        <textarea name="notes" rows="4" style="width:100%;" {% if not proposal.is_editable %}readonly{% endif %}>{{ proposal.notes or '' }}</textarea></p>
+
+      <h3>Rivit</h3>
+      <table class="data-table" id="line-items-table">
+        <thead>
+          <tr><th>Kuvaus</th><th>Määrä</th><th>Hinta</th><th>Alennus %</th><th>Yhteensä</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for li in proposal.line_items %}
+          <tr class="line-row" draggable="true">
+            <td><input type="text" class="li-desc" value="{{ li.description }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
+            <td><input type="number" step="0.0001" class="li-qty" value="{{ li.quantity }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
+            <td><input type="number" step="0.01" class="li-price" value="{{ li.unit_price }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
+            <td><input type="number" step="0.01" class="li-disc" value="{{ li.discount_percent }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
+            <td class="li-total">{{ li.total }}</td>
+            <td>{% if proposal.is_editable %}<button type="button" class="btn secondary li-remove">×</button>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if proposal.is_editable %}
+      <button type="button" class="btn secondary" id="add-line">+ Rivi</button>
+      <button type="submit" class="btn">Tallenna</button>
+      {% endif %}
+    </form>
+    <p style="margin-top:1rem;">
+      <a class="btn secondary" href="{{ url_for('proposals.preview_proposal', proposal_id=proposal.id, **org_query) }}" target="_blank">Esikatselu</a>
+      <a class="btn secondary" href="{{ url_for('proposals.pdf_proposal', proposal_id=proposal.id, **org_query) }}" target="_blank">PDF</a>
+      {% if proposal.status == 'draft' %}
+      <form method="post" action="{{ url_for('proposals.send_proposal', proposal_id=proposal.id, **org_query) }}" style="display:inline;" onsubmit="return confirm('Lähetetäänkö tarjous asiakkaalle?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn">Lähetä</button>
+      </form>
+      {% endif %}
+    </p>
+  </div>
+  <div class="card">
+    <h2>Esikatselu</h2>
+    <div id="live-preview">
+      <p><strong id="pv-subtotal">Välisumma: {{ proposal.subtotal }}</strong></p>
+      <p id="pv-discount">Alennus: {{ proposal.discount_amount }}</p>
+      <p id="pv-total" style="font-size:1.25rem;"><strong>Yhteensä: {{ proposal.total }} {{ proposal.currency }}</strong></p>
+    </div>
+    <iframe src="{{ url_for('proposals.preview_proposal', proposal_id=proposal.id, **org_query) }}" style="width:100%;height:400px;border:1px solid #334155;margin-top:1rem;"></iframe>
+  </div>
+</div>
+
+{% if proposal.is_editable %}
+<script>
+(function() {
+  const table = document.getElementById('line-items-table').querySelector('tbody');
+  const editable = true;
+
+  function lineTotal(qty, price, disc) {
+    const sub = parseFloat(qty||0) * parseFloat(price||0);
+    const d = parseFloat(disc||0);
+    return (sub - sub * d / 100).toFixed(2);
+  }
+
+  function recalcRow(row) {
+    const t = lineTotal(row.querySelector('.li-qty').value, row.querySelector('.li-price').value, row.querySelector('.li-disc').value);
+    row.querySelector('.li-total').textContent = t;
+  }
+
+  function recalcAll() {
+    let sub = 0;
+    table.querySelectorAll('.line-row').forEach(row => {
+      recalcRow(row);
+      sub += parseFloat(row.querySelector('.li-total').textContent || 0);
+    });
+    const discPct = parseFloat(document.getElementById('discount-percent').value || 0);
+    const taxPct = parseFloat(document.getElementById('tax-percent').value || 0);
+    const discAmt = sub * discPct / 100;
+    const taxable = sub - discAmt;
+    const total = taxable + taxable * taxPct / 100;
+    document.getElementById('pv-subtotal').textContent = 'Välisumma: ' + sub.toFixed(2);
+    document.getElementById('pv-discount').textContent = 'Alennus: ' + discAmt.toFixed(2);
+    document.getElementById('pv-total').innerHTML = '<strong>Yhteensä: ' + total.toFixed(2) + ' {{ proposal.currency }}</strong>';
+  }
+
+  function serializeLines() {
+    const items = [];
+    table.querySelectorAll('.line-row').forEach((row, idx) => {
+      items.push({
+        order_index: idx,
+        description: row.querySelector('.li-desc').value,
+        quantity: row.querySelector('.li-qty').value,
+        unit_price: row.querySelector('.li-price').value,
+        discount_percent: row.querySelector('.li-disc').value
+      });
+    });
+    document.getElementById('line-items-json').value = JSON.stringify(items);
+  }
+
+  document.getElementById('add-line').addEventListener('click', () => {
+    const tr = document.createElement('tr');
+    tr.className = 'line-row';
+    tr.innerHTML = '<td><input class="li-desc" value=""></td><td><input class="li-qty" type="number" value="1"></td><td><input class="li-price" type="number" value="0"></td><td><input class="li-disc" type="number" value="0"></td><td class="li-total">0</td><td><button type="button" class="btn secondary li-remove">×</button></td>';
+    table.appendChild(tr);
+    bindRow(tr);
+    recalcAll();
+  });
+
+  function bindRow(row) {
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', recalcAll));
+    const rm = row.querySelector('.li-remove');
+    if (rm) rm.addEventListener('click', () => { row.remove(); recalcAll(); });
+  }
+
+  table.querySelectorAll('.line-row').forEach(bindRow);
+  document.getElementById('discount-percent').addEventListener('input', recalcAll);
+  document.getElementById('tax-percent').addEventListener('input', recalcAll);
+  document.getElementById('proposal-form').addEventListener('submit', () => serializeLines());
+})();
+</script>
+{% endif %}
+{% endblock %}

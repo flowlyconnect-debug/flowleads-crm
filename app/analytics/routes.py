@@ -91,6 +91,10 @@ def dashboard():
     upcoming_meetings = CalendarService.get_upcoming_meetings(
         current_user.id, organization_id, limit=3
     )
+    from app.proposals.services import ProposalService
+
+    open_proposals_count = ProposalService.get_open_count(organization_id)
+    accepted_proposals_month = ProposalService.get_accepted_this_month_total(organization_id)
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
@@ -102,6 +106,8 @@ def dashboard():
         tasks_overdue_count=len(tasks_overdue),
         recent_tasks=recent_tasks,
         upcoming_meetings=upcoming_meetings,
+        open_proposals_count=open_proposals_count,
+        accepted_proposals_month=accepted_proposals_month,
     )
 
 

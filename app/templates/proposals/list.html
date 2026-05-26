@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Tarjoukset — FlowLeads{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Tarjoukset</h1>
+  <a class="btn" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
+</div>
+
+<form method="get" class="filters" style="margin-bottom:1rem;">
+  {% if org_query %}<input type="hidden" name="organization_id" value="{{ org_query.organization_id }}">{% endif %}
+  <label>Status
+    <select name="status" onchange="this.form.submit()">
+      <option value="">Kaikki</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Viite</th>
+      <th>Liidi</th>
+      <th>Otsikko</th>
+      <th>Summa</th>
+      <th>Status</th>
+      <th>Lähetetty</th>
+      <th>Voimassa</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in proposals %}
+    <tr {% if p.valid_until and p.status in ('sent','viewed') and p.valid_until <= warn_date %}style="background:#431407;"{% endif %}>
+      <td><a href="{{ url_for('proposals.edit_proposal', proposal_id=p.id, **org_query) }}">{{ p.reference_number }}</a></td>
+      <td>{{ p.lead_name_snapshot or (p.lead.display_name if p.lead else '—') }}</td>
+      <td>{{ p.title }}</td>
+      <td>{{ p.total }} {{ p.currency }}</td>
+      <td><span class="badge" style="background:{{ status_colors.get(p.status, '#64748b') }};">{{ p.status }}</span></td>
+      <td>{{ p.sent_at.strftime('%Y-%m-%d') if p.sent_at else '—' }}</td>
+      <td>{{ p.valid_until or '—' }}</td>
+      <td><a href="{{ url_for('proposals.edit_proposal', proposal_id=p.id, **org_query) }}">Avaa</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">Ei tarjouksia.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

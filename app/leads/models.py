@@ -40,6 +40,10 @@ ACTIVITY_TYPES = (
     "sequence_unenrolled",
     "meeting_scheduled",
     "meeting_cancelled",
+    "proposal_sent",
+    "proposal_viewed",
+    "proposal_accepted",
+    "proposal_declined",
 )
 
 DEFAULT_PIPELINE_STAGES = [

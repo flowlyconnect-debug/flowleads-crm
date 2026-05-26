@@ -77,6 +77,57 @@ SYSTEM_TEMPLATES = [
             }
         ),
     },
+    {
+        "name": "proposal_sent",
+        "subject_template": "Tarjous {{reference_number}} — {{proposal_title}}",
+        "body_html_template": (
+            "<p>Hei {{first_name}},</p>"
+            "<p>Lähetämme tarjouksen <strong>{{reference_number}}</strong>.</p>"
+            "<p><a href=\"{{proposal_url}}\">Avaa tarjous</a></p>"
+            "<p>Voimassa: {{valid_until}}</p>"
+            "<p>Yhteensä: {{total}}</p>"
+        ),
+        "body_text_template": (
+            "Hei {{first_name}},\n\n"
+            "Tarjous {{reference_number}}: {{proposal_url}}\n"
+            "Voimassa: {{valid_until}}\nYhteensä: {{total}}\n"
+        ),
+        "variables": sorted(
+            {
+                "first_name",
+                "company",
+                "reference_number",
+                "proposal_title",
+                "proposal_url",
+                "valid_until",
+                "total",
+            }
+        ),
+    },
+    {
+        "name": "proposal_accepted_notification",
+        "subject_template": "Tarjous hyväksytty: {{reference_number}}",
+        "body_html_template": (
+            "<p>Tarjous <strong>{{reference_number}}</strong> hyväksyttiin.</p>"
+            "<p>Asiakas: {{lead_name}}</p>"
+            "<p>Summa: {{total}} {{currency}}</p>"
+        ),
+        "body_text_template": (
+            "Tarjous {{reference_number}} hyväksytty.\n"
+            "Asiakas: {{lead_name}}\nSumma: {{total}} {{currency}}\n"
+        ),
+        "variables": sorted({"reference_number", "lead_name", "total", "currency"}),
+    },
+    {
+        "name": "proposal_declined_notification",
+        "subject_template": "Tarjous hylätty: {{reference_number}}",
+        "body_html_template": (
+            "<p>Tarjous <strong>{{reference_number}}</strong> hylättiin.</p>"
+            "<p>Asiakas: {{lead_name}}</p>"
+        ),
+        "body_text_template": "Tarjous {{reference_number}} hylättiin. Asiakas: {{lead_name}}\n",
+        "variables": sorted({"reference_number", "lead_name"}),
+    },
 ]
 
 

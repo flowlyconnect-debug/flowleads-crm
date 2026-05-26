@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 
+from decimal import Decimal
+
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     func,
@@ -39,6 +43,16 @@ class OrganizationSettings(db.Model):
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     data_controller_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     data_controller_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    proposal_sequence_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    proposal_move_lead_to_won_on_accept: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    proposal_default_valid_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    proposal_default_tax_percent: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), nullable=False, default=Decimal("24")
+    )
+    proposal_default_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
