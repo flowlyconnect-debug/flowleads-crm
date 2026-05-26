@@ -54,6 +54,18 @@ def has_useful_identifier(data: dict) -> bool:
     return False
 
 
+def validate_deal_value(deal_value) -> tuple[bool, str | None]:
+    if deal_value is None or deal_value == "":
+        return True, None
+    try:
+        value = float(deal_value)
+    except (TypeError, ValueError):
+        return False, "Deal value must be a number."
+    if value < 0:
+        return False, "Deal value cannot be negative."
+    return True, None
+
+
 def validate_score(score) -> tuple[bool, str | None]:
     if score is None or score == "":
         return True, None
@@ -82,9 +94,27 @@ def normalize_lead_data(data: dict) -> dict:
         result["source"] = str(result["source"]).strip().lower()
     if "tags" in result:
         result["tags"] = normalize_tags(result.get("tags"))
-    for field in ("first_name", "last_name", "phone", "company", "title", "website", "linkedin_url", "source_ref", "notes", "score_reason"):
+    for field in (
+        "first_name",
+        "last_name",
+        "phone",
+        "company",
+        "title",
+        "website",
+        "linkedin_url",
+        "source_ref",
+        "notes",
+        "score_reason",
+    ):
         if field in result and isinstance(result[field], str):
             result[field] = result[field].strip() or None
+    if "deal_value" in result and result["deal_value"] not in (None, ""):
+        try:
+            result["deal_value"] = float(result["deal_value"])
+        except (TypeError, ValueError):
+            pass
+    elif "deal_value" in result:
+        result["deal_value"] = None
     return result
 
 
@@ -99,6 +129,10 @@ def validate_lead_fields(data: dict, *, require_identifier: bool = False) -> tup
         return False, "Invalid email address."
 
     ok, msg = validate_score(data.get("score"))
+    if not ok:
+        return False, msg
+
+    ok, msg = validate_deal_value(data.get("deal_value"))
     if not ok:
         return False, msg
 

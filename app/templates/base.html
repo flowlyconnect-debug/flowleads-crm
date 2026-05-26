@@ -82,6 +82,7 @@
         <a href="{{ url_for('analytics.dashboard', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.dashboard') }}">Dashboard</a>
         &nbsp;|&nbsp;
         <a href="{{ url_for('analytics.reports', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.reports') }}">Reports</a>
+        <a href="{{ url_for('analytics.forecast', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.forecast') }}">Ennuste</a>
         &nbsp;|&nbsp;
         <a href="{{ url_for('leads.list_leads', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('leads.list_leads') }}">Leads</a>
         &nbsp;|&nbsp;

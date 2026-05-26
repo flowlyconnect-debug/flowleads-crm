@@ -85,6 +85,7 @@ def _init_extensions(app):
         from app.gdpr import models as gdpr_models  # noqa: F401
         from app.calendar import models as calendar_models  # noqa: F401
         from app.proposals import models as proposals_models  # noqa: F401
+        from app.analytics import models as analytics_models  # noqa: F401
 
 
 def _register_blueprints(app):

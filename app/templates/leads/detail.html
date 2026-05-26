@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import score_badge, ai_status_badge %}
+{% from "_macros.html" import score_badge, ai_status_badge, probability_badge %}
 {% block title %}{{ lead.display_name }} — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
@@ -129,6 +129,62 @@
       <button type="submit" class="btn secondary" {% if lead.ai_enrichment_status in ('pending', 'processing') %}disabled{% endif %}>
         {% if lead.ai_enriched %}Re-enrich{% else %}Enrich with AI{% endif %}
       </button>
+    </form>
+  </div>
+
+  <div class="card" id="panel-prediction">
+    <h2>AI-ennuste</h2>
+    {% set prob = lead.close_probability %}
+    {% if prob is not none %}
+    <div style="margin:1rem 0;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+        <span>Sulkemistodennäköisyys</span>
+        <strong>{{ probability_badge(prob) }}</strong>
+      </div>
+      <div style="background:#0f172a; border-radius:4px; height:12px; overflow:hidden;">
+        <div style="background:var(--accent); width:{{ (prob * 100)|round(0) }}%; height:100%;"></div>
+      </div>
+    </div>
+    {% else %}
+    <p class="ai-meta">Ei ennustetta vielä.</p>
+    {% endif %}
+
+    {% if latest_prediction %}
+    {% if latest_prediction.key_positive_signals %}
+    <h3 style="font-size:0.95rem;">Positiiviset signaalit</h3>
+    <ul style="font-size:0.9rem; padding-left:1.25rem;">
+      {% for s in latest_prediction.key_positive_signals %}
+      <li>{{ s }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if latest_prediction.key_risk_signals %}
+    <h3 style="font-size:0.95rem;">Riskisignaalit</h3>
+    <ul style="font-size:0.9rem; padding-left:1.25rem;">
+      {% for s in latest_prediction.key_risk_signals %}
+      <li>{{ s }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if latest_prediction.recommendation %}
+    <p><strong>Suositus:</strong> {{ latest_prediction.recommendation }}</p>
+    {% endif %}
+    {% endif %}
+
+    <p><strong>Kaupan arvo:</strong>
+      {% if lead.deal_value %}{{ currency_symbol }}{{ '%.2f'|format(lead.deal_value) }}{% else %}—{% endif %}
+      <a href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}" style="font-size:0.85rem; margin-left:0.5rem;">Muokkaa</a>
+    </p>
+    <p><strong>Odotettu arvo:</strong>
+      {% if lead.expected_value is not none %}{{ currency_symbol }}{{ '%.2f'|format(lead.expected_value) }}{% else %}—{% endif %}
+    </p>
+    {% if lead.probability_updated_at %}
+    <p class="ai-meta">Päivitetty: {{ lead.probability_updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('leads.predict_lead_route', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.predict_lead_route', lead_id=lead.id) }}" style="margin-top:1rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn secondary">Päivitä ennuste</button>
     </form>
   </div>
 </div>

@@ -16,6 +16,7 @@ from flask_login import current_user, login_required
 from flask_wtf.csrf import generate_csrf
 
 from app.core.errors import json_error, json_success, wants_json_response
+from app.core.permissions import require_role
 from app.extensions import db
 from app.leads.forms import BulkActionForm, LeadFilterForm, LeadForm, QuickNoteForm
 from app.leads.models import Activity, Lead, PipelineStage
@@ -101,6 +102,7 @@ def _lead_to_form_data(form: LeadForm, lead: Lead):
     form.source.data = lead.source
     form.source_ref.data = lead.source_ref
     form.score.data = lead.score
+    form.deal_value.data = lead.deal_value
     form.score_reason.data = lead.score_reason
     form.notes.data = lead.notes
     form.tags.data = ", ".join(lead.tags or [])
@@ -119,6 +121,7 @@ def _form_to_data(form: LeadForm) -> dict:
         "source": form.source.data,
         "source_ref": form.source_ref.data,
         "score": form.score.data,
+        "deal_value": form.deal_value.data,
         "score_reason": form.score_reason.data,
         "notes": form.notes.data,
         "tags": form.tags.data,
@@ -156,6 +159,9 @@ def list_leads():
         page = 1
 
     pagination = LeadService.search(organization_id, filters, page=page, per_page=25)
+    from app.analytics.currency import currency_symbol, get_default_currency
+
+    org_currency = get_default_currency(organization_id)
     form_args = {k: v for k, v in request.args.items() if v != ""}
     filter_form = LeadFilterForm(form_args, meta={"csrf": False})
     stages = PipelineStage.query.filter_by(organization_id=organization_id).order_by(
@@ -181,6 +187,8 @@ def list_leads():
         organization_id=organization_id,
         can_archive=can_archive_leads(),
         can_assign_others=can_assign_to_others(),
+        org_currency=org_currency,
+        currency_symbol=currency_symbol(org_currency),
     )
 
 
@@ -197,14 +205,18 @@ def pipeline():
     }
     data = LeadService.get_pipeline_data(organization_id, filters)
     users = _org_users(organization_id)
+    from app.analytics.currency import currency_symbol, get_default_currency
+
     return render_template(
         "leads/pipeline.html",
         stages=data["stages"],
         leads_by_stage=data["leads_by_stage"],
+        stage_deal_totals=data.get("stage_deal_totals", {}),
         users=users,
         filters=filters,
         organization_id=organization_id,
         csrf_token=generate_csrf,
+        currency_symbol=currency_symbol(get_default_currency(organization_id)),
     )
 
 
@@ -269,6 +281,11 @@ def detail(lead_id):
         if current_user.is_superadmin()
         else {}
     )
+    from app.analytics.currency import currency_symbol, get_default_currency
+    from app.analytics.prediction import PredictionService
+
+    latest_prediction = PredictionService.get_latest_prediction(lead.id, organization_id)
+    org_currency = get_default_currency(organization_id)
     return render_template(
         "leads/detail.html",
         lead=lead,
@@ -292,6 +309,9 @@ def detail(lead_id):
         lead_meetings_past=lead_meetings["past"],
         lead_proposals=lead_proposals_summary["proposals"],
         lead_proposals_accepted_total=lead_proposals_summary["accepted_total"],
+        latest_prediction=latest_prediction,
+        org_currency=org_currency,
+        currency_symbol=currency_symbol(org_currency),
     )
 
 
@@ -301,7 +321,15 @@ def create_lead():
     form = LeadForm()
     _populate_lead_form_choices(form, organization_id)
     if not form.validate_on_submit():
-        return render_template("leads/form.html", form=form, lead=None, organization_id=organization_id), 400
+        from app.analytics.currency import get_default_currency
+
+        return render_template(
+            "leads/form.html",
+            form=form,
+            lead=None,
+            organization_id=organization_id,
+            org_currency=get_default_currency(organization_id),
+        ), 400
 
     data = _form_to_data(form)
     if not can_assign_to_others() and not data.get("assigned_to"):
@@ -317,7 +345,15 @@ def create_lead():
     except LeadServiceError as exc:
         db.session.rollback()
         _handle_service_error(exc)
-        return render_template("leads/form.html", form=form, lead=None, organization_id=organization_id), 400
+        from app.analytics.currency import get_default_currency
+
+        return render_template(
+            "leads/form.html",
+            form=form,
+            lead=None,
+            organization_id=organization_id,
+            org_currency=get_default_currency(organization_id),
+        ), 400
 
 
 @leads_bp.route("/new")
@@ -329,7 +365,15 @@ def new_lead():
     form.stage_id.data = default_stage.id
     if not can_assign_to_others():
         form.assigned_to.data = current_user.id
-    return render_template("leads/form.html", form=form, lead=None, organization_id=organization_id)
+    from app.analytics.currency import get_default_currency
+
+    return render_template(
+        "leads/form.html",
+        form=form,
+        lead=None,
+        organization_id=organization_id,
+        org_currency=get_default_currency(organization_id),
+    )
 
 
 @leads_bp.route("/<int:lead_id>/edit")
@@ -345,7 +389,15 @@ def edit_lead(lead_id):
     form = LeadForm()
     _populate_lead_form_choices(form, organization_id)
     _lead_to_form_data(form, lead)
-    return render_template("leads/form.html", form=form, lead=lead, organization_id=organization_id)
+    from app.analytics.currency import get_default_currency
+
+    return render_template(
+        "leads/form.html",
+        form=form,
+        lead=lead,
+        organization_id=organization_id,
+        org_currency=get_default_currency(organization_id),
+    )
 
 
 @leads_bp.route("/<int:lead_id>", methods=["PUT", "POST"])
@@ -444,6 +496,35 @@ def move_stage(lead_id):
             return json_error(exc.code, exc.message, 400)
         flash(exc.message, "danger")
         return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
+
+
+@leads_bp.route("/<int:lead_id>/predict", methods=["POST"])
+@require_role("superadmin", "admin", "user")
+def predict_lead_route(lead_id):
+    organization_id = resolve_organization_id()
+    try:
+        get_lead_for_org(lead_id, organization_id)
+    except LeadServiceError:
+        abort(404)
+
+    from app.analytics.prediction import PredictionService, PredictionServiceError
+
+    try:
+        probability = PredictionService.predict_lead_for_org(lead_id, organization_id)
+        db.session.commit()
+        flash(f"Ennuste päivitetty: {probability * 100:.0f}%", "success")
+    except PredictionServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    except Exception:
+        db.session.rollback()
+        flash("Ennusteen päivitys epäonnistui.", "danger")
+
+    return redirect(
+        url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
+        if current_user.is_superadmin()
+        else url_for("leads.detail", lead_id=lead_id)
+    )
 
 
 @leads_bp.route("/<int:lead_id>/enrich", methods=["POST"])

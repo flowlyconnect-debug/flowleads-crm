@@ -24,6 +24,7 @@
     <label>{{ form.source.label }}{{ form.source() }}</label>
     <label>{{ form.source_ref.label }}{{ form.source_ref() }}</label>
     <label>{{ form.score.label }}{{ form.score() }}</label>
+    <label>{{ form.deal_value.label }} ({{ org_currency|default('EUR') }}){{ form.deal_value() }}</label>
     <label>{{ form.score_reason.label }}{{ form.score_reason() }}</label>
     <label>{{ form.tags.label }}{{ form.tags() }}</label>
     <label>{{ form.notes.label }}{{ form.notes(rows=4) }}</label>

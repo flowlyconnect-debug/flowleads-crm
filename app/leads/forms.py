@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import (
     DateField,
+    DecimalField,
     HiddenField,
     IntegerField,
     SelectField,
@@ -30,6 +31,7 @@ class LeadForm(FlaskForm):
     )
     source_ref = StringField("Source reference", validators=[Optional(), Length(max=255)])
     score = IntegerField("Score", validators=[Optional(), NumberRange(min=0, max=100)])
+    deal_value = DecimalField("Kaupan arvo", places=2, validators=[Optional(), NumberRange(min=0)])
     score_reason = TextAreaField("Score reason", validators=[Optional()])
     notes = TextAreaField("Notes", validators=[Optional()])
     tags = StringField("Tags (comma-separated)", validators=[Optional(), Length(max=1000)])

@@ -67,6 +67,31 @@ def create_api_key_route():
     return redirect(url_for("admin.api_keys", new_key=full_key))
 
 
+@admin_bp.route("/predictions/run-batch", methods=["POST"])
+@login_required
+@require_role("superadmin", "admin")
+@require_2fa
+def run_predictions_batch():
+    from app.leads.permissions import resolve_organization_id
+
+    organization_id = resolve_organization_id()
+    from app.analytics.prediction import PredictionService
+
+    result = PredictionService.predict_batch(organization_id)
+    flash(
+        f"Ennusteet päivitetty: {result['processed']} onnistui, {result['failed']} epäonnistui.",
+        "success" if result["failed"] == 0 else "warning",
+    )
+    return redirect(
+        url_for(
+            "analytics.forecast",
+            organization_id=organization_id,
+        )
+        if current_user.is_superadmin()
+        else url_for("analytics.forecast")
+    )
+
+
 @admin_bp.route("/api-keys/<int:key_id>", methods=["POST", "DELETE"])
 @login_required
 @require_role("superadmin")

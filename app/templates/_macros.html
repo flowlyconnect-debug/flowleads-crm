@@ -10,6 +10,21 @@
 {% endif %}
 {% endmacro %}
 
+{% macro probability_badge(probability) %}
+{% if probability is none %}
+<span class="badge score-none">—</span>
+{% else %}
+{% set pct = (probability * 100)|round(0)|int %}
+{% if pct < 30 %}
+<span class="badge score-low">{{ pct }}%</span>
+{% elif pct <= 60 %}
+<span class="badge score-mid">{{ pct }}%</span>
+{% else %}
+<span class="badge score-high">{{ pct }}%</span>
+{% endif %}
+{% endif %}
+{% endmacro %}
+
 {% macro ai_status_badge(lead) %}
 {% if lead.ai_enrichment_status == 'completed' and lead.ai_enriched %}
 <span class="badge ai-ok">AI Enriched ✓</span>

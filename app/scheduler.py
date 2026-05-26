@@ -169,6 +169,15 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Proposal expiry job failed")
 
+    def run_weekly_predictions():
+        with app.app_context():
+            from app.analytics.prediction import run_weekly_batch_predictions
+
+            try:
+                run_weekly_batch_predictions(app)
+            except Exception:
+                logger.exception("Weekly prediction batch job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -239,6 +248,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_proposal_expiry,
         CronTrigger(hour=1, minute=30, timezone="UTC"),
         id="proposal_expiry",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_weekly_predictions,
+        CronTrigger(day_of_week="sun", hour=23, minute=0, timezone="UTC"),
+        id="weekly_predictions",
         replace_existing=True,
     )
 

@@ -95,6 +95,12 @@ def dashboard():
 
     open_proposals_count = ProposalService.get_open_count(organization_id)
     accepted_proposals_month = ProposalService.get_accepted_this_month_total(organization_id)
+    from app.analytics.currency import currency_symbol, get_default_currency
+    from app.analytics.prediction import PredictionService
+
+    forecast = PredictionService.calculate_forecast(organization_id, period_days=30)
+    high_potential = PredictionService.get_high_potential_leads(organization_id, limit=5)
+    org_currency = get_default_currency(organization_id)
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
@@ -108,6 +114,10 @@ def dashboard():
         upcoming_meetings=upcoming_meetings,
         open_proposals_count=open_proposals_count,
         accepted_proposals_month=accepted_proposals_month,
+        sales_forecast=forecast,
+        high_potential_leads=high_potential,
+        org_currency=org_currency,
+        currency_symbol=currency_symbol(org_currency),
     )
 
 
@@ -147,6 +157,42 @@ def reports():
         end_date=end_param or end_dt.date().isoformat(),
         range_error=range_error,
         report_data=report_data,
+    )
+
+
+@analytics_bp.route("/reports/forecast")
+@require_role(*UI_ROLES)
+@require_2fa
+def forecast():
+    organization_id = _optional_organization_id()
+    organizations = get_accessible_organizations() if current_user.is_superadmin() else []
+
+    period_days = request.args.get("period", 30, type=int)
+    if period_days not in (30, 60, 90):
+        period_days = 30
+
+    forecast_data = None
+    deals = []
+    org_currency = "EUR"
+    currency_sym = "€"
+    if organization_id is not None:
+        from app.analytics.currency import currency_symbol, get_default_currency
+        from app.analytics.prediction import PredictionService
+
+        org_currency = get_default_currency(organization_id)
+        currency_sym = currency_symbol(org_currency)
+        forecast_data = PredictionService.calculate_forecast(organization_id, period_days=period_days)
+        deals = PredictionService.get_forecast_deals(organization_id)
+
+    return render_template(
+        "analytics/forecast.html",
+        organizations=organizations,
+        organization_id=organization_id,
+        forecast=forecast_data,
+        deals=deals,
+        period_days=period_days,
+        org_currency=org_currency,
+        currency_symbol=currency_sym,
     )
 
 

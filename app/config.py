@@ -63,6 +63,9 @@ class Config:
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     AI_ENRICHMENT_ENABLED = os.environ.get("AI_ENRICHMENT_ENABLED", "true").lower() == "true"
     AI_ENRICHMENT_MODEL = os.environ.get("AI_ENRICHMENT_MODEL", "gpt-4o-mini")
+    AI_PREDICTION_MODEL = os.environ.get("AI_PREDICTION_MODEL") or os.environ.get(
+        "AI_ENRICHMENT_MODEL", "gpt-4o-mini"
+    )
     AI_AUTO_ENRICH_ON_CREATE = os.environ.get("AI_AUTO_ENRICH_ON_CREATE", "true").lower() == "true"
     AI_MAX_CONCURRENT_ENRICHMENTS = int(os.environ.get("AI_MAX_CONCURRENT_ENRICHMENTS", 3))
     AI_ENRICHMENT_MAX_RETRIES = int(os.environ.get("AI_ENRICHMENT_MAX_RETRIES", 2))

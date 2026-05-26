@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 
+from decimal import Decimal
+
 from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -132,6 +135,13 @@ class Lead(db.Model):
 
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     score_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    close_probability: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    probability_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expected_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    deal_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

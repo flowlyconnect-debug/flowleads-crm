@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import score_badge %}
+{% from "_macros.html" import score_badge, probability_badge %}
 {% block title %}Leads — FlowLeads{% endblock %}
 {% block content %}
 <div class="card">
@@ -46,6 +46,8 @@
           <th>Company</th>
           <th>Stage</th>
           <th>Score</th>
+          <th>Arvo</th>
+          <th>Ennuste</th>
           <th>Source</th>
           <th>GDPR</th>
           <th>Assigned</th>
@@ -60,13 +62,15 @@
           <td>{{ lead.company or '—' }}</td>
           <td><span class="badge" style="border-left: 3px solid {{ lead.stage.color }}">{{ lead.stage.name }}</span></td>
           <td>{{ score_badge(lead.score) }}</td>
+          <td>{% if lead.deal_value %}{{ currency_symbol }}{{ '%.0f'|format(lead.deal_value) }}{% else %}—{% endif %}</td>
+          <td>{{ probability_badge(lead.close_probability) }}</td>
           <td>{{ lead.source }}</td>
           <td>{% if lead.is_anonymized %}Anon{% elif lead.gdpr_consent %}OK{% elif lead.unsubscribed %}Unsub{% else %}—{% endif %}</td>
           <td>{{ lead.assignee.email if lead.assignee else '—' }}</td>
           <td>{{ lead.created_at.strftime('%Y-%m-%d') if lead.created_at else '' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="9">No leads found.</td></tr>
+        <tr><td colspan="11">No leads found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

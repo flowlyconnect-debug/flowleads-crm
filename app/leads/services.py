@@ -1,6 +1,7 @@
 import csv
 import io
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -31,6 +32,7 @@ LEAD_SORT_COLUMNS = {
     "company": "company",
     "stage": "stage_id",
     "score": "score",
+    "deal_value": "deal_value",
     "source": "source",
     "created_at": "created_at",
 }
@@ -138,6 +140,12 @@ def _status_from_stage_name(stage_name: str) -> str:
     return "active"
 
 
+def _activity_change_value(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
 def _check_duplicate_source(organization_id: int, source: str, source_ref: str | None, exclude_id: int | None = None):
     if not source_ref or not str(source_ref).strip():
         return
@@ -226,6 +234,11 @@ class LeadService:
             source=data.get("source", "manual"),
             source_ref=data.get("source_ref"),
             score=data.get("score") if data.get("score") is not None and data.get("score") != "" else None,
+            deal_value=(
+                Decimal(str(data["deal_value"]))
+                if data.get("deal_value") not in (None, "")
+                else None
+            ),
             score_reason=data.get("score_reason"),
             notes=data.get("notes"),
             tags=normalize_tags(data.get("tags", [])),
@@ -313,7 +326,7 @@ class LeadService:
         updatable = (
             "first_name", "last_name", "email", "phone", "company", "title",
             "website", "linkedin_url", "notes", "score", "score_reason",
-            "source", "source_ref", "assigned_to", "tags",
+            "source", "source_ref", "assigned_to", "tags", "deal_value",
         )
         for field in updatable:
             if field in data:
@@ -355,9 +368,24 @@ class LeadService:
                 if field == "source" and new:
                     if not validate_lead_source(new):
                         raise LeadServiceError("Invalid lead source.", "validation_error")
+                if field == "deal_value":
+                    if new is None or new == "":
+                        new = None
+                    else:
+                        new = Decimal(str(new))
                 if old != new:
-                    changes[field] = {"old": old, "new": new}
+                    changes[field] = {
+                        "old": _activity_change_value(old),
+                        "new": _activity_change_value(new),
+                    }
                     setattr(lead, field, new)
+
+        if lead.deal_value is not None and lead.close_probability is not None:
+            lead.expected_value = Decimal(
+                str(round(float(lead.deal_value) * float(lead.close_probability), 2))
+            )
+        elif "deal_value" in data and lead.deal_value is None:
+            lead.expected_value = None
 
         if "stage_id" in data and data["stage_id"]:
             new_stage = _get_stage_for_org(data["stage_id"], organization_id)
@@ -623,6 +651,7 @@ class LeadService:
 
         leads = query.all()
         by_stage = {s.id: [] for s in stages}
+        stage_totals = {s.id: Decimal("0") for s in stages}
         for lead in leads:
             if lead.stage_id in by_stage:
                 last_activity = (
@@ -631,8 +660,14 @@ class LeadService:
                     .first()
                 )
                 by_stage[lead.stage_id].append({"lead": lead, "last_activity": last_activity})
+                if lead.deal_value is not None:
+                    stage_totals[lead.stage_id] += lead.deal_value
 
-        return {"stages": stages, "leads_by_stage": by_stage}
+        return {
+            "stages": stages,
+            "leads_by_stage": by_stage,
+            "stage_deal_totals": {sid: float(stage_totals[sid]) for sid in stage_totals},
+        }
 
     @staticmethod
     def export_csv(organization_id: int, filters: dict | None = None, selected_ids: list | None = None) -> str:

@@ -54,6 +54,8 @@ class OrganizationSettings(db.Model):
     )
     proposal_default_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
