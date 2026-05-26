@@ -21,6 +21,10 @@
     {{ filter_form.status.label }}{{ filter_form.status() }}
     {{ filter_form.score_min.label }}{{ filter_form.score_min() }}
     {{ filter_form.score_max.label }}{{ filter_form.score_max() }}
+    {{ filter_form.gdpr_consent.label }}{{ filter_form.gdpr_consent() }}
+    {{ filter_form.marketing_opt_in.label }}{{ filter_form.marketing_opt_in() }}
+    {{ filter_form.unsubscribed.label }}{{ filter_form.unsubscribed() }}
+    {{ filter_form.is_anonymized.label }}{{ filter_form.is_anonymized() }}
     {{ filter_form.sort.label }}{{ filter_form.sort() }}
     {{ filter_form.dir.label }}{{ filter_form.dir() }}
     <div><label>&nbsp;</label>{{ filter_form.submit(class_="btn") }}</div>
@@ -43,6 +47,7 @@
           <th>Stage</th>
           <th>Score</th>
           <th>Source</th>
+          <th>GDPR</th>
           <th>Assigned</th>
           <th>Created</th>
         </tr>
@@ -56,11 +61,12 @@
           <td><span class="badge" style="border-left: 3px solid {{ lead.stage.color }}">{{ lead.stage.name }}</span></td>
           <td>{{ score_badge(lead.score) }}</td>
           <td>{{ lead.source }}</td>
+          <td>{% if lead.is_anonymized %}Anon{% elif lead.gdpr_consent %}OK{% elif lead.unsubscribed %}Unsub{% else %}—{% endif %}</td>
           <td>{{ lead.assignee.email if lead.assignee else '—' }}</td>
           <td>{{ lead.created_at.strftime('%Y-%m-%d') if lead.created_at else '' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="8">No leads found.</td></tr>
+        <tr><td colspan="9">No leads found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

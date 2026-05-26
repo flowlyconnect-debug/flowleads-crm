@@ -62,6 +62,15 @@ def serialize_lead(lead: Lead, *, custom_fields: dict | None = None) -> dict:
         "stage": stage_name,
         "created_at": _iso(lead.created_at),
         "updated_at": _iso(lead.updated_at),
+        "gdpr_consent": lead.gdpr_consent,
+        "gdpr_consent_at": _iso(lead.gdpr_consent_at),
+        "gdpr_consent_source": lead.gdpr_consent_source,
+        "gdpr_legal_basis": lead.gdpr_legal_basis,
+        "marketing_opt_in": lead.marketing_opt_in,
+        "unsubscribed": lead.unsubscribed,
+        "unsubscribed_at": _iso(lead.unsubscribed_at),
+        "is_anonymized": lead.is_anonymized,
+        "anonymized_at": _iso(lead.anonymized_at),
     }
     if custom_fields is not None:
         payload["custom_fields"] = custom_fields

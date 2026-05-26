@@ -53,6 +53,7 @@ class EmailLog(db.Model):
     body_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     mailgun_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="failed")
+    gdpr_legal_basis: Mapped[str | None] = mapped_column(String(64), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -201,6 +201,15 @@ def _apply_partial_update(lead: Lead, data: dict) -> bool:
         _apply_metadata(lead, data["metadata"])
         changed = True
 
+    gdpr_keys = {"gdpr_consent", "gdpr_legal_basis", "marketing_opt_in"}
+    if gdpr_keys & set(data.keys()):
+        from app.gdpr.consent import apply_gdpr_consent_fields
+
+        if apply_gdpr_consent_fields(lead, data, consent_source="api"):
+            changed = True
+        elif any(k in data for k in ("gdpr_legal_basis", "marketing_opt_in")):
+            changed = True
+
     return changed
 
 
@@ -282,6 +291,11 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
     db.session.add(lead)
     try:
         db.session.flush()
+        gdpr_keys = {"gdpr_consent", "gdpr_legal_basis", "marketing_opt_in"}
+        if gdpr_keys & set(raw_payload.keys()):
+            from app.gdpr.consent import apply_gdpr_consent_fields
+
+            apply_gdpr_consent_fields(lead, raw_payload, consent_source="api")
     except IntegrityError:
         db.session.rollback()
         dup = find_lead_for_upsert(
@@ -472,6 +486,11 @@ def list_leads_api(organization_id: int, query_args: dict) -> dict:
 
     if query_args.get("source"):
         filters["source"] = query_args.get("source").strip()
+
+    for flag in ("gdpr_consent", "marketing_opt_in", "unsubscribed", "is_anonymized"):
+        raw = query_args.get(flag)
+        if raw is not None and str(raw).lower() in ("1", "true", "yes"):
+            filters[flag] = True
 
     for param, key in (("created_after", "created_from"), ("created_before", "created_to")):
         raw = query_args.get(param)

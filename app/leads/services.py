@@ -547,6 +547,14 @@ class LeadService:
             query = query.filter(Lead.created_at >= filters["created_from"])
         if filters.get("created_to"):
             query = query.filter(Lead.created_at <= filters["created_to"])
+        if filters.get("gdpr_consent"):
+            query = query.filter(Lead.gdpr_consent.is_(True))
+        if filters.get("marketing_opt_in"):
+            query = query.filter(Lead.marketing_opt_in.is_(True))
+        if filters.get("unsubscribed"):
+            query = query.filter(Lead.unsubscribed.is_(True))
+        if filters.get("is_anonymized"):
+            query = query.filter(Lead.is_anonymized.is_(True))
 
         search = (filters.get("search") or "").strip()
         if search:

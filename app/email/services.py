@@ -61,6 +61,28 @@ def html_to_plaintext(html_body: str | None) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+def _append_privacy_footer(
+    body_html: str | None,
+    body_text: str | None,
+    *,
+    organization_id: int,
+) -> tuple[str, str]:
+    from app.gdpr.settings import get_privacy_settings
+
+    settings = get_privacy_settings(organization_id)
+    url = (settings.privacy_policy_url or "").strip()
+    if not url:
+        return body_html or "", body_text or ""
+    html_footer = (
+        f'<p style="font-size:12px;color:#666;margin-top:16px;">'
+        f'<a href="{html.escape(url)}">Tietosuojaseloste</a></p>'
+    )
+    text_footer = f"\n\nTietosuojaseloste: {url}"
+    html = (body_html or "").strip()
+    text = (body_text or "").strip()
+    return html + html_footer, (text + text_footer) if text else text_footer.strip()
+
+
 def plaintext_to_html(text: str | None) -> str:
     if not text:
         return "<p></p>"
@@ -156,6 +178,7 @@ class EmailService:
         *,
         organization_id: int,
         actor: User | None = None,
+        gdpr_legal_basis: str | None = None,
     ) -> dict:
         if not email_sending_enabled():
             raise EmailServiceError("Email sending is disabled.", "sending_disabled")
@@ -165,6 +188,11 @@ class EmailService:
             raise EmailServiceError("Subject is required.", "validation_error")
 
         lead = get_lead_for_org(lead_id, organization_id)
+        if lead.unsubscribed or lead.is_anonymized:
+            raise EmailServiceError(
+                "Lead cannot receive email (unsubscribed or anonymized).",
+                "gdpr_blocked",
+            )
         if not lead.email:
             raise EmailServiceError("Lead has no email address.", "no_email")
 
@@ -176,6 +204,16 @@ class EmailService:
         body_text = (body_text or "").strip() or html_to_plaintext(body_html)
         if not body_html and body_text:
             body_html = plaintext_to_html(body_text)
+
+        body_html, body_text = _append_privacy_footer(
+            body_html, body_text, organization_id=lead.organization_id
+        )
+
+        if gdpr_legal_basis is None:
+            from app.gdpr.settings import get_privacy_settings
+
+            settings = get_privacy_settings(lead.organization_id)
+            gdpr_legal_basis = lead.gdpr_legal_basis or settings.gdpr_default_legal_basis
 
         max_body = current_app.config.get("EMAIL_MAX_BODY_CHARS", 100_000)
         if len(body_html) > max_body or len(body_text) > max_body:
@@ -195,6 +233,7 @@ class EmailService:
             body_html=body_html,
             body_text=body_text,
             status="failed",
+            gdpr_legal_basis=gdpr_legal_basis,
         )
         db.session.add(log)
         db.session.flush()

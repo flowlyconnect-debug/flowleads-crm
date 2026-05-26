@@ -222,12 +222,24 @@ def append_unsubscribe_footer(
     *,
     lead_id: int,
     sequence_id: int,
+    organization_id: int | None = None,
 ) -> tuple[str, str]:
     link = _unsubscribe_url(lead_id, sequence_id)
-    text_footer = f"\n\n---\nUnsubscribe: {link}"
+    privacy_line = ""
+    if organization_id:
+        from app.gdpr.settings import get_privacy_settings
+
+        settings = get_privacy_settings(organization_id)
+        if settings.privacy_policy_url:
+            privacy_line = f" | Privacy: {settings.privacy_policy_url}"
+    text_footer = f"\n\n---\nUnsubscribe: {link}{privacy_line}"
+    privacy_html = ""
+    if privacy_line:
+        url = privacy_line.split("Privacy: ", 1)[-1]
+        privacy_html = f' | <a href="{url}">Privacy policy</a>'
     html_footer = (
         f'<p style="font-size:12px;color:#666;margin-top:24px;">'
-        f'<a href="{link}">Unsubscribe</a> from this email sequence.</p>'
+        f'<a href="{link}">Unsubscribe</a> from this email sequence.{privacy_html}</p>'
     )
     html = (body_html or "").strip()
     text = (body_text or "").strip()
@@ -390,7 +402,7 @@ class SequenceService:
             raise SequenceServiceError("Sequence not found.", "not_found")
 
         lead = get_lead_for_org(lead_id, org_id)
-        if lead.unsubscribed:
+        if lead.unsubscribed or lead.is_anonymized:
             raise SequenceServiceError("Lead is unsubscribed.", "unsubscribed")
 
         if _active_enrollment(sequence.id, lead.id):
@@ -489,7 +501,7 @@ class SequenceService:
         trigger_type: str,
         payload: dict | None = None,
     ) -> int:
-        if lead.unsubscribed:
+        if lead.unsubscribed or lead.is_anonymized:
             return 0
 
         sequences = EmailSequence.query.filter_by(
@@ -561,9 +573,11 @@ class SequenceService:
             return False
 
         lead = get_lead_for_org(enrollment.lead_id, enrollment.organization_id)
-        if lead.unsubscribed:
+        if lead.unsubscribed or lead.is_anonymized:
             SequenceService.unenroll(
-                enrollment.id, "unsubscribed", organization_id=enrollment.organization_id
+                enrollment.id,
+                "unsubscribed" if lead.unsubscribed else "anonymized",
+                organization_id=enrollment.organization_id,
             )
             return False
 
@@ -593,6 +607,7 @@ class SequenceService:
             body_text,
             lead_id=lead.id,
             sequence_id=sequence.id,
+            organization_id=enrollment.organization_id,
         )
 
         try:
@@ -678,7 +693,7 @@ class SequenceService:
                 )
                 continue
             for lead in leads:
-                if lead.unsubscribed:
+                if lead.unsubscribed or lead.is_anonymized:
                     continue
                 try:
                     SequenceService.enroll_lead(

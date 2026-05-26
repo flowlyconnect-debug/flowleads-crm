@@ -32,6 +32,14 @@ class OrganizationSettings(db.Model):
     auto_task_on_new_lead: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     auto_task_no_contact_days: Mapped[int] = mapped_column(Integer, default=14, nullable=False)
     auto_task_stage_change: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    gdpr_default_legal_basis: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    gdpr_retention_days: Mapped[int] = mapped_column(Integer, default=730, nullable=False)
+    gdpr_auto_anonymize_inactive: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    data_controller_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    data_controller_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

@@ -54,6 +54,26 @@ class LeadFilterForm(FlaskForm):
     score_max = IntegerField("Max score", validators=[Optional(), NumberRange(min=0, max=100)])
     created_from = DateField("Created from", validators=[Optional()])
     created_to = DateField("Created to", validators=[Optional()])
+    gdpr_consent = SelectField(
+        "GDPR consent",
+        choices=[("", "All"), ("1", "Consented only")],
+        validators=[Optional()],
+    )
+    marketing_opt_in = SelectField(
+        "Marketing opt-in",
+        choices=[("", "All"), ("1", "Opt-in only")],
+        validators=[Optional()],
+    )
+    unsubscribed = SelectField(
+        "Unsubscribed",
+        choices=[("", "All"), ("1", "Unsubscribed only")],
+        validators=[Optional()],
+    )
+    is_anonymized = SelectField(
+        "Anonymized",
+        choices=[("", "All"), ("1", "Anonymized only")],
+        validators=[Optional()],
+    )
     sort = SelectField(
         "Sort",
         choices=[

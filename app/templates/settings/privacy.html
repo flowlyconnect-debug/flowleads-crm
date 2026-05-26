@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Tietosuoja — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Tietosuoja-asetukset</h1>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>{{ form.gdpr_default_legal_basis.label }}{{ form.gdpr_default_legal_basis(placeholder='consent / legitimate_interest / contract') }}</label>
+    <label>{{ form.gdpr_retention_days.label }}{{ form.gdpr_retention_days() }}</label>
+    <label>
+      <input type="checkbox" name="gdpr_auto_anonymize_inactive" {% if settings.gdpr_auto_anonymize_inactive %}checked{% endif %}>
+      Automaattinen anonymisointi passiivisille liideille
+    </label>
+    <label>{{ form.privacy_policy_url.label }}{{ form.privacy_policy_url() }}</label>
+    <label>{{ form.data_controller_name.label }}{{ form.data_controller_name() }}</label>
+    <label>{{ form.data_controller_email.label }}{{ form.data_controller_email() }}</label>
+    {{ form.submit(class_='btn') }}
+  </form>
+
+  <hr style="margin:2rem 0;">
+  <h2>Organisaation tietojen vienti</h2>
+  <p>Pyydä ZIP-vienti kaikista organisaation tiedoista. Latauslinkki lähetetään sähköpostiin (48 h voimassa).</p>
+  <form method="post" action="{{ url_for('settings.gdpr_export_request') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn secondary">Pyydä organisaation vienti</button>
+  </form>
+</div>
+{% endblock %}

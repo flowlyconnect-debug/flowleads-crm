@@ -93,6 +93,27 @@
   </div>
 </div>
 
+<div class="card" style="margin-top:1.5rem;">
+  <h2>Tulevat tapaamiset</h2>
+  {% if upcoming_meetings %}
+  <ul class="timeline">
+    {% for meeting in upcoming_meetings %}
+    <li>
+      <strong>{{ meeting.title }}</strong>
+      <span class="ai-meta">{{ meeting.start_at.strftime('%a %d.%m. %H:%M') }}</span>
+      {% if meeting.lead %}<span class="ai-meta">— {{ meeting.lead.display_name }}</span>{% endif %}
+      {% if meeting.meeting_url %}
+      <a class="btn secondary" href="{{ meeting.meeting_url }}" target="_blank" rel="noopener" style="margin-left:0.5rem; padding:0.25rem 0.5rem; font-size:0.8rem;">Liity</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <a href="{{ url_for('calendar.my_calendar', organization_id=organization_id) if current_user.is_superadmin() else url_for('calendar.my_calendar') }}" style="font-size:0.85rem;">Näytä kalenteri</a>
+  {% else %}
+  <p class="ai-meta">Ei tulevia tapaamisia.</p>
+  {% endif %}
+</div>
+
 <div class="grid-2" style="margin-top:1.5rem;">
   <div class="card">
     <h2>Viimeisimmät tehtävät</h2>

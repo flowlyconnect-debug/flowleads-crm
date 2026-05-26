@@ -55,6 +55,10 @@ def _filters_from_request() -> dict:
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
         "sort": request.args.get("sort", "created_at"),
         "dir": request.args.get("dir", "desc"),
+        "gdpr_consent": request.args.get("gdpr_consent") == "1",
+        "marketing_opt_in": request.args.get("marketing_opt_in") == "1",
+        "unsubscribed": request.args.get("unsubscribed") == "1",
+        "is_anonymized": request.args.get("is_anonymized") == "1",
     }
 
 
@@ -238,6 +242,25 @@ def detail(lead_id):
 
     sequence_enrollments = lead_enrollment_rows(lead.id, organization_id)
     enrollable_sequences = available_sequences_for_enroll(organization_id)
+    from app.gdpr.forms import AnonymizeLeadForm
+
+    anonymize_form = AnonymizeLeadForm()
+    from app.calendar.forms import ScheduleMeetingForm
+    from app.calendar.services import CalendarService
+
+    schedule_meeting_form = ScheduleMeetingForm()
+    default_title = f"Tapaaminen — {lead.company or lead.display_name}"
+    schedule_meeting_form.title.data = default_title
+    if lead.email:
+        schedule_meeting_form.attendees.data = lead.email
+    if lead.ai_summary:
+        schedule_meeting_form.description.data = lead.ai_summary
+    default_start = datetime.now(timezone.utc) + timedelta(hours=1)
+    schedule_meeting_form.start_at.data = default_start.replace(tzinfo=None)
+    calendar_connection = CalendarService.get_active_connection(
+        current_user.id, organization_id
+    )
+    lead_meetings = CalendarService.get_events_for_lead(lead.id, organization_id)
     org_query = (
         {"organization_id": organization_id}
         if current_user.is_superadmin()
@@ -258,6 +281,12 @@ def detail(lead_id):
         can_assign_others=can_assign_to_others(),
         sequence_enrollments=sequence_enrollments,
         enrollable_sequences=enrollable_sequences,
+        anonymize_form=anonymize_form,
+        can_gdpr_admin=current_user.role in ("admin", "superadmin"),
+        schedule_meeting_form=schedule_meeting_form,
+        calendar_connection=calendar_connection,
+        lead_meetings_upcoming=lead_meetings["upcoming"],
+        lead_meetings_past=lead_meetings["past"],
     )
 
 
@@ -633,3 +662,12 @@ def bulk_action():
     except LeadServiceError as exc:
         db.session.rollback()
         return json_error(exc.code, exc.message, 400)
+
+
+from app.gdpr.routes import register_lead_gdpr_routes  # noqa: E402
+
+register_lead_gdpr_routes(leads_bp)
+
+from app.calendar.routes import register_calendar_lead_routes  # noqa: E402
+
+register_calendar_lead_routes(leads_bp)

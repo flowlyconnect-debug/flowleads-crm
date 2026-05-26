@@ -86,6 +86,11 @@ def dashboard():
     tasks_today = TaskService.get_due_today(current_user.id, organization_id)
     tasks_overdue = TaskService.get_overdue(organization_id, user_id=current_user.id)
     recent_tasks = TaskService.get_recent(organization_id, current_user.id, limit=5)
+    from app.calendar.services import CalendarService
+
+    upcoming_meetings = CalendarService.get_upcoming_meetings(
+        current_user.id, organization_id, limit=3
+    )
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
@@ -96,6 +101,7 @@ def dashboard():
         tasks_today_count=len(tasks_today),
         tasks_overdue_count=len(tasks_overdue),
         recent_tasks=recent_tasks,
+        upcoming_meetings=upcoming_meetings,
     )
 
 

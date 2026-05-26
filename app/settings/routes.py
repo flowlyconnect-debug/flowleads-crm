@@ -89,3 +89,11 @@ def revoke_api_key_route(key_id: int):
 
 
 import app.email.settings_routes  # noqa: F401, E402
+
+from app.gdpr.routes import register_settings_gdpr_routes  # noqa: E402
+
+register_settings_gdpr_routes(settings_bp)
+
+from app.calendar.settings_routes import register_calendar_settings_routes  # noqa: E402
+
+register_calendar_settings_routes(settings_bp)

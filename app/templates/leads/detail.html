@@ -20,7 +20,9 @@
   <a href="#contact" class="active" data-tab="contact">Yhteystiedot</a>
   <a href="#tasks" data-tab="tasks">Tehtävät ({{ lead_tasks|length }})</a>
   <a href="#sequences" data-tab="sequences">Sekvenssit ({{ sequence_enrollments|selectattr('enrollment.status', 'equalto', 'active')|list|length }})</a>
+  <a href="#meetings" data-tab="meetings">Tapaamiset ({{ lead_meetings_upcoming|length }})</a>
   <a href="#activity" data-tab="activity">Aktiviteetti</a>
+  <a href="#privacy" data-tab="privacy">Tietosuoja</a>
 </div>
 
 <div class="grid-2" id="lead-main-grid">
@@ -56,6 +58,28 @@
       <button type="button" class="btn disabled" disabled title="Lead has no email">Send email</button>
       {% endif %}
     </p>
+  </div>
+
+  <div class="card" id="panel-privacy" style="display:none;">
+    <h2>Tietosuoja</h2>
+    <p><strong>Suostumus:</strong> {{ 'Kyllä' if lead.gdpr_consent else 'Ei' }}</p>
+    <p><strong>Suostumusaika:</strong> {{ lead.gdpr_consent_at.strftime('%Y-%m-%d %H:%M') if lead.gdpr_consent_at else '—' }}</p>
+    <p><strong>Lähde:</strong> {{ lead.gdpr_consent_source or '—' }}</p>
+    <p><strong>Oikeusperuste:</strong> {{ lead.gdpr_legal_basis or '—' }}</p>
+    <p><strong>Markkinointi:</strong> {{ 'Kyllä' if lead.marketing_opt_in else 'Ei' }}</p>
+    <p><strong>Uutiskirjeestä pois:</strong> {{ 'Kyllä' if lead.unsubscribed else 'Ei' }}{% if lead.unsubscribed_at %} ({{ lead.unsubscribed_at.strftime('%Y-%m-%d') }}){% endif %}</p>
+    <p><strong>Anonymisoitu:</strong> {{ 'Kyllä' if lead.is_anonymized else 'Ei' }}</p>
+    <p style="margin-top:1rem;">
+      <a class="btn secondary" href="{{ url_for('leads.gdpr_export_lead', lead_id=lead.id, **org_query) }}">Vie tiedot (JSON)</a>
+    </p>
+    {% if can_gdpr_admin and not lead.is_anonymized %}
+    <form method="post" action="{{ url_for('leads.gdpr_anonymize_lead', lead_id=lead.id, **org_query) }}" style="margin-top:1rem;" onsubmit="return confirm('Anonymisoidaanko liidin henkilötiedot pysyvästi?');">
+      {{ anonymize_form.hidden_tag() }}
+      <p><label>Syy (valinnainen)</label>{{ anonymize_form.reason(rows=2) }}</p>
+      <p><label>Salasana</label>{{ anonymize_form.password() }}</p>
+      {{ anonymize_form.submit(class_="btn", style="background:#b91c1c;") }}
+    </form>
+    {% endif %}
   </div>
 
   <div class="card" id="panel-ai">
@@ -203,6 +227,50 @@
   </table>
 </div>
 
+<div class="card" id="panel-meetings" style="display:none; margin-top:1rem;">
+  <div class="toolbar" style="margin-bottom:0.5rem;">
+    <h2 style="margin:0;">Tapaamiset</h2>
+    {% if calendar_connection %}
+    <button type="button" class="btn" onclick="document.getElementById('meeting-modal').classList.add('open')">Aikatauluta tapaaminen</button>
+    {% else %}
+    <a class="btn secondary" href="{{ url_for('settings.calendar_settings') }}">Yhdistä kalenteri</a>
+    {% endif %}
+  </div>
+  {% if calendar_connection %}
+  <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:1rem;">
+    {% if calendar_connection.provider == 'google' %}Google Calendar{% else %}Microsoft Outlook{% endif %}
+  </p>
+  {% endif %}
+  <h3 style="font-size:0.95rem;">Tulevat</h3>
+  <ul class="timeline">
+    {% for meeting in lead_meetings_upcoming %}
+    <li>
+      <strong>{{ meeting.title }}</strong>
+      <span class="ai-meta">{{ meeting.start_at.strftime('%Y-%m-%d %H:%M') }}–{{ meeting.end_at.strftime('%H:%M') }}</span>
+      {% if meeting.attendees %}<br><span class="ai-meta">{{ meeting.attendees|join(', ') }}</span>{% endif %}
+      {% if meeting.meeting_url %}
+      <br><a class="btn secondary" href="{{ meeting.meeting_url }}" target="_blank" rel="noopener" style="margin-top:0.35rem; padding:0.25rem 0.5rem; font-size:0.8rem;">Liity tapaamiseen</a>
+      {% endif %}
+    </li>
+    {% else %}
+    <li>Ei tulevia tapaamisia.</li>
+    {% endfor %}
+  </ul>
+  {% if lead_meetings_past %}
+  <details style="margin-top:1rem;">
+    <summary style="cursor:pointer; color:#94a3b8;">Menneet tapaamiset ({{ lead_meetings_past|length }})</summary>
+    <ul class="timeline" style="opacity:0.6;">
+      {% for meeting in lead_meetings_past %}
+      <li>
+        <s>{{ meeting.title }}</s>
+        <span class="ai-meta">{{ meeting.start_at.strftime('%Y-%m-%d %H:%M') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>
+
 <div class="card" id="panel-activity" style="display:none; margin-top:1rem;">
     <h2>Activity</h2>
     <form method="post" action="{{ url_for('leads.add_note', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.add_note', lead_id=lead.id) }}">
@@ -221,6 +289,32 @@
       <li>No activity yet.</li>
       {% endfor %}
     </ul>
+</div>
+
+<div class="modal-backdrop" id="meeting-modal">
+  <div class="modal" style="max-width:520px;">
+    <h2 style="margin-top:0;">Aikatauluta tapaaminen</h2>
+    <form method="post" action="{{ url_for('leads.schedule_lead_meeting', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.schedule_lead_meeting', lead_id=lead.id) }}">
+      {{ schedule_meeting_form.hidden_tag() }}
+      <label>{{ schedule_meeting_form.title.label }}{{ schedule_meeting_form.title() }}</label>
+      <label>{{ schedule_meeting_form.start_at.label }}{{ schedule_meeting_form.start_at() }}</label>
+      <label>{{ schedule_meeting_form.duration_minutes.label }}{{ schedule_meeting_form.duration_minutes() }}</label>
+      <label>{{ schedule_meeting_form.description.label }}{{ schedule_meeting_form.description(rows=3) }}</label>
+      <label>{{ schedule_meeting_form.attendees.label }}{{ schedule_meeting_form.attendees(placeholder='email@example.com, toinen@example.com') }}</label>
+      <label>{{ schedule_meeting_form.location.label }}{{ schedule_meeting_form.location() }}</label>
+      <label>{{ schedule_meeting_form.video_meeting() }} {{ schedule_meeting_form.video_meeting.label.text }}</label>
+      {% if calendar_connection %}
+      <p style="font-size:0.85rem; color:#94a3b8;">
+        Palvelu:
+        {% if calendar_connection.provider == 'google' %}Google (Meet){% else %}Microsoft (Teams){% endif %}
+      </p>
+      {% endif %}
+      <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="btn">Aikatauluta</button>
+        <button type="button" class="btn secondary" onclick="document.getElementById('meeting-modal').classList.remove('open')">Peruuta</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="task-modal">
@@ -260,10 +354,19 @@ document.querySelectorAll('.tabs a').forEach(link => {
     const mainGrid = document.getElementById('lead-main-grid');
     const tasks = document.getElementById('panel-tasks');
     const sequences = document.getElementById('panel-sequences');
+    const meetings = document.getElementById('panel-meetings');
     const activity = document.getElementById('panel-activity');
-    mainGrid.style.display = tab === 'contact' ? '' : 'none';
+    const contact = document.getElementById('panel-contact');
+    const ai = document.getElementById('panel-ai');
+    const privacy = document.getElementById('panel-privacy');
+    const showMain = tab === 'contact' || tab === 'privacy';
+    mainGrid.style.display = showMain ? '' : 'none';
+    if (contact) contact.style.display = tab === 'contact' ? '' : 'none';
+    if (ai) ai.style.display = tab === 'contact' ? '' : 'none';
+    if (privacy) privacy.style.display = tab === 'privacy' ? '' : 'none';
     tasks.style.display = tab === 'tasks' ? '' : 'none';
     sequences.style.display = tab === 'sequences' ? '' : 'none';
+    if (meetings) meetings.style.display = tab === 'meetings' ? '' : 'none';
     activity.style.display = tab === 'activity' ? '' : 'none';
   });
 });

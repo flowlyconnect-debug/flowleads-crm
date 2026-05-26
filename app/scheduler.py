@@ -122,6 +122,39 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Automation task-overdue job failed")
 
+    def run_monthly_gdpr_retention():
+        with app.app_context():
+            from app.gdpr.jobs import monthly_gdpr_retention
+
+            try:
+                count = monthly_gdpr_retention()
+                if count:
+                    logger.info("GDPR retention anonymized %s lead(s)", count)
+            except Exception:
+                logger.exception("Monthly GDPR retention job failed")
+
+    def run_gdpr_export_processor():
+        with app.app_context():
+            from app.gdpr.jobs import gdpr_export_processor
+
+            try:
+                count = gdpr_export_processor()
+                if count:
+                    logger.info("Processed %s GDPR export request(s)", count)
+            except Exception:
+                logger.exception("GDPR export processor job failed")
+
+    def run_calendar_sync():
+        with app.app_context():
+            from app.calendar.services import CalendarService
+
+            try:
+                count = CalendarService.run_hourly_sync()
+                if count:
+                    logger.info("Calendar sync updated %s event(s)", count)
+            except Exception:
+                logger.exception("Calendar hourly sync job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -168,6 +201,24 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_automation_task_overdue,
         IntervalTrigger(hours=1),
         id="automation_task_overdue",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_monthly_gdpr_retention,
+        CronTrigger(day=1, hour=5, minute=0, timezone="UTC"),
+        id="monthly_gdpr_retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_gdpr_export_processor,
+        IntervalTrigger(minutes=15),
+        id="gdpr_export_processor",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_calendar_sync,
+        IntervalTrigger(hours=1),
+        id="calendar_sync",
         replace_existing=True,
     )
 

@@ -72,6 +72,14 @@ class Config:
     CACHE_TYPE = "SimpleCache"
     DASHBOARD_CACHE_SECONDS = int(os.environ.get("DASHBOARD_CACHE_SECONDS", 300))
 
+    CALENDAR_ENCRYPTION_KEY = os.environ.get("CALENDAR_ENCRYPTION_KEY")
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
+    MICROSOFT_CLIENT_ID = os.environ.get("MICROSOFT_CLIENT_ID")
+    MICROSOFT_CLIENT_SECRET = os.environ.get("MICROSOFT_CLIENT_SECRET")
+    MICROSOFT_REDIRECT_URI = os.environ.get("MICROSOFT_REDIRECT_URI")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -82,9 +90,17 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True
 
 
+def _testing_calendar_fernet_key() -> str:
+    from cryptography.fernet import Fernet
+
+    return Fernet.generate_key().decode("ascii")
+
+
 class TestingConfig(Config):
     TESTING = True
     DEBUG = True
+    _CALENDAR_TEST_FERNET_KEY = _testing_calendar_fernet_key()
+    CALENDAR_ENCRYPTION_KEY = _CALENDAR_TEST_FERNET_KEY
     SERVER_NAME = "localhost"
     PREFERRED_URL_SCHEME = "http"
     WTF_CSRF_ENABLED = False

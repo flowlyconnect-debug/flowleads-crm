@@ -17,6 +17,8 @@ from app.extensions import db
 
 LEAD_STATUSES = ("active", "won", "lost", "archived")
 LEAD_SOURCES = ("n8n", "manual", "import")
+GDPR_CONSENT_SOURCES = ("api", "form", "manual")
+GDPR_LEGAL_BASES = ("consent", "legitimate_interest", "contract")
 AI_ENRICHMENT_STATUSES = ("pending", "processing", "completed", "failed", "disabled")
 ACTIVITY_TYPES = (
     "note",
@@ -36,6 +38,8 @@ ACTIVITY_TYPES = (
     "sequence_enrolled",
     "sequence_email_sent",
     "sequence_unenrolled",
+    "meeting_scheduled",
+    "meeting_cancelled",
 )
 
 DEFAULT_PIPELINE_STAGES = [
@@ -144,6 +148,15 @@ class Lead(db.Model):
     )
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     unsubscribed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    gdpr_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    gdpr_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    gdpr_consent_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    gdpr_legal_basis: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    marketing_opt_in: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_anonymized: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     stage: Mapped[PipelineStage] = relationship("PipelineStage", back_populates="leads")
