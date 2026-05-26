@@ -4,9 +4,13 @@ import io
 import pyotp
 import qrcode
 from flask import current_app
-from flask_login import current_user
 
 from app.auth.models import BackupCode
+from app.auth.totp_utils import (
+    fresh_user_totp_secret,
+    normalize_totp_secret,
+    verify_totp_token,
+)
 from app.core.audit import log_audit
 from app.core.permissions import clear_2fa_session, set_2fa_verified
 from app.core.security import (
@@ -38,20 +42,22 @@ def generate_qr_code_base64(uri: str) -> str:
 
 
 def setup_totp(user: User) -> tuple[str, str, str]:
-    secret = generate_totp_secret()
+    secret = normalize_totp_secret(generate_totp_secret())
+    if not secret:
+        raise UserServiceError("Unable to initialize 2FA.", "totp_setup_failed")
     user.totp_secret = secret
     user.totp_enabled = False
-    db.session.flush()
+    db.session.commit()
     uri = get_totp_uri(user, secret)
     qr_b64 = generate_qr_code_base64(uri)
     return secret, uri, qr_b64
 
 
 def enable_totp(user: User, token: str) -> list[str]:
-    if not user.totp_secret:
+    secret = fresh_user_totp_secret(user)
+    if not secret:
         raise UserServiceError("2FA is not initialized.", "totp_not_initialized")
-    totp = pyotp.TOTP(user.totp_secret)
-    if not token or not totp.verify(token.strip(), valid_window=1):
+    if not verify_totp_token(secret, token, context="enable", user_id=user.id):
         raise UserServiceError("Invalid verification code.", "invalid_totp")
 
     user.totp_enabled = True
@@ -74,10 +80,12 @@ def _regenerate_backup_codes(user: User) -> list[str]:
 def verify_totp_login(user: User, token: str | None, backup: str | None = None) -> bool:
     if backup:
         return _verify_backup_code(user, backup)
-    if not token or not user.totp_secret:
+    secret = fresh_user_totp_secret(user)
+    if not secret:
         return False
-    totp = pyotp.TOTP(user.totp_secret)
-    return totp.verify(token.strip(), valid_window=1)
+    return verify_totp_token(
+        secret, token, context="login", user_id=user.id
+    )
 
 
 def _verify_backup_code(user: User, code: str) -> bool:

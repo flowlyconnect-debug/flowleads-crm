@@ -18,6 +18,7 @@ from app.auth.services import (
     setup_totp,
     verify_totp_login,
 )
+from app.auth.totp_utils import normalize_totp_code
 from app.core.audit import log_audit
 from app.core.permissions import is_2fa_verified, require_2fa
 from app.core.security import (
@@ -173,16 +174,18 @@ def two_fa_setup():
     qr_b64 = None
     secret = current_user.totp_secret
 
-    if not secret:
+    if not secret and request.method == "GET":
         secret, _uri, qr_b64 = setup_totp(current_user)
-    elif not current_user.totp_enabled:
+    elif secret and not current_user.totp_enabled:
         from app.auth.services import get_totp_uri, generate_qr_code_base64
 
         qr_b64 = generate_qr_code_base64(get_totp_uri(current_user, secret))
 
     if form.validate_on_submit():
         try:
-            raw_codes = enable_totp(current_user, form.token.data)
+            raw_codes = enable_totp(
+                current_user, normalize_totp_code(form.token.data) or ""
+            )
             complete_2fa_session(current_user)
             flash("Two-factor authentication has been enabled.", "success")
             return render_template(
@@ -207,8 +210,10 @@ def two_fa_verify():
 
     form = TwoFAVerifyForm()
     if form.validate_on_submit():
-        token = form.token.data.strip() if form.token.data else None
-        backup = form.backup_code.data.strip() if form.backup_code.data else None
+        token = normalize_totp_code(form.token.data)
+        backup = (
+            form.backup_code.data.strip() if form.backup_code.data else None
+        )
         if not token and not backup:
             flash("Enter a verification code or backup code.", "danger")
         elif verify_totp_login(current_user, token, backup):

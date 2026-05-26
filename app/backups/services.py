@@ -383,10 +383,12 @@ def _verify_superadmin_restore(user: User, password: str, totp_code: str) -> Non
         raise BackupServiceError("2FA must be enabled for restore.", "2fa_required")
     if not check_password(password, user.password_hash):
         raise BackupServiceError("Invalid password.", "invalid_password")
-    import pyotp
+    from app.auth.totp_utils import fresh_user_totp_secret, verify_totp_token
 
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp_code or not totp.verify(totp_code.strip(), valid_window=1):
+    secret = fresh_user_totp_secret(user)
+    if not verify_totp_token(
+        secret, totp_code, context="backup_restore", user_id=user.id
+    ):
         raise BackupServiceError("Invalid 2FA code.", "invalid_totp")
 
 
