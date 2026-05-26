@@ -231,6 +231,18 @@ def detail(lead_id):
         task_form.assigned_to.data = lead.assigned_to or current_user.id
     default_due = datetime.now(timezone.utc) + timedelta(days=1)
     task_form.due_date.data = default_due.replace(tzinfo=None)
+    from app.sequences.ui_helpers import (
+        available_sequences_for_enroll,
+        lead_enrollment_rows,
+    )
+
+    sequence_enrollments = lead_enrollment_rows(lead.id, organization_id)
+    enrollable_sequences = available_sequences_for_enroll(organization_id)
+    org_query = (
+        {"organization_id": organization_id}
+        if current_user.is_superadmin()
+        else {}
+    )
     return render_template(
         "leads/detail.html",
         lead=lead,
@@ -241,8 +253,11 @@ def detail(lead_id):
         lead_tasks=lead_tasks,
         task_form=task_form,
         organization_id=organization_id,
+        org_query=org_query,
         can_archive=can_archive_leads(),
         can_assign_others=can_assign_to_others(),
+        sequence_enrollments=sequence_enrollments,
+        enrollable_sequences=enrollable_sequences,
     )
 
 

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unsubscribe — FlowLeads</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; color: #1f2937; }
+    h1 { font-size: 1.5rem; }
+  </style>
+</head>
+<body>
+  {% if success %}
+  <h1>You have been unsubscribed</h1>
+  <p>You will no longer receive emails from this sequence.</p>
+  {% else %}
+  <h1>Unsubscribe failed</h1>
+  <p>This link is invalid or has expired.</p>
+  {% endif %}
+</body>
+</html>

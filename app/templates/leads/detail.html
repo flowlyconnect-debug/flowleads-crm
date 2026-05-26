@@ -2,6 +2,7 @@
 {% from "_macros.html" import score_badge, ai_status_badge %}
 {% block title %}{{ lead.display_name }} — FlowLeads{% endblock %}
 {% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 <div class="toolbar">
   <h1 style="margin:0;">{{ lead.display_name }}</h1>
   <a class="btn" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}">Edit</a>
@@ -18,6 +19,7 @@
 <div class="tabs">
   <a href="#contact" class="active" data-tab="contact">Yhteystiedot</a>
   <a href="#tasks" data-tab="tasks">Tehtävät ({{ lead_tasks|length }})</a>
+  <a href="#sequences" data-tab="sequences">Sekvenssit ({{ sequence_enrollments|selectattr('enrollment.status', 'equalto', 'active')|list|length }})</a>
   <a href="#activity" data-tab="activity">Aktiviteetti</a>
 </div>
 
@@ -142,6 +144,65 @@
     {% endif %}
 </div>
 
+<div class="card" id="panel-sequences" style="display:none; margin-top:1rem;">
+  <div class="toolbar" style="margin-bottom:0.75rem;">
+    <h2 style="margin:0;">Sekvenssit</h2>
+    {% if lead.email and enrollable_sequences %}
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <select id="enroll-sequence-select">
+        <option value="">Lisää sekvenssiin…</option>
+        {% for seq in enrollable_sequences %}
+        <option value="{{ seq.id }}">{{ seq.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="btn" id="btn-enroll-sequence">Lisää</button>
+    </div>
+    {% elif not lead.email %}
+    <span style="color:#94a3b8; font-size:0.9rem;">Liidillä ei ole sähköpostia.</span>
+    {% else %}
+    <span style="color:#94a3b8; font-size:0.9rem;">Ei aktiivisia sekvenssjä.</span>
+    {% endif %}
+  </div>
+  <p id="sequence-action-msg" style="display:none; font-size:0.9rem;"></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Sekvenssi</th>
+        <th>Tila</th>
+        <th>Vaihe</th>
+        <th>Seuraava lähetys</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="sequence-enrollments-body">
+      {% for row in sequence_enrollments %}
+      <tr data-enrollment-id="{{ row.enrollment.id }}">
+        <td>{{ row.sequence_name }}</td>
+        <td><span class="badge">{{ row.status_label }}</span></td>
+        <td>
+          {% if row.step_number %}
+          {{ row.step_number }} / {{ row.step_total }}
+          {% if row.current_subject %}<br><span style="font-size:0.85rem;color:#94a3b8;">{{ row.current_subject }}</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if row.enrollment.status == 'active' and row.next_send_at %}
+          {{ row.next_send_at.strftime('%Y-%m-%d %H:%M') }}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if row.enrollment.status == 'active' %}
+          <button type="button" class="btn secondary btn-sm btn-unenroll" data-enrollment-id="{{ row.enrollment.id }}" style="margin-top:0;padding:0.35rem 0.6rem;font-size:0.8rem;">Poista sekvenssistä</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr id="no-enrollments-row"><td colspan="5">Ei sekvenssijäsenyyksiä.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <div class="card" id="panel-activity" style="display:none; margin-top:1rem;">
     <h2>Activity</h2>
     <form method="post" action="{{ url_for('leads.add_note', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.add_note', lead_id=lead.id) }}">
@@ -198,19 +259,68 @@ document.querySelectorAll('.tabs a').forEach(link => {
     const tab = link.dataset.tab;
     const mainGrid = document.getElementById('lead-main-grid');
     const tasks = document.getElementById('panel-tasks');
+    const sequences = document.getElementById('panel-sequences');
     const activity = document.getElementById('panel-activity');
-    if (tab === 'contact') {
-      mainGrid.style.display = '';
-      tasks.style.display = 'none';
-      activity.style.display = 'none';
-    } else if (tab === 'tasks') {
-      mainGrid.style.display = 'none';
-      tasks.style.display = '';
-      activity.style.display = 'none';
+    mainGrid.style.display = tab === 'contact' ? '' : 'none';
+    tasks.style.display = tab === 'tasks' ? '' : 'none';
+    sequences.style.display = tab === 'sequences' ? '' : 'none';
+    activity.style.display = tab === 'activity' ? '' : 'none';
+  });
+});
+
+const leadId = {{ lead.id }};
+const orgQuery = {{ org_query|tojson }};
+function leadOrgQueryString() {
+  const p = new URLSearchParams();
+  if (orgQuery.organization_id) p.set('organization_id', orgQuery.organization_id);
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+function leadCsrfHeaders() {
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-CSRFToken': document.getElementById('csrf-token')?.value,
+  };
+}
+function showSeqMsg(text, ok) {
+  const el = document.getElementById('sequence-action-msg');
+  el.textContent = text;
+  el.style.color = ok ? 'var(--ok)' : 'var(--danger)';
+  el.style.display = 'block';
+}
+document.getElementById('btn-enroll-sequence')?.addEventListener('click', async () => {
+  const sel = document.getElementById('enroll-sequence-select');
+  const sequenceId = sel?.value;
+  if (!sequenceId) { alert('Valitse sekvenssi.'); return; }
+  const res = await fetch('/leads/' + leadId + '/sequences/enroll' + leadOrgQueryString(), {
+    method: 'POST',
+    headers: leadCsrfHeaders(),
+    body: JSON.stringify({ sequence_id: parseInt(sequenceId, 10) }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showSeqMsg('Liidi lisätty sekvenssiin.', true);
+    setTimeout(() => window.location.reload(), 600);
+  } else {
+    showSeqMsg(data.error?.message || 'Lisäys epäonnistui.', false);
+  }
+});
+document.querySelectorAll('.btn-unenroll').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Poistetaanko liidi sekvenssistä?')) return;
+    const enrollmentId = parseInt(btn.dataset.enrollmentId, 10);
+    const res = await fetch('/leads/' + leadId + '/sequences/unenroll' + leadOrgQueryString(), {
+      method: 'POST',
+      headers: leadCsrfHeaders(),
+      body: JSON.stringify({ enrollment_id: enrollmentId, reason: 'cancelled' }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showSeqMsg('Poistettu sekvenssistä.', true);
+      setTimeout(() => window.location.reload(), 600);
     } else {
-      mainGrid.style.display = 'none';
-      tasks.style.display = 'none';
-      activity.style.display = '';
+      showSeqMsg(data.error?.message || 'Poisto epäonnistui.', false);
     }
   });
 });

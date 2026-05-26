@@ -85,6 +85,8 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     TESTING = True
     DEBUG = True
+    SERVER_NAME = "localhost"
+    PREFERRED_URL_SCHEME = "http"
     WTF_CSRF_ENABLED = False
     SESSION_PROTECTION = None
     LOGIN_RATE_LIMIT = "1000/minute"

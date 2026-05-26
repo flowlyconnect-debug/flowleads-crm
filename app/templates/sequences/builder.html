@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}{{ sequence.name }} — Sekvenssi{% endblock %}
+{% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<input type="hidden" id="sequence-id" value="{{ sequence.id }}">
+
+<div class="toolbar">
+  <h1 style="margin:0;">{{ sequence.name }}</h1>
+  <a class="btn secondary" href="{{ url_for('sequences.list_sequences', **org_query) }}">Takaisin listaan</a>
+  <a class="btn secondary" href="{{ url_for('sequences.sequence_stats_page', sequence_id=sequence.id, **org_query) }}">Tilastot</a>
+  <label style="margin:0; display:flex; align-items:center; gap:0.5rem;">
+    <input type="checkbox" id="toggle-active" {% if sequence.is_active %}checked{% endif %}>
+    <span id="active-label">{% if sequence.is_active %}Aktiivinen{% else %}Ei aktiivinen{% endif %}</span>
+  </label>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+  <p style="margin:0.25rem 0;"><strong>Laukaisin:</strong> {{ trigger_label }}</p>
+  {% if sequence.description %}<p style="margin:0.25rem 0; color:#94a3b8;">{{ sequence.description }}</p>{% endif %}
+  <p style="margin:0.25rem 0; font-size:0.9rem; color:#94a3b8;">
+    Ilmoittautuneet {{ enrollment_counts.enrolled }} ·
+    Aktiiviset {{ enrollment_counts.active }} ·
+    Valmiit {{ enrollment_counts.completed }} ·
+    Peruutukset {{ enrollment_counts.unsubscribed }}
+  </p>
+</div>
+
+<div class="grid-2">
+  <div>
+    <div class="toolbar" style="margin-bottom:0.5rem;">
+      <h2 style="margin:0; font-size:1.1rem;">Vaiheet</h2>
+      <button type="button" class="btn" id="btn-add-step">Lisää vaihe</button>
+    </div>
+    <ol class="seq-timeline" id="steps-timeline">
+      {% for step in steps %}
+      <li class="seq-step-card card" data-step-id="{{ step.id }}" draggable="true">
+        <div class="seq-step-header">
+          <span class="badge seq-step-num">Vaihe {{ loop.index }}</span>
+          <span class="seq-delay">
+            {% if step.order_index == 0 and step.delay_days == 0 and step.delay_hours == 0 %}
+            Heti
+            {% else %}
+            +{{ step.delay_days }} pv {{ step.delay_hours }} h
+            {% endif %}
+          </span>
+        </div>
+        <p class="seq-subject-preview">{{ step.subject_template }}</p>
+        <div class="seq-step-actions">
+          <button type="button" class="btn secondary btn-sm btn-edit-step" data-step-id="{{ step.id }}">Muokkaa</button>
+          <button type="button" class="btn secondary btn-sm btn-move-up" title="Siirrä ylös">↑</button>
+          <button type="button" class="btn secondary btn-sm btn-move-down" title="Siirrä alas">↓</button>
+          <button type="button" class="btn secondary btn-sm btn-delete-step" data-step-id="{{ step.id }}">Poista</button>
+        </div>
+      </li>
+      {% else %}
+      <li class="card" id="no-steps-msg">Ei vaiheita. Lisää ensimmäinen sähköpostivaihe.</li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Esikatselu</h2>
+    <label>Testiliidi
+      <select id="preview-lead-id">
+        <option value="">— Valitse liidi —</option>
+        {% for lead in preview_leads %}
+        <option value="{{ lead.id }}">{{ lead.display_name }} ({{ lead.email }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Vaihe
+      <select id="preview-step-id">
+        {% for step in steps %}
+        <option value="{{ step.id }}">Vaihe {{ loop.index }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="button" class="btn secondary" id="btn-preview">Päivitä esikatselu</button>
+    <p style="margin-top:1rem;"><strong>Aihe:</strong> <span id="preview-subject">—</span></p>
+    <div id="preview-html" class="email-preview-frame" style="background:#fff;color:#111;padding:1rem;border-radius:4px;min-height:100px;margin-top:0.5rem;">—</div>
+    <pre id="preview-text" style="font-size:0.85rem;color:#94a3b8;white-space:pre-wrap;margin-top:0.75rem;"></pre>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="step-modal">
+  <div class="modal" style="max-width:640px; max-height:90vh; overflow-y:auto;">
+    <h2 style="margin-top:0;" id="step-modal-title">Vaihe</h2>
+    <form id="step-form">
+      <input type="hidden" name="step_id" id="step-id-field" value="">
+      <div class="grid-2" style="gap:0.75rem;">
+        <label>Viive (päivää)
+          <input type="number" name="delay_days" id="delay-days" min="0" value="0">
+        </label>
+        <label>Viive (tuntia)
+          <input type="number" name="delay_hours" id="delay-hours" min="0" value="0">
+        </label>
+      </div>
+      <p style="font-size:0.85rem; color:#94a3b8; margin:0.5rem 0 0;">Ensimmäisellä vaiheella viive lasketaan ilmoittautumisesta.</p>
+      <label>Aihemalli
+        <input type="text" name="subject_template" id="subject-template" required maxlength="500">
+      </label>
+      <label>HTML-sisältö
+        <textarea name="body_html_template" id="body-html-template" rows="8"></textarea>
+      </label>
+      <label>Tekstisisältö
+        <textarea name="body_text_template" id="body-text-template" rows="5"></textarea>
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem;">
+        <input type="checkbox" name="skip_if_replied" id="skip-if-replied">
+        Ohita vaihe, jos liidi on vastannut
+      </label>
+      <div class="var-helper card" style="margin-top:1rem; padding:0.75rem; background:#0f172a;">
+        <strong style="font-size:0.9rem;">Muuttujat</strong>
+        <p style="font-size:0.85rem; margin:0.5rem 0 0;">
+          <code>{{"{{"}}first_name{{"}}"}}</code>
+          <code>{{"{{"}}company{{"}}"}}</code>
+          <code>{{"{{"}}email{{"}}"}}</code>
+          <code>{{"{{"}}phone{{"}}"}}</code>
+        </p>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="submit" class="btn">Tallenna</button>
+        <button type="button" class="btn secondary" id="btn-close-step-modal">Peruuta</button>
+      </div>
+    </form>
+    <p id="step-form-error" style="color:var(--danger); display:none;"></p>
+  </div>
+</div>
+
+<style>
+  .seq-timeline { list-style:none; padding:0; margin:0; }
+  .seq-timeline > li { margin-bottom:1rem; position:relative; }
+  .seq-timeline > li::before {
+    content:''; position:absolute; left:1rem; top:100%; width:2px; height:1rem;
+    background:#334155;
+  }
+  .seq-timeline > li:last-child::before { display:none; }
+  .seq-step-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+  .seq-subject-preview { margin:0 0 0.75rem; font-size:0.95rem; color:#cbd5e1; }
+  .seq-step-actions { display:flex; flex-wrap:wrap; gap:0.35rem; }
+  .btn-sm { margin-top:0; padding:0.35rem 0.6rem; font-size:0.8rem; }
+  .seq-timeline .card.drag-over { outline:2px dashed var(--accent); }
+  textarea { width:100%; padding:0.6rem; margin-top:0.25rem; border-radius:4px; border:1px solid #475569; background:#0f172a; color:var(--text); font-family:inherit; }
+  .var-helper code { margin-right:0.5rem; cursor:pointer; }
+</style>
+
+<script>
+const sequenceId = parseInt(document.getElementById('sequence-id').value, 10);
+const orgQuery = {{ org_query|tojson }};
+const stepsData = {{ steps|map(attribute='id')|list|tojson }};
+
+let currentSteps = [
+  {% for step in steps %}
+  {
+    id: {{ step.id }},
+    order_index: {{ step.order_index }},
+    delay_days: {{ step.delay_days }},
+    delay_hours: {{ step.delay_hours }},
+    subject_template: {{ step.subject_template|tojson }},
+    body_html_template: {{ (step.body_html_template or '')|tojson }},
+    body_text_template: {{ (step.body_text_template or '')|tojson }},
+    skip_if_replied: {{ ((step.condition or {}).get('skip_if_replied') or false)|tojson }},
+  },
+  {% endfor %}
+];
+
+function orgQueryString() {
+  const p = new URLSearchParams();
+  if (orgQuery.organization_id) p.set('organization_id', orgQuery.organization_id);
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+function apiUrl(path) {
+  return path + orgQueryString();
+}
+function csrfHeaders() {
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-CSRFToken': document.getElementById('csrf-token')?.value,
+  };
+}
+
+document.querySelectorAll('.var-helper code').forEach(code => {
+  code.addEventListener('click', () => {
+    const field = document.getElementById('subject-template');
+    if (field) {
+      field.value += code.textContent;
+      field.focus();
+    }
+  });
+});
+
+document.getElementById('toggle-active')?.addEventListener('change', async e => {
+  const active = e.target.checked;
+  const res = await fetch(apiUrl('/sequences/' + sequenceId), {
+    method: 'PUT',
+    headers: csrfHeaders(),
+    body: JSON.stringify({ is_active: active }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('active-label').textContent = active ? 'Aktiivinen' : 'Ei aktiivinen';
+  } else {
+    e.target.checked = !active;
+    alert(data.error?.message || 'Tilan päivitys epäonnistui.');
+  }
+});
+
+function openStepModal(step) {
+  document.getElementById('step-modal').classList.add('open');
+  document.getElementById('step-modal-title').textContent = step ? 'Muokkaa vaihetta' : 'Uusi vaihe';
+  document.getElementById('step-id-field').value = step ? step.id : '';
+  document.getElementById('delay-days').value = step ? step.delay_days : 0;
+  document.getElementById('delay-hours').value = step ? step.delay_hours : 0;
+  document.getElementById('subject-template').value = step ? step.subject_template : '';
+  document.getElementById('body-html-template').value = step ? (step.body_html_template || '') : '';
+  document.getElementById('body-text-template').value = step ? (step.body_text_template || '') : '';
+  document.getElementById('skip-if-replied').checked = step ? !!step.skip_if_replied : false;
+  document.getElementById('step-form-error').style.display = 'none';
+}
+
+document.getElementById('btn-add-step')?.addEventListener('click', () => openStepModal(null));
+document.getElementById('btn-close-step-modal')?.addEventListener('click', () => {
+  document.getElementById('step-modal').classList.remove('open');
+});
+document.getElementById('step-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'step-modal') e.target.classList.remove('open');
+});
+
+document.querySelectorAll('.btn-edit-step').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = parseInt(btn.dataset.stepId, 10);
+    const step = currentSteps.find(s => s.id === id);
+    if (step) openStepModal(step);
+  });
+});
+
+document.getElementById('step-form')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const errEl = document.getElementById('step-form-error');
+  errEl.style.display = 'none';
+  const stepId = document.getElementById('step-id-field').value;
+  const body = {
+    delay_days: parseInt(document.getElementById('delay-days').value, 10) || 0,
+    delay_hours: parseInt(document.getElementById('delay-hours').value, 10) || 0,
+    subject_template: document.getElementById('subject-template').value.trim(),
+    body_html_template: document.getElementById('body-html-template').value,
+    body_text_template: document.getElementById('body-text-template').value,
+    skip_if_replied: document.getElementById('skip-if-replied').checked,
+  };
+  const url = stepId
+    ? apiUrl('/sequences/' + sequenceId + '/steps/' + stepId)
+    : apiUrl('/sequences/' + sequenceId + '/steps');
+  const method = stepId ? 'PUT' : 'POST';
+  const res = await fetch(url, { method, headers: csrfHeaders(), body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!data.success) {
+    errEl.textContent = data.error?.message || 'Tallennus epäonnistui.';
+    errEl.style.display = 'block';
+    return;
+  }
+  window.location.reload();
+});
+
+async function deleteStep(stepId) {
+  if (!confirm('Poistetaanko vaihe?')) return;
+  const res = await fetch(apiUrl('/sequences/' + sequenceId + '/steps/' + stepId), {
+    method: 'DELETE',
+    headers: csrfHeaders(),
+  });
+  const data = await res.json();
+  if (data.success) window.location.reload();
+  else alert(data.error?.message || 'Poisto epäonnistui.');
+}
+
+document.querySelectorAll('.btn-delete-step').forEach(btn => {
+  btn.addEventListener('click', () => deleteStep(parseInt(btn.dataset.stepId, 10)));
+});
+
+function orderedStepIds() {
+  return Array.from(document.querySelectorAll('#steps-timeline .seq-step-card'))
+    .map(el => parseInt(el.dataset.stepId, 10));
+}
+
+async function reorderSteps(stepIds) {
+  const res = await fetch(apiUrl('/sequences/' + sequenceId + '/steps/reorder'), {
+    method: 'POST',
+    headers: csrfHeaders(),
+    body: JSON.stringify({ step_ids: stepIds }),
+  });
+  const data = await res.json();
+  if (data.success) window.location.reload();
+  else alert(data.error?.message || 'Järjestys epäonnistui.');
+}
+
+document.querySelectorAll('.btn-move-up').forEach((btn, idx) => {
+  btn.addEventListener('click', () => {
+    const ids = orderedStepIds();
+    if (idx <= 0) return;
+    [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+    reorderSteps(ids);
+  });
+});
+document.querySelectorAll('.btn-move-down').forEach((btn, idx) => {
+  btn.addEventListener('click', () => {
+    const ids = orderedStepIds();
+    if (idx >= ids.length - 1) return;
+    [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    reorderSteps(ids);
+  });
+});
+
+let dragSrc = null;
+document.querySelectorAll('.seq-step-card').forEach(card => {
+  card.addEventListener('dragstart', e => { dragSrc = card; e.dataTransfer.effectAllowed = 'move'; });
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    if (!dragSrc || dragSrc === card) return;
+    const timeline = document.getElementById('steps-timeline');
+    const cards = [...timeline.querySelectorAll('.seq-step-card')];
+    const srcIdx = cards.indexOf(dragSrc);
+    const tgtIdx = cards.indexOf(card);
+    if (srcIdx < 0 || tgtIdx < 0) return;
+    if (srcIdx < tgtIdx) card.after(dragSrc);
+    else card.before(dragSrc);
+    reorderSteps(orderedStepIds());
+  });
+});
+
+document.getElementById('btn-preview')?.addEventListener('click', async () => {
+  const leadId = document.getElementById('preview-lead-id').value;
+  const stepId = document.getElementById('preview-step-id').value;
+  if (!leadId) { alert('Valitse testiliidi.'); return; }
+  const res = await fetch(apiUrl('/sequences/' + sequenceId + '/preview'), {
+    method: 'POST',
+    headers: csrfHeaders(),
+    body: JSON.stringify({ lead_id: parseInt(leadId, 10), step_id: stepId ? parseInt(stepId, 10) : null }),
+  });
+  const data = await res.json();
+  if (!data.success) {
+    alert(data.error?.message || 'Esikatselu epäonnistui.');
+    return;
+  }
+  document.getElementById('preview-subject').textContent = data.data.subject || '—';
+  document.getElementById('preview-html').innerHTML = data.data.body_html || '—';
+  document.getElementById('preview-text').textContent = data.data.body_text || '';
+});
+</script>
+{% endblock %}

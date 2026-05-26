@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ sequence.name }} — Tilastot{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Tilastot: {{ sequence.name }}</h1>
+  <a class="btn secondary" href="{{ url_for('sequences.sequence_builder', sequence_id=sequence.id, **org_query) }}">Muokkaa sekvenssiä</a>
+  <a class="btn secondary" href="{{ url_for('sequences.list_sequences', **org_query) }}">Lista</a>
+</div>
+
+<div class="filters" style="grid-template-columns: repeat(4, 1fr); margin-bottom:1.5rem;">
+  <div class="card" style="text-align:center;">
+    <div style="font-size:1.75rem; font-weight:700;">{{ stats.enrolled }}</div>
+    <div style="color:#94a3b8; font-size:0.9rem;">Ilmoittautuneet</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:1.75rem; font-weight:700;">{{ stats.active }}</div>
+    <div style="color:#94a3b8; font-size:0.9rem;">Aktiiviset</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:1.75rem; font-weight:700;">{{ stats.completed }}</div>
+    <div style="color:#94a3b8; font-size:0.9rem;">Valmiit</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:1.75rem; font-weight:700;">{{ stats.unsubscribed }}</div>
+    <div style="color:#94a3b8; font-size:0.9rem;">Peruutukset</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Vaiheittain</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Vaihe</th>
+        <th>Aihe</th>
+        <th>Lähetetyt</th>
+        <th>Avatut</th>
+        <th>Klikkaukset</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for step in stats.steps %}
+      <tr>
+        <td>{{ step.step_number }}</td>
+        <td>{{ step.subject_preview }}</td>
+        <td>{{ step.sent }}</td>
+        <td>
+          {% if step.opened %}
+          {{ step.opened }}
+          {% else %}
+          <span style="color:#94a3b8;" title="Seuranta tulossa">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if step.clicked %}
+          {{ step.clicked }}
+          {% else %}
+          <span style="color:#94a3b8;" title="Seuranta tulossa">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">Ei vaiheita.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="font-size:0.85rem; color:#94a3b8; margin-top:1rem;">
+    Avaus- ja klikkausluvut näkyvät, kun Mailgun-seuranta on kytketty viesteihin.
+  </p>
+</div>
+{% endblock %}

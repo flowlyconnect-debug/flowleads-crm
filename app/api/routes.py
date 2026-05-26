@@ -138,6 +138,49 @@ def get_lead(lead_id: int):
     )
 
 
+@api_bp.route("/leads/<int:lead_id>/sequences/enroll", methods=["POST"])
+@require_api_key
+@limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
+def enroll_lead_sequence(lead_id: int):
+    if not request.is_json:
+        return json_error("validation_error", "JSON body is required.", 400)
+
+    body = request.get_json(silent=True) or {}
+    sequence_id = body.get("sequence_id")
+    if not sequence_id:
+        return json_error("validation_error", "sequence_id is required.", 400)
+
+    from app.sequences.services import SequenceService, SequenceServiceError
+
+    try:
+        enrollment = SequenceService.enroll_lead(
+            lead_id,
+            int(sequence_id),
+            enrolled_by=None,
+            organization_id=g.organization_id,
+        )
+        db.session.commit()
+    except SequenceServiceError as exc:
+        db.session.rollback()
+        status = 404 if exc.code == "not_found" else 400
+        return json_error(exc.code, exc.message, status)
+
+    return json_success(
+        {
+            "enrollment": {
+                "id": enrollment.id,
+                "sequence_id": enrollment.sequence_id,
+                "lead_id": enrollment.lead_id,
+                "status": enrollment.status,
+                "next_send_at": enrollment.next_send_at.isoformat()
+                if enrollment.next_send_at
+                else None,
+            }
+        },
+        status=201,
+    )
+
+
 @api_bp.route("/leads/<int:lead_id>", methods=["PATCH"])
 @require_api_key
 @limiter.limit(api_rate_limit, key_func=api_rate_limit_key)

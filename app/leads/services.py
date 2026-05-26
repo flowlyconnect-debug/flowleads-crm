@@ -260,6 +260,13 @@ class LeadService:
         except Exception:
             pass
 
+        try:
+            from app.sequences.services import SequenceService
+
+            SequenceService.trigger_auto_enroll(lead, "on_lead_created")
+        except Exception:
+            pass
+
         return lead
 
     @staticmethod
@@ -344,6 +351,17 @@ class LeadService:
                 except Exception:
                     pass
 
+                try:
+                    from app.sequences.services import SequenceService
+
+                    SequenceService.trigger_auto_enroll(
+                        lead,
+                        "on_stage_change",
+                        payload={"stage_id": new_stage.id},
+                    )
+                except Exception:
+                    pass
+
         if "source" in data or "source_ref" in data:
             _check_duplicate_source(
                 organization_id, lead.source, lead.source_ref, exclude_id=lead.id
@@ -403,6 +421,17 @@ class LeadService:
 
         try:
             TaskService.create_auto_tasks(lead, "stage_change")
+        except Exception:
+            pass
+
+        try:
+            from app.sequences.services import SequenceService
+
+            SequenceService.trigger_auto_enroll(
+                lead,
+                "on_stage_change",
+                payload={"stage_id": new_stage.id},
+            )
         except Exception:
             pass
 

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Sekvenssit — FlowLeads{% endblock %}
+{% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<div class="toolbar">
+  <h1 style="margin:0;">Sähköpostisekvenssit</h1>
+  <button type="button" class="btn" id="btn-new-sequence">Uusi sekvenssi</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Nimi</th>
+        <th>Tila</th>
+        <th>Laukaisin</th>
+        <th>Ilmoittautuneet</th>
+        <th>Aktiiviset</th>
+        <th>Valmiit</th>
+        <th>Peruutukset</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in sequences %}
+      {% set seq = row.sequence %}
+      {% set c = row.counts %}
+      <tr>
+        <td><a href="{{ url_for('sequences.sequence_builder', sequence_id=seq.id, **org_query) }}">{{ seq.name }}</a></td>
+        <td>
+          {% if seq.is_active %}
+          <span class="badge" style="background:#14532d;color:#bbf7d0;">Aktiivinen</span>
+          {% else %}
+          <span class="badge">Ei aktiivinen</span>
+          {% endif %}
+        </td>
+        <td>{{ row.trigger_label }}</td>
+        <td>{{ c.enrolled }}</td>
+        <td>{{ c.active }}</td>
+        <td>{{ c.completed }}</td>
+        <td>{{ c.unsubscribed }}</td>
+        <td>
+          <a href="{{ url_for('sequences.sequence_builder', sequence_id=seq.id, **org_query) }}">Muokkaa</a>
+          &nbsp;|&nbsp;
+          <a href="{{ url_for('sequences.sequence_stats_page', sequence_id=seq.id, **org_query) }}">Tilastot</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8">Ei sekvenssjä. Luo ensimmäinen sekvenssi.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-backdrop" id="new-sequence-modal">
+  <div class="modal" style="max-width:520px;">
+    <h2 style="margin-top:0;">Uusi sekvenssi</h2>
+    <form id="new-sequence-form">
+      <label>Nimi
+        <input type="text" name="name" required maxlength="200" placeholder="Esim. Tervetuloa-sarja">
+      </label>
+      <label>Kuvaus
+        <input type="text" name="description" maxlength="500" placeholder="Valinnainen">
+      </label>
+      <label>Laukaisin
+        <select name="trigger_type">
+          <option value="manual">Manuaalinen</option>
+          <option value="on_lead_created">Uusi liidi</option>
+          <option value="on_stage_change">Vaiheen muutos</option>
+          <option value="on_segment_match">Segmentti</option>
+        </select>
+      </label>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="submit" class="btn">Luo sekvenssi</button>
+        <button type="button" class="btn secondary" id="btn-cancel-new">Peruuta</button>
+      </div>
+    </form>
+    <p id="new-sequence-error" style="color:var(--danger); display:none; margin-top:0.75rem;"></p>
+  </div>
+</div>
+
+<script>
+const orgQuery = {{ org_query|tojson }};
+function orgQueryString() {
+  const p = new URLSearchParams();
+  if (orgQuery.organization_id) p.set('organization_id', orgQuery.organization_id);
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+function csrfHeaders() {
+  const token = document.getElementById('csrf-token')?.value;
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-CSRFToken': token,
+  };
+}
+document.getElementById('btn-new-sequence')?.addEventListener('click', () => {
+  document.getElementById('new-sequence-modal').classList.add('open');
+});
+document.getElementById('btn-cancel-new')?.addEventListener('click', () => {
+  document.getElementById('new-sequence-modal').classList.remove('open');
+});
+document.getElementById('new-sequence-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'new-sequence-modal') e.target.classList.remove('open');
+});
+document.getElementById('new-sequence-form')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.target;
+  const errEl = document.getElementById('new-sequence-error');
+  errEl.style.display = 'none';
+  const body = {
+    name: form.name.value.trim(),
+    description: form.description.value.trim() || null,
+    trigger_type: form.trigger_type.value,
+    is_active: false,
+  };
+  try {
+    const res = await fetch('/sequences' + orgQueryString(), {
+      method: 'POST',
+      headers: csrfHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      errEl.textContent = data.error?.message || 'Luonti epäonnistui.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const id = data.data.id;
+    window.location.href = '/sequences/' + id + '/builder' + orgQueryString();
+  } catch {
+    errEl.textContent = 'Verkkovirhe.';
+    errEl.style.display = 'block';
+  }
+});
+</script>
+{% endblock %}

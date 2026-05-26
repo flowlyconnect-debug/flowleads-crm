@@ -316,6 +316,12 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         TaskService.create_auto_tasks(lead, "new_lead")
     except Exception:
         pass
+    try:
+        from app.sequences.services import SequenceService
+
+        SequenceService.trigger_auto_enroll(lead, "on_lead_created")
+    except Exception:
+        pass
     _apply_custom_fields_from_payload(lead, organization_id, raw_payload, partial=True)
     return _load_lead(lead.id, organization_id), "created"
 

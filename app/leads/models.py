@@ -33,6 +33,9 @@ ACTIVITY_TYPES = (
     "task_created",
     "task_completed",
     "task_reminder_sent",
+    "sequence_enrolled",
+    "sequence_email_sent",
+    "sequence_unenrolled",
 )
 
 DEFAULT_PIPELINE_STAGES = [
@@ -140,6 +143,7 @@ class Lead(db.Model):
         nullable=False,
     )
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unsubscribed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     stage: Mapped[PipelineStage] = relationship("PipelineStage", back_populates="leads")

@@ -77,6 +77,8 @@
         <a href="{{ url_for('leads.pipeline', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('leads.pipeline') }}">Pipeline</a>
         &nbsp;|&nbsp;
         <a href="{{ url_for('tasks.list_tasks', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('tasks.list_tasks') }}">Tehtävät{% if nav_overdue_count %}<span class="nav-badge">{{ nav_overdue_count }}</span>{% endif %}</a>
+        &nbsp;|&nbsp;
+        <a href="{{ url_for('sequences.list_sequences', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('sequences.list_sequences') }}">Sekvenssit</a>
         {% if current_user.is_superadmin() %}
         &nbsp;|&nbsp;
         <a href="{{ url_for('analytics.admin_reports') }}">System reports</a>

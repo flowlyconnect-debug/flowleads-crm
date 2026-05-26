@@ -69,6 +69,31 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Segment count refresh job failed")
 
+    def run_sequence_due_steps():
+        with app.app_context():
+            from app.sequences.services import SequenceService
+
+            try:
+                count = SequenceService.process_due_steps()
+                if count:
+                    logger.info("Processed %s sequence due step(s)", count)
+            except Exception:
+                logger.exception("Sequence due steps job failed")
+
+    def run_sequence_segment_match():
+        with app.app_context():
+            from app.extensions import db
+            from app.sequences.services import SequenceService
+
+            try:
+                count = SequenceService.process_segment_match_enrollments()
+                db.session.commit()
+                if count:
+                    logger.info("Segment-match enrolled %s lead(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Sequence segment match job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -91,6 +116,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_segment_count_refresh,
         IntervalTrigger(hours=1),
         id="segment_count_refresh",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_sequence_due_steps,
+        IntervalTrigger(minutes=10),
+        id="sequence_due_steps",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_sequence_segment_match,
+        IntervalTrigger(hours=1),
+        id="sequence_segment_match",
         replace_existing=True,
     )
 
@@ -117,5 +154,5 @@ def run_scheduler(app) -> None:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "false":
         return
     scheduler = create_scheduler(app)
-    logger.info("Starting scheduler (backups, task reminders, auto-tasks)")
+    logger.info("Starting scheduler (backups, tasks, segments, sequences)")
     scheduler.start()

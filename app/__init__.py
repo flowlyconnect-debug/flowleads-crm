@@ -79,6 +79,7 @@ def _init_extensions(app):
         from app.users import models as user_models  # noqa: F401
         from app.custom_fields import models as custom_fields_models  # noqa: F401
         from app.segments import models as segments_models  # noqa: F401
+        from app.sequences import models as sequences_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -91,6 +92,7 @@ def _register_blueprints(app):
     from app.leads.routes import leads_bp
     from app.settings import settings_bp
     from app.tasks import tasks_bp
+    from app.sequences import sequences_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -98,6 +100,7 @@ def _register_blueprints(app):
     app.register_blueprint(backups_bp, url_prefix="/admin")
     app.register_blueprint(leads_bp)
     app.register_blueprint(tasks_bp)
+    app.register_blueprint(sequences_bp)
     app.register_blueprint(email_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(settings_bp)
