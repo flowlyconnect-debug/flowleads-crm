@@ -440,6 +440,17 @@ def handle_mailgun_webhook(event_data: dict) -> bool:
             metadata_json={"email_log_id": log.id, "event": "opened", "message_id": message_id},
         )
         db.session.add(activity)
+        from app.automations.triggers import fire_automation_trigger
+
+        fire_automation_trigger(
+            "email_opened",
+            {
+                "lead_id": log.lead_id,
+                "email_log_id": log.id,
+                "template_id": None,
+            },
+            log.organization_id,
+        )
     elif event == "clicked":
         activity = Activity(
             lead_id=log.lead_id,

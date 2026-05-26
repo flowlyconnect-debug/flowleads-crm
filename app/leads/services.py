@@ -267,6 +267,14 @@ class LeadService:
         except Exception:
             pass
 
+        from app.automations.triggers import fire_automation_trigger
+
+        fire_automation_trigger(
+            "lead_created",
+            {"lead_id": lead.id},
+            organization_id,
+        )
+
         return lead
 
     @staticmethod
@@ -313,6 +321,30 @@ class LeadService:
                 new = data[field]
                 if field == "tags":
                     new = normalize_tags(new)
+                    old_tags = set(old or [])
+                    new_tags = set(new or [])
+                    added_tags = list(new_tags - old_tags)
+                    if added_tags:
+                        from app.automations.triggers import fire_automation_trigger
+
+                        for tag in added_tags:
+                            fire_automation_trigger(
+                                "lead_tag_added",
+                                {"lead_id": lead.id, "added_tags": [tag], "tag": tag},
+                                organization_id,
+                            )
+                if field == "score" and old != new:
+                    from app.automations.triggers import fire_automation_trigger
+
+                    fire_automation_trigger(
+                        "lead_score_changed",
+                        {
+                            "lead_id": lead.id,
+                            "old_score": old,
+                            "new_score": new,
+                        },
+                        organization_id,
+                    )
                 if field == "assigned_to":
                     _validate_assignment_permission(
                         new,
@@ -361,6 +393,18 @@ class LeadService:
                     )
                 except Exception:
                     pass
+
+                from app.automations.triggers import fire_automation_trigger
+
+                fire_automation_trigger(
+                    "lead_stage_changed",
+                    {
+                        "lead_id": lead.id,
+                        "old_stage_id": old_stage.id,
+                        "new_stage_id": new_stage.id,
+                    },
+                    organization_id,
+                )
 
         if "source" in data or "source_ref" in data:
             _check_duplicate_source(
@@ -434,6 +478,18 @@ class LeadService:
             )
         except Exception:
             pass
+
+        from app.automations.triggers import fire_automation_trigger
+
+        fire_automation_trigger(
+            "lead_stage_changed",
+            {
+                "lead_id": lead.id,
+                "old_stage_id": old_stage.id,
+                "new_stage_id": new_stage.id,
+            },
+            organization_id,
+        )
 
         return lead
 

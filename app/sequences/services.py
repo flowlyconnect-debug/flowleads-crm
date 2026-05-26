@@ -188,6 +188,20 @@ def _trigger_config_matches(
     return True
 
 
+def _fire_sequence_completed_automation(enrollment: EmailSequenceEnrollment, sequence: EmailSequence) -> None:
+    from app.automations.triggers import fire_automation_trigger
+
+    fire_automation_trigger(
+        "sequence_completed",
+        {
+            "lead_id": enrollment.lead_id,
+            "sequence_id": sequence.id,
+            "enrollment_id": enrollment.id,
+        },
+        enrollment.organization_id,
+    )
+
+
 def _unsubscribe_url(lead_id: int, sequence_id: int) -> str:
     from flask import current_app, has_request_context
 
@@ -565,6 +579,7 @@ class SequenceService:
             enrollment.completed_at = _utc_now()
             enrollment.next_send_at = None
             enrollment.updated_at = _utc_now()
+            _fire_sequence_completed_automation(enrollment, sequence)
             return False
 
         if not _evaluate_step_condition(lead, step.condition):
@@ -641,6 +656,7 @@ class SequenceService:
         enrollment.completed_at = now
         enrollment.next_send_at = None
         enrollment.updated_at = now
+        _fire_sequence_completed_automation(enrollment, sequence)
         return sent
 
     @staticmethod

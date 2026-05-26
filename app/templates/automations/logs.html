@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Automaatioloki — {{ automation.name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Loki: {{ automation.name }}</h1>
+  <a href="{{ url_for('automations.list_automations', **org_query) }}">← Automaatiot</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Aika</th>
+        <th>Liidi</th>
+        <th>Tulos</th>
+        <th>Virhe</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.created_at.strftime('%d.%m.%Y %H:%M:%S') if log.created_at else '' }}</td>
+        <td>
+          {% if log.lead_id %}
+          <a href="{{ url_for('leads.lead_detail', lead_id=log.lead_id, **org_query) }}">#{{ log.lead_id }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if log.result == 'success' %}
+          <span class="badge" style="background:#14532d;color:#bbf7d0;">Onnistui</span>
+          {% elif log.result == 'failed' %}
+          <span class="badge score-low">Epäonnistui</span>
+          {% else %}
+          <span class="badge">Ohitettu</span>
+          {% endif %}
+        </td>
+        <td style="font-size:0.85rem;color:#94a3b8;">{{ log.error_message or '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">Ei ajoja vielä.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

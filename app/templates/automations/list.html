@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Automaatiot — FlowLeads{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Automaatiot</h1>
+  <a class="btn" href="{{ url_for('automations.create_automation', **org_query) }}">Uusi automaatio</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Nimi</th>
+        <th>Laukaisin</th>
+        <th>Toiminnot</th>
+        <th>Tila</th>
+        <th>Ajot</th>
+        <th>Viimeisin ajo</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      {% set a = row.automation %}
+      <tr>
+        <td><a href="{{ url_for('automations.edit_automation', automation_id=a.id, **org_query) }}">{{ a.name }}</a></td>
+        <td>{{ row.trigger_label }}</td>
+        <td>{{ row.action_count }}</td>
+        <td>
+          {% if a.is_active %}
+          <span class="badge" style="background:#14532d;color:#bbf7d0;">Aktiivinen</span>
+          {% else %}
+          <span class="badge">Ei aktiivinen</span>
+          {% endif %}
+        </td>
+        <td>{{ a.run_count }}</td>
+        <td>{{ a.last_run_at.strftime('%d.%m.%Y %H:%M') if a.last_run_at else '—' }}</td>
+        <td>
+          <a href="{{ url_for('automations.automation_logs', automation_id=a.id, **org_query) }}">Loki</a>
+          &nbsp;|&nbsp;
+          <form method="post" action="{{ url_for('automations.toggle_automation', automation_id=a.id, **org_query) }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="secondary" style="margin:0;padding:0.3rem 0.6rem;">{% if a.is_active %}Poista käytöstä{% else %}Aktivoi{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">Ei automaatioita. Luo ensimmäinen tai odota oletusautomaatioiden luontia.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

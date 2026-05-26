@@ -154,6 +154,9 @@ def create_organization(name: str, slug: str) -> Organization:
     from app.leads.services import seed_default_pipeline_stages
 
     seed_default_pipeline_stages(org.id)
+    from app.automations.seed import seed_default_automations
+
+    seed_default_automations(org.id)
     return org
 
 

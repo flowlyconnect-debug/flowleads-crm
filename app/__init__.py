@@ -80,6 +80,8 @@ def _init_extensions(app):
         from app.custom_fields import models as custom_fields_models  # noqa: F401
         from app.segments import models as segments_models  # noqa: F401
         from app.sequences import models as sequences_models  # noqa: F401
+        from app.automations import models as automations_models  # noqa: F401
+        from app.notifications import models as notifications_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -93,6 +95,8 @@ def _register_blueprints(app):
     from app.settings import settings_bp
     from app.tasks import tasks_bp
     from app.sequences import sequences_bp
+    from app.automations import automations_bp
+    from app.notifications import notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -104,9 +108,12 @@ def _register_blueprints(app):
     app.register_blueprint(email_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(automations_bp)
+    app.register_blueprint(notifications_bp)
     app.register_blueprint(webhooks_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
+    csrf.exempt(notifications_bp)
 
 
 def _register_root_routes(app):

@@ -94,6 +94,34 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Sequence segment match job failed")
 
+    def run_automation_no_activity():
+        with app.app_context():
+            from app.automations.services import AutomationEngine
+            from app.extensions import db
+
+            try:
+                count = AutomationEngine.run_no_activity_checks()
+                db.session.commit()
+                if count:
+                    logger.info("Ran lead_no_activity automations for %s lead(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Automation no-activity job failed")
+
+    def run_automation_task_overdue():
+        with app.app_context():
+            from app.automations.services import AutomationEngine
+            from app.extensions import db
+
+            try:
+                count = AutomationEngine.run_task_overdue_checks()
+                db.session.commit()
+                if count:
+                    logger.info("Ran task_overdue automations for %s task(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Automation task-overdue job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -128,6 +156,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_sequence_segment_match,
         IntervalTrigger(hours=1),
         id="sequence_segment_match",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_automation_no_activity,
+        CronTrigger(hour=4, minute=0, timezone="UTC"),
+        id="automation_no_activity",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_automation_task_overdue,
+        IntervalTrigger(hours=1),
+        id="automation_task_overdue",
         replace_existing=True,
     )
 

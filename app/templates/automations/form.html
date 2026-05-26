@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}{% if automation %}Muokkaa automaatiota{% else %}Uusi automaatio{% endif %} — FlowLeads{% endblock %}
+{% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<div class="toolbar">
+  <h1 style="margin:0;">{% if automation %}{{ automation.name }}{% else %}Uusi automaatio{% endif %}</h1>
+  <a href="{{ url_for('automations.list_automations', **org_query) }}">← Takaisin</a>
+</div>
+
+<form method="post" id="automation-form" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="actions_json" id="actions-json" value="">
+
+  <label>Nimi
+    <input type="text" name="name" required maxlength="200" value="{{ automation.name if automation else '' }}">
+  </label>
+  <label>Kuvaus
+    <input type="text" name="description" value="{{ automation.description if automation else '' }}">
+  </label>
+  <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;">
+    <input type="checkbox" name="is_active" {% if not automation or automation.is_active %}checked{% endif %}>
+    Aktiivinen
+  </label>
+
+  <h2 style="margin-top:1.5rem;font-size:1.1rem;">Laukaisin</h2>
+  <label>Tyyppi
+    <select name="trigger_type" id="trigger-type" required>
+      {% for tt in trigger_types %}
+      <option value="{{ tt }}" {% if automation and automation.trigger_type == tt %}selected{% endif %}
+        data-desc="{{ trigger_descriptions.get(tt, '') }}">{{ trigger_labels.get(tt, tt) }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <p id="trigger-desc" style="color:#94a3b8;font-size:0.9rem;margin-top:0.25rem;"></p>
+
+  <div id="trigger-conditions" style="margin-top:1rem;">
+    {% set tc = automation.trigger_config if automation else {} %}
+    <div class="cond cond-lead_stage_changed" style="display:none;">
+      <label>Kohdevaihe
+        <select name="to_stage_id">
+          <option value="">— mikä tahansa —</option>
+          {% for s in stages %}
+          <option value="{{ s.id }}" {% if tc.get('to_stage_id') == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="cond cond-lead_score_changed" style="display:none;">
+      <label>Raja
+        <input type="number" name="threshold" min="0" max="100" value="{{ tc.get('threshold', 80) }}">
+      </label>
+      <label>Operaattori
+        <select name="operator">
+          <option value="crosses_above" {% if tc.get('operator', 'crosses_above') == 'crosses_above' %}selected{% endif %}>Ylittää ensimmäistä kertaa</option>
+          <option value="gte" {% if tc.get('operator') == 'gte' %}selected{% endif %}>≥ raja</option>
+        </select>
+      </label>
+    </div>
+    <div class="cond cond-lead_no_activity" style="display:none;">
+      <label>Päiviä ilman aktiviteettia
+        <input type="number" name="days" min="1" value="{{ tc.get('days', 14) }}">
+      </label>
+      <label>Vaiheet (pilkuilla erotetut ID:t, valinnainen)
+        <input type="text" name="stages" value="{{ tc.get('stages', [])|join(',') if tc.get('stages') else '' }}">
+      </label>
+    </div>
+    <div class="cond cond-lead_tag_added" style="display:none;">
+      <label>Tunniste
+        <input type="text" name="tag" value="{{ tc.get('tag', '') }}">
+      </label>
+    </div>
+    <div class="cond cond-task_overdue" style="display:none;">
+      <label>Myöhässä vähintään (tuntia)
+        <input type="number" name="hours" min="0" value="{{ tc.get('hours', 0) }}">
+      </label>
+    </div>
+    <div class="cond cond-sequence_completed" style="display:none;">
+      <label>Sekvenssi
+        <select name="sequence_id">
+          <option value="">— mikä tahansa —</option>
+          {% for seq in sequences %}
+          <option value="{{ seq.id }}" {% if tc.get('sequence_id') == seq.id %}selected{% endif %}>{{ seq.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Min. pistemäärä (valinnainen)
+      <input type="number" name="min_score" min="0" max="100" value="{{ tc.get('min_score', '') }}">
+    </label>
+    <label>Lähde (pilkuilla, esim. n8n, manual)
+      <input type="text" name="source" value="{{ tc.get('source', [])|join(',') if tc.get('source') else '' }}">
+    </label>
+  </div>
+
+  <h2 style="margin-top:1.5rem;font-size:1.1rem;">Toiminnot</h2>
+  <div id="actions-list"></div>
+  <button type="button" class="secondary" id="btn-add-action" style="margin-top:0.75rem;">+ Lisää toiminto</button>
+
+  <button type="submit" style="margin-top:1.5rem;">Tallenna</button>
+</form>
+
+{% if automation %}
+<a href="{{ url_for('automations.automation_logs', automation_id=automation.id, **org_query) }}" style="display:inline-block;margin-top:1rem;">Näytä suoritusloki</a>
+{% endif %}
+
+<script>
+const ACTION_LABELS = {{ action_labels|tojson }};
+const STAGES = {{ stages|map(attribute='id')|list|tojson }};
+const STAGE_NAMES = {{ stages|map(attribute='name')|list|tojson }};
+const SEQUENCES = [{% for s in sequences %}{id:{{ s.id }},name:{{ s.name|tojson }}},{% endfor %}];
+const USERS = [{% for u in users %}{id:{{ u.id }},email:{{ u.email|tojson }}},{% endfor %}];
+const TEMPLATES = [{% for t in templates %}{id:{{ t.id }},name:{{ t.name|tojson }}},{% endfor %}];
+let actions = [];
+{% if automation %}
+actions = [
+  {% for act in automation.actions|sort(attribute='order_index') %}
+  {action_type: {{ act.action_type|tojson }}, action_config: {{ (act.action_config or {})|tojson }}}{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+{% endif %}
+
+function updateTriggerUI() {
+  const t = document.getElementById('trigger-type').value;
+  document.querySelectorAll('.cond').forEach(el => el.style.display = 'none');
+  const box = document.querySelector('.cond-' + t);
+  if (box) box.style.display = 'block';
+  const opt = document.getElementById('trigger-type').selectedOptions[0];
+  document.getElementById('trigger-desc').textContent = opt.dataset.desc || '';
+}
+
+function actionFieldsHtml(type, cfg) {
+  cfg = cfg || {};
+  if (type === 'create_task') {
+    return `<label>Otsikko<input name="title" value="${cfg.title||'Ota yhteyttä'}"></label>
+      <label>Eräpäivä (päiviä)<input type="number" name="due_days" value="${cfg.due_days||1}"></label>`;
+  }
+  if (type === 'send_email') {
+    let opts = TEMPLATES.map(t => `<option value="${t.id}" ${cfg.template_id==t.id?'selected':''}>${t.name}</option>`).join('');
+    return `<label>Malli<select name="template_id"><option value="">—</option>${opts}</select></label>`;
+  }
+  if (type === 'enroll_in_sequence') {
+    let opts = SEQUENCES.map(s => `<option value="${s.id}" ${cfg.sequence_id==s.id?'selected':''}>${s.name}</option>`).join('');
+    return `<label>Sekvenssi<select name="sequence_id">${opts}</select></label>`;
+  }
+  if (type === 'change_stage') {
+    let opts = STAGES.map((id,i) => `<option value="${id}" ${cfg.stage_id==id?'selected':''}>${STAGE_NAMES[i]}</option>`).join('');
+    return `<label>Vaihe<select name="stage_id">${opts}</select></label>`;
+  }
+  if (type === 'assign_lead') {
+    let opts = USERS.map(u => `<option value="${u.id}" ${cfg.user_id==u.id?'selected':''}>${u.email}</option>`).join('');
+    return `<label>Käyttäjä<select name="user_id">${opts}</select></label>`;
+  }
+  if (type === 'add_tag' || type === 'remove_tag') {
+    return `<label>Tunniste<input name="tag" value="${cfg.tag||''}"></label>`;
+  }
+  if (type === 'send_webhook') {
+    return `<label>URL<input name="url" value="${cfg.url||''}" required></label>
+      <label>Metodi<select name="method"><option ${cfg.method==='GET'?'selected':''}>GET</option><option ${!cfg.method||cfg.method==='POST'?'selected':''}>POST</option></select></label>
+      <label>Body-malli<textarea name="body_template" rows="3">${cfg.body_template||'{"lead_id":"{{lead.id}}"}'}</textarea></label>
+      <label>Salainen header (nimi=arvo, salataan)<input name="secret_header" placeholder="X-Secret=abc123"></label>`;
+  }
+  if (type === 'notify_user') {
+    let opts = USERS.map(u => `<option value="${u.id}" ${cfg.user_id==u.id?'selected':''}>${u.email}</option>`).join('');
+    return `<label>Käyttäjä<select name="user_id">${opts}</select></label>
+      <label>Otsikko<input name="title" value="${cfg.title||''}"></label>
+      <label>Viesti<textarea name="message" rows="2">${cfg.message||''}</textarea></label>`;
+  }
+  return '';
+}
+
+function renderActions() {
+  const list = document.getElementById('actions-list');
+  list.innerHTML = '';
+  actions.forEach((a, idx) => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.marginTop = '0.75rem';
+    div.style.padding = '1rem';
+    let typeOpts = Object.keys(ACTION_LABELS).map(k =>
+      `<option value="${k}" ${a.action_type===k?'selected':''}>${ACTION_LABELS[k]}</option>`).join('');
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>Toiminto ${idx+1}</strong>
+        <button type="button" class="secondary btn-remove" data-idx="${idx}" style="margin:0;">Poista</button>
+      </div>
+      <label>Tyyppi<select class="action-type">${typeOpts}</select></label>
+      <div class="action-fields">${actionFieldsHtml(a.action_type, a.action_config)}</div>`;
+    list.appendChild(div);
+    const typeSel = div.querySelector('.action-type');
+    typeSel.addEventListener('change', () => {
+      a.action_type = typeSel.value;
+      a.action_config = {};
+      div.querySelector('.action-fields').innerHTML = actionFieldsHtml(a.action_type, {});
+    });
+    div.querySelector('.btn-remove').addEventListener('click', () => {
+      actions.splice(idx, 1);
+      renderActions();
+    });
+    div.querySelectorAll('.action-fields input, .action-fields select, .action-fields textarea').forEach(el => {
+      el.addEventListener('change', () => collectActionConfig(div, a));
+    });
+  });
+}
+
+function collectActionConfig(div, a) {
+  const cfg = {};
+  div.querySelectorAll('.action-fields [name]').forEach(el => {
+    if (el.name === 'secret_header' && el.value.includes('=')) {
+      const [k,v] = el.value.split('=');
+      a.secret_headers = a.secret_headers || {};
+      a.secret_headers[k.trim()] = v.trim();
+      return;
+    }
+    if (el.value) cfg[el.name] = el.type === 'number' ? Number(el.value) : el.value;
+  });
+  a.action_config = cfg;
+}
+
+document.getElementById('btn-add-action').addEventListener('click', () => {
+  actions.push({action_type: 'create_task', action_config: {title: 'Ota yhteyttä', due_days: 1}});
+  renderActions();
+});
+
+document.getElementById('automation-form').addEventListener('submit', () => {
+  document.querySelectorAll('#actions-list .card').forEach((div, idx) => collectActionConfig(div, actions[idx]));
+  document.getElementById('actions-json').value = JSON.stringify(actions.map(a => ({
+    action_type: a.action_type,
+    action_config: a.action_config,
+    secret_headers: a.secret_headers
+  })));
+});
+
+document.getElementById('trigger-type').addEventListener('change', updateTriggerUI);
+updateTriggerUI();
+renderActions();
+</script>
+{% endblock %}
