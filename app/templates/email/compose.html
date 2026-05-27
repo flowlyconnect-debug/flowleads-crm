@@ -1,60 +1,99 @@
 {% extends "base.html" %}
-{% block title %}Send email — {{ lead.display_name }}{% endblock %}
+{% block title %}Lähetä sähköposti — {{ lead.display_name }}{% endblock %}
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1 style="margin:0;">Send email</h1>
-  <a class="btn secondary" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">Back to lead</a>
-  <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Email history</a>
-</div>
+<div class="compose-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Lähetä sähköposti</h1>
+      <p class="page-subtitle">{{ lead.display_name }}{% if lead.company %} · {{ lead.company }}{% endif %}</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">Takaisin liidiin</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Historia</a>
+    </div>
+  </header>
 
-<div class="card" style="margin-bottom:1rem;">
-  <p><strong>To:</strong> {{ lead.email }}</p>
-  <p><strong>Lead:</strong> {{ lead.display_name }}{% if lead.company %} — {{ lead.company }}{% endif %}</p>
   {% if ai_summary %}
   <div class="ai-summary-box">
-    <strong>AI summary (context)</strong>
-    <p>{{ ai_summary }}</p>
+    <strong>AI-yhteenveto (konteksti)</strong>
+    <p class="text-sm mt-2 mb-0">{{ ai_summary }}</p>
   </div>
   {% endif %}
-</div>
 
-<form method="post" action="{{ url_for('email.send', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.send', lead_id=lead.id) }}" id="compose-form">
-  {{ form.hidden_tag() }}
-  <div class="grid-2">
-    <div class="card">
-      <label>Template
-        <select id="template-select" name="template_id">
-          {% for value, label in form.template_id.choices %}
-          <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Subject
-        {{ form.subject(id='subject-field') }}
-      </label>
-      <label>Body
-        <div id="editor" style="min-height:200px; background:#0f172a; border:1px solid #475569; border-radius:4px;"></div>
-        {{ form.body_html(id='body-html-field') }}
-      </label>
-      <button type="submit" class="btn" id="send-btn" {% if not email_enabled %}disabled title="Email sending is disabled"{% endif %}>Send email</button>
-      {% if not email_enabled %}
-      <p style="color:#f87171; font-size:0.9rem;">Email sending is disabled (EMAIL_SENDING_ENABLED=false).</p>
-      {% endif %}
-    </div>
-    <div class="card">
-      <h2>Preview</h2>
-      <p><strong>Subject:</strong> <span id="preview-subject">{{ preview_subject }}</span></p>
-      <div id="preview-body" class="email-preview-frame" style="background:#fff; color:#111; padding:1rem; border-radius:4px; min-height:120px;">
-        {{ preview_html|safe }}
+  <form method="post" action="{{ url_for('email.send', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.send', lead_id=lead.id) }}" id="compose-form">
+    {{ form.hidden_tag() }}
+
+    <div class="compose-header">
+      <div class="compose-header__row">
+        <span class="compose-header__label">Vastaanottaja</span>
+        <span class="compose-header__value">{{ lead.email }}</span>
+      </div>
+      <div class="compose-header__row">
+        <span class="compose-header__label">Liidi</span>
+        <span class="compose-header__value">{{ lead.display_name }}</span>
       </div>
     </div>
-  </div>
-</form>
 
-<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+    <div class="compose-subject-row">
+      <label class="sr-only" for="subject-field">Aihe</label>
+      {{ form.subject(id='subject-field', class='compose-subject-input', placeholder='Aihe') }}
+    </div>
+
+    <div class="compose-layout">
+      <div>
+        <div class="compose-editor-card">
+          <div id="editor" aria-label="Viestin sisältö"></div>
+          {{ form.body_html(id='body-html-field') }}
+        </div>
+        <div class="compose-actions">
+          <button type="submit" class="btn btn-primary" id="send-btn" {% if not email_enabled %}disabled title="Sähköpostin lähetys on pois käytöstä"{% endif %}>Lähetä sähköposti</button>
+          {% if not email_enabled %}
+          <p class="compose-error mb-0">Sähköpostin lähetys on pois käytöstä (EMAIL_SENDING_ENABLED=false).</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <aside class="compose-sidebar">
+        <div class="card card--flat">
+          <h2 class="card-title">Malli</h2>
+          <div class="card-body">
+            <label class="sr-only" for="template-select">Sähköpostimalli</label>
+            <select id="template-select" name="template_id" class="form-select mb-3">
+              {% for value, label in form.template_id.choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="compose-templates" id="template-cards" role="list">
+              {% for t in templates %}
+              <button type="button" class="compose-template-card" role="listitem" data-template-id="{{ t.id }}">
+                <span class="compose-template-card__name">{{ t.name }}</span>
+                <span class="compose-template-card__hint">{{ t.subject_template[:48] }}{% if t.subject_template|length > 48 %}…{% endif %}</span>
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="card card--flat">
+          <h2 class="card-title">Esikatselu</h2>
+          <div class="card-body">
+            <p class="compose-preview-subject"><span id="preview-subject">{{ preview_subject }}</span></p>
+            <div id="preview-body" class="compose-preview email-preview-frame">{{ preview_html|safe }}</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script>
-  const templateData = {
+(function() {
+  var templateData = {
     {% for t in templates %}
     {{ t.id }}: {
       subject: {{ (t.subject_template|tojson) }},
@@ -62,7 +101,7 @@
     },
     {% endfor %}
   };
-  const leadContext = {
+  var leadContext = {
     first_name: {{ (lead.first_name or 'there')|tojson }},
     last_name: {{ (lead.last_name or '')|tojson }},
     company: {{ (lead.company or '')|tojson }},
@@ -70,8 +109,8 @@
     ai_summary: {{ (lead.ai_summary or '')|tojson }}
   };
   function renderVars(text) {
-    return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_, key) => {
-      const val = leadContext[key];
+    return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function(_, key) {
+      var val = leadContext[key];
       if (val === undefined || val === null || val === '') {
         if (key === 'first_name') return 'there';
         return '';
@@ -79,7 +118,7 @@
       return val;
     });
   }
-  const quill = new Quill('#editor', { theme: 'snow' });
+  var quill = new Quill('#editor', { theme: 'snow' });
   {% if preview_html %}
   quill.root.innerHTML = {{ preview_html|tojson }};
   {% endif %}
@@ -88,23 +127,34 @@
   }
   function updatePreview() {
     syncBody();
-    const subj = document.getElementById('subject-field').value;
+    var subj = document.getElementById('subject-field').value;
     document.getElementById('preview-subject').textContent = renderVars(subj);
     document.getElementById('preview-body').innerHTML = renderVars(quill.root.innerHTML);
   }
-  document.getElementById('template-select').addEventListener('change', function() {
-    const id = parseInt(this.value, 10);
+  function applyTemplate(id) {
     if (!id || !templateData[id]) { updatePreview(); return; }
-    const t = templateData[id];
+    var t = templateData[id];
     document.getElementById('subject-field').value = renderVars(t.subject);
     quill.root.innerHTML = renderVars(t.body);
+    document.querySelectorAll('.compose-template-card').forEach(function(card) {
+      card.classList.toggle('is-selected', parseInt(card.dataset.templateId, 10) === id);
+    });
     updatePreview();
+  }
+  document.getElementById('template-select').addEventListener('change', function() {
+    applyTemplate(parseInt(this.value, 10));
+  });
+  document.querySelectorAll('.compose-template-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var id = parseInt(card.dataset.templateId, 10);
+      document.getElementById('template-select').value = String(id);
+      applyTemplate(id);
+    });
   });
   document.getElementById('subject-field').addEventListener('input', updatePreview);
   quill.on('text-change', updatePreview);
-  document.getElementById('compose-form').addEventListener('submit', function() {
-    syncBody();
-  });
+  document.getElementById('compose-form').addEventListener('submit', syncBody);
   updatePreview();
+})();
 </script>
 {% endblock %}

@@ -1,48 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Email templates{% endblock %}
+{% from "_macros.html" import settings_nav, empty_state %}
+{% block title %}Sähköpostimallit — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
-  <div class="toolbar">
-    <h1 style="margin:0;">Email templates</h1>
-    {% if can_edit %}
-    <a class="btn" href="{{ url_for('settings.email_templates_new_form', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_new_form') }}">New template</a>
-    {% endif %}
-  </div>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('email_templates') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header page-header">
+          <div class="page-header__main">
+            <h1 class="settings-panel__title">Sähköpostimallit</h1>
+            <p class="settings-panel__subtitle">Hallitse organisaation ja järjestelmän malleja.</p>
+          </div>
+          {% if can_edit %}
+          <div class="page-header__actions">
+            <a class="btn btn-primary btn-sm" href="{{ url_for('settings.email_templates_new_form', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_new_form') }}">Uusi malli</a>
+          </div>
+          {% endif %}
+        </header>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Subject</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in templates %}
-      <tr>
-        <td>{{ t.name }}</td>
-        <td>{{ 'System' if t.is_system else 'Organization' }}</td>
-        <td>{{ t.subject_template }}</td>
-        <td>
-          <a href="{{ url_for('settings.email_templates_preview', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_preview', template_id=t.id) }}">Preview</a>
-          {% if can_edit and (not t.is_system or current_user.is_superadmin()) %}
-          &nbsp;|&nbsp;
-          <a href="{{ url_for('settings.email_templates_edit', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_edit', template_id=t.id) }}">Edit</a>
-          {% endif %}
-          {% if can_edit and not t.is_system %}
-          &nbsp;|&nbsp;
-          <form method="post" action="{{ url_for('settings.email_templates_delete', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_delete', template_id=t.id) }}" style="display:inline;" onsubmit="return confirm('Delete this template?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="secondary">Delete</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4">No templates.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nimi</th>
+                <th>Tyyppi</th>
+                <th>Aihe</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in templates %}
+              <tr>
+                <td>{{ t.name }}</td>
+                <td>{{ 'Järjestelmä' if t.is_system else 'Organisaatio' }}</td>
+                <td class="truncate">{{ t.subject_template }}</td>
+                <td>
+                  <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.email_templates_preview', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_preview', template_id=t.id) }}">Esikatselu</a>
+                  {% if can_edit and (not t.is_system or current_user.is_superadmin()) %}
+                  <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.email_templates_edit', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_edit', template_id=t.id) }}">Muokkaa</a>
+                  {% endif %}
+                  {% if can_edit and not t.is_system %}
+                  <form method="post" action="{{ url_for('settings.email_templates_delete', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_delete', template_id=t.id) }}" class="form-row-inline" onsubmit="return confirm('Poistetaanko malli?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Poista</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4">
+                {% call empty_state('Ei malleja', 'Luo ensimmäinen sähköpostimalli.') %}{% endcall %}
+              </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

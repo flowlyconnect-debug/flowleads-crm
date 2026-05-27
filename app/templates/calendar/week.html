@@ -1,77 +1,97 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block title %}Kalenteri — FlowLeads{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1 style="margin:0;">Kalenteri</h1>
-  <a class="btn secondary" href="{{ url_for('settings.calendar_settings') }}">Kalenteriasetukset</a>
-</div>
+<div class="list-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Kalenteri</h1>
+      <p class="page-subtitle">Tapaamiset tänään ja tällä viikolla</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.calendar_settings') }}">Kalenteriasetukset</a>
+    </div>
+  </header>
 
-<div class="card" style="margin-top:1rem;">
-  <h2>Tänään</h2>
-  {% if today_events %}
-  <table>
-    <thead>
-      <tr><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for event in today_events %}
-      <tr>
-        <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
-        <td>{{ event.title }}</td>
-        <td>
-          {% if event.lead %}
-          <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
-          {% else %}—{% endif %}
-        </td>
-        <td>
-          {% if event.meeting_url %}
-          <a class="btn secondary" href="{{ event.meeting_url }}" target="_blank" rel="noopener" style="margin:0; padding:0.35rem 0.6rem; font-size:0.8rem;">Liity</a>
-          {% endif %}
-        </td>
-        <td>
-          <form method="post" action="{{ url_for('calendar.cancel_calendar_event', event_id=event.id) }}" style="display:inline;" onsubmit="return confirm('Peruuta tapaaminen?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn secondary" style="margin:0; padding:0.35rem 0.6rem; font-size:0.8rem;">Peruuta</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="ai-meta">Ei tapaamisia tänään.</p>
-  {% endif %}
-</div>
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Tänään</h2>
+    </div>
+    <div class="card-body">
+      {% if today_events %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for event in today_events %}
+            <tr>
+              <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
+              <td>{{ event.title }}</td>
+              <td>
+                {% if event.lead %}
+                <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if event.meeting_url %}
+                <a class="btn btn-secondary btn-sm" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('calendar.cancel_calendar_event', event_id=event.id) }}" class="form-row-inline" onsubmit="return confirm('Peruuta tapaaminen?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-ghost btn-sm">Peruuta</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {% call empty_state('Ei tapaamisia tänään', 'Kalenterisi on vapaa tälle päivälle.') %}{% endcall %}
+      {% endif %}
+    </div>
+  </div>
 
-<div class="card" style="margin-top:1rem;">
-  <h2>Tämä viikko</h2>
-  {% if week_events %}
-  <table>
-    <thead>
-      <tr><th>Päivä</th><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for event in week_events %}
-      <tr>
-        <td>{{ event.start_at.strftime('%a %d.%m.') }}</td>
-        <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
-        <td>{{ event.title }}</td>
-        <td>
-          {% if event.lead %}
-          <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
-          {% else %}—{% endif %}
-        </td>
-        <td>
-          {% if event.meeting_url %}
-          <a class="btn secondary" href="{{ event.meeting_url }}" target="_blank" rel="noopener" style="margin:0; padding:0.35rem 0.6rem; font-size:0.8rem;">Liity</a>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="ai-meta">Ei muita tapaamisia tällä viikolla.</p>
-  {% endif %}
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Tämä viikko</h2>
+    </div>
+    <div class="card-body">
+      {% if week_events %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Päivä</th><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for event in week_events %}
+            <tr>
+              <td>{{ event.start_at.strftime('%a %d.%m.') }}</td>
+              <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
+              <td>{{ event.title }}</td>
+              <td>
+                {% if event.lead %}
+                <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if event.meeting_url %}
+                <a class="btn btn-secondary btn-sm" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {% call empty_state('Ei tapaamisia tällä viikolla', 'Aikatauluta tapaaminen liidiprofiilista.') %}{% endcall %}
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endblock %}

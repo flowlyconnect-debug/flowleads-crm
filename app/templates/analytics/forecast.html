@@ -1,115 +1,139 @@
 {% extends "base.html" %}
-{% from "_macros.html" import probability_badge %}
+{% from "_macros.html" import probability_badge, empty_state %}
 {% block title %}Myyntiennuste — FlowLeads{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1 style="margin:0;">Myyntiennuste</h1>
-  {% if current_user.is_superadmin() and organizations %}
-  <form method="get" action="{{ url_for('analytics.forecast') }}">
-    <label>Organization
-      <select name="organization_id" onchange="this.form.submit()">
-        {% for org in organizations %}
-        <option value="{{ org.id }}" {% if org.id == organization_id %}selected{% endif %}>{{ org.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </form>
-  {% endif %}
-  <a class="btn secondary" href="{{ url_for('analytics.reports', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports') }}">Raportit</a>
-</div>
-
-{% if organization_id is none %}
-<div class="card">
-  <p>Valitse organisaatio nähdäksesi myyntiennusteen.</p>
-</div>
-{% elif forecast %}
-<div class="toolbar" style="margin-bottom:1rem;">
-  <div class="filters" style="display:flex; gap:0.5rem;">
-    {% for days in [30, 60, 90] %}
-    <a class="btn {% if period_days == days %}secondary{% endif %}"
-       href="{{ url_for('analytics.forecast', organization_id=organization_id, period=days) if current_user.is_superadmin() else url_for('analytics.forecast', period=days) }}">
-      {{ days }} päivää
-    </a>
-    {% endfor %}
-  </div>
-  {% if current_user.role in ('admin', 'superadmin') %}
-  <form method="post" action="{{ url_for('admin.run_predictions_batch', organization_id=organization_id) if current_user.is_superadmin() else url_for('admin.run_predictions_batch') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    {% if current_user.is_superadmin() %}
-    <input type="hidden" name="organization_id" value="{{ organization_id }}">
-    {% endif %}
-    <button type="submit" class="btn secondary">Päivitä kaikki ennusteet</button>
-  </form>
-  {% endif %}
-</div>
-
-<h2 style="margin-bottom:1rem;">
-  Odotettu myynti seuraavat {{ period_days }} päivää:
-  <span style="color:var(--accent);">{{ currency_symbol }}{{ '%.0f'|format(forecast.expected_revenue) }}</span>
-</h2>
-
-<div class="filters" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom:1.5rem;">
-  <div class="card" style="padding:1rem;">
-    <strong>Todennäköinen</strong>
-    <p style="font-size:1.5rem;margin:0.5rem 0 0;">{{ currency_symbol }}{{ '%.0f'|format(forecast.expected_revenue) }}</p>
-  </div>
-  <div class="card" style="padding:1rem;">
-    <strong>Optimistinen</strong>
-    <p style="font-size:1.5rem;margin:0.5rem 0 0;">{{ currency_symbol }}{{ '%.0f'|format(forecast.best_case) }}</p>
-    <span class="ai-meta">Todennäköisyys &gt; 50%</span>
-  </div>
-  <div class="card" style="padding:1rem;">
-    <strong>Konservatiivinen</strong>
-    <p style="font-size:1.5rem;margin:0.5rem 0 0;">{{ currency_symbol }}{{ '%.0f'|format(forecast.conservative_case) }}</p>
-    <span class="ai-meta">Todennäköisyys &gt; 80%</span>
-  </div>
-</div>
-
-<div class="card" style="margin-bottom:1.5rem;">
-  <h2>Odotettu myynti vaiheittain</h2>
-  <div id="stage-chart" style="display:flex; align-items:flex-end; gap:0.5rem; min-height:180px; padding:1rem 0;">
-    {% for stage_name, data in forecast.by_stage.items() %}
-    {% set max_val = forecast.expected_revenue or 1 %}
-    {% set height = (data.expected_revenue / max_val * 100) if max_val else 0 %}
-    <div style="flex:1; text-align:center;">
-      <div style="background:var(--accent); height:{{ height|round(0) }}px; min-height:4px; max-height:160px; border-radius:4px 4px 0 0;"></div>
-      <div class="ai-meta" style="font-size:0.7rem; margin-top:0.35rem;">{{ stage_name[:12] }}</div>
-      <div style="font-size:0.75rem;">{{ currency_symbol }}{{ '%.0f'|format(data.expected_revenue) }}</div>
+<div class="reports-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Myyntiennuste</h1>
+      <p class="page-subtitle">Ennustettu myynti valitulla aikajaksolla</p>
     </div>
-    {% endfor %}
-  </div>
-</div>
+    <div class="page-header__actions">
+      {% if current_user.is_superadmin() and organizations %}
+      <form method="get" action="{{ url_for('analytics.forecast') }}" class="form-inline">
+        <label class="form-label mb-0">Organisaatio
+          <select name="organization_id" class="form-select form-input--compact" onchange="this.form.submit()">
+            {% for org in organizations %}
+            <option value="{{ org.id }}" {% if org.id == organization_id %}selected{% endif %}>{{ org.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+      {% endif %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.reports', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports') }}">Raportit</a>
+    </div>
+  </header>
 
-<div class="card">
-  <h2>Aktiiviset diilit ({{ forecast.leads_count }})</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Liidi</th>
-        <th>Yritys</th>
-        <th>Vaihe</th>
-        <th>Todennäköisyys</th>
-        <th>Kaupan arvo</th>
-        <th>Odotettu</th>
-        <th>Viimeisin yhteys</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in deals %}
-      <tr>
-        <td><a href="{{ url_for('leads.detail', lead_id=row.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=row.lead_id) }}">{{ row.lead_name }}</a></td>
-        <td>{{ row.company or '—' }}</td>
-        <td>{{ row.stage_name }}</td>
-        <td>{{ probability_badge(row.probability) }}</td>
-        <td>{% if row.deal_value %}{{ currency_symbol }}{{ '%.0f'|format(row.deal_value) }}{% else %}—{% endif %}</td>
-        <td>{{ currency_symbol }}{{ '%.0f'|format(row.expected_value) }}</td>
-        <td>{{ row.last_contacted_at.strftime('%Y-%m-%d') if row.last_contacted_at else '—' }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7">Ei aktiivisia liidejä.</td></tr>
+  <nav class="reports-tabs" aria-label="Raporttityypit">
+    <a href="{{ url_for('analytics.reports', report='pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='pipeline') }}">Pipeline</a>
+    <a href="{{ url_for('analytics.reports', report='source', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='source') }}">Lähteet</a>
+    <a href="{{ url_for('analytics.reports', report='team', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='team') }}">Tiimi</a>
+    <a href="{{ url_for('analytics.reports', report='ai', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='ai') }}">AI-rikastus</a>
+    <a href="{{ url_for('analytics.forecast', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.forecast') }}" class="is-active" aria-current="page">Ennuste</a>
+  </nav>
+
+  {% if organization_id is none %}
+  <div class="report-card">
+    <div class="report-card__body">
+      {% call empty_state('Valitse organisaatio', 'Valitse organisaatio nähdäksesi myyntiennusteen.') %}{% endcall %}
+    </div>
+  </div>
+  {% elif forecast %}
+  <div class="reports-toolbar">
+    <div class="dashboard-range-switcher" role="group" aria-label="Ennustejakso">
+      {% for days in [30, 60, 90] %}
+      <a class="btn btn-sm btn-ghost{% if period_days == days %} is-active{% endif %}"
+         href="{{ url_for('analytics.forecast', organization_id=organization_id, period=days) if current_user.is_superadmin() else url_for('analytics.forecast', period=days) }}">
+        {{ days }} päivää
+      </a>
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+    {% if current_user.role in ('admin', 'superadmin') %}
+    <form method="post" action="{{ url_for('admin.run_predictions_batch', organization_id=organization_id) if current_user.is_superadmin() else url_for('admin.run_predictions_batch') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if current_user.is_superadmin() %}
+      <input type="hidden" name="organization_id" value="{{ organization_id }}">
+      {% endif %}
+      <button type="submit" class="btn btn-secondary btn-sm">Päivitä kaikki ennusteet</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="report-metrics">
+    <div class="report-metric">
+      <span class="report-metric__label">Odotettu ({{ period_days }} pv)</span>
+      <span class="report-metric__value text-accent">{{ currency_symbol }}{{ '%.0f'|format(forecast.expected_revenue) }}</span>
+    </div>
+    <div class="report-metric">
+      <span class="report-metric__label">Optimistinen</span>
+      <span class="report-metric__value">{{ currency_symbol }}{{ '%.0f'|format(forecast.best_case) }}</span>
+      <span class="form-helper">Todennäköisyys &gt; 50%</span>
+    </div>
+    <div class="report-metric">
+      <span class="report-metric__label">Konservatiivinen</span>
+      <span class="report-metric__value">{{ currency_symbol }}{{ '%.0f'|format(forecast.conservative_case) }}</span>
+      <span class="form-helper">Todennäköisyys &gt; 80%</span>
+    </div>
+    <div class="report-metric">
+      <span class="report-metric__label">Aktiiviset diilit</span>
+      <span class="report-metric__value">{{ forecast.leads_count }}</span>
+    </div>
+  </div>
+
+  <article class="report-card">
+    <header class="report-card__header">
+      <h2 class="report-card__title">Odotettu myynti vaiheittain</h2>
+    </header>
+    <div class="report-card__body">
+      <div class="report-chart-wrap">
+        <canvas id="forecast-chart" role="img" aria-label="Vaiheittainen ennuste"></canvas>
+      </div>
+      <div class="report-table-wrap table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Liidi</th>
+              <th>Yritys</th>
+              <th>Vaihe</th>
+              <th>Todennäköisyys</th>
+              <th>Kaupan arvo</th>
+              <th>Odotettu</th>
+              <th>Viimeisin yhteys</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in deals %}
+            <tr>
+              <td><a href="{{ url_for('leads.detail', lead_id=row.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=row.lead_id) }}">{{ row.lead_name }}</a></td>
+              <td>{{ row.company or '—' }}</td>
+              <td>{{ row.stage_name }}</td>
+              <td>{{ probability_badge(row.probability) }}</td>
+              <td>{% if row.deal_value %}{{ currency_symbol }}{{ '%.0f'|format(row.deal_value) }}{% else %}—{% endif %}</td>
+              <td>{{ currency_symbol }}{{ '%.0f'|format(row.expected_value) }}</td>
+              <td>{{ row.last_contacted_at.strftime('%Y-%m-%d') if row.last_contacted_at else '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Ei aktiivisia liidejä.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if forecast and forecast.by_stage %}
+<script type="application/json" id="report-chart-data">
+{{ {
+  'type': 'bar',
+  'datasetLabel': 'Odotettu myynti',
+  'labels': forecast.by_stage.keys() | list,
+  'values': forecast.by_stage.values() | map(attribute='expected_revenue') | list
+} | tojson }}
+</script>
+<script src="{{ url_for('static', filename='js/reports.js') }}" defer></script>
 {% endif %}
 {% endblock %}

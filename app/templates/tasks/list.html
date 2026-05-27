@@ -1,131 +1,153 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block title %}Tehtävät — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
-<div class="toolbar">
-  <h1 style="margin:0;">Tehtävät</h1>
-</div>
+<div class="tasks-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Tehtävät</h1>
+      <p class="page-subtitle">Nopea työtila — tänään, viikko ja myöhässä</p>
+    </div>
+  </header>
 
-<div class="card" style="margin-bottom:1.5rem;">
-  <h2 style="margin-top:0;">Pikalisäys</h2>
-  <form method="post" action="{{ url_for('tasks.create_task', **org_query) }}" class="filters" style="grid-template-columns: 2fr 1fr 1fr 1fr auto; align-items:end;">
-    {{ quick_form.hidden_tag() }}
-    <label>{{ quick_form.title.label }}
-      {{ quick_form.title(placeholder='Tehtävän otsikko') }}
+  <section class="tasks-quick-add" aria-label="Pikalisäys">
+    <h2 class="tasks-quick-add__title">Pikalisäys</h2>
+    <form method="post" action="{{ url_for('tasks.create_task', **org_query) }}" class="tasks-quick-add__form">
+      {{ quick_form.hidden_tag() }}
+      <label class="form-label">{{ quick_form.title.label.text }}
+        {{ quick_form.title(placeholder='Tehtävän otsikko', class='form-input') }}
+      </label>
+      <label class="form-label">{{ quick_form.type.label.text }}
+        {{ quick_form.type(class='form-select') }}
+      </label>
+      <label class="form-label">{{ quick_form.priority.label.text }}
+        {{ quick_form.priority(class='form-select') }}
+      </label>
+      <label class="form-label">{{ quick_form.due_date.label.text }}
+        {{ quick_form.due_date(class='form-input') }}
+      </label>
+      <button type="submit" class="btn btn-primary">Lisää</button>
+    </form>
+  </section>
+
+  <nav class="tasks-columns-nav" aria-label="Tehtäväjaksot">
+    {% set column_tabs = [
+      ('today', 'Tänään', false),
+      ('week', 'Tämä viikko', false),
+      ('overdue', 'Myöhässä', true),
+      ('all', 'Kaikki', false),
+    ] %}
+    {% for key, label, is_overdue in column_tabs %}
+    <a href="{{ url_for('tasks.list_tasks', tab=key, type=request.args.get('type'), priority=request.args.get('priority'), assigned_to=request.args.get('assigned_to'), **org_query) }}"
+       class="tasks-column-tab{% if tab == key %} is-active{% endif %}{% if is_overdue %} tasks-column-tab--overdue{% endif %}"
+       {% if tab == key %}aria-current="page"{% endif %}>
+      {{ label }}
+      {% if key == 'overdue' and nav_overdue_count %}
+      <span class="tasks-column-tab__count">{{ nav_overdue_count }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+
+  <form method="get" class="tasks-filters-bar">
+    {% if org_query.organization_id %}<input type="hidden" name="organization_id" value="{{ org_query.organization_id }}">{% endif %}
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <label class="form-label">Tyyppi
+      <select name="type" class="form-select" onchange="this.form.submit()">
+        <option value="">Kaikki</option>
+        {% for t in task_types %}
+        <option value="{{ t }}" {% if request.args.get('type') == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
     </label>
-    <label>{{ quick_form.type.label }}{{ quick_form.type() }}</label>
-    <label>{{ quick_form.priority.label }}{{ quick_form.priority() }}</label>
-    <label>{{ quick_form.due_date.label }}{{ quick_form.due_date() }}</label>
-    <button type="submit" class="btn" style="margin-top:1.25rem;">Lisää</button>
+    <label class="form-label">Prioriteetti
+      <select name="priority" class="form-select" onchange="this.form.submit()">
+        <option value="">Kaikki</option>
+        {% for p in priorities %}
+        <option value="{{ p }}" {% if request.args.get('priority') == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if can_assign_others %}
+    <label class="form-label">Vastuuhenkilö
+      <select name="assigned_to" class="form-select" onchange="this.form.submit()">
+        <option value="{{ current_user.id }}" {% if request.args.get('assigned_to', current_user.id|string) == current_user.id|string %}selected{% endif %}>Minä</option>
+        <option value="all" {% if request.args.get('assigned_to') == 'all' %}selected{% endif %}>Kaikki</option>
+        {% for u in users %}
+        <option value="{{ u.id }}" {% if request.args.get('assigned_to') == u.id|string %}selected{% endif %}>{{ u.email }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
   </form>
-</div>
 
-<div class="toolbar">
-  {% set tabs = [('today', 'Tänään'), ('week', 'Tämä viikko'), ('all', 'Kaikki'), ('overdue', 'Myöhässä')] %}
-  {% for key, label in tabs %}
-    <a class="btn {% if tab != key %}secondary{% endif %}"
-       href="{{ url_for('tasks.list_tasks', tab=key, type=request.args.get('type'), priority=request.args.get('priority'), assigned_to=request.args.get('assigned_to'), **org_query) }}">{{ label }}</a>
-  {% endfor %}
-</div>
-
-<form method="get" class="filters" style="margin-top:1rem;">
-  {% if org_query.organization_id %}<input type="hidden" name="organization_id" value="{{ org_query.organization_id }}">{% endif %}
-  <input type="hidden" name="tab" value="{{ tab }}">
-  <label>Tyyppi
-    <select name="type" onchange="this.form.submit()">
-      <option value="">Kaikki</option>
-      {% for t in task_types %}
-      <option value="{{ t }}" {% if request.args.get('type') == t %}selected{% endif %}>{{ t }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Prioriteetti
-    <select name="priority" onchange="this.form.submit()">
-      <option value="">Kaikki</option>
-      {% for p in priorities %}
-      <option value="{{ p }}" {% if request.args.get('priority') == p %}selected{% endif %}>{{ p }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% if can_assign_others %}
-  <label>Vastuuhenkilö
-    <select name="assigned_to" onchange="this.form.submit()">
-      <option value="{{ current_user.id }}" {% if request.args.get('assigned_to', current_user.id|string) == current_user.id|string %}selected{% endif %}>Minä</option>
-      <option value="all" {% if request.args.get('assigned_to') == 'all' %}selected{% endif %}>Kaikki</option>
-      {% for u in users %}
-      <option value="{{ u.id }}" {% if request.args.get('assigned_to') == u.id|string %}selected{% endif %}>{{ u.email }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% endif %}
-</form>
-
-<div class="card" style="margin-top:1rem;">
-  <table>
-    <thead>
-      <tr>
-        <th></th>
-        <th>Prioriteetti</th>
-        <th>Otsikko</th>
-        <th>Liidi</th>
-        <th>Eräpäivä</th>
-        <th>Tyyppi</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for task in tasks %}
-      <tr class="task-row {% if task.is_overdue %}task-overdue{% endif %} {% if task.status == 'completed' %}task-done{% endif %}" data-task-id="{{ task.id }}">
-        <td>
-          {% if task.status != 'completed' %}
-          <input type="checkbox" class="task-complete-cb" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">
-          {% else %}
-          ✓
-          {% endif %}
-        </td>
-        <td><span class="badge priority-{{ task.priority }}">{{ task.priority }}</span></td>
-        <td>{{ task.title }}</td>
-        <td>
+  <div class="tasks-board" role="list">
+    {% for task in tasks %}
+    <article class="task-card{% if task.is_overdue and task.status != 'completed' %} task-card--overdue{% endif %}{% if task.status == 'completed' %} task-card--done{% endif %}"
+             role="listitem" data-task-id="{{ task.id }}">
+      <div class="task-card__check">
+        {% if task.status != 'completed' %}
+        <input type="checkbox" class="task-complete-cb" aria-label="Merkitse valmiiksi: {{ task.title }}"
+               data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">
+        {% else %}
+        <span class="text-success" aria-hidden="true">✓</span>
+        {% endif %}
+      </div>
+      <div class="task-card__body">
+        <div class="task-card__row">
+          <span class="task-priority-dot task-priority-dot--{{ task.priority }}" title="{{ task.priority }}"></span>
+          <span class="task-card__title">{{ task.title }}</span>
+          <span class="badge priority-{{ task.priority }}">{{ task.priority }}</span>
+        </div>
+        <div class="task-card__meta">
           {% if task.lead %}
-          <a href="{{ url_for('leads.detail', lead_id=task.lead_id, **org_query) }}">{{ task.lead.display_name }}</a>
-          {% else %}—{% endif %}
-        </td>
-        <td>{{ task.due_date.strftime('%Y-%m-%d %H:%M') if task.due_date else '—' }}</td>
-        <td><span class="badge">{{ task.type }}</span></td>
-      </tr>
-      {% else %}
-      <tr><td colspan="6">Ei tehtäviä.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+          <a href="{{ url_for('leads.detail', lead_id=task.lead_id, **org_query) }}" class="task-lead-pill">{{ task.lead.display_name }}</a>
+          {% endif %}
+          <span class="task-card__due{% if task.is_overdue and task.status != 'completed' %} task-card__due--overdue{% endif %}">
+            {% if task.due_date %}{{ task.due_date.strftime('%d.%m. %H:%M') }}{% else %}Ei eräpäivää{% endif %}
+          </span>
+          <span class="badge">{{ task.type }}</span>
+        </div>
+      </div>
+    </article>
+    {% else %}
+    <div class="report-card">
+      <div class="report-card__body">
+        {% if tab == 'today' %}
+        {% call empty_state('Ei tehtäviä tänään', 'Olet ajan tasalla — hyvä työ!') %}{% endcall %}
+        {% elif tab == 'overdue' %}
+        {% call empty_state('Ei myöhässä olevia tehtäviä', 'Kaikki eräpäivät ovat hallinnassa.') %}{% endcall %}
+        {% else %}
+        {% call empty_state('Ei tehtäviä', 'Lisää tehtävä pikalisäyksellä yllä.') %}{% endcall %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
-
-<style>
-  .task-overdue td { background: rgba(248, 113, 113, 0.12); }
-  .task-overdue td:first-child { border-left: 3px solid var(--danger); }
-  .task-done td { opacity: 0.55; }
-  .priority-urgent { background: #7f1d1d; color: #fecaca; }
-  .priority-high { background: #713f12; color: #fde68a; }
-</style>
 
 <script>
-document.querySelectorAll('.task-complete-cb').forEach(cb => {
-  cb.addEventListener('change', async () => {
+document.querySelectorAll('.task-complete-cb').forEach(function(cb) {
+  cb.addEventListener('change', async function() {
     if (!cb.checked) return;
-    const url = cb.dataset.completeUrl;
-    const token = document.getElementById('csrf-token')?.value;
+    var url = cb.dataset.completeUrl;
+    var token = document.getElementById('csrf-token') && document.getElementById('csrf-token').value;
     try {
-      const res = await fetch(url, {
+      var res = await fetch(url, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
-          'X-CSRFToken': token,
+          'X-CSRFToken': token || ''
         },
-        credentials: 'same-origin',
+        credentials: 'same-origin'
       });
       if (res.ok) {
-        const row = cb.closest('tr');
-        row.classList.add('task-done');
-        cb.disabled = true;
+        var card = cb.closest('.task-card');
+        if (card) {
+          card.classList.add('task-card--done');
+          cb.disabled = true;
+        }
       } else {
         cb.checked = false;
       }

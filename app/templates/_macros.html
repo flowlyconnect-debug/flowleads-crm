@@ -1,3 +1,33 @@
+{% macro empty_state(title, text='', icon='') %}
+<div class="empty-state" role="status">
+  {% if icon %}
+  <div class="empty-state-icon" aria-hidden="true">{{ icon }}</div>
+  {% endif %}
+  <h3 class="empty-state-title">{{ title }}</h3>
+  {% if text %}
+  <p class="empty-state-text">{{ text }}</p>
+  {% endif %}
+  {% if caller is defined %}
+  <div class="empty-state-actions">{{ caller() }}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro settings_nav(active) %}
+{% set org_id_param = request.args.get('organization_id') %}
+{% set use_org = current_user.is_superadmin() and org_id_param %}
+<nav class="settings-nav" aria-label="Asetukset">
+  <span class="settings-nav__label">Asetukset</span>
+  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="{% if active == 'api_keys' %}is-active{% endif %}">API-avaimet</a>
+  <a href="{% if use_org %}{{ url_for('settings.email_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.email_settings') }}{% endif %}" class="{% if active == 'email' %}is-active{% endif %}">Sähköposti</a>
+  <a href="{% if use_org %}{{ url_for('settings.email_templates_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.email_templates_list') }}{% endif %}" class="{% if active == 'email_templates' %}is-active{% endif %}">Sähköpostimallit</a>
+  <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="{% if active == 'webhooks' %}is-active{% endif %}">Webhook</a>
+  <a href="{% if use_org %}{{ url_for('settings.privacy_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.privacy_settings') }}{% endif %}" class="{% if active == 'privacy' %}is-active{% endif %}">Tietosuoja</a>
+  <a href="{% if use_org %}{{ url_for('settings.proposals_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.proposals_settings') }}{% endif %}" class="{% if active == 'proposals' %}is-active{% endif %}">Tarjoukset</a>
+  <a href="{% if use_org %}{{ url_for('settings.calendar_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.calendar_settings') }}{% endif %}" class="{% if active == 'calendar' %}is-active{% endif %}">Kalenteri</a>
+</nav>
+{% endmacro %}
+
 {% macro score_badge(score) %}
 {% if score is none %}
 <span class="badge score-none">No score</span>

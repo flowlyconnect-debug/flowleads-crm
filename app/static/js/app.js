@@ -44,9 +44,75 @@
     });
   }
 
+  function initModals() {
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    if (!backdrops.length) return;
+
+    function setBodyLock(locked) {
+      document.body.classList.toggle('modal-open', locked);
+    }
+
+    function openModal(modal) {
+      if (!modal) return;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      setBodyLock(true);
+    }
+
+    function closeModal(modal) {
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      if (!document.querySelector('.modal-backdrop.open')) {
+        setBodyLock(false);
+      }
+    }
+
+    document.querySelectorAll('[data-open-modal]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(document.getElementById(btn.getAttribute('data-open-modal')));
+      });
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        closeModal(document.getElementById(btn.getAttribute('data-close-modal')));
+      });
+    });
+
+    backdrops.forEach(function (backdrop) {
+      backdrop.setAttribute('aria-hidden', 'true');
+      backdrop.addEventListener('click', function (e) {
+        if (e.target === backdrop) closeModal(backdrop);
+      });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll('.modal-backdrop.open').forEach(closeModal);
+    });
+  }
+
+  function initReportsFilters() {
+    const rangeSelect = document.getElementById('range-select');
+    const customRow = document.getElementById('reports-custom-dates');
+    if (!rangeSelect || !customRow) return;
+    function syncCustom() {
+      customRow.classList.toggle('is-visible', rangeSelect.value === 'custom');
+    }
+    rangeSelect.addEventListener('change', syncCustom);
+    syncCustom();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSidebar);
+    document.addEventListener('DOMContentLoaded', function () {
+      initSidebar();
+      initModals();
+      initReportsFilters();
+    });
   } else {
     initSidebar();
+    initModals();
+    initReportsFilters();
   }
 })();

@@ -1,135 +1,284 @@
 {% extends "base.html" %}
-{% block title %}Reports — FlowLeads{% endblock %}
+{% from "_macros.html" import empty_state %}
+{% block title %}Raportit — FlowLeads{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1 style="margin:0;">Reports</h1>
-  <a class="btn secondary" href="{{ url_for('analytics.dashboard', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.dashboard') }}">Dashboard</a>
-</div>
+<div class="reports-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Raportit</h1>
+      <p class="page-subtitle">Analytiikkatyötila — pipeline, lähteet, tiimi ja AI</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.dashboard') }}">Dashboard</a>
+    </div>
+  </header>
 
-{% if organization_id is none and current_user.is_superadmin() %}
-<div class="card">
-  <p>Select an organization to view reports.</p>
-  <ul>
-    {% for org in organizations %}
-    <li><a href="{{ url_for('analytics.reports', organization_id=org.id, report=report_type, range=range_key) }}">{{ org.name }}</a></li>
-    {% endfor %}
-  </ul>
-</div>
-{% else %}
-
-{% if range_error %}
-<div class="flash danger">{{ range_error }}</div>
-{% endif %}
-
-<form method="get" class="card" style="margin-bottom:1rem;">
-  {% if current_user.is_superadmin() %}
-  <input type="hidden" name="organization_id" value="{{ organization_id }}">
-  {% endif %}
-  <div class="filters">
-    <label>Report
-      <select name="report">
-        <option value="pipeline" {% if report_type == 'pipeline' %}selected{% endif %}>Pipeline</option>
-        <option value="source" {% if report_type == 'source' %}selected{% endif %}>Lead source</option>
-        <option value="team" {% if report_type == 'team' %}selected{% endif %}>Team activity</option>
-        <option value="ai" {% if report_type == 'ai' %}selected{% endif %}>AI enrichment</option>
-      </select>
-    </label>
-    <label>Range
-      <select name="range" id="range-select">
-        <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>This week</option>
-        <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>This month</option>
-        <option value="last_30_days" {% if range_key == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
-        <option value="custom" {% if range_key == 'custom' %}selected{% endif %}>Custom</option>
-      </select>
-    </label>
-    <label>Start <input type="date" name="start" value="{{ start_date }}"></label>
-    <label>End <input type="date" name="end" value="{{ end_date }}"></label>
+  {% if organization_id is none and current_user.is_superadmin() %}
+  <div class="report-card">
+    <div class="report-card__body">
+      {% call empty_state('Valitse organisaatio', 'Valitse organisaatio nähdäksesi raportit.') %}{% endcall %}
+      <ul class="mt-3">
+        {% for org in organizations %}
+        <li><a class="text-accent font-medium" href="{{ url_for('analytics.reports', organization_id=org.id, report=report_type, range=range_key) }}">{{ org.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
-  <button type="submit" class="btn">Apply</button>
-  <a class="btn secondary" href="{{ url_for('analytics.reports_export', type=report_type, range=range_key, start=start_date, end=end_date, organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports_export', type=report_type, range=range_key, start=start_date, end=end_date) }}">Export CSV</a>
-</form>
+  {% else %}
 
-{% if report_data and not range_error %}
-<div class="card">
-  {% if report_type == 'pipeline' %}
-  <h2>Pipeline report</h2>
-  <table>
-    <thead><tr><th>Stage</th><th>Leads</th><th>Avg score</th><th>Conv. from prev</th><th>Avg days in stage</th></tr></thead>
-    <tbody>
-      {% for s in report_data.stages %}
-      <tr>
-        <td>{{ s.stage_name }}</td>
-        <td>{{ s.lead_count }}</td>
-        <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
-        <td>{% if s.conversion_from_previous is not none %}{{ s.conversion_from_previous }}%{% else %}—{% endif %}</td>
-        <td>{{ s.avg_time_in_stage if s.avg_time_in_stage is not none else 'Insufficient data' }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5">No leads in this period.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <p style="margin-top:1rem;">Won: {{ report_data.won }} · Lost: {{ report_data.lost }} · Conversion: {{ report_data.conversion_rate }}%</p>
-  {% if report_data.won_lost_reasons %}
-  <h3>Recorded reasons</h3>
-  <ul>
-    {% for r in report_data.won_lost_reasons %}
-    <li><span class="badge">{{ r.status }}</span> Lead #{{ r.lead_id }}: {{ r.reason }}</li>
-    {% endfor %}
-  </ul>
+  {% if range_error %}
+  <div class="flash danger" role="alert">{{ range_error }}</div>
   {% endif %}
 
-  {% elif report_type == 'source' %}
-  <h2>Lead source report</h2>
-  <table>
-    <thead><tr><th>Source</th><th>Total</th><th>Won</th><th>Lost</th><th>Conversion</th><th>Avg score</th><th>No score</th></tr></thead>
-    <tbody>
-      {% for s in report_data.sources %}
-      <tr>
-        <td>{{ s.source }}</td>
-        <td>{{ s.total }}</td>
-        <td>{{ s.won }}</td>
-        <td>{{ s.lost }}</td>
-        <td>{{ s.conversion_rate }}%</td>
-        <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
-        <td>{{ s.no_score }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7">No leads in this period.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <nav class="reports-tabs" aria-label="Raporttityypit">
+    {% set tabs = [
+      ('pipeline', 'Pipeline'),
+      ('source', 'Lähteet'),
+      ('team', 'Tiimi'),
+      ('ai', 'AI-rikastus'),
+    ] %}
+    {% for key, label in tabs %}
+    <a href="{{ url_for('analytics.reports', report=key, range=range_key, start=start_date, end=end_date, organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report=key, range=range_key, start=start_date, end=end_date) }}"
+       class="{% if report_type == key %}is-active{% endif %}"
+       {% if report_type == key %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+    <a href="{{ url_for('analytics.forecast', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.forecast') }}">Ennuste</a>
+  </nav>
 
-  {% elif report_type == 'team' %}
-  <h2>Team activity report</h2>
-  <table>
-    <thead><tr><th>User</th><th>Assigned</th><th>Notes</th><th>Emails</th><th>Stage changes</th><th>Calls</th><th>Total</th></tr></thead>
-    <tbody>
-      {% for m in report_data.members %}
-      <tr>
-        <td>{{ m.email }}</td>
-        <td>{{ m.leads_assigned }}</td>
-        <td>{{ m.notes }}</td>
-        <td>{{ m.emails_sent }}</td>
-        <td>{{ m.stage_changes }}</td>
-        <td>{{ m.calls }}</td>
-        <td>{{ m.total_activities }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7">No team data in this period.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <form method="get" class="reports-filters" id="reports-filter-form">
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <input type="hidden" name="report" value="{{ report_type }}">
+    <label class="form-label">Aikaväli
+      <select name="range" id="range-select" class="form-select">
+        <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>Tämä viikko</option>
+        <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>Tämä kuukausi</option>
+        <option value="last_30_days" {% if range_key == 'last_30_days' %}selected{% endif %}>Viimeiset 30 päivää</option>
+        <option value="custom" {% if range_key == 'custom' %}selected{% endif %}>Mukautettu</option>
+      </select>
+    </label>
+    <div class="reports-filters__custom {% if range_key == 'custom' %}is-visible{% endif %}" id="reports-custom-dates">
+      <label class="form-label">Alku
+        <input type="date" name="start" value="{{ start_date }}" class="form-input">
+      </label>
+      <label class="form-label">Loppu
+        <input type="date" name="end" value="{{ end_date }}" class="form-input">
+      </label>
+    </div>
+    <div class="reports-filters__actions">
+      <button type="submit" class="btn btn-primary btn-sm">Käytä</button>
+      <a class="btn-export"
+         href="{{ url_for('analytics.reports_export', type=report_type, range=range_key, start=start_date, end=end_date, organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports_export', type=report_type, range=range_key, start=start_date, end=end_date) }}">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+        Vie CSV
+      </a>
+    </div>
+  </form>
 
-  {% elif report_type == 'ai' %}
-  <h2>AI enrichment report</h2>
-  <p>Attempts: {{ report_data.attempts }} · Completed: {{ report_data.completed }} · Failed: {{ report_data.failed }}</p>
-  <p>Success rate: {{ report_data.success_rate }}% · Avg score (enriched): {{ report_data.avg_score_enriched if report_data.avg_score_enriched is not none else 'No data' }}</p>
-  <p>Tokens used: {{ report_data.total_tokens }} · Estimated cost (USD): {{ report_data.cost_estimate }} <span class="ai-meta">(estimate only)</span></p>
+  {% if report_data and not range_error %}
+  <article class="report-card">
+    <header class="report-card__header">
+      <h2 class="report-card__title">
+        {% if report_type == 'pipeline' %}Pipeline-raportti
+        {% elif report_type == 'source' %}Lähteet
+        {% elif report_type == 'team' %}Tiimiaktiviteetti
+        {% elif report_type == 'ai' %}AI-rikastus
+        {% endif %}
+      </h2>
+    </header>
+    <div class="report-card__body">
+      {% if report_type == 'pipeline' %}
+      <div class="report-metrics">
+        <div class="report-metric">
+          <span class="report-metric__label">Voitetut</span>
+          <span class="report-metric__value">{{ report_data.won }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Hävityt</span>
+          <span class="report-metric__value">{{ report_data.lost }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Konversio</span>
+          <span class="report-metric__value">{{ report_data.conversion_rate }}%</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Liidejä kaudella</span>
+          <span class="report-metric__value">{{ report_data.total_leads_in_range }}</span>
+        </div>
+      </div>
+      {% elif report_type == 'source' %}
+      <div class="report-metrics">
+        <div class="report-metric">
+          <span class="report-metric__label">Liidejä yhteensä</span>
+          <span class="report-metric__value">{{ report_data.total_leads }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Lähteitä</span>
+          <span class="report-metric__value">{{ report_data.sources|length }}</span>
+        </div>
+      </div>
+      {% elif report_type == 'team' %}
+      <div class="report-metrics">
+        <div class="report-metric">
+          <span class="report-metric__label">Tiimin jäseniä</span>
+          <span class="report-metric__value">{{ report_data.members|length }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Aktiviteetteja</span>
+          <span class="report-metric__value">{{ report_data.members|sum(attribute='total_activities') }}</span>
+        </div>
+      </div>
+      {% elif report_type == 'ai' %}
+      <div class="report-metrics">
+        <div class="report-metric">
+          <span class="report-metric__label">Onnistumis%</span>
+          <span class="report-metric__value">{{ report_data.success_rate }}%</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Valmiit</span>
+          <span class="report-metric__value">{{ report_data.completed }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Epäonnistuneet</span>
+          <span class="report-metric__value">{{ report_data.failed }}</span>
+        </div>
+        <div class="report-metric">
+          <span class="report-metric__label">Arvioitu kustannus</span>
+          <span class="report-metric__value">${{ report_data.cost_estimate }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="report-chart-wrap">
+        <canvas id="report-chart" role="img" aria-label="Raporttikaavio"></canvas>
+      </div>
+
+      <div class="report-table-wrap table-wrap">
+        {% if report_type == 'pipeline' %}
+        <table>
+          <thead><tr><th>Vaihe</th><th>Liidejä</th><th>Keskipiste</th><th>Konversio</th><th>Keskim. päivää</th></tr></thead>
+          <tbody>
+            {% for s in report_data.stages %}
+            <tr>
+              <td>{{ s.stage_name }}</td>
+              <td>{{ s.lead_count }}</td>
+              <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
+              <td>{% if s.conversion_from_previous is not none %}{{ s.conversion_from_previous }}%{% else %}—{% endif %}</td>
+              <td>{{ s.avg_time_in_stage if s.avg_time_in_stage is not none else '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Ei liidejä valitulla kaudella.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if report_data.won_lost_reasons %}
+        <h3 class="form-section-title">Tallennetut syyt</h3>
+        <ul class="text-sm">
+          {% for r in report_data.won_lost_reasons %}
+          <li><span class="badge">{{ r.status }}</span> Liidi #{{ r.lead_id }}: {{ r.reason }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% elif report_type == 'source' %}
+        <table>
+          <thead><tr><th>Lähde</th><th>Yhteensä</th><th>Voitetut</th><th>Hävityt</th><th>Konversio</th><th>Keskipiste</th><th>Ei pistettä</th></tr></thead>
+          <tbody>
+            {% for s in report_data.sources %}
+            <tr>
+              <td>{{ s.source }}</td>
+              <td>{{ s.total }}</td>
+              <td>{{ s.won }}</td>
+              <td>{{ s.lost }}</td>
+              <td>{{ s.conversion_rate }}%</td>
+              <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
+              <td>{{ s.no_score }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Ei liidejä valitulla kaudella.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% elif report_type == 'team' %}
+        <table>
+          <thead><tr><th>Käyttäjä</th><th>Osoitetut</th><th>Muistiinpanot</th><th>Sähköpostit</th><th>Vaiheiden muutokset</th><th>Puhelut</th><th>Yhteensä</th></tr></thead>
+          <tbody>
+            {% for m in report_data.members %}
+            <tr>
+              <td>{{ m.email }}</td>
+              <td>{{ m.leads_assigned }}</td>
+              <td>{{ m.notes }}</td>
+              <td>{{ m.emails_sent }}</td>
+              <td>{{ m.stage_changes }}</td>
+              <td>{{ m.calls }}</td>
+              <td>{{ m.total_activities }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Ei tiimidataa valitulla kaudella.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% elif report_type == 'ai' %}
+        <table>
+          <thead><tr><th>Mittari</th><th>Arvo</th></tr></thead>
+          <tbody>
+            <tr><td>Yritykset</td><td>{{ report_data.attempts }}</td></tr>
+            <tr><td>Valmiit</td><td>{{ report_data.completed }}</td></tr>
+            <tr><td>Epäonnistuneet</td><td>{{ report_data.failed }}</td></tr>
+            <tr><td>Keskipiste (rikastetut)</td><td>{{ report_data.avg_score_enriched if report_data.avg_score_enriched is not none else '—' }}</td></tr>
+            <tr><td>Tokenit</td><td>{{ report_data.total_tokens }}</td></tr>
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+    </div>
+  </article>
+
+  {% elif not range_error %}
+  <div class="report-card">
+    <div class="report-card__body">
+      {% call empty_state('Ei dataa', 'Valitulla aikavälillä ei ole raporttidataa. Kokeile laajempaa aikaväliä.') %}{% endcall %}
+    </div>
+  </div>
+  {% endif %}
   {% endif %}
 </div>
-{% elif not range_error %}
-<div class="card"><p class="ai-meta">No data for this report.</p></div>
+{% endblock %}
+
+{% block scripts %}
+{% if report_data and not range_error %}
+<script type="application/json" id="report-chart-data">
+{% if report_type == 'pipeline' %}
+{{ {
+  'type': 'bar',
+  'datasetLabel': 'Liidejä',
+  'labels': report_data.stages | map(attribute='stage_name') | list,
+  'values': report_data.stages | map(attribute='lead_count') | list
+} | tojson }}
+{% elif report_type == 'source' %}
+{{ {
+  'type': 'doughnut',
+  'labels': report_data.sources | map(attribute='source') | list,
+  'values': report_data.sources | map(attribute='total') | list
+} | tojson }}
+{% elif report_type == 'team' %}
+{{ {
+  'type': 'bar',
+  'datasetLabel': 'Aktiviteetit',
+  'labels': report_data.members | map(attribute='email') | list,
+  'values': report_data.members | map(attribute='total_activities') | list
+} | tojson }}
+{% elif report_type == 'ai' %}
+{{ {
+  'type': 'doughnut',
+  'labels': ['Valmiit', 'Epäonnistuneet'],
+  'values': [report_data.completed, report_data.failed]
+} | tojson }}
 {% endif %}
+</script>
+<script src="{{ url_for('static', filename='js/reports.js') }}" defer></script>
 {% endif %}
 {% endblock %}

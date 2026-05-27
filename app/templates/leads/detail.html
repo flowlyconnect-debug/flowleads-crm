@@ -681,7 +681,7 @@
 </section>
 
 <div class="modal-backdrop" id="meeting-modal">
-  <div class="modal" style="max-width:520px;">
+  <div class="modal modal--wide">
     <h2 class="modal-title">Aikatauluta tapaaminen</h2>
     <form method="post" action="{{ url_for('leads.schedule_lead_meeting', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.schedule_lead_meeting', lead_id=lead.id) }}">
       {{ schedule_meeting_form.hidden_tag() }}

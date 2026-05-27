@@ -1,31 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Tietosuoja — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav %}
+{% block title %}Tietosuoja — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>Tietosuoja-asetukset</h1>
-  <form method="post">
-    {{ form.hidden_tag() }}
-    {% if current_user.is_superadmin() %}
-    <input type="hidden" name="organization_id" value="{{ organization_id }}">
-    {% endif %}
-    <label>{{ form.gdpr_default_legal_basis.label }}{{ form.gdpr_default_legal_basis(placeholder='consent / legitimate_interest / contract') }}</label>
-    <label>{{ form.gdpr_retention_days.label }}{{ form.gdpr_retention_days() }}</label>
-    <label>
-      <input type="checkbox" name="gdpr_auto_anonymize_inactive" {% if settings.gdpr_auto_anonymize_inactive %}checked{% endif %}>
-      Automaattinen anonymisointi passiivisille liideille
-    </label>
-    <label>{{ form.privacy_policy_url.label }}{{ form.privacy_policy_url() }}</label>
-    <label>{{ form.data_controller_name.label }}{{ form.data_controller_name() }}</label>
-    <label>{{ form.data_controller_email.label }}{{ form.data_controller_email() }}</label>
-    {{ form.submit(class_='btn') }}
-  </form>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('privacy') }}
+    <div class="settings-content">
+      <div class="settings-panel">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Tietosuoja</h1>
+          <p class="settings-panel__subtitle">GDPR-asetukset ja organisaation tietojen vienti.</p>
+        </header>
 
-  <hr style="margin:2rem 0;">
-  <h2>Organisaation tietojen vienti</h2>
-  <p>Pyydä ZIP-vienti kaikista organisaation tiedoista. Latauslinkki lähetetään sähköpostiin (48 h voimassa).</p>
-  <form method="post" action="{{ url_for('settings.gdpr_export_request') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn secondary">Pyydä organisaation vienti</button>
-  </form>
+        <form method="post">
+          {{ form.hidden_tag() }}
+          {% if current_user.is_superadmin() %}
+          <input type="hidden" name="organization_id" value="{{ organization_id }}">
+          {% endif %}
+          <div class="form-group">
+            <label class="form-label">{{ form.gdpr_default_legal_basis.label.text }}
+              {{ form.gdpr_default_legal_basis(placeholder='consent / legitimate_interest / contract', class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.gdpr_retention_days.label.text }}
+              {{ form.gdpr_retention_days(class='form-input') }}
+            </label>
+            <label class="form-check">
+              <input type="checkbox" name="gdpr_auto_anonymize_inactive" {% if settings.gdpr_auto_anonymize_inactive %}checked{% endif %}>
+              Automaattinen anonymisointi passiivisille liideille
+            </label>
+            <label class="form-label">{{ form.privacy_policy_url.label.text }}
+              {{ form.privacy_policy_url(class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.data_controller_name.label.text }}
+              {{ form.data_controller_name(class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.data_controller_email.label.text }}
+              {{ form.data_controller_email(class='form-input') }}
+            </label>
+          </div>
+          <div class="form-actions form-actions--sticky">
+            {{ form.submit(class_='btn btn-primary') }}
+          </div>
+        </form>
+
+        <hr class="form-divider">
+        <h2 class="form-section-title">Organisaation tietojen vienti</h2>
+        <p class="form-helper">Pyydä ZIP-vienti kaikista organisaation tiedoista. Latauslinkki lähetetään sähköpostiin (48 h voimassa).</p>
+        <form method="post" action="{{ url_for('settings.gdpr_export_request') }}" class="form-actions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-secondary">Pyydä organisaation vienti</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

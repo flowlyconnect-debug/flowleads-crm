@@ -1,52 +1,66 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block title %}Lomakkeet — FlowLeads{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1 style="margin:0;">Lomakkeet</h1>
-  <form method="post" action="{{ url_for('forms.create_form', **org_query) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="name" value="Uusi lomake">
-    <input type="hidden" name="title" value="Ota yhteyttä">
-    <button type="submit">+ Uusi lomake</button>
-  </form>
-</div>
+<div class="list-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Lomakkeet</h1>
+      <p class="page-subtitle">Upotettavat yhteydenottolomakkeet</p>
+    </div>
+    <div class="page-header__actions">
+      <form method="post" action="{{ url_for('forms.create_form', **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="name" value="Uusi lomake">
+        <input type="hidden" name="title" value="Ota yhteyttä">
+        <button type="submit" class="btn btn-primary btn-sm">+ Uusi lomake</button>
+      </form>
+    </div>
+  </header>
 
-<table>
-  <thead>
-    <tr>
-      <th>Nimi</th>
-      <th>Lähetyksiä</th>
-      <th>Tila</th>
-      <th>Luotu</th>
-      <th>Toiminnot</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for f in forms %}
-    <tr>
-      <td><a href="{{ url_for('forms.edit_form', form_id=f.id, **org_query) }}">{{ f.name }}</a></td>
-      <td>{{ f.submission_count }}</td>
-      <td>
-        {% if f.is_active %}
-        <span class="badge badge-active">Aktiivinen</span>
-        {% else %}
-        <span class="badge badge-inactive">Ei aktiivinen</span>
-        {% endif %}
-      </td>
-      <td>{{ f.created_at.strftime('%d.%m.%Y %H:%M') if f.created_at else '—' }}</td>
-      <td class="webhook-actions">
-        <a class="btn secondary" href="{{ url_for('forms.edit_form', form_id=f.id, **org_query) }}">Muokkaa</a>
-        <a class="btn secondary" href="{{ url_for('forms.form_submissions', form_id=f.id, **org_query) }}">Lähetykset</a>
-        <a class="btn secondary" href="{{ url_for('forms.edit_form', form_id=f.id, tab='embed', **org_query) }}#embed">Upota</a>
-        <form method="post" action="{{ url_for('forms.delete_form', form_id=f.id, **org_query) }}" onsubmit="return confirm('Poistetaanko lomake?');">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="secondary">Poista</button>
-        </form>
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="5">Ei lomakkeita. Luo ensimmäinen lomake yllä.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nimi</th>
+            <th>Lähetyksiä</th>
+            <th>Tila</th>
+            <th>Luotu</th>
+            <th>Toiminnot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in forms %}
+          <tr>
+            <td><a href="{{ url_for('forms.edit_form', form_id=f.id, **org_query) }}">{{ f.name }}</a></td>
+            <td>{{ f.submission_count }}</td>
+            <td>
+              {% if f.is_active %}
+              <span class="badge badge-active">Aktiivinen</span>
+              {% else %}
+              <span class="badge badge-inactive">Ei aktiivinen</span>
+              {% endif %}
+            </td>
+            <td>{{ f.created_at.strftime('%d.%m.%Y %H:%M') if f.created_at else '—' }}</td>
+            <td class="webhook-actions">
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('forms.edit_form', form_id=f.id, **org_query) }}">Muokkaa</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('forms.form_submissions', form_id=f.id, **org_query) }}">Lähetykset</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('forms.edit_form', form_id=f.id, tab='embed', **org_query) }}#embed">Upota</a>
+              <form method="post" action="{{ url_for('forms.delete_form', form_id=f.id, **org_query) }}" onsubmit="return confirm('Poistetaanko lomake?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-ghost btn-sm">Poista</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">
+            {% call empty_state('Ei lomakkeita', 'Luo ensimmäinen lomake yllä olevalla painikkeella.') %}{% endcall %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

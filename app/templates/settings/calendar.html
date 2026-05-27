@@ -1,48 +1,59 @@
 {% extends "base.html" %}
-{% block title %}Kalenteri — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav %}
+{% block title %}Kalenteri — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>Kalenteri-integraatio</h1>
-  <p style="color:#94a3b8;">Yhdistä Google Calendar tai Microsoft Outlook aikatauluttaaksesi tapaamisia suoraan CRM:stä.</p>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('calendar') }}
+    <div class="settings-content">
+      <div class="settings-panel">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Kalenteri-integraatio</h1>
+          <p class="settings-panel__subtitle">Yhdistä Google Calendar tai Microsoft Outlook aikatauluttaaksesi tapaamisia suoraan CRM:stä.</p>
+        </header>
 
-  {% if connection %}
-  <div style="margin:1.5rem 0; padding:1rem; background:#0f172a; border-radius:6px;">
-    <p><strong>Yhdistetty:</strong>
-      {% if connection.provider == 'google' %}Google Calendar{% else %}Microsoft Outlook{% endif %}
-    </p>
-    <p><strong>Kalenteri ID:</strong> {{ connection.calendar_id or '—' }}</p>
-    <p><strong>Viimeisin synkronointi:</strong>
-      {{ connection.last_synced_at.strftime('%Y-%m-%d %H:%M') if connection.last_synced_at else 'Ei vielä' }}
-    </p>
-    <p><strong>Synkronointi:</strong> {{ 'Käytössä' if connection.sync_enabled else 'Pois' }}</p>
-  </div>
+        {% if connection %}
+        <div class="card card--flat mb-4">
+          <p class="text-sm mb-2"><strong>Yhdistetty:</strong>
+            {% if connection.provider == 'google' %}Google Calendar{% else %}Microsoft Outlook{% endif %}
+          </p>
+          <p class="text-sm mb-2"><strong>Kalenteri ID:</strong> {{ connection.calendar_id or '—' }}</p>
+          <p class="text-sm mb-2"><strong>Viimeisin synkronointi:</strong>
+            {{ connection.last_synced_at.strftime('%Y-%m-%d %H:%M') if connection.last_synced_at else 'Ei vielä' }}
+          </p>
+          <p class="text-sm mb-0"><strong>Synkronointi:</strong> {{ 'Käytössä' if connection.sync_enabled else 'Pois' }}</p>
+        </div>
 
-  <div class="toolbar">
-    <button type="button" class="btn secondary" id="btn-test-calendar">Testaa yhteys</button>
-    <form method="post" action="{{ url_for('settings.calendar_disconnect') }}" style="display:inline;" onsubmit="return confirm('Katkaistaanko kalenteriyhteys?');">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn" style="background:#b91c1c;">Katkaise yhteys</button>
-    </form>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-test-calendar">Testaa yhteys</button>
+          <form method="post" action="{{ url_for('settings.calendar_disconnect') }}" class="form-row-inline" onsubmit="return confirm('Katkaistaanko kalenteriyhteys?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger btn-sm">Katkaise yhteys</button>
+          </form>
+        </div>
+        <pre id="calendar-test-result" class="form-code hidden mt-3" aria-live="polite"></pre>
+        {% else %}
+        <p class="form-helper mb-4">Ei aktiivista kalenteriyhteyttä.</p>
+        <div class="form-actions">
+          <a class="btn btn-primary" href="{{ url_for('settings.calendar_connect_google') }}">Yhdistä Google Calendar</a>
+          <a class="btn btn-secondary" href="{{ url_for('settings.calendar_connect_microsoft') }}">Yhdistä Microsoft Outlook</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
-  <pre id="calendar-test-result" style="display:none; margin-top:1rem; padding:1rem; background:#0f172a; border-radius:4px; font-size:0.85rem; overflow:auto;"></pre>
-  {% else %}
-  <p style="margin:1.5rem 0;">Ei aktiivista kalenteriyhteyttä.</p>
-  <div class="toolbar">
-    <a class="btn" href="{{ url_for('settings.calendar_connect_google') }}">Yhdistä Google Calendar</a>
-    <a class="btn secondary" href="{{ url_for('settings.calendar_connect_microsoft') }}">Yhdistä Microsoft Outlook</a>
-  </div>
-  {% endif %}
 </div>
 <script>
-document.getElementById('btn-test-calendar')?.addEventListener('click', async () => {
-  const el = document.getElementById('calendar-test-result');
-  el.style.display = 'block';
+document.getElementById('btn-test-calendar')?.addEventListener('click', async function() {
+  var el = document.getElementById('calendar-test-result');
+  if (!el) return;
+  el.classList.remove('hidden');
   el.textContent = 'Testataan…';
   try {
-    const res = await fetch('{{ url_for("settings.calendar_test") }}', {credentials: 'same-origin'});
-    const data = await res.json();
+    var res = await fetch('{{ url_for("settings.calendar_test") }}', {credentials: 'same-origin'});
+    var data = await res.json();
     if (data.success) {
-      el.textContent = 'Yhteys OK. Kalenterit:\n' + data.calendars.map(c => '- ' + c.summary + ' (' + c.id + ')').join('\n');
+      el.textContent = 'Yhteys OK. Kalenterit:\n' + data.calendars.map(function(c) { return '- ' + c.summary + ' (' + c.id + ')'; }).join('\n');
     } else {
       el.textContent = 'Virhe: ' + (data.message || data.error);
     }

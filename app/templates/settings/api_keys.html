@@ -1,62 +1,79 @@
 {% extends "base.html" %}
-{% block title %}API Keys — Settings{% endblock %}
+{% from "_macros.html" import settings_nav, empty_state %}
+{% block title %}API-avaimet — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>API keys</h1>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('api_keys') }}
+    <div class="settings-content">
+      <div class="settings-panel">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">API-avaimet</h1>
+          <p class="settings-panel__subtitle">Hallitse integraatioavaimia (esim. n8n).</p>
+        </header>
 
-  {% if new_key %}
-  <div class="flash warning">
-    <strong>Copy this API key now — it will not be shown again:</strong><br>
-    <code style="word-break: break-all;">{{ new_key }}</code>
+        {% if new_key %}
+        <div class="flash warning" role="alert">
+          <strong>Kopioi avain nyt — sitä ei näytetä uudelleen:</strong><br>
+          <code class="form-code mt-2">{{ new_key }}</code>
+        </div>
+        {% endif %}
+
+        <h2 class="form-section-title">Luo avain</h2>
+        <form method="post" action="{{ url_for('settings.create_api_key_route') }}" class="form-group">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="form-label" for="api-key-name">Nimi
+            <input type="text" id="api-key-name" name="name" class="form-input" maxlength="100" required placeholder="n8n production">
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Luo API-avain</button>
+          </div>
+        </form>
+
+        <h2 class="form-section-title">Organisaation avaimet</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nimi</th>
+                <th>Etuliite</th>
+                <th>Aktiivinen</th>
+                <th>Viimeksi käytetty</th>
+                <th>Vanhenee</th>
+                <th>Pyynnöt</th>
+                <th>Luotu</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for key in keys %}
+              <tr>
+                <td>{{ key.name }}</td>
+                <td><code>{{ key.key_prefix }}…</code></td>
+                <td>{{ 'kyllä' if key.is_active and not key.revoked_at else 'ei' }}</td>
+                <td>{{ key.last_used_at or '—' }}</td>
+                <td>{{ key.expires_at or '—' }}</td>
+                <td>{{ key.request_count }}</td>
+                <td>{{ key.created_at }}</td>
+                <td>
+                  {% if key.is_active and not key.revoked_at %}
+                  <form method="post" action="{{ url_for('settings.revoke_api_key_route', key_id=key.id) }}" class="form-row-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Peruuta</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8">
+                {% call empty_state('Ei API-avaimia', 'Luo ensimmäinen avain integraatioita varten.') %}{% endcall %}
+              </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
-  {% endif %}
-
-  <h2>Create key</h2>
-  <form method="post" action="{{ url_for('settings.create_api_key_route') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Name
-      <input type="text" name="name" maxlength="100" required placeholder="n8n production">
-    </label>
-    <button type="submit">Create API key</button>
-  </form>
-
-  <h2>Your organization keys</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Prefix</th>
-        <th>Active</th>
-        <th>Last used</th>
-        <th>Expires</th>
-        <th>Requests</th>
-        <th>Created</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for key in keys %}
-      <tr>
-        <td>{{ key.name }}</td>
-        <td><code>{{ key.key_prefix }}…</code></td>
-        <td>{{ 'yes' if key.is_active and not key.revoked_at else 'no' }}</td>
-        <td>{{ key.last_used_at or '—' }}</td>
-        <td>{{ key.expires_at or '—' }}</td>
-        <td>{{ key.request_count }}</td>
-        <td>{{ key.created_at }}</td>
-        <td>
-          {% if key.is_active and not key.revoked_at %}
-          <form method="post" action="{{ url_for('settings.revoke_api_key_route', key_id=key.id) }}" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="secondary">Revoke</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="8">No API keys yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
 </div>
 {% endblock %}

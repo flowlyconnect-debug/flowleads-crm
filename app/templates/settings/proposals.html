@@ -1,17 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Tarjousasetukset — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav %}
+{% block title %}Tarjoukset — Asetukset{% endblock %}
 {% block content %}
-<h1>Tarjousasetukset</h1>
-<form method="post" class="card" style="max-width:640px;">
-  {{ form.hidden_tag() }}
-  <h2>Organisaatio</h2>
-  <p>{{ form.proposal_move_lead_to_won_on_accept() }} {{ form.proposal_move_lead_to_won_on_accept.label }}</p>
-  <p><label>{{ form.proposal_default_valid_days.label }}</label>{{ form.proposal_default_valid_days() }}</p>
-  <p><label>{{ form.proposal_default_tax_percent.label }}</label>{{ form.proposal_default_tax_percent() }}</p>
-  <p><label>{{ form.proposal_default_notes.label }}</label>{{ form.proposal_default_notes(rows=3) }}</p>
-  <h2>PDF-malli</h2>
-  <p><label>{{ form.header_html.label }}</label>{{ form.header_html(rows=3) }}</p>
-  <p><label>{{ form.footer_html.label }}</label>{{ form.footer_html(rows=3) }}</p>
-  <p>{{ form.submit(class_="btn") }}</p>
-</form>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('proposals') }}
+    <div class="settings-content">
+      <div class="settings-panel">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Tarjousasetukset</h1>
+          <p class="settings-panel__subtitle">Organisaation oletukset ja PDF-malli.</p>
+        </header>
+
+        <form method="post">
+          {{ form.hidden_tag() }}
+          <h2 class="form-section-title">Organisaatio</h2>
+          <div class="form-group">
+            <label class="form-check">
+              {{ form.proposal_move_lead_to_won_on_accept() }}
+              {{ form.proposal_move_lead_to_won_on_accept.label.text }}
+            </label>
+            <label class="form-label">{{ form.proposal_default_valid_days.label.text }}
+              {{ form.proposal_default_valid_days(class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.proposal_default_tax_percent.label.text }}
+              {{ form.proposal_default_tax_percent(class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.proposal_default_notes.label.text }}
+              {{ form.proposal_default_notes(rows=3, class='form-input') }}
+            </label>
+          </div>
+          <h2 class="form-section-title">PDF-malli</h2>
+          <div class="form-group">
+            <label class="form-label">{{ form.header_html.label.text }}
+              {{ form.header_html(rows=3, class='form-input') }}
+            </label>
+            <label class="form-label">{{ form.footer_html.label.text }}
+              {{ form.footer_html(rows=3, class='form-input') }}
+            </label>
+          </div>
+          <div class="form-actions form-actions--sticky">
+            {{ form.submit(class_='btn btn-primary') }}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
