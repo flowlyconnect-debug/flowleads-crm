@@ -10,13 +10,16 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import func
 
 from app.admin.services import get_accessible_organizations
 from app.analytics.date_ranges import resolve_report_dates
 from app.analytics.exports import export_report_csv
 from app.analytics.services import AnalyticsService
+from app.core.errors import json_success
 from app.core.permissions import require_2fa, require_role
-from app.extensions import cache
+from app.extensions import cache, db
+from app.leads.models import Lead, PipelineStage
 from app.leads.permissions import resolve_organization_id
 
 analytics_bp = Blueprint("analytics", __name__)
@@ -60,10 +63,104 @@ def _get_cached_dashboard_stats(organization_id: int, period_days: int = 30) -> 
     return data
 
 
+def _pipeline_bucket_label(stage_name: str | None, status: str | None) -> str | None:
+    """Map stage + status to one of the dashboard pipeline buckets."""
+    if not status:
+        return None
+    if status == "won":
+        return "Closed Won"
+    if status == "lost":
+        return "Closed Lost"
+    # Non-closed: bucket by stage name
+    name = (stage_name or "").strip()
+    if not name:
+        return None
+    if name == "New Lead":
+        return "New Lead"
+    if name == "Contacted":
+        return "Contacted"
+    if name in {"Interested", "Qualified"}:
+        return "Qualified"
+    if name in {"Proposal Sent", "Proposal"}:
+        return "Proposal"
+    return None
+
+
 @analytics_bp.before_request
 @login_required
 def block_api_client():
     _require_ui_role()
+
+
+@analytics_bp.route("/api/dashboard/pipeline-distribution", methods=["GET"])
+def dashboard_pipeline_distribution():
+    """Return pipeline distribution for the current organization as JSON."""
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success(
+            {
+                "labels": [],
+                "counts": [],
+                "percentages": [],
+                "total": 0,
+            }
+        )
+
+    rows = (
+        db.session.query(PipelineStage.name, Lead.status, func.count(Lead.id))
+        .join(Lead, Lead.stage_id == PipelineStage.id)
+        .filter(
+            Lead.organization_id == organization_id,
+            PipelineStage.organization_id == organization_id,
+            Lead.status.in_(("active", "won", "lost")),
+        )
+        .group_by(PipelineStage.name, Lead.status)
+        .all()
+    )
+
+    buckets = {
+        "New Lead": 0,
+        "Contacted": 0,
+        "Qualified": 0,
+        "Proposal": 0,
+        "Closed Won": 0,
+        "Closed Lost": 0,
+    }
+
+    for stage_name, status, count in rows:
+        label = _pipeline_bucket_label(stage_name, status)
+        if label and label in buckets:
+            buckets[label] += int(count or 0)
+
+    # Remove empty buckets from response but keep deterministic order
+    ordered_labels = [
+        key for key in buckets.keys() if buckets[key] > 0
+    ]
+    total = sum(buckets.values())
+
+    if total <= 0 or not ordered_labels:
+        return json_success(
+            {
+                "labels": [],
+                "counts": [],
+                "percentages": [],
+                "total": 0,
+            }
+        )
+
+    counts = [buckets[label] for label in ordered_labels]
+    percentages = [
+        round((count / total) * 100.0, 1) if count else 0.0 for count in counts
+    ]
+
+    return json_success(
+        {
+            "labels": ordered_labels,
+            "counts": counts,
+            "percentages": percentages,
+            "total": total,
+        }
+    )
 
 
 @analytics_bp.route("/dashboard")

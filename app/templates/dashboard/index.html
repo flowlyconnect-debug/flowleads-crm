@@ -275,6 +275,19 @@
           {% endfor %}
         </div>
       </div>
+
+      <div class="card pipeline-donut-card">
+        <div class="card-header">
+          <span class="card-title">Myyntiputki</span>
+        </div>
+        <div class="pipeline-donut-body">
+          <div class="pipeline-donut-chart-wrapper">
+            <canvas id="pipelineDonutChart" width="220" height="220" aria-label="Myyntiputki" role="img"></canvas>
+            <div class="pipeline-donut-empty" id="pipelineDonutEmpty">Ei liidejä vielä</div>
+          </div>
+          <div class="pipeline-donut-legend" id="pipelineDonutLegend"></div>
+        </div>
+      </div>
     </aside>
   </div>
 
