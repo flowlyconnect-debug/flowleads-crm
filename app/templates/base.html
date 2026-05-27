@@ -3,159 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}FlowLeads CRM{% endblock %}</title>
-  <style>
-    :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --accent: #38bdf8; --danger: #f87171; --ok: #4ade80; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-    header { padding: 1rem 2rem; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-    header a { color: var(--accent); text-decoration: none; }
-    main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
-    main.narrow { max-width: 720px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
-    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #334155; }
-    th a { color: var(--accent); text-decoration: none; }
-    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: #334155; }
-    .score-low { background: #7f1d1d; color: #fecaca; }
-    .score-mid { background: #713f12; color: #fde68a; }
-    .score-high { background: #14532d; color: #bbf7d0; }
-    .score-none { background: #475569; color: #cbd5e1; }
-    .ai-ok { background: #14532d; color: #bbf7d0; }
-    .ai-pending { background: #1e3a5f; color: #93c5fd; }
-    .ai-failed { background: #7f1d1d; color: #fecaca; }
-    .ai-disabled { background: #475569; color: #cbd5e1; }
-    .ai-summary-box { background: #0f172a; border-left: 4px solid var(--accent); padding: 1rem; margin: 1rem 0; border-radius: 4px; }
-    .ai-error { color: #fecaca; font-size: 0.9rem; margin-top: 0.5rem; }
-    .ai-meta { color: #94a3b8; font-size: 0.85rem; margin-left: 0.35rem; }
-    details.ai-insights { margin-top: 1rem; }
-    details.ai-insights summary { cursor: pointer; color: var(--accent); font-weight: 600; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
-    .toolbar a.btn { margin-top: 0; }
-    .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
-    .filters label { margin-top: 0; }
-    .filters input, .filters select { margin-top: 0.25rem; }
-    .kanban { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
-    .kanban-col { min-width: 240px; flex: 0 0 240px; background: #0f172a; border-radius: 8px; padding: 0.75rem; }
-    .kanban-col h3 { margin: 0 0 0.75rem; font-size: 0.95rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; }
-    .lead-card { background: var(--card); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab; }
-    .lead-card .meta { font-size: 0.8rem; color: #94a3b8; margin-top: 0.35rem; }
-    .timeline { list-style: none; padding: 0; margin: 0; }
-    .timeline li { padding: 0.75rem 0; border-bottom: 1px solid #334155; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
-    button.secondary { background: #475569; color: var(--text); }
-    button:disabled, .btn.disabled { opacity: 0.5; cursor: not-allowed; background: #475569; }
-    .card { background: var(--card); border-radius: 8px; padding: 1.5rem; }
-    label { display: block; margin-top: 1rem; font-size: 0.9rem; }
-    input { width: 100%; padding: 0.6rem; margin-top: 0.25rem; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: var(--text); }
-    button, .btn { margin-top: 1.25rem; padding: 0.6rem 1.2rem; background: var(--accent); color: #0f172a; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
-    .flash { padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
-    .flash.danger { background: #7f1d1d; }
-    .flash.success { background: #14532d; }
-    .flash.info, .flash.warning, .flash.secondary { background: #334155; }
-    .errors { color: var(--danger); font-size: 0.85rem; margin-top: 0.25rem; }
-    .nav-badge { background: var(--danger); color: #fff; border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.7rem; margin-left: 0.2rem; vertical-align: super; }
-    .nav-notifications { position: relative; display: inline-block; }
-    .nav-notifications-panel { display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem; min-width: 320px; max-width: 400px; background: var(--card); border: 1px solid #334155; border-radius: 8px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-    .nav-notifications-panel.open { display: block; }
-    .nav-notifications-panel header { padding: 0.75rem 1rem; border-bottom: 1px solid #334155; font-size: 0.9rem; }
-    .nav-notifications-panel ul { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
-    .nav-notifications-panel li { border-bottom: 1px solid #334155; }
-    .nav-notifications-panel li a { display: block; padding: 0.75rem 1rem; color: var(--text); text-decoration: none; font-size: 0.85rem; }
-    .nav-notifications-panel li a:hover { background: #0f172a; }
-    .nav-notifications-panel li.unread a { border-left: 3px solid var(--accent); }
-    .nav-notifications-panel .panel-footer { padding: 0.5rem 1rem; text-align: center; border-top: 1px solid #334155; }
-    .nav-notifications-panel .panel-footer button { margin: 0; padding: 0.35rem 0.75rem; font-size: 0.8rem; }
-    .tabs { display: flex; gap: 0.5rem; border-bottom: 1px solid #334155; margin-bottom: 1rem; }
-    .tabs a { padding: 0.5rem 1rem; color: #94a3b8; text-decoration: none; }
-    .tabs a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
-    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
-    .modal-backdrop.open { display: flex; }
-    .modal { background: var(--card); padding: 1.5rem; border-radius: 8px; max-width: 480px; width: 90%; }
-    .webhook-provider { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-    .webhook-provider.slack { background: #4a154b; color: #f5e6ff; }
-    .webhook-provider.teams { background: #464eb8; color: #e8ebff; }
-    .webhook-provider.custom { background: #334155; color: #e2e8f0; }
-    .badge-active { background: #14532d; color: #bbf7d0; }
-    .badge-inactive { background: #475569; color: #cbd5e1; }
-    .badge-delivered { background: #14532d; color: #bbf7d0; }
-    .badge-failed { background: #7f1d1d; color: #fecaca; }
-    .badge-pending { background: #1e3a5f; color: #93c5fd; }
-    .webhook-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
-    .webhook-actions form { margin: 0; }
-    .webhook-actions button { margin-top: 0; padding: 0.35rem 0.65rem; font-size: 0.8rem; }
-    .event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin-top: 0.5rem; }
-    .event-grid label { margin-top: 0; font-size: 0.85rem; }
-    select, textarea { width: 100%; padding: 0.6rem; margin-top: 0.25rem; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: var(--text); }
-    #webhook-secret-row { display: none; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block head %}{% endblock %}
 </head>
-<body>
-  <header>
-    <strong><a href="{{ url_for('index') }}">FlowLeads CRM</a></strong>
-    <nav>
-      {% if current_user.is_authenticated %}
-        <a href="{{ url_for('analytics.dashboard', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.dashboard') }}">Dashboard</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('analytics.reports', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.reports') }}">Reports</a>
-        <a href="{{ url_for('analytics.forecast', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('analytics.forecast') }}">Ennuste</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('leads.list_leads', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('leads.list_leads') }}">Leads</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('leads.pipeline', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('leads.pipeline') }}">Pipeline</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('tasks.list_tasks', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('tasks.list_tasks') }}">Tehtävät{% if nav_overdue_count %}<span class="nav-badge">{{ nav_overdue_count }}</span>{% endif %}</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('calendar.my_calendar', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('calendar.my_calendar') }}">Kalenteri</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('sequences.list_sequences', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('sequences.list_sequences') }}">Sekvenssit</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('proposals.list_proposals', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('proposals.list_proposals') }}">Tarjoukset</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('forms.list_forms', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('forms.list_forms') }}">Lomakkeet</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('automations.list_automations', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('automations.list_automations') }}">Automaatiot</a>
-        &nbsp;|&nbsp;
-        <span class="nav-notifications" id="nav-notifications">
-          <a href="#" id="nav-notifications-toggle" title="Ilmoitukset">🔔{% if nav_unread_count %}<span class="nav-badge" id="nav-unread-badge">{{ nav_unread_count }}</span>{% endif %}</a>
-          <div class="nav-notifications-panel" id="nav-notifications-panel">
-            <header><strong>Ilmoitukset</strong> <span id="nav-notif-count-label"></span></header>
-            <ul id="nav-notifications-list"></ul>
-            <div class="panel-footer">
-              <button type="button" class="secondary" id="nav-mark-all-read">Merkitse kaikki luetuiksi</button>
-            </div>
-          </div>
-        </span>
-        {% if current_user.role in ('admin', 'superadmin') %}
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('settings.webhooks_list', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('settings.webhooks_list') }}">Webhooks</a>
+<body class="{% if current_user.is_authenticated %}app-authenticated{% else %}app-guest{% endif %}{% block body_class %}{% endblock %}">
+  {% if current_user.is_authenticated %}
+  <button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Sulje valikko"></button>
+  <div class="app-layout">
+    {% include 'components/sidebar.html' %}
+    <main class="app-main" id="app-main" role="main">
+      <div class="app-main__topbar">
+        <button type="button" class="btn btn-secondary btn-sm" id="sidebar-toggle" aria-expanded="false" aria-controls="app-sidebar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+          <span class="sr-only">Valikko</span>
+        </button>
+      </div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages" role="status" aria-live="polite">
+          {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
         {% endif %}
-        {% if current_user.is_superadmin() %}
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('analytics.admin_reports') }}">System reports</a>
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('backups.backups_list') }}">Backups</a>
-        {% endif %}
-        &nbsp;|&nbsp;
-        <a href="{{ url_for('auth.logout') }}">Sign out</a>
-      {% else %}
-        <a href="{{ url_for('auth.login') }}">Sign in</a>
-      {% endif %}
-    </nav>
-  </header>
-  <main>
+      {% endwith %}
+      <div class="page-content">
+  {% else %}
+  <main class="app-main app-main--guest" role="main">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
+      <div class="flash-messages" role="status" aria-live="polite">
         {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
+        <div class="flash {{ category }}">{{ message }}</div>
         {% endfor %}
+      </div>
       {% endif %}
     {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+  {% endif %}
+        {% block content %}{% endblock %}
   {% if current_user.is_authenticated %}
-  <script>
-  (function() {
+      </div>
+    </main>
+  </div>
+  {% else %}
+  </main>
+  {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js" defer></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% if current_user.is_authenticated %}
+  <script defer>
+  document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('nav-notifications-toggle');
     const panel = document.getElementById('nav-notifications-panel');
     const list = document.getElementById('nav-notifications-list');
@@ -178,21 +84,32 @@
         const badge = document.getElementById('nav-unread-badge');
         if (data.unread_count > 0) {
           if (badge) badge.textContent = data.unread_count;
-          else toggle.insertAdjacentHTML('beforeend', '<span class="nav-badge" id="nav-unread-badge">' + data.unread_count + '</span>');
-        } else if (badge) badge.remove();
-        document.getElementById('nav-notif-count-label').textContent = data.unread_count ? '(' + data.unread_count + ' lukematonta)' : '';
+          else {
+            const span = document.createElement('span');
+            span.className = 'sidebar-badge';
+            span.id = 'nav-unread-badge';
+            span.textContent = data.unread_count;
+            toggle.appendChild(span);
+          }
+        } else if (badge) {
+          badge.remove();
+        }
+        const label = document.getElementById('nav-notif-count-label');
+        if (label) {
+          label.textContent = data.unread_count ? '(' + data.unread_count + ' lukematonta)' : '';
+        }
         list.innerHTML = '';
         if (!data.notifications.length) {
-          list.innerHTML = '<li style="padding:1rem;color:#94a3b8;">Ei ilmoituksia.</li>';
+          list.innerHTML = '<li class="nav-notifications-empty">Ei ilmoituksia.</li>';
           return;
         }
-        data.notifications.forEach(n => {
+        data.notifications.forEach(function(n) {
           const li = document.createElement('li');
           if (!n.is_read) li.className = 'unread';
           const a = document.createElement('a');
           a.href = n.link || '#';
-          a.innerHTML = '<strong>' + escapeHtml(n.title) + '</strong><br><span style="color:#94a3b8;">' + escapeHtml(n.message).slice(0, 120) + '</span>';
-          a.addEventListener('click', async (e) => {
+          a.innerHTML = '<strong>' + escapeHtml(n.title) + '</strong><br><span class="notif-preview-muted">' + escapeHtml(n.message).slice(0, 120) + '</span>';
+          a.addEventListener('click', async function(e) {
             if (!n.is_read) {
               await fetch('/api/notifications/' + n.id + '/read' + orgQuery(), {
                 method: 'POST',
@@ -213,25 +130,34 @@
       return d.innerHTML;
     }
 
-    toggle.addEventListener('click', (e) => {
+    toggle.addEventListener('click', function(e) {
       e.preventDefault();
-      panel.classList.toggle('open');
-      if (panel.classList.contains('open')) loadNotifications();
+      e.stopPropagation();
+      const open = panel.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) loadNotifications();
     });
-    document.addEventListener('click', (e) => {
-      if (!document.getElementById('nav-notifications').contains(e.target)) panel.classList.remove('open');
+    document.addEventListener('click', function(e) {
+      const wrap = document.getElementById('nav-notifications');
+      if (wrap && !wrap.contains(e.target)) {
+        panel.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
     });
-    if (markAll) markAll.addEventListener('click', async () => {
-      await fetch('/api/notifications/read-all' + orgQuery(), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: csrf ? {'X-CSRFToken': csrf} : {}
+    if (markAll) {
+      markAll.addEventListener('click', async function() {
+        await fetch('/api/notifications/read-all' + orgQuery(), {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: csrf ? {'X-CSRFToken': csrf} : {}
+        });
+        loadNotifications();
       });
-      loadNotifications();
-    });
+    }
     loadNotifications();
-  })();
+  });
   </script>
   {% endif %}
+  {% block scripts %}{% endblock %}
 </body>
 </html>
