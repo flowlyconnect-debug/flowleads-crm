@@ -106,30 +106,6 @@
   text-overflow: ellipsis;
 }
 
-.sidebar-search {
-  flex-shrink: 0;
-  margin: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--sidebar-surface);
-  border: 1px solid var(--sidebar-border);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  width: calc(100% - var(--space-6));
-}
-
-.sidebar-search:hover {
-  background: var(--sidebar-surface-hover);
-}
-
-.sidebar-search__label {
-  color: var(--sidebar-text-search);
-  font-size: var(--font-size-sm);
-}
-
 .sidebar-scroll {
   flex: 1;
   min-height: 0;
