@@ -79,6 +79,68 @@ def _org_users(organization_id: int):
     return User.query.filter_by(organization_id=organization_id, is_active=True).order_by(User.email).all()
 
 
+def _ensure_utc(value: datetime | None) -> datetime | None:
+    if not value:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _activity_icon(activity_type: str | None) -> str:
+    icon_map = {
+        "note": "📝",
+        "email_sent": "✉️",
+        "email_opened": "👀",
+        "email_clicked": "🔗",
+        "call": "📞",
+        "stage_changed": "🔁",
+        "task_created": "📋",
+        "task_completed": "✅",
+        "meeting_scheduled": "📅",
+        "proposal_sent": "📄",
+        "proposal_viewed": "👁️",
+        "proposal_accepted": "🎉",
+    }
+    return icon_map.get((activity_type or "").strip(), "•")
+
+
+def _activity_label(activity: Activity) -> str:
+    fallback = (activity.type or "aktiviteetti").replace("_", " ").strip().capitalize()
+    return (activity.content or "").strip() or fallback
+
+
+def _time_ago_label(created_at: datetime | None) -> str:
+    ts = _ensure_utc(created_at)
+    if not ts:
+        return "—"
+    now = datetime.now(timezone.utc)
+    delta = now - ts
+    minutes = int(max(delta.total_seconds(), 0) // 60)
+    if minutes < 1:
+        return "Juuri nyt"
+    if minutes < 60:
+        return f"{minutes} min sitten"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} h sitten"
+    days = hours // 24
+    if days < 7:
+        return f"{days} pv sitten"
+    return ts.strftime("%d.%m.%Y")
+
+
+def _engagement_level_from_last_activity(last_activity: Activity | None) -> int:
+    if not last_activity or not last_activity.created_at:
+        return 0
+    days_ago = (datetime.now(timezone.utc) - _ensure_utc(last_activity.created_at)).days
+    if days_ago <= 3:
+        return 3
+    if days_ago <= 14:
+        return 2
+    return 1
+
+
 def _populate_lead_form_choices(form: LeadForm, organization_id: int):
     stages = PipelineStage.query.filter_by(organization_id=organization_id).order_by(
         PipelineStage.order_index
@@ -204,6 +266,38 @@ def pipeline():
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
     }
     data = LeadService.get_pipeline_data(organization_id, filters)
+    lead_ids: list[int] = []
+    for stage in data.get("stages", []):
+        for item in data.get("leads_by_stage", {}).get(stage.id, []):
+            lead = item.get("lead") if isinstance(item, dict) else item
+            if lead and lead.id:
+                lead_ids.append(lead.id)
+    last_activity_by_lead: dict[int, Activity] = {}
+    if lead_ids:
+        activities = (
+            Activity.query.filter(
+                Activity.organization_id == organization_id,
+                Activity.lead_id.in_(lead_ids),
+            )
+            .order_by(Activity.lead_id.asc(), Activity.created_at.desc())
+            .all()
+        )
+        for activity in activities:
+            if activity.lead_id not in last_activity_by_lead:
+                last_activity_by_lead[activity.lead_id] = activity
+    for stage in data.get("stages", []):
+        for item in data.get("leads_by_stage", {}).get(stage.id, []):
+            lead = item.get("lead") if isinstance(item, dict) else item
+            if not lead:
+                continue
+            last_activity = last_activity_by_lead.get(lead.id)
+            lead.last_activity = last_activity
+            lead.last_activity_days_ago = (
+                (datetime.now(timezone.utc) - _ensure_utc(last_activity.created_at)).days
+                if last_activity and last_activity.created_at
+                else None
+            )
+            lead.engagement_level = _engagement_level_from_last_activity(last_activity)
     users = _org_users(organization_id)
     from app.analytics.currency import currency_symbol, get_default_currency
 

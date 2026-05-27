@@ -97,6 +97,62 @@
       0% { background-position: 100% 0; }
       100% { background-position: 0 0; }
     }
+    .lead-drawer {
+      position: fixed; right: -480px; top: 0; bottom: 0;
+      width: 460px; background: #fff;
+      border-left: 1px solid #E4E7EF;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+      z-index: 400; display: flex; flex-direction: column;
+      transition: right 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .lead-drawer.open { right: 0; }
+    .lead-drawer-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.2); z-index:390; }
+    .lead-drawer-overlay.visible { display:block; }
+    .lead-drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #E4E7EF;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .lead-drawer-body { flex:1; overflow-y:auto; padding:20px; }
+    .drawer-contact-section { background: #F4F6FB; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+    .drawer-field { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; border-bottom: 1px solid #F0F2F8; }
+    .drawer-field:last-child { border-bottom: none; }
+    .drawer-field label { color: #9CA3AF; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .drawer-field span, .drawer-field a { color: #111827; text-align: right; word-break: break-word; }
+    .drawer-ai-summary { background: linear-gradient(135deg, #EBF2FF, #F4F6FB); border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px; font-size: 12px; color: #374151; margin-bottom: 14px; display: flex; gap: 8px; line-height: 1.5; }
+    .drawer-ai-icon { color: #1D6BF3; font-size: 14px; flex-shrink: 0; }
+    .drawer-quick-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .drawer-section-title { font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+    .drawer-activity-item { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid #F0F2F8; font-size: 12px; }
+    .drawer-activity-icon { font-size: 14px; flex-shrink: 0; }
+    .drawer-activity-text { color: #374151; }
+    .drawer-activity-time { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
+    .cmd-palette-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:500; backdrop-filter:blur(2px); }
+    .cmd-palette {
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(560px, calc(100vw - 24px));
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.20);
+      z-index: 501;
+      overflow: hidden;
+      border: 1px solid #E4E7EF;
+    }
+    .cmd-input-wrapper { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid #E4E7EF; }
+    .cmd-icon { font-size:16px; color:#9CA3AF; }
+    .cmd-input { flex:1; border:none; outline:none; font-size:15px; color:#0F1117; }
+    .cmd-results { max-height:360px; overflow-y:auto; padding:8px; }
+    .cmd-section-label { font-size:10px; font-weight:700; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.06em; padding:8px 10px 4px; }
+    .cmd-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:7px; cursor:pointer; transition:background 100ms; }
+    .cmd-item:hover, .cmd-item.selected { background:#EBF2FF; }
+    .cmd-item-icon { width:24px; height:24px; border-radius:6px; background:#F3F4F6; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+    .cmd-item-label { flex:1; font-size:13px; font-weight:500; color:#0F1117; }
+    .cmd-item-shortcut { font-size:10px; background:#F3F4F6; padding:2px 6px; border-radius:4px; color:#6B7280; font-family:monospace; }
+    .cmd-item-meta { font-size:11px; color:#9CA3AF; }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -195,6 +251,54 @@
     </div>
   </div>
   <div class="ai-drawer-overlay" id="aiOverlay" onclick="toggleAIDrawer()"></div>
+
+  <div class="lead-drawer" id="leadDrawer">
+    <div class="lead-drawer-header">
+      <div id="drawerLeadName" style="font-size:16px;font-weight:700;color:#0F1117;"></div>
+      <div style="display:flex;gap:8px;">
+        <a id="drawerOpenFull" href="#" class="btn btn-secondary btn-sm">Avaa täysin →</a>
+        <button onclick="closeLeadDrawer()" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:20px;">✕</button>
+      </div>
+    </div>
+    <div class="lead-drawer-body" id="leadDrawerBody">
+      <div class="skeleton" style="height:80px;border-radius:8px;margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:200px;border-radius:8px;margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:120px;border-radius:8px;"></div>
+    </div>
+  </div>
+  <div class="lead-drawer-overlay" id="leadDrawerOverlay" onclick="closeLeadDrawer()"></div>
+
+  <div class="cmd-palette-overlay" id="cmdOverlay" onclick="closeCmdPalette()" style="display:none;"></div>
+  <div class="cmd-palette" id="cmdPalette" style="display:none;">
+    <div class="cmd-input-wrapper">
+      <span class="cmd-icon">⌘</span>
+      <input type="text" class="cmd-input" id="cmdInput"
+             placeholder="Hae liidit, tehtävät, komennot..."
+             oninput="searchCmd(this.value)"
+             onkeydown="handleCmdKey(event)">
+    </div>
+    <div class="cmd-results" id="cmdResults">
+      <div class="cmd-section-label">Nopeat toiminnot</div>
+      <div class="cmd-item" onclick="window.location='/leads/new'">
+        <span class="cmd-item-icon">+</span>
+        <span class="cmd-item-label">Lisää uusi liidi</span>
+        <span class="cmd-item-shortcut">N</span>
+      </div>
+      <div class="cmd-item" onclick="window.location='/tasks'">
+        <span class="cmd-item-icon">✓</span>
+        <span class="cmd-item-label">Lisää tehtävä</span>
+        <span class="cmd-item-shortcut">T</span>
+      </div>
+      <div class="cmd-item" onclick="window.location='/leads/pipeline'">
+        <span class="cmd-item-icon">⬜</span>
+        <span class="cmd-item-label">Avaa pipeline</span>
+      </div>
+      <div class="cmd-item" onclick="window.location='/dashboard'">
+        <span class="cmd-item-icon">📊</span>
+        <span class="cmd-item-label">Dashboard</span>
+      </div>
+    </div>
+  </div>
   {% endif %}
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
@@ -357,6 +461,185 @@
       })
       .catch(() => {});
   }
+
+  function flowOrgQuerySuffix() {
+    const params = new URLSearchParams(window.location.search || '');
+    const orgId = params.get('organization_id');
+    return orgId ? ('organization_id=' + encodeURIComponent(orgId)) : '';
+  }
+
+  function withOrgQuery(url) {
+    const orgQuery = flowOrgQuerySuffix();
+    if (!orgQuery) return url;
+    return url + (url.includes('?') ? '&' : '?') + orgQuery;
+  }
+
+  function escapeUiHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+  }
+
+  window.openLeadDrawer = function openLeadDrawer(leadId) {
+    const drawer = document.getElementById('leadDrawer');
+    const overlay = document.getElementById('leadDrawerOverlay');
+    const openFull = document.getElementById('drawerOpenFull');
+    if (!drawer || !overlay || !openFull || !leadId) return;
+    drawer.classList.add('open');
+    overlay.classList.add('visible');
+    openFull.href = withOrgQuery('/leads/' + leadId);
+
+    const body = document.getElementById('leadDrawerBody');
+    if (body) {
+      body.innerHTML = '<div class="skeleton" style="height:80px;border-radius:8px;margin-bottom:12px;"></div><div class="skeleton" style="height:200px;border-radius:8px;margin-bottom:12px;"></div><div class="skeleton" style="height:120px;border-radius:8px;"></div>';
+    }
+
+    fetch(withOrgQuery('/api/leads/' + leadId + '/preview'), { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.success && data.data) {
+          window.renderLeadDrawer(data.data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  window.closeLeadDrawer = function closeLeadDrawer() {
+    const drawer = document.getElementById('leadDrawer');
+    const overlay = document.getElementById('leadDrawerOverlay');
+    if (drawer) drawer.classList.remove('open');
+    if (overlay) overlay.classList.remove('visible');
+  };
+
+  window.renderLeadDrawer = function renderLeadDrawer(lead) {
+    const title = document.getElementById('drawerLeadName');
+    const body = document.getElementById('leadDrawerBody');
+    if (!body || !title || !lead) return;
+
+    const fullName = [lead.first_name || '', lead.last_name || ''].join(' ').trim();
+    title.textContent = fullName
+      ? (fullName + ' — ' + (lead.company || ''))
+      : (lead.company || 'Liidi');
+    const activities = Array.isArray(lead.recent_activities) ? lead.recent_activities : [];
+    const activityHtml = activities.length
+      ? activities.map((a) => (
+        '<div class="drawer-activity-item">' +
+          '<span class="drawer-activity-icon">' + escapeUiHtml(a.icon || '•') + '</span>' +
+          '<div><div class="drawer-activity-text">' + escapeUiHtml(a.description || '') + '</div>' +
+          '<div class="drawer-activity-time">' + escapeUiHtml(a.time_ago || '') + '</div></div>' +
+        '</div>'
+      )).join('')
+      : '<div class="drawer-activity-time">Ei aktiviteetteja.</div>';
+    body.innerHTML =
+      '<div class="drawer-contact-section">' +
+        '<div class="drawer-field"><label>Yritys</label><span>' + escapeUiHtml(lead.company || '—') + '</span></div>' +
+        '<div class="drawer-field"><label>Sähköposti</label><a href="mailto:' + escapeUiHtml(lead.email || '') + '">' + escapeUiHtml(lead.email || '—') + '</a></div>' +
+        '<div class="drawer-field"><label>Puhelin</label><span>' + escapeUiHtml(lead.phone || '—') + '</span></div>' +
+        '<div class="drawer-field"><label>Vaihe</label><span class="badge">' + escapeUiHtml(lead.stage_name || '—') + '</span></div>' +
+        '<div class="drawer-field"><label>AI Score</label><span>' + escapeUiHtml(lead.score == null ? '—' : lead.score) + '/100</span></div>' +
+      '</div>' +
+      (lead.ai_summary
+        ? ('<div class="drawer-ai-summary"><span class="drawer-ai-icon">✦</span>' + escapeUiHtml(lead.ai_summary) + '</div>')
+        : '') +
+      '<div class="drawer-quick-actions">' +
+        '<a href="' + withOrgQuery('/leads/' + lead.id + '/email/compose') + '" class="btn btn-primary btn-sm">✉ Sähköposti</a>' +
+        '<a href="' + withOrgQuery('/tasks') + '" class="btn btn-secondary btn-sm">+ Tehtävä</a>' +
+        '<a href="' + withOrgQuery('/leads/' + lead.id + '/proposals') + '" class="btn btn-secondary btn-sm">📄 Tarjous</a>' +
+      '</div>' +
+      '<div class="drawer-activities">' +
+        '<div class="drawer-section-title">Viimeisin aktiviteetti</div>' +
+        activityHtml +
+      '</div>';
+  };
+
+  function defaultCmdResults() {
+    return '<div class="cmd-section-label">Nopeat toiminnot</div>' +
+      '<div class="cmd-item" onclick="window.location=\'/leads/new\'"><span class="cmd-item-icon">+</span><span class="cmd-item-label">Lisää uusi liidi</span><span class="cmd-item-shortcut">N</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/tasks\'"><span class="cmd-item-icon">✓</span><span class="cmd-item-label">Lisää tehtävä</span><span class="cmd-item-shortcut">T</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/leads/pipeline\'"><span class="cmd-item-icon">⬜</span><span class="cmd-item-label">Avaa pipeline</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/dashboard\'"><span class="cmd-item-icon">📊</span><span class="cmd-item-label">Dashboard</span></div>';
+  }
+
+  window.openCmdPalette = function openCmdPalette() {
+    const palette = document.getElementById('cmdPalette');
+    const overlay = document.getElementById('cmdOverlay');
+    const input = document.getElementById('cmdInput');
+    const results = document.getElementById('cmdResults');
+    if (!palette || !overlay || !input || !results) return;
+    palette.style.display = 'block';
+    overlay.style.display = 'block';
+    results.innerHTML = defaultCmdResults();
+    setTimeout(() => input.focus(), 50);
+  };
+
+  window.closeCmdPalette = function closeCmdPalette() {
+    const palette = document.getElementById('cmdPalette');
+    const overlay = document.getElementById('cmdOverlay');
+    const input = document.getElementById('cmdInput');
+    const results = document.getElementById('cmdResults');
+    if (palette) palette.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+    if (input) input.value = '';
+    if (results) results.innerHTML = defaultCmdResults();
+  };
+
+  window.searchCmd = function searchCmd(query) {
+    if (!query || query.length < 2) {
+      const results = document.getElementById('cmdResults');
+      if (results) results.innerHTML = defaultCmdResults();
+      return;
+    }
+    fetch(withOrgQuery('/api/search?q=' + encodeURIComponent(query)), { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.success) {
+          window.renderCmdResults(data.data || {});
+        }
+      })
+      .catch(() => {});
+  };
+
+  window.renderCmdResults = function renderCmdResults(results) {
+    const el = document.getElementById('cmdResults');
+    if (!el) return;
+    const leads = Array.isArray(results.leads) ? results.leads : [];
+    const tasks = Array.isArray(results.tasks) ? results.tasks : [];
+    const leadHtml = leads.map((l) =>
+      '<div class="cmd-item" onclick="openLeadDrawer(' + Number(l.id) + ');closeCmdPalette()">' +
+      '<span class="cmd-item-icon">👤</span>' +
+      '<span class="cmd-item-label">' + escapeUiHtml((l.company || '—') + ' — ' + (l.first_name || '') + ' ' + (l.last_name || '')) + '</span>' +
+      '<span class="cmd-item-meta">' + escapeUiHtml(l.stage_name || '') + '</span>' +
+      '</div>'
+    ).join('');
+    const taskHtml = tasks.map((t) =>
+      '<div class="cmd-item" onclick="window.location=\'' + withOrgQuery('/tasks') + '\';closeCmdPalette()">' +
+      '<span class="cmd-item-icon">✓</span>' +
+      '<span class="cmd-item-label">' + escapeUiHtml(t.title || '') + '</span>' +
+      '<span class="cmd-item-meta">' + escapeUiHtml(t.due_label || '') + '</span>' +
+      '</div>'
+    ).join('');
+    el.innerHTML = (leadHtml + taskHtml) || '<div class="cmd-section-label">Ei osumia</div>';
+  };
+
+  window.handleCmdKey = function handleCmdKey(event) {
+    if (event.key !== 'Enter') return;
+    const first = document.querySelector('#cmdResults .cmd-item');
+    if (first) {
+      event.preventDefault();
+      first.click();
+    }
+  };
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      window.openCmdPalette();
+    }
+    if (e.key === 'Escape') {
+      window.closeCmdPalette();
+      window.closeLeadDrawer();
+    }
+  });
   </script>
   {% endif %}
   {% block scripts %}{% endblock %}

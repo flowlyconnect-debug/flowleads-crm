@@ -192,6 +192,24 @@
               {% if contact_label %}
               <div class="lead-card__contact">{{ contact_label }}</div>
               {% endif %}
+              <div class="card-engagement-row">
+                {% if lead.last_activity %}
+                  {% set days_ago = lead.last_activity_days_ago if lead.last_activity_days_ago is not none else 999 %}
+                  <span class="engagement-dot {% if days_ago == 0 %}eng-today{% elif days_ago <= 3 %}eng-recent{% elif days_ago <= 14 %}eng-aging{% else %}eng-cold{% endif %}"
+                        title="Viimeisin aktiviteetti: {{ days_ago }} pv sitten"></span>
+                  <span class="engagement-label">
+                    {% if days_ago == 0 %}Tänään{% elif days_ago == 1 %}Eilen{% elif days_ago <= 7 %}{{ days_ago }} pv sitten{% else %}{{ days_ago }} pv hiljaa{% endif %}
+                  </span>
+                {% else %}
+                  <span class="engagement-dot eng-cold"></span>
+                  <span class="engagement-label" style="color:#EF4444;">Ei aktiviteettia</span>
+                {% endif %}
+                <div class="eng-dots" title="Aktiivisuustaso">
+                  {% for i in range(3) %}
+                    <span class="eng-dot {% if i < (lead.engagement_level or 0) %}filled{% endif %}"></span>
+                  {% endfor %}
+                </div>
+              </div>
               {% if urgency.badge %}
               <div class="lead-urgency-badge {{ urgency.css }}">{{ urgency.badge }}</div>
               {% endif %}

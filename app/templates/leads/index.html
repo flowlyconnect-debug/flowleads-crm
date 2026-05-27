@@ -232,7 +232,7 @@
           </thead>
           <tbody>
             {% for lead in leads %}
-            <tr class="leads-row">
+            <tr class="leads-row" data-lead-id="{{ lead.id }}" onclick="openLeadDrawer({{ lead.id }})">
               <td class="leads-cell-select">
                 <input type="checkbox" name="lead_ids" value="{{ lead.id }}" class="lead-check" aria-label="Valitse {{ lead.display_name }}">
               </td>
@@ -395,6 +395,16 @@
       }
     });
   }
+
+  root.querySelectorAll('.leads-row[data-lead-id]').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.closest('a, button, input, select, textarea, label')) return;
+      const leadId = row.getAttribute('data-lead-id');
+      if (leadId && typeof window.openLeadDrawer === 'function') {
+        window.openLeadDrawer(leadId);
+      }
+    });
+  });
 })();
 </script>
 {% endblock %}
