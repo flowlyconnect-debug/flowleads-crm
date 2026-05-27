@@ -3,7 +3,7 @@
   <div class="page-header">
     <div>
       <h1>Dashboard</h1>
-      <p class="page-subtitle">Valitse organisaatio nähdäksesi analytiikan.</p>
+      <p class="page-subtitle">Valitse organisaatio nähdäksesi komentokeskuksen.</p>
     </div>
   </div>
   <div class="card dashboard-org-picker">
@@ -32,21 +32,54 @@
 {% set ext = extended or {} %}
 {% set row1_pipeline = ext.pipeline_value if ext.pipeline_value is not none else pipeline_ns.total %}
 
-<div class="dashboard-page" id="dashboard-analytics"
-     data-won-deals='{{ won_deals_chart | tojson }}'
-     data-sales-projection='{{ sales_projection_chart | tojson }}'
-     data-pipeline-donut='{{ pipeline_stages | tojson }}'
-     data-loss-reasons='{{ loss_reasons | tojson }}'>
+{% set alert_ns = namespace(count=0) %}
+{% if tasks_overdue_count > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
+{% if open_proposals_count > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
+{% if form_submissions_today > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 
-  <header class="page-header">
+{% set action_tasks = recent_tasks|selectattr('status', 'in', ['pending', 'in_progress'])|list %}
+{% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
+
+{% set wf_new_leads = stats.leads_this_month if stats and stats.leads_this_month is not none else 0 %}
+{% set wf_pending = (tasks_today_count or 0) + (tasks_overdue_count or 0) %}
+{% set wf_proposals = open_proposals_count or 0 %}
+{% set wf_won = stats.won_count if stats and stats.won_count is not none else 0 %}
+
+<div class="dashboard-page dashboard-command-center" id="dashboard-command-center"
+     data-activity-feed='{{ activity_feed | tojson }}'
+     data-org-query='{{ org_q | tojson }}'>
+
+  {% if alert_ns.count > 0 %}
+  <div class="alert-strip" id="alertStrip">
+    <div class="alert-strip-inner">
+      <span class="alert-strip-icon" aria-hidden="true">⚡</span>
+      <span class="alert-strip-text">
+        <strong>{{ alert_ns.count }} toimintoa odottaa:</strong>
+        {% if tasks_overdue_count > 0 %}
+        <a href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}" class="alert-link">{{ tasks_overdue_count }} tehtävää myöhässä</a>
+        {% endif %}
+        {% if tasks_overdue_count > 0 and (open_proposals_count > 0 or form_submissions_today > 0) %} · {% endif %}
+        {% if open_proposals_count > 0 %}
+        <a href="{{ url_for('proposals.list_proposals', **org_q) }}" class="alert-link">{{ open_proposals_count }} avointa tarjousta</a>
+        {% endif %}
+        {% if open_proposals_count > 0 and form_submissions_today > 0 %} · {% endif %}
+        {% if form_submissions_today > 0 %}
+        <a href="{{ url_for('forms.list_forms', **org_q) }}" class="alert-link">{{ form_submissions_today }} lomakelähetystä tänään</a>
+        {% endif %}
+      </span>
+      <button type="button" class="alert-strip-close" onclick="closeAlertStrip()" aria-label="Sulje hälytys">✕</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <header class="page-header command-header">
     <div>
-      <h1>Hei, {{ (current_user.first_name or current_user.email.split('@')[0]) }} 👋</h1>
-      <p class="page-subtitle">Tässä on tänään — <time id="dashboard-current-date" datetime=""></time></p>
+      <h1>Sales Command Center</h1>
+      <p class="page-subtitle">Hei, {{ (current_user.first_name or current_user.email.split('@')[0]) }} — <time id="dashboard-current-date" datetime=""></time></p>
     </div>
     <div class="dashboard-header-extra">
       {% if current_user.is_superadmin() and organizations %}
       <form method="get" action="{{ url_for('analytics.dashboard') }}" class="dashboard-header-extra">
-        <input type="hidden" name="period" value="{{ period }}">
         <label class="sr-only" for="dashboard-org-select">Organisaatio</label>
         <select id="dashboard-org-select" name="organization_id" class="btn btn-secondary btn-sm" onchange="this.form.submit()">
           {% for o in organizations %}
@@ -57,11 +90,6 @@
       {% elif org %}
       <span class="dashboard-org-label">{{ org.name }}</span>
       {% endif %}
-      <div class="btn-group" role="group" aria-label="Aikaväli">
-        <button type="button" class="btn btn-secondary btn-sm {% if period == 1 %}active{% endif %}" onclick="setPeriod(1)">Tänään</button>
-        <button type="button" class="btn btn-secondary btn-sm {% if period == 7 %}active{% endif %}" onclick="setPeriod(7)">7 pv</button>
-        <button type="button" class="btn btn-primary btn-sm {% if period == 30 %}active{% endif %}" onclick="setPeriod(30)">30 pv</button>
-      </div>
       <a class="btn btn-secondary btn-sm"
          href="{{ url_for('analytics.reports', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports') }}">Raportit</a>
     </div>
@@ -122,153 +150,158 @@
     </div>
   </section>
 
-  <section class="metrics-grid-row2" aria-label="Lisämittarit">
-    <div class="metric-card" style="--card-color: #1E40AF;">
-      <div class="metric-card-inner">
-        <div class="metric-label">Pipeline-arvo</div>
-        <div class="metric-value">{% if row1_pipeline > 0 %}{{ currency_symbol }}{{ '{:,.0f}'.format(row1_pipeline).replace(',', ' ') }}{% else %}—{% endif %}</div>
-        <div class="metric-delta">Koko putki</div>
-      </div>
-    </div>
-
-    <div class="metric-card" style="--card-color: #065F46;">
-      <div class="metric-card-inner">
-        <div class="metric-label">Avoimet kaupat</div>
-        <div class="metric-value">{{ ext.open_deals if ext.open_deals is not none else 0 }}</div>
-        <div class="metric-delta">aktiivista kauppaa</div>
-      </div>
-    </div>
-
-    <div class="metric-card" style="--card-color: #92400E;">
-      <div class="metric-card-inner">
-        <div class="metric-label">Painotettu arvo</div>
-        {% if ext.weighted_value and ext.weighted_value > 0 %}
-        <div class="metric-value">{{ currency_symbol }}{{ '{:,.0f}'.format(ext.weighted_value).replace(',', ' ') }}</div>
-        <div class="metric-delta">todennäköisyys huomioitu</div>
-        {% else %}
-        <div class="metric-value">—</div>
-        <div class="metric-delta">Ei dataa</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="metric-card" style="--card-color: #1F2937;">
-      <div class="metric-card-inner">
-        <div class="metric-label">Avg. kaupan ikä</div>
-        <div class="metric-value">{% if ext.avg_deal_age is not none %}{{ ext.avg_deal_age }}{% else %}—{% endif %}</div>
-        <div class="metric-delta">{% if ext.avg_deal_age is not none %}päivää{% else %}Ei dataa{% endif %}</div>
-      </div>
-    </div>
-  </section>
-
-  <div class="dashboard-main">
-    <div class="dashboard-main-left">
-      <div class="card">
+  <div class="command-main-grid">
+    <div class="command-main-left">
+      <div class="card ai-pulse-card">
         <div class="card-header">
-          <span class="card-title">Voitetut kaupat — viimeiset 12 kk</span>
-          <div class="chart-header-legend">
-            <span class="chart-legend"><span class="legend-dot" style="background:#1D6BF3"></span>Suljettu arvo</span>
-            <span class="chart-legend"><span class="legend-dot" style="background:#38BDF8"></span>Voitetut kaupat</span>
+          <div class="ai-pulse-header-title">
+            <div class="ai-pulse-indicator" aria-hidden="true"></div>
+            <span class="card-title">AI Pulse</span>
           </div>
+          <span class="ai-pulse-header-time">Juuri nyt</span>
         </div>
-        <div class="card-body dashboard-chart-card-body">
-          <div class="dashboard-chart-wrap dashboard-chart-wrap--lg">
-            <canvas id="wonDealsChart"></canvas>
+        <div class="ai-pulse-feed" id="aiPulseFeed">
+          {% set pulse_ns = namespace(shown=0) %}
+          {% for hp in high_potential_leads %}
+          {% if pulse_ns.shown < 6 %}
+          <div class="ai-pulse-item hot">
+            <span class="ai-pulse-icon" aria-hidden="true">🔥</span>
+            <div class="ai-pulse-content">
+              <span class="ai-pulse-text">Korkean potentiaalin liidi: {{ hp.company or hp.lead_name }}</span>
+              <a href="{{ url_for('leads.detail', lead_id=hp.lead_id, **org_q) }}" class="ai-pulse-action">Avaa →</a>
+            </div>
+            <span class="ai-pulse-time">{% if hp.probability is not none %}{{ (hp.probability * 100)|round|int }}%{% endif %}</span>
           </div>
+          {% set pulse_ns.shown = pulse_ns.shown + 1 %}
+          {% endif %}
+          {% endfor %}
+          {% for act in activity_feed %}
+          {% if pulse_ns.shown < 6 and act.type in ('ai_enriched', 'proposal_viewed', 'created') %}
+          <div class="ai-pulse-item {% if act.type == 'ai_enriched' %}hot{% elif act.type == 'proposal_viewed' %}signal{% else %}hot{% endif %}">
+            <span class="ai-pulse-icon" aria-hidden="true">{% if act.type == 'proposal_viewed' %}👁{% elif act.type == 'created' %}⚡{% else %}🤖{% endif %}</span>
+            <div class="ai-pulse-content">
+              <span class="ai-pulse-text">
+                {% if act.type == 'proposal_viewed' %}Tarjous avattu: {{ act.lead_company or act.lead_name }}
+                {% elif act.type == 'created' %}Uusi liidi: {{ act.lead_company or act.lead_name }}
+                {% else %}AI rikastus: {{ act.lead_company or act.lead_name }}{% endif %}
+              </span>
+              {% if act.lead_id %}
+              <a href="{{ url_for('leads.detail', lead_id=act.lead_id, **org_q) }}" class="ai-pulse-action">{% if act.type == 'proposal_viewed' %}Seuraa{% else %}Tutki{% endif %} →</a>
+              {% endif %}
+            </div>
+            <span class="ai-pulse-time">{{ act.time_ago }}</span>
+          </div>
+          {% set pulse_ns.shown = pulse_ns.shown + 1 %}
+          {% endif %}
+          {% endfor %}
+          {% if pulse_ns.shown == 0 %}
+          <div class="ai-pulse-empty">
+            <p>Ei signaaleja vielä.</p>
+            <p class="ai-pulse-empty-sub">AI analysoi liidejä jatkuvasti.</p>
+          </div>
+          {% endif %}
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Myyntiennuste — seuraavat 12 kk</span>
-          <div class="chart-header-legend">
-            <span class="chart-legend"><span class="legend-dot" style="background:#7C3AED"></span>Ennustettu arvo</span>
-            <span class="chart-legend"><span class="legend-dot legend-dot--dashed" style="background:#1D6BF3"></span>Erääntyvät kaupat</span>
-          </div>
+          <span class="card-title">Tehtäväsi tänään</span>
+          <span class="badge badge-accent" id="todayTaskCount">{{ tasks_today_count or 0 }}</span>
         </div>
-        <div class="card-body dashboard-chart-card-body">
-          <div class="dashboard-chart-wrap dashboard-chart-wrap--lg">
-            <canvas id="salesProjectionChart"></canvas>
+        <div class="priority-actions-list">
+          {% for task in action_tasks[:5] %}
+          <div class="priority-action-item" data-task-id="{{ task.id }}">
+            <button type="button" class="priority-complete-btn"
+                    onclick="completeTask({{ task.id }}, this)"
+                    data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_q) }}"
+                    title="Merkitse valmiiksi">
+              <span class="check-circle" aria-hidden="true">○</span>
+            </button>
+            <div class="priority-action-content">
+              <div class="priority-action-title">{{ task.title }}</div>
+              <div class="priority-action-meta">
+                {% if task.lead %}
+                <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_q) }}" class="priority-lead-link">{{ task.lead.company or task.lead.display_name }}</a> ·
+                {% endif %}
+                <span class="{% if task.is_overdue %}text-danger{% else %}text-warning{% endif %}">
+                  {% if task.due_date %}{{ task.due_date.strftime('%H:%M') }}{% endif %}
+                </span>
+              </div>
+            </div>
+            <span class="priority-type-badge priority-{{ task.type }}">{{ task.type }}</span>
           </div>
+          {% else %}
+          <div class="priority-empty">
+            <span class="priority-empty-icon" aria-hidden="true">🎉</span>
+            <p class="priority-empty-text">Ei tehtäviä tänään — olet ajan tasalla!</p>
+          </div>
+          {% endfor %}
+          {% if (tasks_today_count or 0) > 5 %}
+          <a href="{{ url_for('tasks.list_tasks', tab='today', **org_q) }}" class="priority-show-more">+ {{ (tasks_today_count or 0) - 5 }} lisää tehtävää</a>
+          {% endif %}
         </div>
       </div>
     </div>
 
-    <aside class="dashboard-main-right">
-      <form class="card dashboard-filter-panel" method="get" action="{{ url_for('analytics.dashboard') }}">
-        {% if current_user.is_superadmin() and organization_id %}
-        <input type="hidden" name="organization_id" value="{{ organization_id }}">
-        {% endif %}
-        <div class="card-body">
-          <div class="filter-group">
-            <label class="filter-label" for="filter-start-date">Raportin aikaväli</label>
-            <div class="date-range-row">
-              <input type="date" id="filter-start-date" name="start" class="form-input form-input-sm" value="{{ start_date }}">
-              <span class="date-range-sep">—</span>
-              <input type="date" id="filter-end-date" name="end" class="form-input form-input-sm" value="{{ end_date }}">
-            </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label" for="filter-assignee">Vastuuhenkilö</label>
-            <select id="filter-assignee" name="assignee" class="form-input form-input-sm">
-              <option value="">Kaikki</option>
-              {% for user in org_users %}
-              <option value="{{ user.id }}">{{ user.email }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label" for="filter-stage">Pipeline-vaihe</label>
-            <select id="filter-stage" name="stage_id" class="form-input form-input-sm">
-              <option value="">Kaikki</option>
-              {% for stage in stages %}
-              <option value="{{ stage.id }}">{{ stage.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <input type="hidden" name="period" value="{{ period }}">
-          <button type="submit" class="btn btn-primary dashboard-filter-submit">Hae</button>
+    <aside class="command-main-right">
+      <div class="card activity-stream-card">
+        <div class="card-header">
+          <span class="card-title">Live aktiviteetti</span>
+          <span class="activity-live-dot" aria-hidden="true" title="Live"></span>
         </div>
-      </form>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Myyntiputki</span></div>
-        <div class="card-body">
-          <div class="dashboard-chart-wrap dashboard-chart-wrap--donut">
-            <canvas id="pipelineDonut"></canvas>
-          </div>
-          <div class="donut-legend">
-            {% for stage in pipeline_stages %}
-            <div class="donut-legend-item">
-              <span class="legend-dot" style="background:{{ stage.color }}"></span>
-              <span class="legend-name">{{ stage.name }}</span>
-              <span class="legend-pct">{{ stage.percentage }}%</span>
+        <div class="activity-stream" id="activityStream">
+          {% for activity in activity_feed %}
+          <div class="activity-stream-item">
+            <div class="activity-stream-icon {{ activity.type }}">
+              {% if activity.type == 'email_sent' %}✉
+              {% elif activity.type == 'stage_changed' %}↗
+              {% elif activity.type in ('created', 'lead_created') %}★
+              {% elif activity.type == 'ai_enriched' %}🤖
+              {% elif activity.type == 'task_completed' %}✓
+              {% elif activity.type == 'call' %}📞
+              {% elif activity.type == 'proposal_viewed' %}👁
+              {% elif activity.type == 'proposal_sent' %}📄
+              {% else %}•{% endif %}
             </div>
-            {% else %}
-            <div class="dashboard-empty dashboard-empty--compact">Ei putkidataa</div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Kaupan häviösyyt</span></div>
-        <div class="card-body">
-          <div class="dashboard-chart-wrap dashboard-chart-wrap--donut">
-            <canvas id="lossReasonsDonut"></canvas>
-          </div>
-          <div class="donut-legend">
-            {% for reason in loss_reasons %}
-            <div class="donut-legend-item">
-              <span class="legend-dot" style="background:{{ reason.color }}"></span>
-              <span class="legend-name">{{ reason.name }}</span>
-              <span class="legend-pct">{{ reason.percentage }}%</span>
+            <div class="activity-stream-content">
+              <div class="activity-stream-text">
+                <strong>{{ activity.lead_name }}</strong> — {{ activity.content_preview or activity.type }}
+              </div>
+              <div class="activity-stream-meta">{{ activity.time_ago }}</div>
             </div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="dashboard-empty dashboard-empty--compact">Ei aktiviteettia vielä.</div>
+          {% endfor %}
         </div>
       </div>
     </aside>
   </div>
+
+  <div class="workflow-context-bar workflow-context-bar--page">
+    <span class="wf-label">Workflow:</span>
+    <div class="wf-steps">
+      <a href="{{ url_for('leads.pipeline', **org_q) }}" class="wf-step {% if wf_new_leads > 0 %}has-data{% endif %}">
+        <span class="wf-step-count">{{ wf_new_leads }}</span>
+        <span class="wf-step-name">Uudet liidit</span>
+      </a>
+      <span class="wf-arrow" aria-hidden="true">→</span>
+      <a href="{{ url_for('tasks.list_tasks', tab='today', **org_q) }}" class="wf-step {% if wf_pending > 0 %}has-data{% endif %}">
+        <span class="wf-step-count">{{ wf_pending }}</span>
+        <span class="wf-step-name">Tehtävät</span>
+      </a>
+      <span class="wf-arrow" aria-hidden="true">→</span>
+      <a href="{{ url_for('proposals.list_proposals', **org_q) }}" class="wf-step {% if wf_proposals > 0 %}has-data{% endif %}">
+        <span class="wf-step-count">{{ wf_proposals }}</span>
+        <span class="wf-step-name">Tarjoukset</span>
+      </a>
+      <span class="wf-arrow" aria-hidden="true">→</span>
+      <a href="{{ url_for('leads.pipeline', **org_q) }}" class="wf-step success">
+        <span class="wf-step-count">{{ wf_won }}</span>
+        <span class="wf-step-name">Voitettu kk</span>
+      </a>
+    </div>
+  </div>
 </div>
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 {% endif %}

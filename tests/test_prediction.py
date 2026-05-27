@@ -381,7 +381,8 @@ def test_dashboard_forecast_card_renders(mock_openai, client, app):
 
     response = client.get(f"/dashboard?organization_id={ctx['org_id']}")
     assert response.status_code == 200
-    assert b"Myyntiennuste" in response.data
+    assert b"Sales Command Center" in response.data
+    assert b"AI Pulse" in response.data
 
 
 @patch("app.analytics.prediction.call_openai_prediction")

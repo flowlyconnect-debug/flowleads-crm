@@ -50,6 +50,33 @@
         {% block content %}{% endblock %}
   {% if current_user.is_authenticated %}
       </div>
+      {% if not hide_workflow_bar|default(false) %}
+      {% set wf = workflow_stats|default({}) %}
+      <div class="workflow-context-bar">
+        <span class="wf-label">Workflow:</span>
+        <div class="wf-steps">
+          <a href="/leads?filter=new" class="wf-step {% if (wf.new_leads|default(0)) > 0 %}has-data{% endif %}">
+            <span class="wf-step-count">{{ wf.new_leads|default(0) }}</span>
+            <span class="wf-step-name">Uudet liidit</span>
+          </a>
+          <span class="wf-arrow" aria-hidden="true">→</span>
+          <a href="/tasks" class="wf-step {% if (wf.pending_tasks|default(nav_overdue_count|default(0))) > 0 %}has-data{% endif %}">
+            <span class="wf-step-count">{{ wf.pending_tasks|default(nav_overdue_count|default(0)) }}</span>
+            <span class="wf-step-name">Tehtävät</span>
+          </a>
+          <span class="wf-arrow" aria-hidden="true">→</span>
+          <a href="/proposals?filter=active" class="wf-step {% if (wf.active_proposals|default(0)) > 0 %}has-data{% endif %}">
+            <span class="wf-step-count">{{ wf.active_proposals|default(0) }}</span>
+            <span class="wf-step-name">Tarjoukset</span>
+          </a>
+          <span class="wf-arrow" aria-hidden="true">→</span>
+          <a href="/leads?filter=won" class="wf-step success">
+            <span class="wf-step-count">{{ wf.won_this_month|default(0) }}</span>
+            <span class="wf-step-name">Voitettu kk</span>
+          </a>
+        </div>
+      </div>
+      {% endif %}
     </main>
   </div>
   {% else %}

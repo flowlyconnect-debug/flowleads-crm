@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — FlowLeads{% endblock %}
+{% set hide_workflow_bar = true %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 {% endblock %}

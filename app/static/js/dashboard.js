@@ -1,26 +1,27 @@
 /**
- * FlowLeads CRM — dashboard charts (Coupler.io style)
+ * FlowLeads CRM — Sales Command Center
  */
 (function () {
   'use strict';
 
-  var chartInstances = {};
+  var ACTIVITY_ICONS = {
+    email_sent: '✉',
+    stage_changed: '↗',
+    created: '★',
+    lead_created: '★',
+    ai_enriched: '🤖',
+    task_completed: '✓',
+    call: '📞',
+    proposal_viewed: '👁',
+    proposal_sent: '📄',
+  };
 
-  function destroyChart(key) {
-    if (chartInstances[key]) {
-      chartInstances[key].destroy();
-      chartInstances[key] = null;
-    }
-  }
-
-  function parseJsonAttr(root, name) {
-    var raw = root.getAttribute(name);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      return null;
-    }
+  function getCsrfToken() {
+    return (
+      document.querySelector('meta[name=csrf-token]')?.content ||
+      document.getElementById('csrf-token')?.value ||
+      ''
+    );
   }
 
   function setCurrentDate() {
@@ -38,227 +39,140 @@
     }
   }
 
-  function initCharts() {
-    var root = document.getElementById('dashboard-analytics');
-    if (!root || typeof Chart === 'undefined') return;
+  function escapeHtml(text) {
+    var d = document.createElement('div');
+    d.textContent = text == null ? '' : String(text);
+    return d.innerHTML;
+  }
 
-    var wonData = parseJsonAttr(root, 'data-won-deals') || {};
-    var projectionData = parseJsonAttr(root, 'data-sales-projection') || {};
-    var pipelineData = parseJsonAttr(root, 'data-pipeline-donut') || [];
-    var lossData = parseJsonAttr(root, 'data-loss-reasons') || [];
+  function activityIcon(type) {
+    return ACTIVITY_ICONS[type] || '•';
+  }
 
-    var gridColor = '#F0F2F8';
-    var muted = '#9CA3AF';
+  function renderActivityItem(activity) {
+    var type = activity.type || 'note';
+    var subject = activity.subject || activity.lead_name || activity.user_label || 'System';
+    var description = activity.description || activity.content_preview || type;
+    var timeAgo = activity.time_ago || '';
 
-    var wonCanvas = document.getElementById('wonDealsChart');
-    if (wonCanvas) {
-      destroyChart('won');
-      chartInstances.won = new Chart(wonCanvas, {
-        type: 'line',
-        data: {
-          labels: wonData.labels || [],
-          datasets: [
-            {
-              label: 'Suljettu arvo (€)',
-              data: wonData.closed_values || [],
-              borderColor: '#1D6BF3',
-              backgroundColor: 'rgba(29,107,243,0.06)',
-              fill: true,
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: '#1D6BF3',
-              yAxisID: 'y',
-            },
-            {
-              label: 'Voitetut kaupat',
-              data: wonData.won_counts || [],
-              borderColor: '#38BDF8',
-              backgroundColor: 'transparent',
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: '#38BDF8',
-              yAxisID: 'y1',
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: {
-              grid: { display: false },
-              border: { display: false },
-              ticks: { color: muted, font: { size: 11 } },
-            },
-            y: {
-              grid: { color: gridColor },
-              border: { display: false },
-              ticks: {
-                color: muted,
-                font: { size: 11 },
-                callback: function (v) {
-                  return '€' + Number(v).toLocaleString('fi-FI');
-                },
-              },
-            },
-            y1: {
-              position: 'right',
-              grid: { display: false },
-              border: { display: false },
-              ticks: { color: muted, font: { size: 11 } },
-            },
-          },
-        },
-      });
+    return (
+      '<div class="activity-stream-item">' +
+      '<div class="activity-stream-icon ' + escapeHtml(type) + '">' +
+      activityIcon(type) +
+      '</div>' +
+      '<div class="activity-stream-content">' +
+      '<div class="activity-stream-text">' +
+      '<strong>' + escapeHtml(subject) + '</strong> — ' + escapeHtml(description) +
+      '</div>' +
+      '<div class="activity-stream-meta">' + escapeHtml(timeAgo) + '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function updateActivityStream(activities) {
+    var container = document.getElementById('activityStream');
+    if (!container || !Array.isArray(activities)) return;
+
+    if (!activities.length) {
+      container.innerHTML =
+        '<div class="dashboard-empty dashboard-empty--compact">Ei aktiviteettia vielä.</div>';
+      return;
     }
 
-    var projectionCanvas = document.getElementById('salesProjectionChart');
-    if (projectionCanvas) {
-      destroyChart('projection');
-      chartInstances.projection = new Chart(projectionCanvas, {
-        type: 'line',
-        data: {
-          labels: projectionData.labels || [],
-          datasets: [
-            {
-              label: 'Ennustettu arvo (€)',
-              data: projectionData.forecasted_values || [],
-              borderColor: '#7C3AED',
-              backgroundColor: 'rgba(124,58,237,0.06)',
-              fill: true,
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: '#7C3AED',
-            },
-            {
-              label: 'Erääntyvät kaupat (€)',
-              data: projectionData.due_values || [],
-              borderColor: '#1D6BF3',
-              backgroundColor: 'transparent',
-              borderDash: [6, 4],
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: '#1D6BF3',
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: {
-              grid: { display: false },
-              border: { display: false },
-              ticks: { color: muted, font: { size: 11 } },
-            },
-            y: {
-              grid: { color: gridColor },
-              border: { display: false },
-              ticks: {
-                color: muted,
-                font: { size: 11 },
-                callback: function (v) {
-                  return '€' + Number(v).toLocaleString('fi-FI');
-                },
-              },
-            },
-          },
-        },
-      });
+    container.innerHTML = activities.map(renderActivityItem).join('');
+  }
+
+  function refreshActivityStream() {
+    var root = document.getElementById('dashboard-command-center');
+    if (!root) return;
+
+    var orgQuery = {};
+    try {
+      orgQuery = JSON.parse(root.getAttribute('data-org-query') || '{}');
+    } catch (e) {
+      orgQuery = {};
     }
 
-    var pipelineCanvas = document.getElementById('pipelineDonut');
-    if (pipelineCanvas) {
-      destroyChart('pipeline');
-      var pipelineColors = pipelineData.map(function (s) {
-        return s.color;
-      });
-      var pipelinePcts = pipelineData.map(function (s) {
-        return s.percentage;
-      });
-      chartInstances.pipeline = new Chart(pipelineCanvas, {
-        type: 'doughnut',
-        data: {
-          labels: pipelineData.map(function (s) {
-            return s.name;
-          }),
-          datasets: [
-            {
-              data: pipelinePcts.length ? pipelinePcts : [1],
-              backgroundColor: pipelineColors.length
-                ? pipelineColors
-                : ['#1D6BF3', '#38BDF8', '#7C3AED', '#F59E0B', '#10B981', '#EF4444'],
-              borderWidth: 0,
-              hoverOffset: 4,
-            },
-          ],
-        },
-        options: {
-          cutout: '68%',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: function (ctx) {
-                  return ctx.label + ': ' + ctx.parsed + '%';
-                },
-              },
-            },
-          },
-        },
-      });
-    }
+    var params = new URLSearchParams(orgQuery);
+    var url = '/api/dashboard/activity-stream' + (params.toString() ? '?' + params.toString() : '');
 
-    var lossCanvas = document.getElementById('lossReasonsDonut');
-    if (lossCanvas) {
-      destroyChart('loss');
-      chartInstances.loss = new Chart(lossCanvas, {
-        type: 'doughnut',
-        data: {
-          labels: lossData.map(function (r) {
-            return r.name;
-          }),
-          datasets: [
-            {
-              data: lossData.map(function (r) {
-                return r.percentage;
-              }),
-              backgroundColor: lossData.map(function (r) {
-                return r.color;
-              }),
-              borderWidth: 0,
-              hoverOffset: 4,
-            },
-          ],
-        },
-        options: {
-          cutout: '68%',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: function (ctx) {
-                  return ctx.label + ': ' + ctx.parsed + '%';
-                },
-              },
-            },
-          },
-        },
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('activity stream unavailable');
+        return r.json();
+      })
+      .then(function (data) {
+        if (data.success && data.data && data.data.activities) {
+          updateActivityStream(data.data.activities);
+        }
+      })
+      .catch(function () {
+        /* API optional — initial SSR feed remains */
       });
-    }
+  }
+
+  window.closeAlertStrip = function () {
+    var strip = document.getElementById('alertStrip');
+    if (strip) strip.classList.add('is-hidden');
+    try {
+      sessionStorage.setItem('flowleads-alert-strip-closed', '1');
+    } catch (e) {}
+  };
+
+  window.completeTask = function (taskId, btn) {
+    var url =
+      btn.getAttribute('data-complete-url') ||
+      '/tasks/' + taskId + '/complete';
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      credentials: 'same-origin',
+    })
+      .then(function (r) {
+        return r.json().then(function (data) {
+          return { ok: r.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok || !result.data.success) return;
+
+        btn.classList.add('done');
+        var item = btn.closest('.priority-action-item');
+        if (!item) return;
+
+        item.classList.add('completing');
+        setTimeout(function () {
+          item.remove();
+        }, 400);
+
+        var badge = document.getElementById('todayTaskCount');
+        if (badge) {
+          badge.textContent = Math.max(0, parseInt(badge.textContent, 10) - 1);
+        }
+      })
+      .catch(function () {});
+  };
+
+  function initAlertStrip() {
+    var strip = document.getElementById('alertStrip');
+    if (!strip) return;
+    try {
+      if (sessionStorage.getItem('flowleads-alert-strip-closed') === '1') {
+        strip.classList.add('is-hidden');
+      }
+    } catch (e) {}
   }
 
   function init() {
     setCurrentDate();
-    initCharts();
+    initAlertStrip();
+    refreshActivityStream();
+    setInterval(refreshActivityStream, 30000);
   }
 
   if (document.readyState === 'loading') {
@@ -266,14 +180,4 @@
   } else {
     init();
   }
-
-  window.setPeriod = function (days) {
-    var url = new URL(window.location.href);
-    url.searchParams.set('period', String(days));
-    window.location.href = url.toString();
-  };
-
-  window.addEventListener('pagehide', function () {
-    Object.keys(chartInstances).forEach(destroyChart);
-  });
 })();
