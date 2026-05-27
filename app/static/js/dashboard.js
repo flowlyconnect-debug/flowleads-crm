@@ -1,26 +1,10 @@
 /**
- * FlowLeads CRM — dashboard charts (Chart.js)
+ * FlowLeads CRM — dashboard charts (Coupler.io style)
  */
 (function () {
   'use strict';
 
   var chartInstances = {};
-
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-
-  function withAlpha(color, alpha) {
-    if (!color) return 'rgba(29, 107, 243, ' + alpha + ')';
-    var hex = color.trim();
-    if (hex.indexOf('#') === 0 && hex.length === 7) {
-      var r = parseInt(hex.slice(1, 3), 16);
-      var g = parseInt(hex.slice(3, 5), 16);
-      var b = parseInt(hex.slice(5, 7), 16);
-      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-    }
-    return color;
-  }
 
   function destroyChart(key) {
     if (chartInstances[key]) {
@@ -29,36 +13,14 @@
     }
   }
 
-  function initFunnelBars() {
-    document.querySelectorAll('.pipeline-funnel__bar[data-pct]').forEach(function (bar) {
-      var pct = parseFloat(bar.getAttribute('data-pct') || '0', 10);
-      if (Number.isNaN(pct)) pct = 0;
-      pct = Math.max(0, Math.min(100, pct));
-      var color = bar.getAttribute('data-color');
-      if (color) {
-        bar.style.setProperty('--stage-color', color);
-      }
-      requestAnimationFrame(function () {
-        bar.style.width = pct + '%';
-      });
-    });
-  }
-
-  function initForecastProgress() {
-    document.querySelectorAll('[data-forecast-pct]').forEach(function (el) {
-      var pct = parseFloat(el.getAttribute('data-forecast-pct') || '0', 10);
-      if (Number.isNaN(pct)) pct = 0;
-      pct = Math.max(0, Math.min(100, pct));
-      el.style.width = pct + '%';
-    });
-  }
-
-  function initEmailBars() {
-    document.querySelectorAll('.dashboard-email-bar__fill[data-pct]').forEach(function (el) {
-      var pct = parseFloat(el.getAttribute('data-pct') || '0', 10);
-      if (Number.isNaN(pct)) pct = 0;
-      el.style.width = Math.max(0, Math.min(100, pct)) + '%';
-    });
+  function parseJsonAttr(root, name) {
+    var raw = root.getAttribute(name);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
   }
 
   function setCurrentDate() {
@@ -76,189 +38,226 @@
     }
   }
 
-  function initRangeSwitcher() {
-    var wrap = document.querySelector('.dashboard-range-switcher');
-    if (!wrap) return;
-    wrap.querySelectorAll('[data-range]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        wrap.querySelectorAll('[data-range]').forEach(function (b) {
-          b.classList.remove('is-active');
-          b.setAttribute('aria-pressed', 'false');
-        });
-        btn.classList.add('is-active');
-        btn.setAttribute('aria-pressed', 'true');
-      });
-    });
-  }
-
   function initCharts() {
     var root = document.getElementById('dashboard-analytics');
     if (!root || typeof Chart === 'undefined') return;
 
-    var leadsRaw = root.getAttribute('data-leads-per-day');
-    var sourcesRaw = root.getAttribute('data-sources-pie');
-    var leadsPerDay = [];
-    var sourcesPie = [];
+    var wonData = parseJsonAttr(root, 'data-won-deals') || {};
+    var projectionData = parseJsonAttr(root, 'data-sales-projection') || {};
+    var pipelineData = parseJsonAttr(root, 'data-pipeline-donut') || [];
+    var lossData = parseJsonAttr(root, 'data-loss-reasons') || [];
 
-    try {
-      leadsPerDay = leadsRaw ? JSON.parse(leadsRaw) : [];
-    } catch (e) {
-      leadsPerDay = [];
-    }
-    try {
-      sourcesPie = sourcesRaw ? JSON.parse(sourcesRaw) : [];
-    } catch (e) {
-      sourcesPie = [];
-    }
+    var gridColor = '#F0F2F8';
+    var muted = '#9CA3AF';
 
-    var accent = cssVar('--color-accent') || '#1D6BF3';
-    var success = cssVar('--color-success') || '#10B981';
-    var gridColor = cssVar('--color-border-light') || '#F0F2F8';
-    var muted = cssVar('--color-text-muted') || '#9CA3AF';
-
-    var leadsCanvas = document.getElementById('leadsPerDayChart');
-    var leadsEmpty = document.getElementById('leads-chart-empty');
-    var hasLeadsData = leadsPerDay.some(function (d) {
-      return Number(d.count) > 0;
-    });
-
-    if (leadsCanvas) {
-      destroyChart('leads');
-      if (hasLeadsData) {
-        if (leadsEmpty) leadsEmpty.hidden = true;
-        leadsCanvas.hidden = false;
-
-        var ctx = leadsCanvas.getContext('2d');
-        var gradient = ctx.createLinearGradient(0, 0, 0, 240);
-        var fillTop = withAlpha(accent, 0.14);
-        var fillBottom = withAlpha(accent, 0.02);
-        gradient.addColorStop(0, fillTop);
-        gradient.addColorStop(1, fillBottom);
-
-        chartInstances.leads = new Chart(leadsCanvas, {
-          type: 'line',
-          data: {
-            labels: leadsPerDay.map(function (d) {
-              return d.date ? d.date.slice(5) : '';
-            }),
-            datasets: [
-              {
-                label: 'Uudet liidit',
-                data: leadsPerDay.map(function (d) {
-                  return d.count;
-                }),
-                borderColor: accent,
-                backgroundColor: gradient,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                borderWidth: 2,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: cssVar('--color-text-primary'),
-                padding: 10,
-                cornerRadius: 8,
+    var wonCanvas = document.getElementById('wonDealsChart');
+    if (wonCanvas) {
+      destroyChart('won');
+      chartInstances.won = new Chart(wonCanvas, {
+        type: 'line',
+        data: {
+          labels: wonData.labels || [],
+          datasets: [
+            {
+              label: 'Suljettu arvo (€)',
+              data: wonData.closed_values || [],
+              borderColor: '#1D6BF3',
+              backgroundColor: 'rgba(29,107,243,0.06)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 4,
+              pointBackgroundColor: '#1D6BF3',
+              yAxisID: 'y',
+            },
+            {
+              label: 'Voitetut kaupat',
+              data: wonData.won_counts || [],
+              borderColor: '#38BDF8',
+              backgroundColor: 'transparent',
+              tension: 0.4,
+              pointRadius: 4,
+              pointBackgroundColor: '#38BDF8',
+              yAxisID: 'y1',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { display: false },
+              ticks: { color: muted, font: { size: 11 } },
+            },
+            y: {
+              grid: { color: gridColor },
+              border: { display: false },
+              ticks: {
+                color: muted,
+                font: { size: 11 },
+                callback: function (v) {
+                  return '€' + Number(v).toLocaleString('fi-FI');
+                },
               },
             },
-            scales: {
-              x: {
-                grid: { display: false },
-                border: { display: false },
-                ticks: { color: muted, maxTicksLimit: 8, font: { size: 11 } },
-              },
-              y: {
-                beginAtZero: true,
-                grid: { color: gridColor },
-                border: { display: false },
-                ticks: { color: muted, precision: 0, font: { size: 11 } },
-              },
+            y1: {
+              position: 'right',
+              grid: { display: false },
+              border: { display: false },
+              ticks: { color: muted, font: { size: 11 } },
             },
           },
-        });
-      } else {
-        leadsCanvas.hidden = true;
-        if (leadsEmpty) leadsEmpty.hidden = false;
-      }
+        },
+      });
     }
 
-    var sourcesCanvas = document.getElementById('sourcesDonutChart');
-    var sourcesEmpty = document.getElementById('sources-chart-empty');
-    var sourceTotal = sourcesPie.reduce(function (sum, s) {
-      return sum + (Number(s.count) || 0);
-    }, 0);
-
-    if (sourcesCanvas) {
-      destroyChart('sources');
-      if (sourceTotal > 0) {
-        if (sourcesEmpty) sourcesEmpty.hidden = true;
-        sourcesCanvas.hidden = false;
-
-        var colorMap = {
-          n8n: cssVar('--color-accent'),
-          manual: cssVar('--color-info'),
-          webform: cssVar('--color-success'),
-          import: cssVar('--color-warning'),
-          other: cssVar('--color-text-muted'),
-        };
-
-        chartInstances.sources = new Chart(sourcesCanvas, {
-          type: 'doughnut',
-          data: {
-            labels: sourcesPie.map(function (s) {
-              return s.source;
-            }),
-            datasets: [
-              {
-                data: sourcesPie.map(function (s) {
-                  return s.count;
-                }),
-                backgroundColor: sourcesPie.map(function (s) {
-                  return colorMap[s.source] || cssVar('--color-neutral-emphasis');
-                }),
-                borderWidth: 0,
-                hoverOffset: 4,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '68%',
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: cssVar('--color-text-primary'),
-                padding: 10,
-                cornerRadius: 8,
+    var projectionCanvas = document.getElementById('salesProjectionChart');
+    if (projectionCanvas) {
+      destroyChart('projection');
+      chartInstances.projection = new Chart(projectionCanvas, {
+        type: 'line',
+        data: {
+          labels: projectionData.labels || [],
+          datasets: [
+            {
+              label: 'Ennustettu arvo (€)',
+              data: projectionData.forecasted_values || [],
+              borderColor: '#7C3AED',
+              backgroundColor: 'rgba(124,58,237,0.06)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 4,
+              pointBackgroundColor: '#7C3AED',
+            },
+            {
+              label: 'Erääntyvät kaupat (€)',
+              data: projectionData.due_values || [],
+              borderColor: '#1D6BF3',
+              backgroundColor: 'transparent',
+              borderDash: [6, 4],
+              tension: 0.4,
+              pointRadius: 4,
+              pointBackgroundColor: '#1D6BF3',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { display: false },
+              ticks: { color: muted, font: { size: 11 } },
+            },
+            y: {
+              grid: { color: gridColor },
+              border: { display: false },
+              ticks: {
+                color: muted,
+                font: { size: 11 },
+                callback: function (v) {
+                  return '€' + Number(v).toLocaleString('fi-FI');
+                },
               },
             },
           },
-        });
+        },
+      });
+    }
 
-        var centerVal = document.getElementById('sources-donut-total');
-        if (centerVal) centerVal.textContent = String(sourceTotal);
-      } else {
-        sourcesCanvas.hidden = true;
-        if (sourcesEmpty) sourcesEmpty.hidden = false;
-      }
+    var pipelineCanvas = document.getElementById('pipelineDonut');
+    if (pipelineCanvas) {
+      destroyChart('pipeline');
+      var pipelineColors = pipelineData.map(function (s) {
+        return s.color;
+      });
+      var pipelinePcts = pipelineData.map(function (s) {
+        return s.percentage;
+      });
+      chartInstances.pipeline = new Chart(pipelineCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: pipelineData.map(function (s) {
+            return s.name;
+          }),
+          datasets: [
+            {
+              data: pipelinePcts.length ? pipelinePcts : [1],
+              backgroundColor: pipelineColors.length
+                ? pipelineColors
+                : ['#1D6BF3', '#38BDF8', '#7C3AED', '#F59E0B', '#10B981', '#EF4444'],
+              borderWidth: 0,
+              hoverOffset: 4,
+            },
+          ],
+        },
+        options: {
+          cutout: '68%',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return ctx.label + ': ' + ctx.parsed + '%';
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    var lossCanvas = document.getElementById('lossReasonsDonut');
+    if (lossCanvas) {
+      destroyChart('loss');
+      chartInstances.loss = new Chart(lossCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: lossData.map(function (r) {
+            return r.name;
+          }),
+          datasets: [
+            {
+              data: lossData.map(function (r) {
+                return r.percentage;
+              }),
+              backgroundColor: lossData.map(function (r) {
+                return r.color;
+              }),
+              borderWidth: 0,
+              hoverOffset: 4,
+            },
+          ],
+        },
+        options: {
+          cutout: '68%',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return ctx.label + ': ' + ctx.parsed + '%';
+                },
+              },
+            },
+          },
+        },
+      });
     }
   }
 
   function init() {
     setCurrentDate();
-    initRangeSwitcher();
-    initFunnelBars();
-    initForecastProgress();
-    initEmailBars();
     initCharts();
   }
 
@@ -267,6 +266,12 @@
   } else {
     init();
   }
+
+  window.setPeriod = function (days) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('period', String(days));
+    window.location.href = url.toString();
+  };
 
   window.addEventListener('pagehide', function () {
     Object.keys(chartInstances).forEach(destroyChart);

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 from flask import current_app
 from sqlalchemy import and_, func, or_
@@ -47,6 +48,72 @@ def conversion_rate(won: int, closed: int) -> float:
     if closed <= 0:
         return 0.0
     return round((won / closed) * 100, 1)
+
+
+_FI_MONTH_SHORT = (
+    "tammi",
+    "helmi",
+    "maalis",
+    "huhti",
+    "touko",
+    "kesä",
+    "heinä",
+    "elo",
+    "syys",
+    "loka",
+    "marras",
+    "joulu",
+)
+
+_PIPELINE_DONUT_COLORS = (
+    "#1D6BF3",
+    "#38BDF8",
+    "#7C3AED",
+    "#F59E0B",
+    "#10B981",
+    "#EF4444",
+)
+
+_LOSS_REASON_CATEGORIES = (
+    ("Kiireettömyys", ("kiire", "ei kiire", "not urgent", "no hurry")),
+    ("Hintaliian korkea", ("hinta", "kallis", "expensive", "price")),
+    ("Parempi vaihtoehto", ("vaihtoehto", "kilpailija", "competitor", "alternative")),
+    ("Feature puuttuu", ("feature", "ominaisuus", "puuttuu", "missing")),
+    ("Budjettirajoitus", ("budjetti", "budget", "rahoitus")),
+)
+
+_LOSS_REASON_COLORS = ("#EF4444", "#F59E0B", "#6B7280", "#8B5CF6", "#1D6BF3")
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    month_index = dt.month - 1 + months
+    year = dt.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(dt.day, [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+    return dt.replace(year=year, month=month, day=day)
+
+
+def _month_label(dt: datetime) -> str:
+    return _FI_MONTH_SHORT[dt.month - 1]
+
+
+def _month_range_bounds(year: int, month: int) -> tuple[datetime, datetime]:
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(microseconds=1)
+    else:
+        end = datetime(year, month + 1, 1, tzinfo=timezone.utc) - timedelta(microseconds=1)
+    return start, end
+
+
+def _classify_loss_reason(text: str | None) -> str:
+    if not text:
+        return _LOSS_REASON_CATEGORIES[0][0]
+    lower = text.lower()
+    for label, keywords in _LOSS_REASON_CATEGORIES:
+        if any(kw in lower for kw in keywords):
+            return label
+    return _LOSS_REASON_CATEGORIES[0][0]
 
 
 def time_ago(dt: datetime | None) -> str:
@@ -273,6 +340,223 @@ class AnalyticsService:
                 "top_team": top_team,
             },
         }
+
+    @staticmethod
+    def get_dashboard_extended_metrics(organization_id: int) -> dict:
+        now = _utc_now()
+        active_leads = _lead_base(organization_id).filter(Lead.status == "active").all()
+        open_deals = len(active_leads)
+
+        pipeline_value = Decimal("0")
+        weighted_value = Decimal("0")
+        age_days: list[int] = []
+        for lead in active_leads:
+            if lead.deal_value is not None:
+                pipeline_value += lead.deal_value
+            prob = lead.close_probability or Decimal("0")
+            if lead.deal_value is not None:
+                weighted_value += lead.deal_value * prob
+            if lead.created_at:
+                created = lead.created_at
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                age_days.append(max(0, (now - created).days))
+
+        won_leads = (
+            _lead_base(organization_id)
+            .filter(Lead.status == "won")
+            .all()
+        )
+        close_days: list[int] = []
+        for lead in won_leads:
+            if lead.created_at and lead.updated_at:
+                created = lead.created_at
+                updated = lead.updated_at
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if updated.tzinfo is None:
+                    updated = updated.replace(tzinfo=timezone.utc)
+                close_days.append(max(0, (updated - created).days))
+
+        avg_days_to_close = round(sum(close_days) / len(close_days), 1) if close_days else None
+        avg_deal_age = round(sum(age_days) / len(age_days), 1) if age_days else None
+
+        month_start = _month_start(now)
+        prev_month_start = _previous_month_start(month_start)
+        won_this_month = sum(
+            1
+            for lead in won_leads
+            if lead.updated_at
+            and (
+                lead.updated_at.replace(tzinfo=timezone.utc)
+                if lead.updated_at.tzinfo is None
+                else lead.updated_at
+            )
+            >= month_start
+        )
+        won_last_month = sum(
+            1
+            for lead in won_leads
+            if lead.updated_at
+            and prev_month_start
+            <= (
+                lead.updated_at.replace(tzinfo=timezone.utc)
+                if lead.updated_at.tzinfo is None
+                else lead.updated_at
+            )
+            < month_start
+        )
+
+        return {
+            "open_deals": open_deals,
+            "pipeline_value": float(pipeline_value),
+            "weighted_value": float(weighted_value),
+            "avg_days_to_close": avg_days_to_close,
+            "avg_deal_age": avg_deal_age,
+            "won_month_pct_change": pct_change(won_this_month, won_last_month),
+        }
+
+    @staticmethod
+    def get_won_deals_monthly_chart(organization_id: int, months: int = 12) -> dict:
+        now = _utc_now()
+        labels: list[str] = []
+        closed_values: list[float] = []
+        won_counts: list[int] = []
+
+        for offset in range(months - 1, -1, -1):
+            month_dt = _add_months(_month_start(now), -offset)
+            start, end = _month_range_bounds(month_dt.year, month_dt.month)
+            rows = (
+                _lead_base(organization_id)
+                .filter(
+                    Lead.status == "won",
+                    Lead.updated_at >= start,
+                    Lead.updated_at <= end,
+                )
+                .all()
+            )
+            labels.append(_month_label(month_dt))
+            closed_values.append(
+                float(sum((lead.deal_value or 0) for lead in rows))
+            )
+            won_counts.append(len(rows))
+
+        return {
+            "labels": labels,
+            "closed_values": closed_values,
+            "won_counts": won_counts,
+        }
+
+    @staticmethod
+    def get_sales_projection_chart(organization_id: int, months: int = 12) -> dict:
+        now = _utc_now()
+        historical = AnalyticsService.get_won_deals_monthly_chart(organization_id, months=6)
+        hist_vals = historical["closed_values"] or [0]
+        monthly_baseline = sum(hist_vals) / len(hist_vals) if hist_vals else 0.0
+
+        extended = AnalyticsService.get_dashboard_extended_metrics(organization_id)
+        avg_close = extended.get("avg_days_to_close") or 45
+        avg_close = max(7, int(avg_close))
+
+        active_leads = (
+            _lead_base(organization_id)
+            .filter(Lead.status == "active")
+            .all()
+        )
+        due_by_month: dict[str, float] = defaultdict(float)
+        for lead in active_leads:
+            if lead.created_at is None:
+                continue
+            created = lead.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            projected_close = created + timedelta(days=avg_close)
+            if projected_close < now:
+                projected_close = now + timedelta(days=7)
+            key = f"{projected_close.year}-{projected_close.month:02d}"
+            due_by_month[key] += float(lead.deal_value or 0)
+
+        labels: list[str] = []
+        forecasted: list[float] = []
+        due_values: list[float] = []
+
+        for offset in range(1, months + 1):
+            month_dt = _add_months(_month_start(now), offset)
+            labels.append(_month_label(month_dt))
+            key = f"{month_dt.year}-{month_dt.month:02d}"
+            due_values.append(round(due_by_month.get(key, 0), 2))
+            growth = 1.0 + (offset * 0.02)
+            forecasted.append(round(monthly_baseline * growth, 2))
+
+        return {
+            "labels": labels,
+            "forecasted_values": forecasted,
+            "due_values": due_values,
+        }
+
+    @staticmethod
+    def get_pipeline_stages_donut(organization_id: int) -> list[dict]:
+        stages = (
+            PipelineStage.query.filter_by(organization_id=organization_id)
+            .order_by(PipelineStage.order_index)
+            .all()
+        )
+        stage_counts = dict(
+            db.session.query(Lead.stage_id, func.count(Lead.id))
+            .filter(Lead.organization_id == organization_id, Lead.status == "active")
+            .group_by(Lead.stage_id)
+            .all()
+        )
+        total = sum(stage_counts.values()) or 1
+        result = []
+        for idx, stage in enumerate(stages):
+            count = stage_counts.get(stage.id, 0)
+            if count <= 0:
+                continue
+            result.append(
+                {
+                    "name": stage.name,
+                    "color": stage.color or _PIPELINE_DONUT_COLORS[idx % len(_PIPELINE_DONUT_COLORS)],
+                    "count": count,
+                    "percentage": round((count / total) * 100, 1),
+                }
+            )
+        if not result and stages:
+            result.append(
+                {
+                    "name": stages[0].name,
+                    "color": stages[0].color or _PIPELINE_DONUT_COLORS[0],
+                    "count": 0,
+                    "percentage": 0.0,
+                }
+            )
+        return result
+
+    @staticmethod
+    def get_loss_reasons_donut(organization_id: int) -> list[dict]:
+        lost_leads = (
+            _lead_base(organization_id)
+            .filter(Lead.status == "lost")
+            .all()
+        )
+        counts: dict[str, int] = {label: 0 for label, _ in _LOSS_REASON_CATEGORIES}
+        for lead in lost_leads:
+            label = _classify_loss_reason(lead.score_reason)
+            counts[label] = counts.get(label, 0) + 1
+
+        total = sum(counts.values()) or 1
+        result = []
+        for idx, (label, _) in enumerate(_LOSS_REASON_CATEGORIES):
+            count = counts.get(label, 0)
+            result.append(
+                {
+                    "name": label,
+                    "color": _LOSS_REASON_COLORS[idx],
+                    "count": count,
+                    "percentage": round((count / total) * 100, 1) if count else 0.0,
+                }
+            )
+        return result
 
     @staticmethod
     def get_recent_activity(organization_id: int, limit: int = 20) -> list[dict]:

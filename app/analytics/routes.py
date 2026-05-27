@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from flask import (
     Blueprint,
     abort,
@@ -93,7 +95,34 @@ def dashboard():
             organization_id=None,
         )
 
-    stats = _get_cached_dashboard_stats(organization_id)
+    period = request.args.get("period", 30, type=int)
+    if period not in (1, 7, 30):
+        period = 30
+
+    stats = _get_cached_dashboard_stats(organization_id, period_days=period)
+    extended = AnalyticsService.get_dashboard_extended_metrics(organization_id)
+    won_deals_chart = AnalyticsService.get_won_deals_monthly_chart(organization_id)
+    sales_projection_chart = AnalyticsService.get_sales_projection_chart(organization_id)
+    pipeline_stages = AnalyticsService.get_pipeline_stages_donut(organization_id)
+    loss_reasons = AnalyticsService.get_loss_reasons_donut(organization_id)
+
+    from app.users.models import Organization, User
+    from app.leads.models import PipelineStage
+
+    org = Organization.query.get(organization_id)
+    org_users = User.query.filter_by(organization_id=organization_id, is_active=True).order_by(
+        User.email
+    ).all()
+    stages = (
+        PipelineStage.query.filter_by(organization_id=organization_id)
+        .order_by(PipelineStage.order_index)
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    end_date = now.date().isoformat()
+    start_date = (now - timedelta(days=period - 1)).date().isoformat()
+
     activity_feed = AnalyticsService.get_recent_activity(organization_id)
     from app.tasks.services import TaskService
 
@@ -123,7 +152,18 @@ def dashboard():
         org_picker=False,
         organizations=organizations,
         organization_id=organization_id,
+        org=org,
+        period=period,
+        start_date=start_date,
+        end_date=end_date,
+        org_users=org_users,
+        stages=stages,
         stats=stats,
+        extended=extended,
+        won_deals_chart=won_deals_chart,
+        sales_projection_chart=sales_projection_chart,
+        pipeline_stages=pipeline_stages,
+        loss_reasons=loss_reasons,
         activity_feed=activity_feed,
         tasks_today_count=len(tasks_today),
         tasks_overdue_count=len(tasks_overdue),
