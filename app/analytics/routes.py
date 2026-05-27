@@ -86,10 +86,266 @@ def _pipeline_bucket_label(stage_name: str | None, status: str | None) -> str | 
     return None
 
 
+def _ai_recommendations_for_context(organization_id: int, context: str) -> list[dict]:
+    from app.proposals.models import Proposal
+    from app.sequences.models import EmailSequenceEnrollment
+    from app.tasks.models import Task
+
+    now = datetime.now(timezone.utc)
+    recs: list[dict] = []
+
+    overdue_tasks = (
+        Task.query.filter(
+            Task.organization_id == organization_id,
+            Task.status.in_(("pending", "in_progress")),
+            Task.due_date < now,
+        )
+        .order_by(Task.due_date.asc())
+        .limit(10)
+        .count()
+    )
+    stale_leads = (
+        Lead.query.filter(
+            Lead.organization_id == organization_id,
+            Lead.status == "active",
+            Lead.last_contacted_at.isnot(None),
+            Lead.last_contacted_at < now - timedelta(days=14),
+        )
+        .order_by(Lead.last_contacted_at.asc())
+        .limit(10)
+        .count()
+    )
+    no_contact_count = (
+        Lead.query.filter(
+            Lead.organization_id == organization_id,
+            Lead.status == "active",
+            Lead.last_contacted_at.is_(None),
+        )
+        .limit(10)
+        .count()
+    )
+    high_score_push = (
+        Lead.query.filter(
+            Lead.organization_id == organization_id,
+            Lead.status == "active",
+            Lead.score.isnot(None),
+            Lead.score >= 80,
+        )
+        .order_by(Lead.score.desc())
+        .limit(10)
+        .count()
+    )
+    expiring_proposals = (
+        Proposal.query.filter(
+            Proposal.organization_id == organization_id,
+            Proposal.status.in_(("sent", "viewed")),
+            Proposal.valid_until.isnot(None),
+            Proposal.valid_until <= (now + timedelta(days=7)).date(),
+        )
+        .order_by(Proposal.valid_until.asc())
+        .limit(10)
+        .count()
+    )
+    proposals_viewed_not_accepted = (
+        Proposal.query.filter(
+            Proposal.organization_id == organization_id,
+            Proposal.status == "viewed",
+        )
+        .order_by(Proposal.last_opened_at.desc())
+        .limit(10)
+        .count()
+    )
+    proposals_unviewed_sent = (
+        Proposal.query.filter(
+            Proposal.organization_id == organization_id,
+            Proposal.status == "sent",
+            Proposal.sent_at.isnot(None),
+            Proposal.sent_at <= now - timedelta(days=7),
+        )
+        .order_by(Proposal.sent_at.asc())
+        .limit(10)
+        .count()
+    )
+
+    leads_without_tasks = (
+        db.session.query(Lead.id)
+        .outerjoin(
+            Task,
+            (Task.lead_id == Lead.id)
+            & (Task.organization_id == organization_id)
+            & (Task.status.in_(("pending", "in_progress"))),
+        )
+        .filter(
+            Lead.organization_id == organization_id,
+            Lead.status == "active",
+            Task.id.is_(None),
+        )
+        .limit(10)
+        .count()
+    )
+    high_score_no_contact = (
+        Lead.query.filter(
+            Lead.organization_id == organization_id,
+            Lead.status == "active",
+            Lead.score.isnot(None),
+            Lead.score >= 80,
+            Lead.last_contacted_at.is_(None),
+        )
+        .limit(10)
+        .count()
+    )
+    active_sequences = (
+        EmailSequenceEnrollment.query.filter(
+            EmailSequenceEnrollment.organization_id == organization_id,
+            EmailSequenceEnrollment.status == "active",
+        )
+        .limit(10)
+        .count()
+    )
+
+    if context == "pipeline":
+        if stale_leads:
+            recs.append(
+                {
+                    "icon": "⚠️",
+                    "priority": "urgent",
+                    "title": "Liidejä riskissä putkessa",
+                    "body": f"{stale_leads} liidiä ilman kontaktia yli 14 päivää.",
+                    "action_url": "/leads/pipeline",
+                    "action_label": "Avaa putki",
+                }
+            )
+        if high_score_push:
+            recs.append(
+                {
+                    "icon": "🔥",
+                    "priority": "hot",
+                    "title": "Korkean todennäköisyyden liidit valmiina",
+                    "body": f"{high_score_push} liidillä score 80+ — nosta ne seuraavaan vaiheeseen.",
+                    "action_url": "/leads/pipeline",
+                    "action_label": "Priorisoi kuumat",
+                }
+            )
+        if active_sequences:
+            recs.append(
+                {
+                    "icon": "✉️",
+                    "priority": "",
+                    "title": "Sekvenssit käyvät taustalla",
+                    "body": f"{active_sequences} aktiivista sekvenssiä tukee putken etenemistä.",
+                    "action_url": "/sequences",
+                    "action_label": "Tarkista sekvenssit",
+                }
+            )
+    elif context == "leads":
+        if leads_without_tasks:
+            recs.append(
+                {
+                    "icon": "📋",
+                    "priority": "urgent",
+                    "title": "Liideiltä puuttuu tehtäviä",
+                    "body": f"{leads_without_tasks} aktiivisella liidillä ei ole avointa tehtävää.",
+                    "action_url": "/tasks",
+                    "action_label": "Luo tehtäviä",
+                }
+            )
+        if high_score_no_contact:
+            recs.append(
+                {
+                    "icon": "🔥",
+                    "priority": "hot",
+                    "title": "Korkean score:n liidit ilman kontaktia",
+                    "body": f"{high_score_no_contact} liidiä scorella 80+ odottaa ensimmäistä yhteydenottoa.",
+                    "action_url": "/leads?sort=score&dir=desc",
+                    "action_label": "Avaa liidilista",
+                }
+            )
+        if proposals_unviewed_sent:
+            recs.append(
+                {
+                    "icon": "📨",
+                    "priority": "",
+                    "title": "Tarjouksia lähetetty ilman avauksia",
+                    "body": f"{proposals_unviewed_sent} tarjous on lähetetty yli 7 päivää sitten, mutta ei avattu.",
+                    "action_url": "/proposals?filter=active",
+                    "action_label": "Avaa tarjoukset",
+                }
+            )
+    elif context == "proposals":
+        if proposals_viewed_not_accepted:
+            recs.append(
+                {
+                    "icon": "👀",
+                    "priority": "hot",
+                    "title": "Tarjouksia katsottu, mutta ei hyväksytty",
+                    "body": f"{proposals_viewed_not_accepted} tarjousta on tilassa 'viewed'.",
+                    "action_url": "/proposals?filter=active",
+                    "action_label": "Seuraa tarjouksia",
+                }
+            )
+        if expiring_proposals:
+            recs.append(
+                {
+                    "icon": "⏳",
+                    "priority": "urgent",
+                    "title": "Tarjouksia vanhenee pian",
+                    "body": f"{expiring_proposals} aktiivista tarjousta vanhenee 7 päivän sisällä.",
+                    "action_url": "/proposals?filter=active",
+                    "action_label": "Uusi ennen vanhenemista",
+                }
+            )
+    else:
+        if overdue_tasks:
+            recs.append(
+                {
+                    "icon": "⏰",
+                    "priority": "urgent",
+                    "title": "Erääntyneet tehtävät",
+                    "body": f"{overdue_tasks} tehtävää on erääntynyt.",
+                    "action_url": "/tasks",
+                    "action_label": "Näytä tehtävät",
+                }
+            )
+        if no_contact_count:
+            recs.append(
+                {
+                    "icon": "📞",
+                    "priority": "",
+                    "title": "Liidit ilman kontaktia",
+                    "body": f"{no_contact_count} aktiivisella liidillä ei ole vielä yhteydenottoa.",
+                    "action_url": "/leads",
+                    "action_label": "Avaa liidit",
+                }
+            )
+        if expiring_proposals:
+            recs.append(
+                {
+                    "icon": "🧾",
+                    "priority": "hot",
+                    "title": "Tarjoukset vaativat toimenpiteitä",
+                    "body": f"{expiring_proposals} tarjousta vanhenee pian.",
+                    "action_url": "/proposals?filter=active",
+                    "action_label": "Tarkista tarjoukset",
+                }
+            )
+
+    return recs[:5]
+
+
 @analytics_bp.before_request
 @login_required
 def block_api_client():
     _require_ui_role()
+
+
+@analytics_bp.route("/api/ai/recommendations", methods=["GET"])
+def ai_recommendations():
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success({"recommendations": []})
+    context = (request.args.get("context") or "dashboard").strip().lower()
+    recommendations = _ai_recommendations_for_context(organization_id, context)
+    return json_success({"recommendations": recommendations})
 
 
 @analytics_bp.route("/api/dashboard/pipeline-distribution", methods=["GET"])

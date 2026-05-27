@@ -217,6 +217,7 @@ def pipeline():
         organization_id=organization_id,
         csrf_token=generate_csrf,
         currency_symbol=currency_symbol(get_default_currency(organization_id)),
+        now=datetime.now(timezone.utc),
     )
 
 

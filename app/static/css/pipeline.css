@@ -476,6 +476,20 @@
   color: var(--color-text-secondary);
 }
 
+.lead-urgency-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 4px;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.badge-urgency-risk { background: #FEE2E2; color: #991B1B; }
+.badge-urgency-hot { background: #D1FAE5; color: #065F46; }
+.badge-urgency-sequence { background: #DBEAFE; color: #1E40AF; }
+.badge-urgency-task { background: #FEF3C7; color: #92400E; }
+
 .lead-card__value-row {
   display: flex;
   align-items: baseline;
@@ -499,6 +513,40 @@
   letter-spacing: -0.1px;
   color: var(--color-text-primary);
   white-space: nowrap;
+}
+
+.ai-score-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ai-score-bar {
+  height: 4px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+  transition: width 300ms ease;
+  max-width: 60px;
+  min-width: 12px;
+}
+
+.score-high { background: #10B981; }
+.score-mid { background: #F59E0B; }
+.score-low { background: #EF4444; }
+
+.ai-score-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B7280;
+}
+
+.lead-next-action {
+  font-size: 11px;
+  color: #1D6BF3;
+  font-weight: 500;
+  margin-top: 5px;
+  font-style: italic;
 }
 
 .lead-card__actions {

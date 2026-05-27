@@ -160,6 +160,20 @@
             {% set accent_class = 'lead-card--urgent' %}
           {% endif %}
           {% set deal_amount = lead.deal_value|float if lead.deal_value else 0 %}
+          {% set urgency = namespace(badge='', css='') %}
+          {% if lead.last_contacted_at and (now - lead.last_contacted_at).days > 14 %}
+            {% set urgency.badge = '⚠ ' + ((now - lead.last_contacted_at).days)|string + ' pv hiljaa' %}
+            {% set urgency.css = 'badge-urgency-risk' %}
+          {% elif lead.ai_enrichment_status == 'completed' and lead.score and lead.score > 80 %}
+            {% set urgency.badge = '🔥 Kuuma liidi' %}
+            {% set urgency.css = 'badge-urgency-hot' %}
+          {% elif lead.sequence_active %}
+            {% set urgency.badge = '✉ Sekvenssissä' %}
+            {% set urgency.css = 'badge-urgency-sequence' %}
+          {% elif lead.open_tasks_count > 0 %}
+            {% set urgency.badge = '📋 ' + lead.open_tasks_count|string + ' tehtävää' %}
+            {% set urgency.css = 'badge-urgency-task' %}
+          {% endif %}
 
           <article
             class="lead-card {{ accent_class }}"
@@ -178,6 +192,9 @@
               {% if contact_label %}
               <div class="lead-card__contact">{{ contact_label }}</div>
               {% endif %}
+              {% if urgency.badge %}
+              <div class="lead-urgency-badge {{ urgency.css }}">{{ urgency.badge }}</div>
+              {% endif %}
               {% if lead.close_probability is not none %}
               <span class="sr-only">Todennäköisyys {{ (lead.close_probability * 100)|round(0)|int }}%</span>
               {% endif %}
@@ -186,6 +203,14 @@
                 <span class="lead-card__value-label">Arvo</span>
                 <span class="lead-card__value">{{ currency_symbol }}{{ '{:,.0f}'.format(deal_amount).replace(',', ' ') if lead.deal_value else '0' }}</span>
               </div>
+              <div class="ai-score-bar-wrapper" title="AI Score: {{ lead.score if lead.score is not none else '—' }}/100">
+                <div class="ai-score-bar {% if lead.score is not none and lead.score >= 70 %}score-high{% elif lead.score is not none and lead.score >= 40 %}score-mid{% else %}score-low{% endif %}"
+                     style="width: {{ lead.score or 0 }}%;"></div>
+                <span class="ai-score-num">{{ lead.score if lead.score is not none else '—' }}</span>
+              </div>
+              {% if lead.ai_recommendation %}
+              <div class="lead-next-action">→ {{ lead.ai_recommendation }}</div>
+              {% endif %}
 
               <div class="lead-card__actions" aria-label="Pikatoiminnot">
                 <a
@@ -235,6 +260,7 @@
 {% block scripts %}
 <script>
 (() => {
+  window.aiContext = 'pipeline';
   const csrfToken = "{{ csrf_token() }}";
   const currencySymbol = {{ currency_symbol|tojson }};
   const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if is_superadmin else url_for('leads.move_stage', lead_id=0) }}";

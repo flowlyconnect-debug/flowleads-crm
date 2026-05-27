@@ -9,6 +9,95 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    .ai-fab {
+      position: fixed; bottom: 80px; right: 20px;
+      background: linear-gradient(135deg, #1D6BF3, #0EA5E9);
+      color: #fff;
+      border: none; border-radius: 50px;
+      padding: 12px 18px;
+      display: flex; align-items: center; gap: 7px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(29, 107, 243, 0.40);
+      font-size: 13px; font-weight: 700;
+      transition: all 200ms;
+      z-index: 200;
+    }
+    .ai-fab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(29, 107, 243, 0.50);
+    }
+    .ai-fab-icon { font-size: 16px; }
+    .ai-fab-badge {
+      position: absolute; top: -4px; right: -4px;
+      background: #EF4444; color: #fff;
+      font-size: 10px; font-weight: 800;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff;
+    }
+    .ai-drawer {
+      position: fixed; right: -360px; top: 0; bottom: 0;
+      width: 340px;
+      background: #fff;
+      border-left: 1px solid #E4E7EF;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+      z-index: 300;
+      display: flex; flex-direction: column;
+      transition: right 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ai-drawer.open { right: 0; }
+    .ai-drawer-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.20);
+      z-index: 290;
+    }
+    .ai-drawer-overlay.visible { display: block; }
+    .ai-drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #E4E7EF;
+      display: flex; align-items: center; justify-content: space-between;
+      background: linear-gradient(135deg, #EBF2FF, #F4F6FB);
+    }
+    .ai-drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .ai-recommendation {
+      background: #F4F6FB;
+      border: 1px solid #E4E7EF;
+      border-left: 3px solid #1D6BF3;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .ai-recommendation.urgent { border-left-color: #EF4444; background: #FFF8F8; }
+    .ai-recommendation.hot { border-left-color: #10B981; background: #F0FDF4; }
+    .ai-rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ai-rec-icon { font-size: 16px; }
+    .ai-rec-title { font-size: 13px; font-weight: 700; color: #0F1117; }
+    .ai-rec-body { font-size: 12px; color: #5C6170; line-height: 1.5; margin-bottom: 8px; }
+    .ai-rec-action { font-size: 12px; font-weight: 600; color: #1D6BF3; text-decoration: none; }
+    .ai-rec-action:hover { text-decoration: underline; }
+    .ai-pulse-indicator {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #10B981; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+      animation: ai-pulse 1.8s infinite;
+    }
+    .ai-drawer-loading .skeleton {
+      background: linear-gradient(90deg, #E5E7EB 25%, #F3F4F6 37%, #E5E7EB 63%);
+      background-size: 400% 100%;
+      animation: ai-skeleton 1.3s ease infinite;
+    }
+    @keyframes ai-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    @keyframes ai-skeleton {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+  </style>
   {% block head %}{% endblock %}
 </head>
 <body class="{% if current_user.is_authenticated %}app-authenticated{% else %}app-guest{% endif %}{% block body_class %}{% endblock %}">
@@ -82,6 +171,31 @@
   {% else %}
   </main>
   {% endif %}
+  {% if current_user.is_authenticated %}
+  <button class="ai-fab" id="aiFab" onclick="toggleAIDrawer()" title="AI-avustaja">
+    <span class="ai-fab-icon">✦</span>
+    <span class="ai-fab-label">AI</span>
+    <span class="ai-fab-badge" id="aiFabBadge" style="display:none">0</span>
+  </button>
+
+  <div class="ai-drawer" id="aiDrawer">
+    <div class="ai-drawer-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="ai-pulse-indicator"></div>
+        <span style="font-size:14px;font-weight:700;color:#0F1117;">FlowLeads AI</span>
+      </div>
+      <button onclick="toggleAIDrawer()" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:18px;">✕</button>
+    </div>
+    <div class="ai-drawer-body" id="aiDrawerBody">
+      <div class="ai-drawer-loading">
+        <div class="skeleton" style="height:60px;border-radius:8px;margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:60px;border-radius:8px;margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:60px;border-radius:8px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="ai-drawer-overlay" id="aiOverlay" onclick="toggleAIDrawer()"></div>
+  {% endif %}
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js" defer></script>
@@ -89,6 +203,14 @@
   {% if current_user.is_authenticated %}
   <script defer>
   document.addEventListener('DOMContentLoaded', function() {
+    if (!window.aiContext) {
+      const path = window.location.pathname || '';
+      if (path.indexOf('/leads/pipeline') === 0) window.aiContext = 'pipeline';
+      else if (path.indexOf('/leads') === 0) window.aiContext = 'leads';
+      else if (path.indexOf('/proposals') === 0) window.aiContext = 'proposals';
+      else window.aiContext = 'dashboard';
+    }
+
     const toggle = document.getElementById('nav-notifications-toggle');
     const panel = document.getElementById('nav-notifications-panel');
     const list = document.getElementById('nav-notifications-list');
@@ -182,7 +304,59 @@
       });
     }
     loadNotifications();
+    loadAIRecommendations(false);
   });
+
+  function toggleAIDrawer() {
+    const drawer = document.getElementById('aiDrawer');
+    const overlay = document.getElementById('aiOverlay');
+    if (!drawer || !overlay) return;
+    const isOpen = drawer.classList.contains('open');
+    drawer.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('visible', !isOpen);
+    if (!isOpen) loadAIRecommendations(true);
+  }
+
+  function escapeAIHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value || '';
+    return div.innerHTML;
+  }
+
+  function loadAIRecommendations(updateDrawer = false) {
+    const ctx = window.aiContext || 'dashboard';
+    fetch('/api/ai/recommendations?context=' + encodeURIComponent(ctx), { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((data) => {
+        const recommendations = data?.success ? (data.data?.recommendations || []) : [];
+        const badge = document.getElementById('aiFabBadge');
+        if (badge) {
+          if (recommendations.length > 0) {
+            badge.textContent = String(recommendations.length);
+            badge.style.display = 'flex';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+        if (!updateDrawer) return;
+        const body = document.getElementById('aiDrawerBody');
+        if (!body) return;
+        if (recommendations.length === 0) {
+          body.innerHTML = '<div style="text-align:center;padding:32px;color:#9CA3AF;font-size:13px;">Kaikki näyttää hyvältä ✓</div>';
+          return;
+        }
+        body.innerHTML = recommendations.map((rec) => {
+          const action = rec.action_url
+            ? '<a href="' + escapeAIHtml(rec.action_url) + '" class="ai-rec-action">' + escapeAIHtml(rec.action_label || 'Avaa') + ' →</a>'
+            : '';
+          return '<div class="ai-recommendation ' + escapeAIHtml(rec.priority || '') + '">' +
+            '<div class="ai-rec-header"><span class="ai-rec-icon">' + escapeAIHtml(rec.icon || '✦') + '</span>' +
+            '<span class="ai-rec-title">' + escapeAIHtml(rec.title || '') + '</span></div>' +
+            '<div class="ai-rec-body">' + escapeAIHtml(rec.body || '') + '</div>' + action + '</div>';
+        }).join('');
+      })
+      .catch(() => {});
+  }
   </script>
   {% endif %}
   {% block scripts %}{% endblock %}

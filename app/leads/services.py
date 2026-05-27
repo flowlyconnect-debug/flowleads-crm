@@ -1,9 +1,9 @@
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
@@ -176,6 +176,29 @@ def _check_duplicate_source(organization_id: int, source: str, source_ref: str |
 
 
 class LeadService:
+    @staticmethod
+    def _pipeline_ai_recommendation(
+        lead: Lead,
+        *,
+        now: datetime,
+        has_any_proposal: bool,
+        has_old_unviewed_proposal: bool,
+        has_heavily_viewed_proposal: bool,
+    ) -> str | None:
+        if lead.last_contacted_at:
+            last_contacted = lead.last_contacted_at
+            if last_contacted.tzinfo is None:
+                last_contacted = last_contacted.replace(tzinfo=timezone.utc)
+            if (now - last_contacted) > timedelta(days=14):
+                return "Ota yhteyttä nyt"
+        if (lead.score or 0) > 80 and not has_any_proposal:
+            return "Lähetä tarjous"
+        if has_old_unviewed_proposal:
+            return "Muistuta tarjouksesta"
+        if has_heavily_viewed_proposal:
+            return "Seuraa välittömästi"
+        return None
+
     @staticmethod
     def log_activity(
         lead_id: int,
@@ -752,10 +775,101 @@ class LeadService:
             query = query.filter(Lead.created_at <= filters["created_to"])
 
         leads = query.all()
+        lead_ids = [lead.id for lead in leads]
+
+        open_tasks_by_lead: dict[int, int] = {}
+        sequence_active_by_lead: dict[int, bool] = {}
+        proposals_count_by_lead: dict[int, int] = {}
+        old_unviewed_proposal_lead_ids: set[int] = set()
+        heavily_viewed_proposal_lead_ids: set[int] = set()
+        now = datetime.now(timezone.utc)
+        seven_days_ago = now - timedelta(days=7)
+
+        if lead_ids:
+            from app.tasks.models import Task
+            from app.sequences.models import EmailSequenceEnrollment
+            from app.proposals.models import Proposal
+
+            task_rows = (
+                db.session.query(Task.lead_id, func.count(Task.id))
+                .filter(
+                    Task.organization_id == organization_id,
+                    Task.lead_id.in_(lead_ids),
+                    Task.status.in_(("pending", "in_progress")),
+                )
+                .group_by(Task.lead_id)
+                .all()
+            )
+            open_tasks_by_lead = {int(lead_id): int(count) for lead_id, count in task_rows if lead_id}
+
+            sequence_rows = (
+                db.session.query(EmailSequenceEnrollment.lead_id)
+                .filter(
+                    EmailSequenceEnrollment.organization_id == organization_id,
+                    EmailSequenceEnrollment.lead_id.in_(lead_ids),
+                    EmailSequenceEnrollment.status == "active",
+                )
+                .distinct()
+                .all()
+            )
+            sequence_active_by_lead = {int(lead_id): True for (lead_id,) in sequence_rows if lead_id}
+
+            proposal_rows = (
+                db.session.query(Proposal.lead_id, func.count(Proposal.id))
+                .filter(
+                    Proposal.organization_id == organization_id,
+                    Proposal.lead_id.in_(lead_ids),
+                )
+                .group_by(Proposal.lead_id)
+                .all()
+            )
+            proposals_count_by_lead = {
+                int(lead_id): int(count) for lead_id, count in proposal_rows if lead_id
+            }
+
+            old_unviewed_rows = (
+                db.session.query(Proposal.lead_id)
+                .filter(
+                    Proposal.organization_id == organization_id,
+                    Proposal.lead_id.in_(lead_ids),
+                    Proposal.status == "sent",
+                    Proposal.sent_at.isnot(None),
+                    Proposal.sent_at <= seven_days_ago,
+                )
+                .distinct()
+                .all()
+            )
+            old_unviewed_proposal_lead_ids = {
+                int(lead_id) for (lead_id,) in old_unviewed_rows if lead_id
+            }
+
+            heavily_viewed_rows = (
+                db.session.query(Proposal.lead_id)
+                .filter(
+                    Proposal.organization_id == organization_id,
+                    Proposal.lead_id.in_(lead_ids),
+                    Proposal.opened_count >= 3,
+                )
+                .distinct()
+                .all()
+            )
+            heavily_viewed_proposal_lead_ids = {
+                int(lead_id) for (lead_id,) in heavily_viewed_rows if lead_id
+            }
+
         by_stage = {s.id: [] for s in stages}
         stage_totals = {s.id: Decimal("0") for s in stages}
         for lead in leads:
             if lead.stage_id in by_stage:
+                lead.open_tasks_count = open_tasks_by_lead.get(lead.id, 0)
+                lead.sequence_active = sequence_active_by_lead.get(lead.id, False)
+                lead.ai_recommendation = LeadService._pipeline_ai_recommendation(
+                    lead,
+                    now=now,
+                    has_any_proposal=proposals_count_by_lead.get(lead.id, 0) > 0,
+                    has_old_unviewed_proposal=lead.id in old_unviewed_proposal_lead_ids,
+                    has_heavily_viewed_proposal=lead.id in heavily_viewed_proposal_lead_ids,
+                )
                 last_activity = (
                     Activity.query.filter_by(lead_id=lead.id, organization_id=organization_id)
                     .order_by(Activity.created_at.desc())
