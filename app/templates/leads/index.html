@@ -2,7 +2,10 @@
 {% from "_macros.html" import score_badge, probability_badge %}
 {% block title %}Leads — FlowLeads{% endblock %}
 {% block content %}
-<section class="leads-page">
+{% set has_active_filters = filters.search or filters.source or filters.stage_id or filters.assigned_to or filters.status or filters.score_min or filters.score_max or filters.gdpr_consent or filters.marketing_opt_in or filters.unsubscribed or filters.is_anonymized %}
+{% set show_onboarding = pagination.total == 0 and not has_active_filters %}
+{% set show_no_results = pagination.total == 0 and has_active_filters %}
+<section class="leads-page{% if show_onboarding %} leads-page--empty{% endif %}">
   <header class="page-header leads-header">
     <div class="page-header__main">
       <div class="breadcrumbs">
@@ -102,7 +105,7 @@
     </div>
   </header>
 
-  <div class="leads-source-tabs" role="tablist" aria-label="Lähdesuodattimet">
+  <div class="leads-source-tabs{% if pagination.total == 0 %} leads-source-tabs--empty{% endif %}" role="tablist" aria-label="Lähdesuodattimet"{% if pagination.total == 0 %} aria-disabled="true"{% endif %}>
     {% set active_source = filter_form.source.data or '' %}
     {% for value, label in filter_form.source.choices %}
     {% set tab_filters = {
@@ -116,13 +119,78 @@
       'sort': filters.sort,
       'dir': filters.dir,
     } %}
+    {% if pagination.total == 0 %}
+    <span class="leads-source-tab{% if value == active_source %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}" aria-disabled="true">
+      {{ label }}
+    </span>
+    {% else %}
     <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_filters) }}"
-       class="leads-source-tab {% if value == active_source %}is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}">
+       class="leads-source-tab{% if value == active_source %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}">
       {{ label }}
     </a>
+    {% endif %}
     {% endfor %}
   </div>
 
+  {% if show_onboarding %}
+  <div class="leads-onboarding" role="region" aria-label="Aloita liidien kanssa">
+    <article class="leads-onboarding-card">
+      <div class="leads-onboarding-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <h2 class="leads-onboarding-title">Aloita liidien seuranta</h2>
+      <p class="leads-onboarding-text">
+        Tämä on myyntityötilasi. Lisää ensimmäinen kontakti tai tuo liidejä automaattisesti integraatioista.
+      </p>
+      <div class="leads-onboarding-actions">
+        <a href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}" class="btn btn-primary btn-sm">
+          Lisää ensimmäinen liidi
+        </a>
+        <a href="{{ url_for('settings.api_keys', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.api_keys') }}" class="btn btn-secondary btn-sm">
+          Importtaa CSV
+        </a>
+        <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}" class="btn btn-ghost btn-sm">
+          Yhdistä n8n
+        </a>
+      </div>
+      <div class="leads-onboarding-suggestions">
+        <p class="leads-onboarding-suggestions-label">Nopeat tavat aloittaa</p>
+        <ul>
+          <li class="leads-onboarding-suggestion">
+            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
+            <a href="{{ url_for('settings.api_keys', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.api_keys') }}">Importtaa Excel/CSV</a>
+            <span class="leads-onboarding-suggestion-hint">API-avaimen kautta</span>
+          </li>
+          <li class="leads-onboarding-suggestion">
+            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
+            <a href="{{ url_for('forms.list_forms', organization_id=organization_id) if current_user.is_superadmin() else url_for('forms.list_forms') }}">Yhdistä webform</a>
+            <span class="leads-onboarding-suggestion-hint">Luo lomake liideille</span>
+          </li>
+          <li class="leads-onboarding-suggestion">
+            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
+            <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}">Tuo n8n-workflowsta</a>
+            <span class="leads-onboarding-suggestion-hint">Automaattinen synkronointi</span>
+          </li>
+        </ul>
+      </div>
+    </article>
+  </div>
+
+  {% elif show_no_results %}
+  <div class="leads-no-results" role="status">
+    <p class="leads-no-results-title">Ei tuloksia</p>
+    <p class="leads-no-results-text">Kokeile toista hakua tai poista suodattimia nähdäksesi liidejä.</p>
+    <a href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}" class="btn btn-secondary btn-sm">
+      Tyhjennä suodattimet
+    </a>
+  </div>
+
+  {% else %}
   <div class="card card--flat">
     <form method="post" action="{{ url_for('leads.bulk_action', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.bulk_action') }}" class="leads-bulk-form">
       {{ bulk_form.hidden_tag() }}
@@ -140,7 +208,6 @@
         </div>
       </div>
 
-      {% if leads %}
       <div class="table-wrap leads-table-wrap" role="region" aria-label="Liidilistaus">
         <table class="leads-table">
           <thead>
@@ -233,23 +300,6 @@
           </tbody>
         </table>
       </div>
-      {% else %}
-      <div class="empty-state">
-        <div class="empty-state-icon">✨</div>
-        <h2 class="empty-state-title">Ei liidejä vielä</h2>
-        <p class="empty-state-text">
-          Aloita tuomalla liidit sisään tai lisää ensimmäinen liidi manuaalisesti.
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <a href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}" class="btn btn-primary btn-sm">
-            Lisää ensimmäinen liidi
-          </a>
-          <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}" class="btn btn-secondary btn-sm">
-            Yhdistä n8n
-          </a>
-        </div>
-      </div>
-      {% endif %}
 
       <input type="hidden" name="lead_ids" id="bulk-lead-ids" value="">
     </form>
@@ -274,6 +324,7 @@
     </footer>
     {% endif %}
   </div>
+  {% endif %}
 </section>
 
 <script>
