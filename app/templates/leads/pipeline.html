@@ -2,10 +2,18 @@
 {% from "_macros.html" import score_badge, probability_badge %}
 {% block title %}Pipeline — FlowLeads{% endblock %}
 {% block content %}
+{% set stages = stages|default([]) %}
+{% set leads_by_stage = leads_by_stage|default({}) %}
+{% set stage_deal_totals = stage_deal_totals|default({}) %}
+{% set users = users|default([]) %}
+{% set filters = filters|default({}) %}
+{% set currency_symbol = currency_symbol|default('€') %}
+{% set is_superadmin = current_user.is_authenticated and current_user.is_superadmin() %}
 {% set ns = namespace(total_leads=0, total_value=0) %}
 {% for stage in stages %}
-  {% set ns.total_leads = ns.total_leads + (leads_by_stage[stage.id]|length) %}
-  {% if stage_deal_totals and stage_deal_totals.get(stage.id) %}
+  {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
+  {% set ns.total_leads = ns.total_leads + (stage_leads|length) %}
+  {% if stage_deal_totals.get(stage.id) %}
     {% set ns.total_value = ns.total_value + stage_deal_totals.get(stage.id) %}
   {% endif %}
 {% endfor %}
@@ -33,7 +41,7 @@
 
           <div class="pipeline-filters__panel" id="pipeline-filters-panel" role="dialog" aria-label="Pipeline suodattimet">
             <form method="get" class="pipeline-filters__form">
-              {% if current_user.is_superadmin() %}
+              {% if is_superadmin %}
               <input type="hidden" name="organization_id" value="{{ organization_id }}">
               {% endif %}
 
@@ -43,7 +51,7 @@
                   <select name="assigned_to">
                     <option value="">Anyone</option>
                     {% for u in users %}
-                    <option value="{{ u.id }}" {% if filters.assigned_to and filters.assigned_to|int == u.id %}selected{% endif %}>{{ u.email }}</option>
+                    <option value="{{ u.id }}" {% if filters.get('assigned_to') and filters.get('assigned_to')|int == u.id %}selected{% endif %}>{{ u.email }}</option>
                     {% endfor %}
                   </select>
                 </label>
@@ -52,9 +60,9 @@
                   <span class="pipeline-filter__label">Source</span>
                   <select name="source">
                     <option value="">All</option>
-                    <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Manual</option>
-                    <option value="n8n" {% if filters.source == 'n8n' %}selected{% endif %}>n8N</option>
-                    <option value="import" {% if filters.source == 'import' %}selected{% endif %}>Import</option>
+                    <option value="manual" {% if filters.get('source') == 'manual' %}selected{% endif %}>Manual</option>
+                    <option value="n8n" {% if filters.get('source') == 'n8n' %}selected{% endif %}>n8N</option>
+                    <option value="import" {% if filters.get('source') == 'import' %}selected{% endif %}>Import</option>
                   </select>
                 </label>
               </div>
@@ -68,8 +76,8 @@
       </div>
 
       <div class="pipeline-toolbar__right">
-        <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Lista</a>
-        <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', organization_id=organization_id) if is_superadmin else url_for('leads.list_leads') }}">Lista</a>
+        <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
       </div>
     </div>
 
@@ -103,8 +111,8 @@
         <div class="empty-state-title">Lisää ensimmäinen liidi</div>
         <p class="empty-state-text">Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n — ja seuraa etenemistä vaiheittain.</p>
         <div class="pipeline-empty__actions">
-          <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.webhooks', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks') }}">Yhdistä n8n</a>
+          <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if is_superadmin else url_for('settings.webhooks_list') }}">Yhdistä n8n</a>
         </div>
       </div>
     </div>
@@ -113,9 +121,10 @@
   <div class="pipeline-wrapper" id="pipeline-wrapper">
     <div class="pipeline-board kanban" id="kanban" role="list">
       {% for stage in stages %}
-      {% set stage_count = leads_by_stage[stage.id]|length %}
-      {% set stage_total = stage_deal_totals.get(stage.id) if stage_deal_totals else None %}
-      {% set stage_color = (stage.color or '')|upper %}
+      {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
+      {% set stage_count = stage_leads|length %}
+      {% set stage_total = stage_deal_totals.get(stage.id) %}
+      {% set stage_color = (stage.color|default(''))|upper %}
       {% set stage_token = 'accent' %}
       {% if stage_color in ['#3B82F6'] %}
         {% set stage_token = 'contacted' %}
@@ -172,15 +181,16 @@
             </div>
           {% endif %}
 
-          {% for item in leads_by_stage[stage.id] %}
-          {% set lead = item.lead %}
-          <article class="lead-card lead-card--premium" data-lead-id="{{ lead.id }}" data-probability="{{ lead.close_probability or 0 }}" tabindex="0" role="listitem" aria-label="{{ lead.display_name }}">
+          {% for item in stage_leads %}
+          {% set lead = item.get('lead') if item is mapping else item %}
+          {% if lead %}
+          <article class="lead-card lead-card--premium" data-lead-id="{{ lead.id }}" data-probability="{{ lead.close_probability|default(0) }}" tabindex="0" role="listitem" aria-label="{{ lead.display_name|default('Liidi') }}">
             <div class="lead-card__top">
               <div class="lead-card__identity">
-                <a class="lead-card__name truncate" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">
+                <a class="lead-card__name truncate" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) }}">
                   {{ lead.display_name }}
                 </a>
-                {% if lead.company %}
+                {% if lead.company|default('') %}
                 <div class="lead-card-meta truncate">{{ lead.company }}</div>
                 {% endif %}
               </div>
@@ -202,11 +212,11 @@
                 {{ probability_badge(lead.close_probability) }}
               </span>
 
-              {% if lead.ai_enrichment_status == 'processing' %}
+              {% if lead.ai_enrichment_status|default('') == 'processing' %}
                 <span class="lead-card-ai" title="AI-rikastettu" aria-label="AI-rikastettu" role="img" data-ai="processing">
                   <span class="lead-card-ai__spinner" aria-hidden="true"></span>
                 </span>
-              {% elif lead.ai_enriched %}
+              {% elif lead.ai_enriched|default(false) %}
                 <span class="lead-card-ai" title="AI-rikastettu" aria-label="AI-rikastettu" role="img" data-ai="ok">✦</span>
               {% endif %}
             </div>
@@ -214,11 +224,11 @@
             <div class="lead-card__footer">
               <div class="lead-card-assignee">
                 <span class="lead-card-assignee__avatar" aria-hidden="true">
-                  {% if lead.assignee %}{{ lead.assignee.email[0]|upper }}{% else %}—{% endif %}
+                  {% if lead.assignee and lead.assignee.email|default('') %}{{ lead.assignee.email[0]|upper }}{% else %}—{% endif %}
                 </span>
                 <span class="lead-card-assignee__meta truncate">
-                  <span class="lead-card__source">{{ lead.source }}</span>
-                  {% if item.last_activity %}
+                  <span class="lead-card__source">{{ lead.source|default('—') }}</span>
+                  {% if item is mapping and item.last_activity and item.last_activity.created_at %}
                     <span class="lead-card__sep">·</span>
                     <time class="lead-card__activity" datetime="{{ item.last_activity.created_at.isoformat() }}">{{ item.last_activity.created_at.strftime('%Y-%m-%d') }}</time>
                   {% endif %}
@@ -226,16 +236,17 @@
               </div>
 
               <div class="lead-card__actions" aria-label="Toiminnot">
-                <a class="lead-card__action" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}" aria-label="Avaa liidi">Avaa</a>
-                <a class="lead-card__action" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}" aria-label="Muokkaa liidiä">Muokkaa</a>
+                <a class="lead-card__action" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) }}" aria-label="Avaa liidi">Avaa</a>
+                <a class="lead-card__action" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.edit_lead', lead_id=lead.id) }}" aria-label="Muokkaa liidiä">Muokkaa</a>
               </div>
             </div>
           </article>
+          {% endif %}
           {% endfor %}
         </div>
 
         <div class="pipeline-col__add">
-          <a class="pipeline-add-lead" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+          <a class="pipeline-add-lead" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
         </div>
       </section>
       {% endfor %}
@@ -248,7 +259,7 @@
 <script>
 (() => {
   const csrfToken = "{{ csrf_token() }}";
-  const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=0) }}";
+  const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if is_superadmin else url_for('leads.move_stage', lead_id=0) }}";
   const stageUrl = (leadId) => stageUrlTemplate.replace('/0/', `/${leadId}/`);
 
   function toast(message, kind = 'info') {
