@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge, probability_badge %}
+{% block title %}Leads — FlowLeads{% endblock %}
+{% block content %}
+<section class="leads-page">
+  <header class="page-header leads-header">
+    <div class="page-header__main">
+      <div class="breadcrumbs">
+        <span>Liidit</span>
+      </div>
+      <h1>Liidit</h1>
+      <p class="page-subtitle">
+        {{ pagination.total }} liidiä
+        {% if today_new_count is defined %}
+          · {{ today_new_count }} uutta tänään
+        {% endif %}
+      </p>
+    </div>
+    <div class="page-header__actions leads-toolbar" role="toolbar" aria-label="Liidilistan työkalupalkki">
+      <form method="get" class="leads-search" role="search" aria-label="Hae liidejä">
+        {% if current_user.is_superadmin() %}
+        <input type="hidden" name="organization_id" value="{{ organization_id }}">
+        {% endif %}
+        <span class="leads-search__icon" aria-hidden="true">🔍</span>
+        {{ filter_form.search(class_="leads-search__input", placeholder="Hae nimellä, yrityksellä tai sähköpostilla") }}
+      </form>
+      <div class="leads-filters">
+        <button type="button" class="btn btn-secondary btn-sm leads-filters__toggle" aria-haspopup="true" aria-expanded="false">
+          Suodattimet
+          <span aria-hidden="true">▾</span>
+        </button>
+        <div class="leads-filters__panel" role="dialog" aria-label="Suodata liidejä">
+          <form method="get" class="leads-filters__form">
+            {% if current_user.is_superadmin() %}
+            <input type="hidden" name="organization_id" value="{{ organization_id }}">
+            {% endif %}
+            <div class="leads-filters__grid">
+              <div class="form-group">
+                {{ filter_form.stage_id.label(class_="form-label") }}
+                {{ filter_form.stage_id(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.source.label(class_="form-label") }}
+                {{ filter_form.source(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.assigned_to.label(class_="form-label") }}
+                {{ filter_form.assigned_to(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.status.label(class_="form-label") }}
+                {{ filter_form.status(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.score_min.label(class_="form-label") }}
+                {{ filter_form.score_min(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.score_max.label(class_="form-label") }}
+                {{ filter_form.score_max(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.gdpr_consent.label(class_="form-label") }}
+                {{ filter_form.gdpr_consent(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.marketing_opt_in.label(class_="form-label") }}
+                {{ filter_form.marketing_opt_in(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.unsubscribed.label(class_="form-label") }}
+                {{ filter_form.unsubscribed(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.is_anonymized.label(class_="form-label") }}
+                {{ filter_form.is_anonymized(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.sort.label(class_="form-label") }}
+                {{ filter_form.sort(class_="form-input") }}
+              </div>
+              <div class="form-group">
+                {{ filter_form.dir.label(class_="form-label") }}
+                {{ filter_form.dir(class_="form-input") }}
+              </div>
+            </div>
+            <div class="leads-filters__actions">
+              {{ filter_form.submit(class_="btn btn-primary btn-sm") }}
+            </div>
+          </form>
+        </div>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">
+        Pipeline
+      </a>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">
+        Export CSV
+      </a>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
+        + Liidi
+      </a>
+    </div>
+  </header>
+
+  <div class="leads-source-tabs" role="tablist" aria-label="Lähdesuodattimet">
+    {% set active_source = filter_form.source.data or '' %}
+    {% for value, label in filter_form.source.choices %}
+    {% set tab_filters = {
+      'search': filters.search or none,
+      'stage_id': filters.stage_id,
+      'source': value or none,
+      'assigned_to': filters.assigned_to,
+      'status': filters.status,
+      'score_min': filters.score_min,
+      'score_max': filters.score_max,
+      'sort': filters.sort,
+      'dir': filters.dir,
+    } %}
+    <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_filters) }}"
+       class="leads-source-tab {% if value == active_source %}is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="card card--flat">
+    <form method="post" action="{{ url_for('leads.bulk_action', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.bulk_action') }}" class="leads-bulk-form">
+      {{ bulk_form.hidden_tag() }}
+      <div class="leads-bulk-toolbar">
+        <div class="leads-bulk-toolbar__left">
+          {{ bulk_form.action(class_="form-input form-input--compact") }}
+          {% if can_assign_others %}
+          {{ bulk_form.assigned_to(class_="form-input form-input--compact") }}
+          {% endif %}
+          {{ bulk_form.stage_id(class_="form-input form-input--compact") }}
+          {{ bulk_form.submit(class_="btn btn-secondary btn-sm") }}
+        </div>
+        <div class="leads-bulk-toolbar__right text-sm text-muted">
+          Valittuna <span id="leads-selected-count">0</span>
+        </div>
+      </div>
+
+      {% if leads %}
+      <div class="table-wrap leads-table-wrap" role="region" aria-label="Liidilistaus">
+        <table class="leads-table">
+          <thead>
+            <tr>
+              <th scope="col" class="leads-col-select">
+                <input type="checkbox" id="select-all-leads" aria-label="Valitse kaikki liidit">
+              </th>
+              <th scope="col" class="leads-col-contact">
+                <button type="button" class="leads-th-sortable">
+                  Kontakti
+                </button>
+              </th>
+              <th scope="col">Yritys</th>
+              <th scope="col">Vaihe</th>
+              <th scope="col">Score</th>
+              <th scope="col">Lähde</th>
+              <th scope="col">Luotu</th>
+              <th scope="col" class="leads-col-actions">
+                <span class="sr-only">Toiminnot</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lead in leads %}
+            <tr class="leads-row">
+              <td class="leads-cell-select">
+                <input type="checkbox" name="lead_ids" value="{{ lead.id }}" class="lead-check" aria-label="Valitse {{ lead.display_name }}">
+              </td>
+              <td class="leads-cell-contact">
+                <div class="lead-contact-cell">
+                  <div class="lead-contact-avatar" aria-hidden="true">
+                    {% set initials = (lead.display_name or lead.email or '?').split() %}
+                    {% if initials|length > 1 %}
+                      {{ initials[0][0] }}{{ initials[1][0] }}
+                    {% else %}
+                      {{ (initials[0][0:2])|upper }}
+                    {% endif %}
+                  </div>
+                  <div class="lead-contact-main">
+                    <a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}"
+                       class="lead-contact-name truncate">
+                      {{ lead.display_name }}
+                    </a>
+                    {% if lead.email %}
+                    <div class="lead-contact-email truncate">{{ lead.email }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td class="leads-cell-company">
+                <span class="truncate text-secondary">{{ lead.company or '—' }}</span>
+              </td>
+              <td class="leads-cell-stage">
+                <span class="badge badge-neutral badge--dot leads-stage-badge">
+                  {{ lead.stage.name }}
+                </span>
+              </td>
+              <td class="leads-cell-score">
+                {{ score_badge(lead.score) }}
+              </td>
+              <td class="leads-cell-source">
+                {% if lead.source %}
+                <span class="badge leads-source-badge">{{ lead.source }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="leads-cell-created">
+                <span class="text-sm text-muted">
+                  {{ lead.created_at.strftime('%Y-%m-%d') if lead.created_at else '' }}
+                </span>
+              </td>
+              <td class="leads-cell-actions">
+                <div class="leads-row-actions" role="group" aria-label="Toiminnot">
+                  <a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}"
+                     class="leads-row-action">
+                    Avaa
+                  </a>
+                  <a href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}"
+                     class="leads-row-action">
+                    Muokkaa
+                  </a>
+                  <button type="button" class="leads-row-action leads-row-action--icon" aria-label="Lisää toimintoja">
+                    ⋯
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">✨</div>
+        <h2 class="empty-state-title">Ei liidejä vielä</h2>
+        <p class="empty-state-text">
+          Aloita tuomalla liidit sisään tai lisää ensimmäinen liidi manuaalisesti.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <a href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}" class="btn btn-primary btn-sm">
+            Lisää ensimmäinen liidi
+          </a>
+          <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}" class="btn btn-secondary btn-sm">
+            Yhdistä n8n
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      <input type="hidden" name="lead_ids" id="bulk-lead-ids" value="">
+    </form>
+
+    {% if pagination.pages > 1 %}
+    <footer class="leads-pagination text-sm text-muted">
+      <span>Sivu {{ pagination.page }} / {{ pagination.pages }}</span>
+      <div class="ml-auto flex gap-2">
+        {% if pagination.has_prev %}
+        <a href="{{ url_for('leads.list_leads', page=pagination.prev_num, organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.prev_num, **filters) }}"
+           class="btn btn-secondary btn-sm">
+          Edellinen
+        </a>
+        {% endif %}
+        {% if pagination.has_next %}
+        <a href="{{ url_for('leads.list_leads', page=pagination.next_num, organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.next_num, **filters) }}"
+           class="btn btn-secondary btn-sm">
+          Seuraava
+        </a>
+        {% endif %}
+      </div>
+    </footer>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+(function() {
+  const root = document;
+  const selectAll = root.getElementById('select-all-leads');
+  const bulkIdsInput = root.getElementById('bulk-lead-ids');
+  const bulkForm = root.querySelector('.leads-bulk-form');
+  const selectedCount = root.getElementById('leads-selected-count');
+
+  function updateSelectedCount() {
+    const checks = root.querySelectorAll('.lead-check:checked');
+    if (selectedCount) selectedCount.textContent = checks.length.toString();
+  }
+
+  selectAll && selectAll.addEventListener('change', function(e) {
+    const checked = e.target.checked;
+    root.querySelectorAll('.lead-check').forEach(function(cb) {
+      cb.checked = checked;
+    });
+    updateSelectedCount();
+  });
+
+  root.querySelectorAll('.lead-check').forEach(function(cb) {
+    cb.addEventListener('change', updateSelectedCount);
+  });
+
+  bulkForm && bulkForm.addEventListener('submit', function(e) {
+    const ids = Array.prototype.map.call(
+      root.querySelectorAll('.lead-check:checked'),
+      function(cb) { return cb.value; }
+    );
+    if (!ids.length) {
+      e.preventDefault();
+      alert('Valitse vähintään yksi liidi.');
+      return;
+    }
+    bulkIdsInput.value = JSON.stringify(ids);
+    root.querySelectorAll('.lead-check').forEach(function(cb) {
+      cb.disabled = true;
+    });
+  });
+
+  const filterToggle = root.querySelector('.leads-filters__toggle');
+  const filterPanel = root.querySelector('.leads-filters__panel');
+  if (filterToggle && filterPanel) {
+    function closePanel() {
+      filterPanel.classList.remove('is-open');
+      filterToggle.setAttribute('aria-expanded', 'false');
+    }
+    filterToggle.addEventListener('click', function() {
+      const isOpen = filterPanel.classList.toggle('is-open');
+      filterToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      if (isOpen) {
+        const firstInput = filterPanel.querySelector('input, select');
+        if (firstInput) firstInput.focus();
+      }
+    });
+    document.addEventListener('click', function(e) {
+      if (!filterPanel.classList.contains('is-open')) return;
+      if (!filterPanel.contains(e.target) && !filterToggle.contains(e.target)) {
+        closePanel();
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && filterPanel.classList.contains('is-open')) {
+        closePanel();
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}
+
