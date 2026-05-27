@@ -2,119 +2,424 @@
 {% from "_macros.html" import score_badge, probability_badge %}
 {% block title %}Pipeline — FlowLeads{% endblock %}
 {% block content %}
-<div class="card">
-  <div class="toolbar">
-    <h1 style="margin:0; flex:1;">Pipeline</h1>
-    <a class="btn" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">List view</a>
-    <a class="btn" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">New lead</a>
-  </div>
+{% set ns = namespace(total_leads=0, total_value=0) %}
+{% for stage in stages %}
+  {% set ns.total_leads = ns.total_leads + (leads_by_stage[stage.id]|length) %}
+  {% if stage_deal_totals and stage_deal_totals.get(stage.id) %}
+    {% set ns.total_value = ns.total_value + stage_deal_totals.get(stage.id) %}
+  {% endif %}
+{% endfor %}
 
-  <form method="get" class="filters">
-    {% if current_user.is_superadmin() %}
-    <input type="hidden" name="organization_id" value="{{ organization_id }}">
-    {% endif %}
-    <label>Assigned to
-      <select name="assigned_to">
-        <option value="">Anyone</option>
-        {% for u in users %}
-        <option value="{{ u.id }}" {% if filters.assigned_to and filters.assigned_to|int == u.id %}selected{% endif %}>{{ u.email }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Source
-      <select name="source">
-        <option value="">All</option>
-        <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Manual</option>
-        <option value="n8n" {% if filters.source == 'n8n' %}selected{% endif %}>n8N</option>
-        <option value="import" {% if filters.source == 'import' %}selected{% endif %}>Import</option>
-      </select>
-    </label>
-    <button type="submit" class="btn secondary">Filter</button>
-  </form>
+<section class="pipeline" aria-label="Pipeline">
+  <header class="pipeline-header" role="banner">
+    <div class="pipeline-toolbar">
+      <div class="pipeline-toolbar__left">
+        <h1 class="pipeline-title">Pipeline</h1>
+      </div>
 
-  <div class="kanban" id="kanban">
-    {% for stage in stages %}
-    <div class="kanban-col" data-stage-id="{{ stage.id }}" style="--stage-color: {{ stage.color }}">
-      <h3 style="border-color: {{ stage.color }}">
-        {{ stage.name }}
-        {% if stage_deal_totals.get(stage.id) %}
-        <span class="meta" style="display:block; font-weight:normal; font-size:0.8rem;">
-          {{ currency_symbol }}{{ '%.0f'|format(stage_deal_totals[stage.id]) }}
-        </span>
-        {% endif %}
-      </h3>
-      <button type="button" class="btn secondary sort-prob-btn" data-stage-id="{{ stage.id }}" style="font-size:0.75rem; margin-bottom:0.5rem; width:100%;">
-        Järjestä todennäköisyyden mukaan
-      </button>
-      <div class="kanban-list" data-stage-id="{{ stage.id }}">
-        {% for item in leads_by_stage[stage.id] %}
-        {% set lead = item.lead %}
-        <div class="lead-card" data-lead-id="{{ lead.id }}" data-probability="{{ lead.close_probability or 0 }}">
-          <strong><a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">{{ lead.display_name }}</a></strong>
-          <div>{{ lead.company or '' }}</div>
-          <div style="margin-top:0.35rem; display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
-            {{ score_badge(lead.score) }}
-            {{ probability_badge(lead.close_probability) }}
-          </div>
-          {% if lead.deal_value %}
-          <div class="meta">{{ currency_symbol }}{{ '%.0f'|format(lead.deal_value) }}</div>
-          {% endif %}
-          <div class="meta">
-            {% if lead.assignee %}{{ lead.assignee.email[0]|upper }}{% else %}—{% endif %}
-            {% if item.last_activity %} · {{ item.last_activity.created_at.strftime('%Y-%m-%d') }}{% endif %}
+      <div class="pipeline-toolbar__center">
+        <label class="pipeline-search" aria-label="Hae liidejä">
+          <span class="sr-only">Hae</span>
+          <svg class="pipeline-search__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+          </svg>
+          <input id="pipeline-search" class="pipeline-search__input" type="search" placeholder="Hae nimi, yritys…" autocomplete="off" />
+        </label>
+
+        <div class="pipeline-filters">
+          <button type="button" class="btn btn-ghost btn-sm pipeline-filters__toggle" id="pipeline-filters-toggle" aria-expanded="false" aria-controls="pipeline-filters-panel">
+            Suodattimet
+          </button>
+
+          <div class="pipeline-filters__panel" id="pipeline-filters-panel" role="dialog" aria-label="Pipeline suodattimet">
+            <form method="get" class="pipeline-filters__form">
+              {% if current_user.is_superadmin() %}
+              <input type="hidden" name="organization_id" value="{{ organization_id }}">
+              {% endif %}
+
+              <div class="pipeline-filters__grid">
+                <label class="pipeline-filter">
+                  <span class="pipeline-filter__label">Assigned to</span>
+                  <select name="assigned_to">
+                    <option value="">Anyone</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {% if filters.assigned_to and filters.assigned_to|int == u.id %}selected{% endif %}>{{ u.email }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+
+                <label class="pipeline-filter">
+                  <span class="pipeline-filter__label">Source</span>
+                  <select name="source">
+                    <option value="">All</option>
+                    <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Manual</option>
+                    <option value="n8n" {% if filters.source == 'n8n' %}selected{% endif %}>n8N</option>
+                    <option value="import" {% if filters.source == 'import' %}selected{% endif %}>Import</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="pipeline-filters__actions">
+                <button type="submit" class="btn btn-secondary btn-sm">Näytä</button>
+              </div>
+            </form>
           </div>
         </div>
-        {% endfor %}
+      </div>
+
+      <div class="pipeline-toolbar__right">
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Lista</a>
+        <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
       </div>
     </div>
-    {% endfor %}
+
+    <div class="pipeline-summary" aria-live="polite">
+      <div class="pipeline-summary__stats">
+        <span class="pipeline-summary__item">
+          {% if ns.total_leads is not none %}
+            <strong>{{ ns.total_leads }}</strong> liidiä
+          {% else %}
+            <strong>—</strong> liidiä
+          {% endif %}
+        </span>
+        <span class="pipeline-summary__sep">·</span>
+        <span class="pipeline-summary__item">
+          {% if ns.total_value and ns.total_value > 0 %}
+            <strong>{{ currency_symbol }}{{ '%.0f'|format(ns.total_value) }}</strong> yhteensä
+          {% else %}
+            <strong>{{ currency_symbol }}—</strong> yhteensä
+          {% endif %}
+        </span>
+        <span class="pipeline-summary__sep">·</span>
+        <span class="pipeline-summary__item pipeline-summary__muted">Päivitetty juuri nyt</span>
+      </div>
+      <div class="pipeline-toast" id="pipeline-toast" aria-live="polite" aria-atomic="true"></div>
+    </div>
+  </header>
+
+  {% if not stages or ns.total_leads == 0 %}
+    <div class="card pipeline-empty">
+      <div class="empty-state">
+        <div class="empty-state-title">Lisää ensimmäinen liidi</div>
+        <p class="empty-state-text">Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n — ja seuraa etenemistä vaiheittain.</p>
+        <div class="pipeline-empty__actions">
+          <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.webhooks', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks') }}">Yhdistä n8n</a>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="pipeline-wrapper" id="pipeline-wrapper">
+    <div class="pipeline-board kanban" id="kanban" role="list">
+      {% for stage in stages %}
+      {% set stage_count = leads_by_stage[stage.id]|length %}
+      {% set stage_total = stage_deal_totals.get(stage.id) if stage_deal_totals else None %}
+      {% set stage_color = (stage.color or '')|upper %}
+      {% set stage_token = 'accent' %}
+      {% if stage_color in ['#3B82F6'] %}
+        {% set stage_token = 'contacted' %}
+      {% elif stage_color in ['#8B5CF6'] %}
+        {% set stage_token = 'new' %}
+      {% elif stage_color in ['#F59E0B'] %}
+        {% set stage_token = 'interested' %}
+      {% elif stage_color in ['#EC4899'] %}
+        {% set stage_token = 'proposal' %}
+      {% elif stage_color in ['#10B981', '#22C55E'] %}
+        {% set stage_token = 'won' %}
+      {% elif stage_color in ['#6B7280'] %}
+        {% set stage_token = 'lost' %}
+      {% elif stage_color in ['#EF4444'] %}
+        {% set stage_token = 'danger' %}
+      {% elif stage_color in ['#06B6D4'] %}
+        {% set stage_token = 'info' %}
+      {% endif %}
+
+      <section class="pipeline-col kanban-col" data-stage-id="{{ stage.id }}" data-stage-token="{{ stage_token }}" aria-label="{{ stage.name }}">
+        <div class="pipeline-col__header" role="heading" aria-level="2">
+          <div class="pipeline-col__title-row">
+            <span class="pipeline-col__dot" aria-hidden="true"></span>
+            <span class="pipeline-col__title truncate">{{ stage.name }}</span>
+            <span class="pipeline-col__count">{{ stage_count }}</span>
+          </div>
+
+          <div class="pipeline-col__metrics">
+            <div class="pipeline-col__value">
+              {% if stage_total %}
+                {{ currency_symbol }}{{ '%.0f'|format(stage_total) }}
+              {% else %}
+                {{ currency_symbol }}—
+              {% endif %}
+            </div>
+            <div class="pipeline-col__delta-row" data-delta="none">
+              {# hidden by CSS when no delta is available #}
+              <span class="pipeline-col__delta pipeline-col__delta--muted">—</span>
+            </div>
+          </div>
+
+          <div class="pipeline-col__controls">
+            <button type="button" class="btn btn-ghost btn-sm sort-prob-btn" data-stage-id="{{ stage.id }}">
+              Järjestä todennäköisyyden mukaan
+            </button>
+          </div>
+        </div>
+
+        <div class="pipeline-col__list kanban-list" data-stage-id="{{ stage.id }}" role="list">
+          {% if stage_count == 0 %}
+            <div class="pipeline-col__placeholder">
+              <div class="pipeline-col__placeholder-title">Ei vielä liidejä</div>
+              <div class="pipeline-col__placeholder-text">Vedä liidi tähän tai lisää uusi.</div>
+            </div>
+          {% endif %}
+
+          {% for item in leads_by_stage[stage.id] %}
+          {% set lead = item.lead %}
+          <article class="lead-card lead-card--premium" data-lead-id="{{ lead.id }}" data-probability="{{ lead.close_probability or 0 }}" tabindex="0" role="listitem" aria-label="{{ lead.display_name }}">
+            <div class="lead-card__top">
+              <div class="lead-card__identity">
+                <a class="lead-card__name truncate" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}">
+                  {{ lead.display_name }}
+                </a>
+                {% if lead.company %}
+                <div class="lead-card-meta truncate">{{ lead.company }}</div>
+                {% endif %}
+              </div>
+
+              <div class="lead-card__value">
+                {% if lead.deal_value %}
+                  {{ currency_symbol }}{{ '%.0f'|format(lead.deal_value) }}
+                {% else %}
+                  {{ currency_symbol }}—
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="lead-card__badges">
+              <span class="lead-card-priority">
+                {{ score_badge(lead.score) }}
+              </span>
+              <span class="lead-card-meta">
+                {{ probability_badge(lead.close_probability) }}
+              </span>
+
+              {% if lead.ai_enrichment_status == 'processing' %}
+                <span class="lead-card-ai" title="AI-rikastettu" aria-label="AI-rikastettu" role="img" data-ai="processing">
+                  <span class="lead-card-ai__spinner" aria-hidden="true"></span>
+                </span>
+              {% elif lead.ai_enriched %}
+                <span class="lead-card-ai" title="AI-rikastettu" aria-label="AI-rikastettu" role="img" data-ai="ok">✦</span>
+              {% endif %}
+            </div>
+
+            <div class="lead-card__footer">
+              <div class="lead-card-assignee">
+                <span class="lead-card-assignee__avatar" aria-hidden="true">
+                  {% if lead.assignee %}{{ lead.assignee.email[0]|upper }}{% else %}—{% endif %}
+                </span>
+                <span class="lead-card-assignee__meta truncate">
+                  <span class="lead-card__source">{{ lead.source }}</span>
+                  {% if item.last_activity %}
+                    <span class="lead-card__sep">·</span>
+                    <time class="lead-card__activity" datetime="{{ item.last_activity.created_at.isoformat() }}">{{ item.last_activity.created_at.strftime('%Y-%m-%d') }}</time>
+                  {% endif %}
+                </span>
+              </div>
+
+              <div class="lead-card__actions" aria-label="Toiminnot">
+                <a class="lead-card__action" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}" aria-label="Avaa liidi">Avaa</a>
+                <a class="lead-card__action" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}" aria-label="Muokkaa liidiä">Muokkaa</a>
+              </div>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+
+        <div class="pipeline-col__add">
+          <a class="pipeline-add-lead" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+        </div>
+      </section>
+      {% endfor %}
+    </div>
   </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script>
+(() => {
   const csrfToken = "{{ csrf_token() }}";
-  const stageUrl = (leadId) => "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=0) }}".replace('/0/', `/${leadId}/`);
+  const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=0) }}";
+  const stageUrl = (leadId) => stageUrlTemplate.replace('/0/', `/${leadId}/`);
 
-  document.querySelectorAll('.sort-prob-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const stageId = btn.dataset.stageId;
-      const list = document.querySelector(`.kanban-list[data-stage-id="${stageId}"]`);
-      if (!list) return;
-      const cards = Array.from(list.querySelectorAll('.lead-card'));
-      cards.sort((a, b) => parseFloat(b.dataset.probability || 0) - parseFloat(a.dataset.probability || 0));
-      cards.forEach(card => list.appendChild(card));
+  function toast(message, kind = 'info') {
+    const el = document.getElementById('pipeline-toast');
+    if (!el) return;
+    el.textContent = message || '';
+    el.dataset.kind = kind;
+    el.classList.toggle('is-visible', Boolean(message));
+    if (message) {
+      window.clearTimeout(el.__hideTimer);
+      el.__hideTimer = window.setTimeout(() => {
+        el.classList.remove('is-visible');
+      }, 3800);
+    }
+  }
+
+  function destroySortables(root) {
+    root.querySelectorAll('.kanban-list').forEach((list) => {
+      const inst = list.__flSortable;
+      if (inst && typeof inst.destroy === 'function') {
+        inst.destroy();
+      }
+      list.__flSortable = null;
     });
-  });
+  }
 
-  document.querySelectorAll('.kanban-list').forEach(list => {
-    new Sortable(list, {
-      group: 'leads',
-      animation: 150,
-      onEnd: async function(evt) {
-        const leadId = evt.item.dataset.leadId;
-        const stageId = evt.to.dataset.stageId;
-        const prevList = evt.from;
-        const prevIndex = evt.oldIndex;
-        try {
-          const res = await fetch(stageUrl(leadId), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken,
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify({ stage_id: parseInt(stageId, 10) }),
-          });
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.error?.message || 'Stage update failed');
+  function initSortable(root) {
+    if (!window.Sortable) return;
+    root.querySelectorAll('.kanban-list').forEach((list) => {
+      if (list.__flSortable) return;
+      const inst = new Sortable(list, {
+        group: 'leads',
+        animation: 160,
+        easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+        dragClass: 'is-dragging',
+        ghostClass: 'is-ghost',
+        chosenClass: 'is-chosen',
+        filter: '.pipeline-col__placeholder',
+        onStart: () => document.body.classList.add('pipeline-is-dragging'),
+        onEnd: async (evt) => {
+          document.body.classList.remove('pipeline-is-dragging');
+          root.querySelectorAll('.kanban-list.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+
+          const leadId = evt.item?.dataset?.leadId;
+          const stageId = evt.to?.dataset?.stageId;
+          if (!leadId || !stageId) return;
+
+          const prevList = evt.from;
+          const prevIndex = evt.oldIndex;
+
+          evt.item.classList.add('is-updating');
+          evt.item.setAttribute('aria-busy', 'true');
+
+          try {
+            const res = await fetch(stageUrl(leadId), {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({ stage_id: parseInt(stageId, 10) }),
+            });
+
+            let data = null;
+            try { data = await res.json(); } catch (e) {}
+            if (!res.ok || !data || !data.success) {
+              throw new Error(data?.error?.message || 'Stage update failed');
+            }
+          } catch (err) {
+            prevList?.insertBefore(evt.item, prevList.children[prevIndex] || null);
+            evt.item.classList.add('is-error');
+            toast(err?.message || 'Liidin siirto epäonnistui.', 'error');
+            window.setTimeout(() => evt.item.classList.remove('is-error'), 1400);
+          } finally {
+            evt.item.classList.remove('is-updating');
+            evt.item.removeAttribute('aria-busy');
           }
-        } catch (err) {
-          prevList.insertBefore(evt.item, prevList.children[prevIndex] || null);
-          alert(err.message || 'Could not move lead.');
-        }
-      },
+        },
+        onMove: (evt) => {
+          const to = evt.to;
+          if (!to) return true;
+          root.querySelectorAll('.kanban-list.is-drop-target').forEach(el => {
+            if (el !== to) el.classList.remove('is-drop-target');
+          });
+          to.classList.add('is-drop-target');
+          return true;
+        },
+      });
+      list.__flSortable = inst;
     });
-  });
+  }
+
+  function initSearch(root) {
+    const input = root.querySelector('#pipeline-search');
+    if (!input || input.__flBound) return;
+    input.__flBound = true;
+    input.addEventListener('input', () => {
+      const q = (input.value || '').trim().toLowerCase();
+      root.querySelectorAll('.lead-card').forEach((card) => {
+        if (!q) {
+          card.classList.remove('is-hidden');
+          return;
+        }
+        const hay = (card.textContent || '').toLowerCase();
+        card.classList.toggle('is-hidden', !hay.includes(q));
+      });
+    }, {passive: true});
+  }
+
+  function initFilters(root) {
+    const toggle = root.querySelector('#pipeline-filters-toggle');
+    const panel = root.querySelector('#pipeline-filters-panel');
+    if (!toggle || !panel || toggle.__flBound) return;
+    toggle.__flBound = true;
+
+    function close() {
+      panel.classList.remove('is-open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+    function open() {
+      panel.classList.add('is-open');
+      toggle.setAttribute('aria-expanded', 'true');
+      const first = panel.querySelector('select, input, button');
+      if (first) first.focus();
+    }
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      panel.classList.contains('is-open') ? close() : open();
+    });
+    document.addEventListener('click', (e) => {
+      if (!panel.classList.contains('is-open')) return;
+      const wrap = root.querySelector('.pipeline-filters');
+      if (wrap && !wrap.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  }
+
+  function initSortByProbability(root) {
+    root.querySelectorAll('.sort-prob-btn').forEach((btn) => {
+      if (btn.__flBound) return;
+      btn.__flBound = true;
+      btn.addEventListener('click', () => {
+        const stageId = btn.dataset.stageId;
+        const list = root.querySelector(`.kanban-list[data-stage-id="${stageId}"]`);
+        if (!list) return;
+        const cards = Array.from(list.querySelectorAll('.lead-card'));
+        cards.sort((a, b) => parseFloat(b.dataset.probability || 0) - parseFloat(a.dataset.probability || 0));
+        cards.forEach(card => list.appendChild(card));
+        toast('Järjestetty todennäköisyyden mukaan.', 'info');
+      }, {passive: true});
+    });
+  }
+
+  function initAll() {
+    const root = document.querySelector('.pipeline');
+    if (!root) return;
+    initFilters(root);
+    initSearch(root);
+    initSortByProbability(root);
+    destroySortables(root);
+    initSortable(root);
+  }
+
+  document.addEventListener('DOMContentLoaded', initAll);
+  window.addEventListener('pageshow', initAll);
+  window.addEventListener('pipeline:refresh', initAll);
+})();
 </script>
 {% endblock %}
