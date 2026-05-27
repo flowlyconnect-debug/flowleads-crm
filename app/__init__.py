@@ -87,6 +87,7 @@ def _init_extensions(app):
         from app.proposals import models as proposals_models  # noqa: F401
         from app.analytics import models as analytics_models  # noqa: F401
         from app.webhooks import models as webhooks_models  # noqa: F401
+        from app.forms import models as forms_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -104,6 +105,7 @@ def _register_blueprints(app):
     from app.notifications import notifications_bp
     from app.calendar.routes import calendar_bp
     from app.proposals import proposals_bp, proposals_public_bp
+    from app.forms import forms_bp, forms_public_api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -120,11 +122,14 @@ def _register_blueprints(app):
     app.register_blueprint(calendar_bp)
     app.register_blueprint(proposals_bp)
     app.register_blueprint(proposals_public_bp)
+    app.register_blueprint(forms_bp)
+    app.register_blueprint(forms_public_api_bp)
     app.register_blueprint(webhooks_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)
     csrf.exempt(proposals_public_bp)
+    csrf.exempt(forms_public_api_bp)
 
 
 def _register_root_routes(app):

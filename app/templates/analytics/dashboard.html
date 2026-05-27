@@ -69,6 +69,11 @@
     <span class="badge">This month: {{ stats.ai_enrichments_completed_month }}</span>
   </div>
   <div class="card" style="padding:1rem;">
+    <strong>Lomakelähetykset tänään</strong>
+    <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ form_submissions_today }}</p>
+    <a href="{{ url_for('forms.list_forms', organization_id=organization_id) if current_user.is_superadmin() else url_for('forms.list_forms') }}" style="font-size:0.85rem;">Näytä lomakkeet</a>
+  </div>
+  <div class="card" style="padding:1rem;">
     <strong>Avoimet tarjoukset</strong>
     <p style="font-size:1.75rem;margin:0.5rem 0 0;">{{ open_proposals_count }}</p>
     <a href="{{ url_for('proposals.list_proposals', status='sent', organization_id=organization_id) if current_user.is_superadmin() else url_for('proposals.list_proposals', status='sent') }}" style="font-size:0.85rem;">Näytä tarjoukset</a>

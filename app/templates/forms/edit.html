@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}{{ form.name }} — Lomake{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">{{ form.name }}</h1>
+  <a class="btn secondary" href="{{ url_for('forms.list_forms', **org_query) }}">← Lomakkeet</a>
+  <a class="btn secondary" href="{{ url_for('forms.form_submissions', form_id=form.id, **org_query) }}">Lähetykset ({{ form.submission_count }})</a>
+</div>
+
+<div class="tabs">
+  <a href="#builder" class="active" data-tab="builder">Rakennus</a>
+  <a href="#settings" data-tab="settings">Asetukset</a>
+  <a href="#embed" data-tab="embed" id="embed">Upota</a>
+</div>
+
+<form method="post" action="{{ url_for('forms.update_form', form_id=form.id, **org_query) }}" id="form-editor">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="fields_json" id="fields-json" value="">
+  <input type="hidden" name="name" id="form-name-hidden" value="{{ form.name }}">
+
+  <div id="panel-builder" class="tab-panel">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Kentät</h2>
+        <label>Otsikko (julkinen)
+          <input type="text" name="title" id="form-title" value="{{ form.title }}" required>
+        </label>
+        <label>Kuvaus
+          <textarea name="description" rows="2">{{ form.description or '' }}</textarea>
+        </label>
+        <div id="field-builder"></div>
+        <button type="button" class="secondary" id="add-field-btn">+ Lisää kenttä</button>
+      </div>
+      <div class="card">
+        <h2>Esikatselu</h2>
+        <div id="form-preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-settings" class="tab-panel" style="display:none;">
+    <div class="card">
+      <label>Sisäinen nimi
+        <input type="text" id="form-name" value="{{ form.name }}" required>
+      </label>
+      <label>Lähetyspainike
+        <input type="text" name="submit_button_text" value="{{ form.submit_button_text }}">
+      </label>
+      <label>Kiitosviesti
+        <input type="text" name="success_message" value="{{ form.success_message }}">
+      </label>
+      <label>Oletusvaihe
+        <select name="default_stage_id">
+          <option value="">—</option>
+          {% for s in stages %}
+          <option value="{{ s.id }}" {% if form.default_stage_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Vastuuhenkilö
+        <select name="default_assigned_to">
+          <option value="">—</option>
+          {% for u in users %}
+          <option value="{{ u.id }}" {% if form.default_assigned_to == u.id %}selected{% endif %}>{{ u.email }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Automaattinen sekvenssi
+        <select name="auto_enroll_sequence_id">
+          <option value="">—</option>
+          {% for seq in sequences %}
+          <option value="{{ seq.id }}" {% if form.auto_enroll_sequence_id == seq.id %}selected{% endif %}>{{ seq.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Ilmoita käyttäjille</label>
+      <div class="event-grid">
+        {% for u in users %}
+        <label><input type="checkbox" name="notify_users" value="{{ u.id }}" {% if u.id in (form.notify_users or []) %}checked{% endif %}> {{ u.email }}</label>
+        {% endfor %}
+      </div>
+      <label style="margin-top:1rem;"><input type="checkbox" name="is_active" value="1" {% if form.is_active %}checked{% endif %}> Lomake aktiivinen</label>
+    </div>
+  </div>
+
+  <div id="panel-embed" class="tab-panel" style="display:none;">
+    <div class="card">
+      <h2>Script-upotus</h2>
+      <textarea readonly rows="6" style="font-family:monospace;font-size:0.85rem;">{{ embed_code.script }}</textarea>
+      <button type="button" class="secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">Kopioi</button>
+      <h2 style="margin-top:1.5rem;">Iframe-upotus</h2>
+      <textarea readonly rows="4" style="font-family:monospace;font-size:0.85rem;">{{ embed_code.iframe }}</textarea>
+      <button type="button" class="secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">Kopioi</button>
+      <p style="margin-top:1rem;"><a href="{{ url_for('forms.iframe_embed', form_token=form.form_token) }}" target="_blank" rel="noopener">Avaa iframe-esikatselu</a></p>
+    </div>
+  </div>
+
+  <button type="submit">Tallenna lomake</button>
+</form>
+
+<script>
+(function() {
+  const FIELD_TYPES = ['text','email','tel','number','textarea','select','checkbox'];
+  let fields = {{ fields_json|safe }};
+
+  const builder = document.getElementById('field-builder');
+  const preview = document.getElementById('form-preview');
+  const fieldsInput = document.getElementById('fields-json');
+  const titleInput = document.getElementById('form-title');
+  const nameInput = document.getElementById('form-name');
+  const nameHidden = document.getElementById('form-name-hidden');
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function renderBuilder() {
+    builder.innerHTML = fields.map((f, i) => {
+      const opts = (f.options || []).join(', ');
+      return `<div class="card" style="padding:0.75rem;margin-bottom:0.75rem;" draggable="true" data-idx="${i}">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+          <span title="Vedä järjestääksesi">☰</span>
+          <input type="text" data-k="label" value="${esc(f.label)}" placeholder="Otsikko" style="flex:1;">
+          <input type="text" data-k="key" value="${esc(f.key)}" placeholder="avain" style="width:120px;">
+          <select data-k="type">${FIELD_TYPES.map(t => `<option value="${t}" ${f.type===t?'selected':''}>${t}</option>`).join('')}</select>
+          <label><input type="checkbox" data-k="required" ${f.required?'checked':''}> Pakollinen</label>
+          <button type="button" class="secondary" data-del="${i}">Poista</button>
+        </div>
+        ${f.type === 'select' ? `<label style="margin-top:0.5rem;">Vaihtoehdot (pilkulla)<input type="text" data-k="options" value="${esc(opts)}"></label>` : ''}
+      </div>`;
+    }).join('');
+
+    builder.querySelectorAll('[data-k]').forEach(el => {
+      el.addEventListener('change', syncFromDom);
+      el.addEventListener('input', syncFromDom);
+    });
+    builder.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => { fields.splice(+btn.dataset.del, 1); render(); });
+    });
+    setupDrag();
+    renderPreview();
+    fieldsInput.value = JSON.stringify(fields);
+  }
+
+  function syncFromDom() {
+    builder.querySelectorAll('[data-idx]').forEach(row => {
+      const i = +row.dataset.idx;
+      const f = fields[i];
+      row.querySelectorAll('[data-k]').forEach(inp => {
+        const k = inp.dataset.k;
+        if (k === 'required') f.required = inp.checked;
+        else if (k === 'options') f.options = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+        else f[k] = inp.value;
+      });
+    });
+    fieldsInput.value = JSON.stringify(fields);
+    renderPreview();
+  }
+
+  function renderPreview() {
+    const title = titleInput.value || 'Lomake';
+    let html = `<h3>${esc(title)}</h3>`;
+    fields.forEach(f => {
+      const req = f.required ? ' *' : '';
+      if (f.type === 'checkbox') {
+        html += `<label style="display:block;margin:0.5rem 0;"><input type="checkbox" disabled> ${esc(f.label)}${req}</label>`;
+      } else {
+        html += `<label style="display:block;margin:0.5rem 0;">${esc(f.label)}${req}</label>`;
+        if (f.type === 'textarea') html += '<textarea disabled rows="3" style="width:100%;"></textarea>';
+        else if (f.type === 'select') html += '<select disabled style="width:100%;"><option>—</option></select>';
+        else html += `<input type="${f.type === 'email' || f.type === 'tel' || f.type === 'number' ? f.type : 'text'}" disabled style="width:100%;">`;
+      }
+    });
+    html += '<button type="button" disabled>Lähetä</button>';
+    preview.innerHTML = html;
+  }
+
+  function setupDrag() {
+    let dragIdx = null;
+    builder.querySelectorAll('[draggable]').forEach(row => {
+      row.addEventListener('dragstart', e => { dragIdx = +row.dataset.idx; e.dataTransfer.effectAllowed = 'move'; });
+      row.addEventListener('dragover', e => { e.preventDefault(); });
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        const targetIdx = +row.dataset.idx;
+        if (dragIdx === null || dragIdx === targetIdx) return;
+        const item = fields.splice(dragIdx, 1)[0];
+        fields.splice(targetIdx, 0, item);
+        render();
+      });
+    });
+  }
+
+  function render() { renderBuilder(); }
+
+  document.getElementById('add-field-btn').addEventListener('click', () => {
+    fields.push({ key: 'field_' + (fields.length + 1), label: 'Uusi kenttä', type: 'text', required: false });
+    render();
+  });
+
+  titleInput.addEventListener('input', renderPreview);
+  nameInput.addEventListener('input', () => { nameHidden.value = nameInput.value; });
+
+  document.querySelectorAll('.tabs a').forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.tabs a').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      ['builder','settings','embed'].forEach(id => {
+        document.getElementById('panel-' + id).style.display = tab.dataset.tab === id ? '' : 'none';
+      });
+    });
+  });
+  if (location.hash === '#embed') {
+    document.querySelector('.tabs a[data-tab="embed"]').click();
+  }
+
+  document.getElementById('form-editor').addEventListener('submit', () => {
+    syncFromDom();
+    nameHidden.value = nameInput.value;
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

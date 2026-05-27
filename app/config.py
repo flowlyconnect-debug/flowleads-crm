@@ -50,6 +50,7 @@ class Config:
 
     LOGIN_RATE_LIMIT = os.environ.get("LOGIN_RATE_LIMIT", "5/minute")
     API_RATE_LIMIT = os.environ.get("API_RATE_LIMIT", "100/hour")
+    FORM_SUBMISSION_RATE_LIMIT = os.environ.get("FORM_SUBMISSION_RATE_LIMIT", "10/hour")
 
     PASSWORD_RESET_SALT = os.environ.get("PASSWORD_RESET_SALT", "password-reset-salt")
     PASSWORD_RESET_MAX_AGE = int(os.environ.get("PASSWORD_RESET_MAX_AGE", 3600))
@@ -119,6 +120,7 @@ class TestingConfig(Config):
     SESSION_PROTECTION = None
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
+    FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")
     SQLALCHEMY_DATABASE_URI = _env_or_default("TEST_DATABASE_URL", "sqlite://")
     AI_ENRICHMENT_ENABLED = _env_or_default("AI_ENRICHMENT_ENABLED", "false").lower() == "true"
     AI_AUTO_ENRICH_ON_CREATE = _env_or_default("AI_AUTO_ENRICH_ON_CREATE", "false").lower() == "true"

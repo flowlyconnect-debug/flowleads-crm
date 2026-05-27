@@ -95,6 +95,9 @@ def dashboard():
 
     open_proposals_count = ProposalService.get_open_count(organization_id)
     accepted_proposals_month = ProposalService.get_accepted_this_month_total(organization_id)
+    from app.forms.services import WebFormService
+
+    form_submissions_today = WebFormService.submissions_today_count(organization_id)
     from app.analytics.currency import currency_symbol, get_default_currency
     from app.analytics.prediction import PredictionService
 
@@ -114,6 +117,7 @@ def dashboard():
         upcoming_meetings=upcoming_meetings,
         open_proposals_count=open_proposals_count,
         accepted_proposals_month=accepted_proposals_month,
+        form_submissions_today=form_submissions_today,
         sales_forecast=forecast,
         high_potential_leads=high_potential,
         org_currency=org_currency,

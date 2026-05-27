@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Lähetykset — {{ form.name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0;">Lähetykset: {{ form.name }}</h1>
+  <a class="btn secondary" href="{{ url_for('forms.edit_form', form_id=form.id, **org_query) }}">← Lomake</a>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aika</th>
+      <th>Nimi</th>
+      <th>Sähköposti</th>
+      <th>Yritys</th>
+      <th>IP</th>
+      <th>Tila</th>
+      <th>Liidi</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in submissions %}
+    {% set data = s.raw_data or {} %}
+    {% set name = ((data.get('first_name') or '') ~ ' ' ~ (data.get('last_name') or '')).strip() or '—' %}
+    <tr class="submission-row" style="cursor:pointer;" data-json="{{ data|tojson|e }}">
+      <td>{{ s.created_at.strftime('%d.%m.%Y %H:%M') if s.created_at else '—' }}</td>
+      <td>{{ name }}</td>
+      <td>{{ data.get('email') or '—' }}</td>
+      <td>{{ data.get('company') or '—' }}</td>
+      <td>{{ s.ip_address or '—' }}</td>
+      <td><span class="badge">{{ s.status }}</span></td>
+      <td>
+        {% if s.lead_id %}
+        <a href="{{ url_for('leads.detail', lead_id=s.lead_id, **org_query) }}" onclick="event.stopPropagation();">#{{ s.lead_id }}</a>
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">Ei lähetyksiä.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="modal-backdrop" id="submission-modal">
+  <div class="modal">
+    <h3>Lähetyksen tiedot</h3>
+    <pre id="submission-detail" style="white-space:pre-wrap;font-size:0.85rem;max-height:360px;overflow:auto;"></pre>
+    <button type="button" class="secondary" id="close-modal">Sulje</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const modal = document.getElementById('submission-modal');
+  const detail = document.getElementById('submission-detail');
+  document.querySelectorAll('.submission-row').forEach(row => {
+    row.addEventListener('click', () => {
+      try {
+        const data = JSON.parse(row.getAttribute('data-json'));
+        detail.textContent = JSON.stringify(data, null, 2);
+      } catch (_) {
+        detail.textContent = row.getAttribute('data-json');
+      }
+      modal.classList.add('open');
+    });
+  });
+  document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+})();
+</script>
+{% endblock %}

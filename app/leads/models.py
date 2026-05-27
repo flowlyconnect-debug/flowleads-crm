@@ -19,7 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
 
 LEAD_STATUSES = ("active", "won", "lost", "archived")
-LEAD_SOURCES = ("n8n", "manual", "import")
+LEAD_SOURCES = ("n8n", "manual", "import", "webform")
 GDPR_CONSENT_SOURCES = ("api", "form", "manual")
 GDPR_LEGAL_BASES = ("consent", "legitimate_interest", "contract")
 AI_ENRICHMENT_STATUSES = ("pending", "processing", "completed", "failed", "disabled")
