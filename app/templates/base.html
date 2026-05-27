@@ -72,6 +72,22 @@
     .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
     .modal-backdrop.open { display: flex; }
     .modal { background: var(--card); padding: 1.5rem; border-radius: 8px; max-width: 480px; width: 90%; }
+    .webhook-provider { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .webhook-provider.slack { background: #4a154b; color: #f5e6ff; }
+    .webhook-provider.teams { background: #464eb8; color: #e8ebff; }
+    .webhook-provider.custom { background: #334155; color: #e2e8f0; }
+    .badge-active { background: #14532d; color: #bbf7d0; }
+    .badge-inactive { background: #475569; color: #cbd5e1; }
+    .badge-delivered { background: #14532d; color: #bbf7d0; }
+    .badge-failed { background: #7f1d1d; color: #fecaca; }
+    .badge-pending { background: #1e3a5f; color: #93c5fd; }
+    .webhook-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+    .webhook-actions form { margin: 0; }
+    .webhook-actions button { margin-top: 0; padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+    .event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin-top: 0.5rem; }
+    .event-grid label { margin-top: 0; font-size: 0.85rem; }
+    select, textarea { width: 100%; padding: 0.6rem; margin-top: 0.25rem; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: var(--text); }
+    #webhook-secret-row { display: none; }
   </style>
 </head>
 <body>
@@ -108,6 +124,10 @@
             </div>
           </div>
         </span>
+        {% if current_user.role in ('admin', 'superadmin') %}
+        &nbsp;|&nbsp;
+        <a href="{{ url_for('settings.webhooks_list', organization_id=request.args.get('organization_id')) if current_user.is_superadmin() and request.args.get('organization_id') else url_for('settings.webhooks_list') }}">Webhooks</a>
+        {% endif %}
         {% if current_user.is_superadmin() %}
         &nbsp;|&nbsp;
         <a href="{{ url_for('analytics.admin_reports') }}">System reports</a>

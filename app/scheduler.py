@@ -122,6 +122,34 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Automation task-overdue job failed")
 
+    def run_webhook_retry_deliveries():
+        with app.app_context():
+            from app.extensions import db
+            from app.webhooks.services import WebhookService
+
+            try:
+                count = WebhookService.retry_pending_deliveries()
+                db.session.commit()
+                if count:
+                    logger.info("Retried %s webhook delivery(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Webhook retry job failed")
+
+    def run_webhook_task_overdue():
+        with app.app_context():
+            from app.extensions import db
+            from app.webhooks.services import WebhookService
+
+            try:
+                count = WebhookService.dispatch_task_overdue_events()
+                db.session.commit()
+                if count:
+                    logger.info("Dispatched %s webhook task.overdue event(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Webhook task.overdue job failed")
+
     def run_monthly_gdpr_retention():
         with app.app_context():
             from app.gdpr.jobs import monthly_gdpr_retention
@@ -224,6 +252,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_automation_task_overdue,
         IntervalTrigger(hours=1),
         id="automation_task_overdue",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_webhook_retry_deliveries,
+        IntervalTrigger(minutes=5),
+        id="webhook_retry_deliveries",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_webhook_task_overdue,
+        IntervalTrigger(hours=1),
+        id="webhook_task_overdue",
         replace_existing=True,
     )
     scheduler.add_job(

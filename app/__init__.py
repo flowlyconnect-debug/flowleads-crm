@@ -86,6 +86,7 @@ def _init_extensions(app):
         from app.calendar import models as calendar_models  # noqa: F401
         from app.proposals import models as proposals_models  # noqa: F401
         from app.analytics import models as analytics_models  # noqa: F401
+        from app.webhooks import models as webhooks_models  # noqa: F401
 
 
 def _register_blueprints(app):

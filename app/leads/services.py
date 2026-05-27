@@ -38,6 +38,21 @@ LEAD_SORT_COLUMNS = {
 }
 
 
+def _safe_dispatch_webhook(event_type: str, payload: dict, organization_id: int, triggered_by=None) -> None:
+    try:
+        from app.webhooks.services import WebhookService
+
+        WebhookService.dispatch(
+            event_type,
+            payload,
+            organization_id,
+            triggered_by=triggered_by,
+        )
+    except Exception:
+        # Webhook failures must never break CRM actions.
+        pass
+
+
 class LeadServiceError(Exception):
     def __init__(self, message: str, code: str = "lead_error"):
         self.message = message
@@ -287,6 +302,28 @@ class LeadService:
             {"lead_id": lead.id},
             organization_id,
         )
+        _safe_dispatch_webhook(
+            "lead.created",
+            {
+                "lead": {
+                    "id": lead.id,
+                    "name": lead.display_name,
+                    "company": lead.company,
+                    "score": lead.score,
+                    "source": lead.source,
+                    "crm_url": f"https://app.flowleads.fi/leads/{lead.id}",
+                }
+            },
+            organization_id,
+            triggered_by={"id": user_id} if user_id else "system",
+        )
+        if lead.assigned_to:
+            _safe_dispatch_webhook(
+                "lead.assigned",
+                {"lead": {"id": lead.id, "assigned_to": lead.assigned_to}},
+                organization_id,
+                triggered_by={"id": user_id} if user_id else "system",
+            )
 
         return lead
 
@@ -300,6 +337,7 @@ class LeadService:
         actor_role: str | None = None,
     ) -> Lead:
         lead = get_lead_for_org(lead_id, organization_id)
+        previous_score = lead.score
         data = normalize_lead_data(data)
 
         if lead.status == "archived":
@@ -433,6 +471,19 @@ class LeadService:
                     },
                     organization_id,
                 )
+                _safe_dispatch_webhook(
+                    "lead.stage_changed",
+                    {
+                        "lead": {
+                            "id": lead.id,
+                            "name": lead.display_name,
+                            "old_stage_id": old_stage.id,
+                            "new_stage_id": new_stage.id,
+                        }
+                    },
+                    organization_id,
+                    triggered_by={"id": user_id} if user_id else "system",
+                )
 
         if "source" in data or "source_ref" in data:
             _check_duplicate_source(
@@ -447,6 +498,44 @@ class LeadService:
             raise LeadServiceError("A lead with this source and reference already exists.", "duplicate_source") from None
 
         if changes:
+            if "assigned_to" in changes and lead.assigned_to:
+                _safe_dispatch_webhook(
+                    "lead.assigned",
+                    {"lead": {"id": lead.id, "assigned_to": lead.assigned_to}},
+                    organization_id,
+                    triggered_by={"id": user_id} if user_id else "system",
+                )
+            if "score" in changes:
+                old_score = previous_score if previous_score is not None else 0
+                new_score = lead.score if lead.score is not None else 0
+                if abs(int(new_score) - int(old_score)) > 10:
+                    _safe_dispatch_webhook(
+                        "lead.score_updated",
+                        {
+                            "lead": {
+                                "id": lead.id,
+                                "name": lead.display_name,
+                                "old_score": previous_score,
+                                "new_score": lead.score,
+                            }
+                        },
+                        organization_id,
+                        triggered_by={"id": user_id} if user_id else "system",
+                    )
+                if int(old_score) < 80 <= int(new_score):
+                    _safe_dispatch_webhook(
+                        "lead.high_score",
+                        {
+                            "lead": {
+                                "id": lead.id,
+                                "name": lead.display_name,
+                                "old_score": previous_score,
+                                "new_score": lead.score,
+                            }
+                        },
+                        organization_id,
+                        triggered_by={"id": user_id} if user_id else "system",
+                    )
             LeadService.log_activity(lead.id, user_id, "updated", metadata={"changes": changes})
             log_audit(
                 "lead_updated",
@@ -517,6 +606,19 @@ class LeadService:
                 "new_stage_id": new_stage.id,
             },
             organization_id,
+        )
+        _safe_dispatch_webhook(
+            "lead.stage_changed",
+            {
+                "lead": {
+                    "id": lead.id,
+                    "name": lead.display_name,
+                    "old_stage_id": old_stage.id,
+                    "new_stage_id": new_stage.id,
+                }
+            },
+            organization_id,
+            triggered_by={"id": user_id} if user_id else "system",
         )
 
         return lead
@@ -731,6 +833,13 @@ class LeadService:
                         lead.id, user_id, "assigned",
                         metadata={"assigned_to": assigned_to},
                     )
+                    if assigned_to:
+                        _safe_dispatch_webhook(
+                            "lead.assigned",
+                            {"lead": {"id": lead.id, "assigned_to": assigned_to}},
+                            organization_id,
+                            triggered_by={"id": user_id} if user_id else "system",
+                        )
             db.session.flush()
             return {"updated": len(leads)}
 

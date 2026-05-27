@@ -76,6 +76,7 @@ class Config:
     DASHBOARD_CACHE_SECONDS = int(os.environ.get("DASHBOARD_CACHE_SECONDS", 300))
 
     CALENDAR_ENCRYPTION_KEY = os.environ.get("CALENDAR_ENCRYPTION_KEY")
+    WEBHOOK_ENCRYPTION_KEY = os.environ.get("WEBHOOK_ENCRYPTION_KEY")
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
     GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
@@ -99,11 +100,19 @@ def _testing_calendar_fernet_key() -> str:
     return Fernet.generate_key().decode("ascii")
 
 
+def _testing_webhook_fernet_key() -> str:
+    from cryptography.fernet import Fernet
+
+    return Fernet.generate_key().decode("ascii")
+
+
 class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     _CALENDAR_TEST_FERNET_KEY = _testing_calendar_fernet_key()
     CALENDAR_ENCRYPTION_KEY = _CALENDAR_TEST_FERNET_KEY
+    _WEBHOOK_TEST_FERNET_KEY = _testing_webhook_fernet_key()
+    WEBHOOK_ENCRYPTION_KEY = _WEBHOOK_TEST_FERNET_KEY
     SERVER_NAME = "localhost"
     PREFERRED_URL_SCHEME = "http"
     WTF_CSRF_ENABLED = False

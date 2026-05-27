@@ -200,6 +200,21 @@ def _fire_sequence_completed_automation(enrollment: EmailSequenceEnrollment, seq
         },
         enrollment.organization_id,
     )
+    try:
+        from app.webhooks.services import WebhookService
+
+        WebhookService.dispatch(
+            "sequence.completed",
+            {
+                "sequence": {"id": sequence.id, "name": sequence.name},
+                "lead": {"id": enrollment.lead_id},
+                "enrollment": {"id": enrollment.id},
+            },
+            enrollment.organization_id,
+            triggered_by="system",
+        )
+    except Exception:
+        pass
 
 
 def _unsubscribe_url(lead_id: int, sequence_id: int) -> str:

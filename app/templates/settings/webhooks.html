@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Webhooks — Asetukset{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Ulospäin menevät webhookit</h1>
+  <p>Ilmoita Slackiin, Microsoft Teamsiin tai omaan järjestelmään, kun CRM:ssä tapahtuu tärkeitä tapahtumia.</p>
+
+  <h2>{{ "Muokkaa endpointia" if editing_endpoint else "Lisää endpoint" }}</h2>
+  <form method="post" action="{{ url_for('settings.webhooks_update', endpoint_id=editing_endpoint.id, **org_query) if editing_endpoint else url_for('settings.webhooks_create', **org_query) }}" id="webhook-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>{{ form.name.label.text }}
+      <input type="text" name="name" maxlength="200" required value="{{ form.name.data or (editing_endpoint.name if editing_endpoint else '') }}">
+    </label>
+    <label>{{ form.provider.label.text }}
+      <select name="provider" id="webhook-provider">
+        {% for value, label in form.provider.choices %}
+        <option value="{{ value }}" {% if (form.provider.data or (editing_endpoint.provider if editing_endpoint else 'slack')) == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label id="webhook-url-label">
+      <span id="webhook-url-label-text">Webhook-URL</span>
+      <input type="url" name="url" maxlength="2000" required placeholder="https://..." value="">
+    </label>
+    <p style="font-size:0.85rem;color:#94a3b8;margin-top:0.25rem;" id="webhook-url-hint">Slack Incoming Webhook URL</p>
+    <div id="webhook-secret-row">
+      <label>Secret (valinnainen, suositeltu custom-endpointille)
+        <input type="password" name="secret" maxlength="1000" autocomplete="new-password" placeholder="{% if editing_endpoint %}Jätä tyhjäksi säilyttääksesi nykyisen{% else %}HMAC-signatuuri{% endif %}">
+      </label>
+    </div>
+    <label style="margin-top:1rem;">
+      <input type="checkbox" name="is_active" value="y" {% if editing_endpoint is none or editing_endpoint.is_active %}checked{% endif %}>
+      Aktiivinen
+    </label>
+
+    <h3>Tapahtumat</h3>
+    {% for group_name, event_names in event_groups.items() %}
+      <fieldset style="margin-top:0.75rem;border:1px solid #334155;border-radius:6px;padding:0.75rem 1rem;">
+        <legend>{{ event_group_labels.get(group_name, group_name) }}</legend>
+        <div class="event-grid">
+          {% for event_name in event_names %}
+          <label>
+            <input type="checkbox" name="events" value="{{ event_name }}"
+              {% if editing_endpoint and event_name in (editing_endpoint.events or []) %}checked{% endif %}>
+            {{ events_catalog[event_name].label }}
+            <span style="color:#64748b;font-size:0.75rem;">({{ event_name }})</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endfor %}
+
+    <details class="provider-guide" data-provider="slack" style="margin-top:1rem;">
+      <summary>Slack-asennusohje</summary>
+      <ol>
+        <li>Mene Slackissa: Apps → Incoming Webhooks</li>
+        <li>Lisää webhook kanavaan</li>
+        <li>Kopioi URL</li>
+        <li>Liitä URL tähän</li>
+      </ol>
+    </details>
+
+    <details class="provider-guide" data-provider="teams" style="margin-top:1rem;">
+      <summary>Teams-asennusohje</summary>
+      <ol>
+        <li>Luo Incoming Webhook -connector Teams-kanavassa</li>
+        <li>Kopioi webhook-URL</li>
+        <li>Liitä URL tähän</li>
+      </ol>
+    </details>
+
+    <button type="submit">{{ "Tallenna" if editing_endpoint else "Luo endpoint" }}</button>
+    {% if editing_endpoint %}
+      <a class="btn secondary" href="{{ url_for('settings.webhooks_list', **org_query) }}">Peruuta</a>
+    {% endif %}
+  </form>
+
+  <h2 style="margin-top:2rem;">Endpointit</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Nimi</th>
+        <th>Palvelu</th>
+        <th>Tapahtumat</th>
+        <th>Tila</th>
+        <th>Viimeksi</th>
+        <th>Onnistui</th>
+        <th>Epäonnistui</th>
+        <th>Toiminnot</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for endpoint in endpoints %}
+      <tr>
+        <td><strong>{{ endpoint.name }}</strong></td>
+        <td>
+          {% if endpoint.provider == 'slack' %}
+          <span class="webhook-provider slack" title="Slack">💬 Slack</span>
+          {% elif endpoint.provider == 'teams' %}
+          <span class="webhook-provider teams" title="Microsoft Teams">👥 Teams</span>
+          {% else %}
+          <span class="webhook-provider custom" title="Custom">🔗 Custom</span>
+          {% endif %}
+        </td>
+        <td><span class="badge">{{ (endpoint.events or [])|length }} tapahtumaa</span></td>
+        <td>
+          {% if endpoint.is_active %}
+          <span class="badge badge-active">Aktiivinen</span>
+          {% else %}
+          <span class="badge badge-inactive">Ei aktiivinen</span>
+          {% endif %}
+        </td>
+        <td>{{ endpoint.last_triggered_at.strftime('%Y-%m-%d %H:%M') if endpoint.last_triggered_at else '—' }}</td>
+        <td>{{ endpoint.success_count }}</td>
+        <td>{{ endpoint.failure_count }}</td>
+        <td>
+          <div class="webhook-actions">
+            <a class="btn secondary" href="{{ url_for('settings.webhooks_edit', endpoint_id=endpoint.id, **org_query) }}">Muokkaa</a>
+            <form method="post" action="{{ url_for('settings.webhooks_test', endpoint_id=endpoint.id, **org_query) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="secondary">Testaa</button>
+            </form>
+            <a class="btn secondary" href="{{ url_for('settings.webhooks_deliveries', endpoint_id=endpoint.id, **org_query) }}">Toimitukset</a>
+            <form method="post" action="{{ url_for('settings.webhooks_delete_post', endpoint_id=endpoint.id, **org_query) }}" onsubmit="return confirm('Poistetaanko endpoint?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="secondary">Poista</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8">Ei webhook-endpointeja. Luo ensimmäinen yllä olevalla lomakkeella.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function() {
+  const provider = document.getElementById('webhook-provider');
+  const secretRow = document.getElementById('webhook-secret-row');
+  const urlLabelText = document.getElementById('webhook-url-label-text');
+  const urlHint = document.getElementById('webhook-url-hint');
+  const guides = document.querySelectorAll('.provider-guide');
+
+  function syncProviderUi() {
+    const p = provider.value;
+    secretRow.style.display = p === 'custom' ? 'block' : 'none';
+    if (p === 'slack') {
+      urlLabelText.textContent = 'Slack Incoming Webhook URL';
+      urlHint.textContent = 'Slack Incoming Webhook URL kanavalta';
+    } else if (p === 'teams') {
+      urlLabelText.textContent = 'Teams Incoming Webhook URL';
+      urlHint.textContent = 'Microsoft Teams Incoming Webhook URL';
+    } else {
+      urlLabelText.textContent = 'Webhook-URL';
+      urlHint.textContent = 'Oma HTTP(S)-endpoint. Custom-payload sisältää HMAC-signatuurin.';
+    }
+    guides.forEach(g => {
+      g.open = g.dataset.provider === p;
+    });
+  }
+
+  provider.addEventListener('change', syncProviderUi);
+  syncProviderUi();
+})();
+</script>
+{% endblock %}

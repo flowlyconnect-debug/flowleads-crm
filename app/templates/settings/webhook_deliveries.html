@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Webhook-toimitukset — Asetukset{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Toimitusloki: {{ endpoint.name }}</h1>
+  <p>
+    {% if endpoint.provider == 'slack' %}
+    <span class="webhook-provider slack">💬 Slack</span>
+    {% elif endpoint.provider == 'teams' %}
+    <span class="webhook-provider teams">👥 Teams</span>
+    {% else %}
+    <span class="webhook-provider custom">🔗 Custom</span>
+    {% endif %}
+    &nbsp;
+    <a href="{{ url_for('settings.webhooks_list', **org_query) }}">← Takaisin endpointeihin</a>
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Tapahtuma</th>
+        <th>Tila</th>
+        <th>HTTP</th>
+        <th>Aika</th>
+        <th>Kesto (ms)</th>
+        <th>Uudelleenyritykset</th>
+        <th>Toiminnot</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for delivery in deliveries %}
+      <tr>
+        <td><code>{{ delivery.event_type }}</code></td>
+        <td>
+          {% if delivery.status == 'delivered' %}
+          <span class="badge badge-delivered">Toimitettu</span>
+          {% elif delivery.status == 'failed' %}
+          <span class="badge badge-failed">Epäonnistui</span>
+          {% else %}
+          <span class="badge badge-pending">Odottaa</span>
+          {% endif %}
+        </td>
+        <td>{{ delivery.response_status or '—' }}</td>
+        <td>{{ delivery.created_at.strftime('%Y-%m-%d %H:%M:%S') if delivery.created_at else '—' }}</td>
+        <td>{{ delivery.duration_ms if delivery.duration_ms is not none else '—' }}</td>
+        <td>{{ delivery.retry_count }}</td>
+        <td>
+          {% if delivery.status != 'delivered' and delivery.retry_count < 1 %}
+          <form method="post" action="{{ url_for('settings.webhooks_retry_delivery', delivery_id=delivery.id, **org_query) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="secondary">Yritä uudelleen</button>
+          </form>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td colspan="7">
+          <details>
+            <summary>Lähetetty payload ja vastaus</summary>
+            <p style="font-size:0.85rem;color:#94a3b8;margin-bottom:0.25rem;">Lähetetty:</p>
+            <pre style="white-space: pre-wrap; background:#0f172a; padding:0.75rem; border-radius:4px; font-size:0.8rem;">{{ delivery.payload | tojson(indent=2) }}</pre>
+            <p style="font-size:0.85rem;color:#94a3b8;margin:0.75rem 0 0.25rem;">Vastaus:</p>
+            <pre style="white-space: pre-wrap; background:#0f172a; padding:0.75rem; border-radius:4px; font-size:0.8rem;">{{ delivery.response_body or '(ei vastausta)' }}</pre>
+          </details>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">Ei toimituksia vielä. Lähetä testi endpointin asetussivulta.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -39,6 +39,20 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _safe_dispatch_webhook(event_type: str, payload: dict, organization_id: int, triggered_by=None) -> None:
+    try:
+        from app.webhooks.services import WebhookService
+
+        WebhookService.dispatch(
+            event_type,
+            payload,
+            organization_id,
+            triggered_by=triggered_by,
+        )
+    except Exception:
+        pass
+
+
 def get_proposal_for_org(proposal_id: int, organization_id: int) -> Proposal:
     proposal = (
         Proposal.query.filter_by(id=proposal_id, organization_id=organization_id)
@@ -414,6 +428,18 @@ class ProposalService:
                 },
                 proposal.organization_id,
             )
+            _safe_dispatch_webhook(
+                "proposal.viewed",
+                {
+                    "proposal": {
+                        "id": proposal.id,
+                        "reference_number": proposal.reference_number,
+                    },
+                    "lead": {"id": proposal.lead_id},
+                },
+                proposal.organization_id,
+                triggered_by="system",
+            )
 
         proposal.updated_at = _utc_now()
         db.session.flush()
@@ -475,6 +501,19 @@ class ProposalService:
                 "total": str(proposal.total),
             },
             proposal.organization_id,
+        )
+        _safe_dispatch_webhook(
+            "proposal.accepted",
+            {
+                "proposal": {
+                    "id": proposal.id,
+                    "reference_number": proposal.reference_number,
+                    "total": str(proposal.total),
+                },
+                "lead": {"id": proposal.lead_id},
+            },
+            proposal.organization_id,
+            triggered_by="system",
         )
 
         ProposalService._move_lead_to_won_if_enabled(proposal)
@@ -587,6 +626,19 @@ class ProposalService:
                 "reason": content,
             },
             proposal.organization_id,
+        )
+        _safe_dispatch_webhook(
+            "proposal.declined",
+            {
+                "proposal": {
+                    "id": proposal.id,
+                    "reference_number": proposal.reference_number,
+                    "reason": content,
+                },
+                "lead": {"id": proposal.lead_id},
+            },
+            proposal.organization_id,
+            triggered_by="system",
         )
         ProposalService._notify_assignee_declined(proposal, content)
         return proposal
