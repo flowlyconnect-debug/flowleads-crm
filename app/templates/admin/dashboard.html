@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Hallintapaneeli — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('admin') }}
+    <div class="settings-content">
+<div class="card settings-panel--wide">
   <h1>Admin dashboard</h1>
   <p>Organizations: {{ stats.organization_count }}</p>
   <p>Users: {{ stats.user_count }}</p>
@@ -35,5 +40,8 @@
   <p>Estimated tokens used: {{ stats.ai_usage.total_tokens }}</p>
   <p>Failed enrichments: {{ stats.ai_usage.failed_count }}</p>
   {% endif %}
+</div>
+    </div>
+  </div>
 </div>
 {% endblock %}

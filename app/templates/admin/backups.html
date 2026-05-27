@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Backups — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Backups — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('backups') }}
+    <div class="settings-content">
+<div class="card settings-panel--wide">
   <h1>Backups</h1>
   <p>Full backups include database dump, email templates, system settings (no secrets), and uploaded files.</p>
 
@@ -37,5 +42,8 @@
   {% else %}
   <p>No backups yet.</p>
   {% endif %}
+</div>
+    </div>
+  </div>
 </div>
 {% endblock %}

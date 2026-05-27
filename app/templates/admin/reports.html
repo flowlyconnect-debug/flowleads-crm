@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% block title %}System reports — FlowLeads{% endblock %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}System reports — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('admin_reports') }}
+    <div class="settings-content">
+<div class="card settings-panel--wide">
   <h1>System reports</h1>
   <p class="ai-meta">Cross-tenant overview. No API key hashes or secrets are shown.</p>
 
@@ -66,5 +71,8 @@
     </tbody>
   </table>
   {% endif %}
+</div>
+    </div>
+  </div>
 </div>
 {% endblock %}
