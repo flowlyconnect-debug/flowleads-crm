@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import settings_nav, empty_state %}
+{% from "_macros.html" import settings_nav with context %}
+{% from "_macros.html" import empty_state %}
 {% block title %}Sähköpostimallit — Asetukset{% endblock %}
 {% block content %}
 <div class="settings-page">
