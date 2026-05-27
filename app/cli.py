@@ -42,6 +42,29 @@ def register_cli(app):
         click.echo(f"Superadmin created: {user.email}")
         click.echo("Complete 2FA setup on first login.")
 
+    @app.cli.command("create-organization")
+    @click.option("--name", default=None, help="Organization display name")
+    @click.option("--slug", default=None, help="URL-safe slug (lowercase, hyphens)")
+    @with_appcontext
+    def create_organization_cmd(name, slug):
+        """Create an organization (seeds default pipeline stages and automations)."""
+        if not name:
+            name = click.prompt("Organization name")
+        if not slug:
+            slug = click.prompt("Slug (e.g. acme-corp)")
+
+        from app.users.services import UserServiceError, create_organization
+
+        try:
+            org = create_organization(name, slug)
+            db.session.commit()
+        except UserServiceError as exc:
+            db.session.rollback()
+            click.echo(exc.message, err=True)
+            sys.exit(1)
+
+        click.echo(f"Organization created: {org.name} (id={org.id}, slug={org.slug})")
+
     @app.cli.command("backup-create")
     @with_appcontext
     def backup_create():

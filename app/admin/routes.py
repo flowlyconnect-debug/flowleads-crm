@@ -5,6 +5,7 @@ from app.admin.services import get_accessible_organizations, get_dashboard_stats
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
+from app.users.services import UserServiceError, create_organization
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -15,7 +16,29 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 @require_2fa
 def dashboard():
     stats = get_dashboard_stats()
-    return render_template("admin/dashboard.html", stats=stats)
+    organizations = get_accessible_organizations()
+    return render_template(
+        "admin/dashboard.html",
+        stats=stats,
+        organizations=organizations,
+    )
+
+
+@admin_bp.route("/organizations", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def create_organization_route():
+    name = request.form.get("name", "").strip()
+    slug = request.form.get("slug", "").strip().lower()
+    try:
+        org = create_organization(name, slug)
+        db.session.commit()
+        flash(f"Organisaatio luotu: {org.name}", "success")
+    except UserServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/api-keys", methods=["GET"])

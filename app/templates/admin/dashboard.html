@@ -5,6 +5,30 @@
   <h1>Admin dashboard</h1>
   <p>Organizations: {{ stats.organization_count }}</p>
   <p>Users: {{ stats.user_count }}</p>
+
+  {% if current_user.is_superadmin() %}
+  <h2 style="margin-top:1.5rem;">Organisaatiot</h2>
+  {% if organizations %}
+  <ul>
+    {% for org in organizations %}
+    <li>{{ org.name }} ({{ org.slug }})</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>Ei organisaatioita vielä. Luo ensimmäinen organisaatio alla.</p>
+  {% endif %}
+  <h3 style="margin-top:1rem;">Luo organisaatio</h3>
+  <form method="post" action="{{ url_for('admin.create_organization_route') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Nimi
+      <input type="text" name="name" maxlength="255" required placeholder="Acme Oy">
+    </label>
+    <label>Slug
+      <input type="text" name="slug" maxlength="120" required placeholder="acme-oy" pattern="[a-z0-9]+(?:-[a-z0-9]+)*">
+    </label>
+    <button type="submit">Luo organisaatio</button>
+  </form>
+  {% endif %}
   {% if stats.ai_usage %}
   <h2 style="margin-top:1.5rem;">AI enrichment usage</h2>
   <p>Total enrichments: {{ stats.ai_usage.total_enrichments }}</p>

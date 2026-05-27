@@ -68,8 +68,22 @@ def block_api_client():
 @require_role(*UI_ROLES)
 @require_2fa
 def dashboard():
+    from flask import current_app
+
     organization_id = _optional_organization_id()
     organizations = get_accessible_organizations() if current_user.is_superadmin() else []
+
+    try:
+        current_app.logger.info(
+            "dashboard_debug: user_id=%s role=%s org_id=%s org_count=%s",
+            getattr(current_user, "id", None),
+            getattr(current_user, "role", None),
+            getattr(current_user, "organization_id", None),
+            len(organizations),
+        )
+    except Exception:
+        # Best-effort debug logging; ignore all errors.
+        pass
 
     if organization_id is None:
         return render_template(
