@@ -4,10 +4,11 @@
 <div class="card">
   <h1>API keys (all organizations)</h1>
 
-  {% if new_key %}
+  {% if has_pending_key %}
   <div class="flash warning">
     <strong>Copy this API key now — it will not be shown again:</strong><br>
-    <code style="word-break: break-all;">{{ new_key }}</code>
+    <button type="button" class="btn btn-secondary btn-sm mt-2" id="admin-reveal-api-key-btn">Show and copy API key</button>
+    <code style="word-break: break-all;display:none;" id="admin-revealed-api-key"></code>
   </div>
   {% endif %}
 
@@ -69,4 +70,32 @@
     </tbody>
   </table>
 </div>
+{% if has_pending_key %}
+<script>
+  (function () {
+    const btn = document.getElementById("admin-reveal-api-key-btn");
+    const output = document.getElementById("admin-revealed-api-key");
+    if (!btn || !output) return;
+    btn.addEventListener("click", async function () {
+      const form = new FormData();
+      form.append("csrf_token", "{{ csrf_token() }}");
+      const resp = await fetch("{{ url_for('admin.reveal_latest_api_key') }}", {
+        method: "POST",
+        body: form,
+        credentials: "same-origin",
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success || !data.data || !data.data.api_key) {
+        window.alert((data && data.error) || "Failed to load API key.");
+        return;
+      }
+      output.textContent = data.data.api_key;
+      output.style.display = "block";
+      await navigator.clipboard.writeText(data.data.api_key);
+      btn.disabled = true;
+      btn.textContent = "Copied";
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

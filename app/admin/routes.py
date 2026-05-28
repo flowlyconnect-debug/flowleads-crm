@@ -1,4 +1,7 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+import secrets
+import time
+
+from flask import Blueprint, jsonify, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.admin.services import get_accessible_organizations, get_dashboard_stats
@@ -8,6 +11,54 @@ from app.extensions import db
 from app.users.services import UserServiceError, create_organization
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+_PENDING_ADMIN_API_KEYS_SESSION = "pending_admin_api_keys"
+_PENDING_ADMIN_API_KEY_TTL_SECONDS = 15 * 60
+
+
+def _store_pending_admin_api_key(organization_id: int, full_key: str) -> None:
+    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
+    token = secrets.token_urlsafe(24)
+    pending[token] = {
+        "organization_id": int(organization_id),
+        "full_key": full_key,
+        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
+    }
+    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
+    session.modified = True
+
+
+def _pending_admin_api_key_exists() -> bool:
+    now = int(time.time())
+    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
+    changed = False
+    exists = False
+    for token, entry in list(pending.items()):
+        if int(entry.get("expires_at", 0)) < now:
+            pending.pop(token, None)
+            changed = True
+            continue
+        exists = True
+    if changed:
+        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
+        session.modified = True
+    return exists
+
+
+def _consume_pending_admin_api_key() -> str | None:
+    now = int(time.time())
+    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
+    for token, entry in list(pending.items()):
+        if int(entry.get("expires_at", 0)) < now:
+            pending.pop(token, None)
+            continue
+        full_key = str(entry.get("full_key", "")).strip()
+        pending.pop(token, None)
+        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
+        session.modified = True
+        return full_key or None
+    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
+    session.modified = True
+    return None
 
 
 @admin_bp.route("/dashboard")
@@ -48,12 +99,11 @@ def create_organization_route():
 def api_keys():
     keys = list_api_keys()
     organizations = get_accessible_organizations()
-    new_key = request.args.get("new_key")
     return render_template(
         "admin/api_keys.html",
         keys=keys,
         organizations=organizations,
-        new_key=new_key,
+        has_pending_key=_pending_admin_api_key_exists(),
     )
 
 
@@ -87,7 +137,19 @@ def create_api_key_route():
         flash(exc.message, "danger")
         return redirect(url_for("admin.api_keys"))
 
-    return redirect(url_for("admin.api_keys", new_key=full_key))
+    _store_pending_admin_api_key(organization_id, full_key)
+    return redirect(url_for("admin.api_keys"))
+
+
+@admin_bp.route("/api-keys/reveal-latest", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def reveal_latest_api_key():
+    full_key = _consume_pending_admin_api_key()
+    if not full_key:
+        return jsonify({"success": False, "error": "No pending API key available."}), 404
+    return jsonify({"success": True, "data": {"api_key": full_key}})
 
 
 @admin_bp.route("/predictions/run-batch", methods=["POST"])

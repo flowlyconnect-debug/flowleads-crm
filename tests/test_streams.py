@@ -74,10 +74,11 @@ def test_lead_stream_routing(app):
         db.session.flush()
         previous = stream.last_lead_at
         LeadStreamService.apply_stream_to_lead(lead, stream)
+        LeadStreamService.apply_stream_to_lead(lead, stream)
         db.session.commit()
 
         assert set(lead.tags) == {"existing", "saas", "b2b"}
-        assert stream.lead_count == 1
+        assert stream.lead_count == 2
         assert stream.last_lead_at is not None
         assert stream.last_lead_at != previous
 

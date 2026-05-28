@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.audit import log_audit
 from app.core.permissions import require_role
 from app.extensions import db
+from app.api.models import APIKey
 from app.leads.models import LeadStream, PipelineStage
 from app.streams.services import StreamHealthService
 from app.users.models import User
@@ -29,6 +30,14 @@ def _org_query() -> dict:
     if current_user.is_superadmin() and request.args.get("organization_id"):
         return {"organization_id": request.args.get("organization_id")}
     return {}
+
+
+def _format_user_label(user: User) -> str:
+    local_part = (user.email or "").split("@")[0].strip()
+    parts = [p for p in local_part.replace(".", " ").replace("_", " ").split(" ") if p]
+    if not parts:
+        return user.email
+    return " ".join(part.capitalize() for part in parts)
 
 
 def register_stream_settings_routes(settings_bp):
@@ -84,7 +93,6 @@ def register_stream_settings_routes(settings_bp):
                 "name": (request.form.get("name") or "").strip(),
                 "source_match": (request.form.get("source_match") or "").strip() or None,
                 "segment_key": (request.form.get("segment_key") or "").strip() or None,
-                "priority": int(request.form.get("priority") or 10),
                 "pipeline_stage_id": int(request.form["pipeline_stage_id"])
                 if request.form.get("pipeline_stage_id")
                 else None,
@@ -103,7 +111,14 @@ def register_stream_settings_routes(settings_bp):
                 target_id = stream.id
                 flash("Liidivirta paivitetty.", "success")
             else:
+                next_priority = (
+                    db.session.query(db.func.max(LeadStream.priority))
+                    .filter_by(organization_id=organization_id)
+                    .scalar()
+                    or 0
+                ) + 1
                 stream = LeadStream(organization_id=organization_id, **data)
+                stream.priority = next_priority
                 db.session.add(stream)
                 db.session.flush()
                 action_name = "stream_created"
@@ -153,6 +168,12 @@ def register_stream_settings_routes(settings_bp):
             .order_by(User.email.asc())
             .all()
         )
+        api_key = (
+            APIKey.query.filter_by(organization_id=organization_id, is_active=True)
+            .order_by(APIKey.created_at.asc())
+            .first()
+        )
+        user_display_map = {user.id: _format_user_label(user) for user in users}
         try:
             stale_ids = {s.id for s in StreamHealthService.get_stale_streams(organization_id)}
         except SQLAlchemyError:
@@ -170,4 +191,46 @@ def register_stream_settings_routes(settings_bp):
             org_query=org_query,
             editing_stream=editing_stream,
             migration_needed=migration_needed,
+            org_api_key=api_key,
+            user_display_map=user_display_map,
         )
+
+    @settings_bp.route("/streams/reorder", methods=["POST"])
+    @login_required
+    @require_role("admin", "superadmin")
+    def reorder_streams():
+        organization_id = _scope_org_id()
+        payload = request.get_json(silent=True) or {}
+        order = payload.get("order")
+        if not isinstance(order, list):
+            return jsonify({"success": False, "error": "Invalid order payload"}), 400
+
+        ids = []
+        for item in order:
+            try:
+                ids.append(int(item))
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "Invalid stream id"}), 400
+        if not ids:
+            return jsonify({"success": True})
+
+        streams = LeadStream.query.filter(
+            LeadStream.organization_id == organization_id,
+            LeadStream.id.in_(ids),
+        ).all()
+        if len(streams) != len(set(ids)):
+            return jsonify({"success": False, "error": "Stream not found"}), 404
+
+        stream_by_id = {stream.id: stream for stream in streams}
+        for index, stream_id in enumerate(ids, start=1):
+            stream_by_id[stream_id].priority = index
+
+        log_audit(
+            "stream_updated",
+            user_id=current_user.id,
+            organization_id=organization_id,
+            target_type="lead_stream",
+            metadata={"action": "reorder", "order": ids},
+        )
+        db.session.commit()
+        return jsonify({"success": True})

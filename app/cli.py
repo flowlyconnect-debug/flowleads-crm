@@ -182,8 +182,8 @@ def register_cli(app):
             sys.exit(1)
         streams = LeadStream.query.filter_by(organization_id=org.id).all()
         for stream in streams:
-            status = "Y" if stream.is_active else "N"
+            status = "✓" if stream.is_active else "✗"
             click.echo(
-                f"{status} [{stream.priority}] {stream.name} - "
+                f"{status} [{stream.priority}] {stream.name} — "
                 f"source:{stream.source_match} key:{stream.segment_key} leads:{stream.lead_count}"
             )

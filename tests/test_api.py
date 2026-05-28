@@ -428,7 +428,7 @@ def test_admin_can_create_own_org_key(client, app):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"fl_test_" in response.data or b"Copy this API key" in response.data
+    assert b"Kopioi avain nyt" in response.data or b"Nayta ja kopioi API-avain" in response.data
     with app.app_context():
         assert AuditLog.query.filter_by(action="api_key_created").count() >= 1
 
@@ -479,7 +479,7 @@ def test_superadmin_create_key_after_2fa(client, app):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Copy this API key" in response.data
+    assert b"Copy this API key now" in response.data or b"Show and copy API key" in response.data
 
 
 def test_full_key_shown_only_once(client, app):
@@ -493,8 +493,8 @@ def test_full_key_shown_only_once(client, app):
         data={"name": "once"},
         follow_redirects=True,
     )
-    assert b"fl_test_" in first.data
-    second = client.get("/settings/api-keys")
+    assert b"Kopioi avain nyt" in first.data or b"Nayta ja kopioi API-avain" in first.data
+    second = client.get("/settings/api-keys", follow_redirects=True)
     assert b"Copy this API key now" not in second.data
 
 

@@ -304,7 +304,7 @@ class EmailService:
             "</tr>"
             for item in stale_streams
         )
-        subject = f"\u26a0 Liidivirta ei ole vastaanottanut liideja - {org_name}"
+        subject = f"\u26a0 Liidivirta ei ole vastaanottanut liideja — {org_name}"
         body_html = (
             "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
             "<h2 style='color:#B45309;'>Varoitus: liidivirran aktiivisuus</h2>"
