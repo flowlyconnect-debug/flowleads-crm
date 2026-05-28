@@ -2,6 +2,7 @@
 {% from "_macros.html" import empty_state %}
 {% block title %}Tarjoukset — FlowLeads{% endblock %}
 {% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 <div class="list-page">
   <header class="page-header">
     <div class="page-header__main">
@@ -25,41 +26,105 @@
     </label>
   </form>
 
-  <div class="card">
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Viite</th>
-            <th>Liidi</th>
-            <th>Otsikko</th>
-            <th>Summa</th>
-            <th>Tila</th>
-            <th>Lähetetty</th>
-            <th>Voimassa</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in proposals %}
-          <tr class="{% if p.valid_until and p.status in ('sent','viewed') and p.valid_until <= warn_date %}proposal-row--warn{% endif %}">
-            <td><a href="{{ url_for('proposals.edit_proposal', proposal_id=p.id, **org_query) }}">{{ p.reference_number }}</a></td>
-            <td>{{ p.lead_name_snapshot or (p.lead.display_name if p.lead else '—') }}</td>
-            <td>{{ p.title }}</td>
-            <td>{{ p.total }} {{ p.currency }}</td>
-            <td><span class="badge">{{ p.status }}</span></td>
-            <td>{{ p.sent_at.strftime('%Y-%m-%d') if p.sent_at else '—' }}</td>
-            <td>{{ p.valid_until or '—' }}</td>
-            <td><a class="btn btn-ghost btn-sm" href="{{ url_for('proposals.edit_proposal', proposal_id=p.id, **org_query) }}">Avaa</a></td>
-          </tr>
+  <div class="proposal-cards-grid">
+    {% for proposal in proposals %}
+    {% set company_name = proposal.lead_company_snapshot or (proposal.lead.company if proposal.lead else proposal.lead_name_snapshot) or '—' %}
+    {% set status_rank = {'draft': 0, 'sent': 1, 'viewed': 2, 'accepted': 3, 'declined': 3, 'expired': 3}.get(proposal.status, 0) %}
+    {% set view_count = proposal.opened_count or (1 if proposal.viewed_at else 0) %}
+    <div class="proposal-card" {% if proposal.viewed_at %}data-viewed-at="{{ proposal.viewed_at.isoformat() }}"{% endif %}>
+      {% if proposal.viewed_at %}
+      <div class="proposal-hot-banner" hidden>
+        <span class="proposal-hot-pulse"></span>
+        Avattu äskettäin — ota yhteyttä nyt!
+      </div>
+      {% endif %}
+
+      <div class="proposal-card-header">
+        <div>
+          <div class="proposal-ref">{{ proposal.reference_number }}</div>
+          <div class="proposal-company">{{ company_name }}</div>
+        </div>
+        <div class="proposal-value">€{{ '{:,.0f}'.format(proposal.total).replace(',', ' ') }}</div>
+      </div>
+
+      <div class="proposal-timeline">
+        {% set steps = [('draft','Luotu'),('sent','Lähetetty'),('viewed','Avattu'),('accepted','Hyväksytty')] %}
+        {% for step_key, step_label in steps %}
+        <div class="proposal-timeline-step{% if proposal.status == step_key %} active{% elif status_rank > loop.index0 %} done{% endif %}">
+          <div class="proposal-timeline-dot"></div>
+          <div class="proposal-timeline-label">{{ step_label }}</div>
+        </div>
+        {% if not loop.last %}
+        <div class="proposal-timeline-line {% if status_rank > loop.index0 %}done{% endif %}"></div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if view_count > 0 %}
+      <div class="proposal-view-signal">
+        👁 Avattu <strong>{{ view_count }}x</strong>
+        {% if proposal.viewed_at %} · viimeksi {{ proposal.viewed_at.strftime('%d.%m. %H:%M') }}{% endif %}
+        {% if view_count >= 3 %}<span class="badge badge-warning" style="margin-left:6px;">Korkea kiinnostus</span>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="proposal-card-footer">
+        <span class="badge">{{ proposal.status }}</span>
+        <div style="display:flex;gap:8px;">
+          {% if proposal.status == 'draft' %}
+          <a href="{{ url_for('proposals.edit_proposal', proposal_id=proposal.id, **org_query) }}" class="btn btn-secondary btn-sm">Muokkaa</a>
+          <button onclick="sendProposal({{ proposal.id }})" class="btn btn-primary btn-sm">Lähetä →</button>
+          {% elif proposal.status == 'sent' or proposal.status == 'viewed' %}
+          {% if proposal.lead %}
+          <a href="{{ url_for('leads.detail', lead_id=proposal.lead.id, **org_query) }}" class="btn btn-secondary btn-sm">Avaa liidi</a>
+          {% endif %}
           {% else %}
-          <tr><td colspan="8">
-            {% call empty_state('Ei tarjouksia', 'Luo tarjous liidiprofiilista.') %}{% endcall %}
-          </td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('proposals.edit_proposal', proposal_id=proposal.id, **org_query) }}">Avaa</a>
+          {% endif %}
+        </div>
+      </div>
     </div>
+    {% else %}
+    <div class="report-card">
+      <div class="report-card__body">
+        {% call empty_state('Ei tarjouksia', 'Luo tarjous liidiprofiilista.') %}{% endcall %}
+      </div>
+    </div>
+    {% endfor %}
   </div>
 </div>
+<script>
+const proposalOrgQuery = {{ org_query|tojson }};
+function proposalOrgQueryString() {
+  var p = new URLSearchParams();
+  if (proposalOrgQuery.organization_id) p.set('organization_id', proposalOrgQuery.organization_id);
+  var s = p.toString();
+  return s ? ('?' + s) : '';
+}
+function sendProposal(proposalId) {
+  var token = document.getElementById('csrf-token') && document.getElementById('csrf-token').value;
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/proposals/' + proposalId + '/send' + proposalOrgQueryString();
+  var csrf = document.createElement('input');
+  csrf.type = 'hidden';
+  csrf.name = 'csrf_token';
+  csrf.value = token || '';
+  form.appendChild(csrf);
+  document.body.appendChild(form);
+  form.submit();
+}
+document.querySelectorAll('.proposal-card[data-viewed-at]').forEach(function(card) {
+  var viewedAt = card.getAttribute('data-viewed-at');
+  if (!viewedAt) return;
+  var viewedTime = new Date(viewedAt).getTime();
+  if (!viewedTime) return;
+  var diffHours = (Date.now() - viewedTime) / 36e5;
+  if (diffHours < 24) {
+    card.classList.add('proposal-hot');
+    var banner = card.querySelector('.proposal-hot-banner');
+    if (banner) banner.hidden = false;
+  }
+});
+</script>
 {% endblock %}

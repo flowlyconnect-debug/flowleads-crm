@@ -82,36 +82,75 @@
     {% endif %}
   </form>
 
-  <div class="tasks-board" role="list">
-    {% for task in tasks %}
-    <article class="task-card{% if task.is_overdue and task.status != 'completed' %} task-card--overdue{% endif %}{% if task.status == 'completed' %} task-card--done{% endif %}"
-             role="listitem" data-task-id="{{ task.id }}">
-      <div class="task-card__check">
-        {% if task.status != 'completed' %}
-        <input type="checkbox" class="task-complete-cb" aria-label="Merkitse valmiiksi: {{ task.title }}"
-               data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">
-        {% else %}
-        <span class="text-success" aria-hidden="true">✓</span>
+  {% set open_tasks = tasks | selectattr('status', 'ne', 'completed') | list %}
+  {% set focus_task = open_tasks[0] if open_tasks else none %}
+  {% set queued_tasks = open_tasks[1:] if open_tasks|length > 1 else [] %}
+
+  <section class="focus-card{% if focus_task and focus_task.is_overdue %} focus-overdue{% elif focus_task and tab == 'today' %} focus-today{% endif %}">
+    {% if focus_task %}
+    <div class="focus-card-label">
+      {% if focus_task.is_overdue %}⚠ MYÖHÄSSÄ{% else %}▶ TEE SEURAAVAKSI{% endif %}
+    </div>
+    <div class="focus-card-title">{{ focus_task.title }}</div>
+    <div class="focus-card-meta">
+      {% if focus_task.lead %}
+      <a href="#" onclick="openLeadDrawer({{ focus_task.lead.id }});return false;" class="focus-lead-link">{{ focus_task.lead.company or focus_task.lead.display_name }}</a>
+      {% endif %}
+      {% if focus_task.due_date %} · {{ focus_task.due_date.strftime('%d.%m. klo %H:%M') }}{% endif %}
+    </div>
+    <div class="focus-card-actions">
+      <button class="btn btn-primary"
+              data-complete-url="{{ url_for('tasks.complete_task', task_id=focus_task.id, **org_query) }}"
+              onclick="completeTask({{ focus_task.id }}, this, true)">
+        ✓ Merkitse valmiiksi
+      </button>
+      <a href="{{ url_for('tasks.list_tasks', tab=tab, type=request.args.get('type'), priority=request.args.get('priority'), assigned_to=request.args.get('assigned_to'), **org_query) }}" class="btn btn-secondary">
+        ⏰ Siirrä 1h
+      </a>
+      {% if focus_task.lead %}
+      <a href="{{ url_for('email.compose', lead_id=focus_task.lead.id, **org_query) }}" class="btn btn-secondary">✉ Sähköposti</a>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="focus-card-empty">
+      <span class="focus-card-empty-icon" aria-hidden="true">🎉</span>
+      <div class="focus-card-title focus-card-title--empty">Kaikki tehtävät hoidettu!</div>
+      <div class="focus-card-meta">Loistavaa työtä. Tänään ei ole avoimia tehtäviä.</div>
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="task-queue" role="list">
+    {% for task in queued_tasks %}
+    <div class="task-queue-item priority-{{ task.priority }}" data-task-id="{{ task.id }}" role="listitem">
+      <button class="task-check"
+              data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"
+              onclick="completeTask({{ task.id }}, this)"
+              title="Merkitse valmiiksi">○</button>
+      <div class="task-queue-content">
+        <div class="task-queue-title">{{ task.title }}</div>
+        <div class="task-queue-meta">
+          {% if task.lead %}<span class="task-lead">{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
+          <span class="task-type-dot task-{{ task.type }}"></span>
+          <span class="task-due {% if task.is_overdue %}overdue{% endif %}">
+            {% if task.is_overdue %}
+            ⚠ Myöhässä
+            {% elif tab == 'today' and task.due_date %}
+            Tänään {{ task.due_date.strftime('%H:%M') }}
+            {% else %}
+            {{ task.due_date.strftime('%d.%m.') if task.due_date else '' }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="task-queue-actions">
+        {% if task.lead %}
+        <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}" class="task-action-link" title="Avaa liidi">→</a>
         {% endif %}
       </div>
-      <div class="task-card__body">
-        <div class="task-card__row">
-          <span class="task-priority-dot task-priority-dot--{{ task.priority }}" title="{{ task.priority }}"></span>
-          <span class="task-card__title">{{ task.title }}</span>
-          <span class="badge priority-{{ task.priority }}">{{ task.priority }}</span>
-        </div>
-        <div class="task-card__meta">
-          {% if task.lead %}
-          <a href="{{ url_for('leads.detail', lead_id=task.lead_id, **org_query) }}" class="task-lead-pill">{{ task.lead.display_name }}</a>
-          {% endif %}
-          <span class="task-card__due{% if task.is_overdue and task.status != 'completed' %} task-card__due--overdue{% endif %}">
-            {% if task.due_date %}{{ task.due_date.strftime('%d.%m. %H:%M') }}{% else %}Ei eräpäivää{% endif %}
-          </span>
-          <span class="badge">{{ task.type }}</span>
-        </div>
-      </div>
-    </article>
+    </div>
     {% else %}
+    {% if not focus_task %}
     <div class="report-card">
       <div class="report-card__body">
         {% if tab == 'today' %}
@@ -123,38 +162,48 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}
     {% endfor %}
   </div>
 </div>
 
 <script>
-document.querySelectorAll('.task-complete-cb').forEach(function(cb) {
-  cb.addEventListener('change', async function() {
-    if (!cb.checked) return;
-    var url = cb.dataset.completeUrl;
-    var token = document.getElementById('csrf-token') && document.getElementById('csrf-token').value;
-    try {
-      var res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRFToken': token || ''
-        },
-        credentials: 'same-origin'
+function completeTask(taskId, btn, isFocus) {
+  var url = btn.getAttribute('data-complete-url') || ('/tasks/' + taskId + '/complete');
+  var token = document.getElementById('csrf-token') && document.getElementById('csrf-token').value;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'X-CSRFToken': token || ''
+    },
+    credentials: 'same-origin'
+  })
+    .then(function(res) {
+      return res.json().then(function(data) {
+        return { ok: res.ok, data: data };
       });
-      if (res.ok) {
-        var card = cb.closest('.task-card');
-        if (card) {
-          card.classList.add('task-card--done');
-          cb.disabled = true;
+    })
+    .then(function(result) {
+      if (!result.ok || !result.data.success) return;
+      if (isFocus) {
+        var focusCard = document.querySelector('.focus-card');
+        if (focusCard) {
+          focusCard.classList.add('task-queue-item--completing');
         }
-      } else {
-        cb.checked = false;
+        setTimeout(function() {
+          window.location.reload();
+        }, 320);
+        return;
       }
-    } catch (e) {
-      cb.checked = false;
-    }
-  });
-});
+      var item = btn.closest('.task-queue-item');
+      if (!item) return;
+      item.classList.add('task-queue-item--completing');
+      setTimeout(function() {
+        item.remove();
+      }, 320);
+    })
+    .catch(function() {});
+}
 </script>
 {% endblock %}

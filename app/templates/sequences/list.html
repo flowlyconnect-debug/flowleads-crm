@@ -14,54 +14,58 @@
     </div>
   </header>
 
-  <div class="card">
-    <div class="table-wrap">
-    <table>
-    <thead>
-      <tr>
-        <th>Nimi</th>
-        <th>Tila</th>
-        <th>Laukaisin</th>
-        <th>Ilmoittautuneet</th>
-        <th>Aktiiviset</th>
-        <th>Valmiit</th>
-        <th>Peruutukset</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in sequences %}
-      {% set seq = row.sequence %}
-      {% set c = row.counts %}
-      <tr>
-        <td><a href="{{ url_for('sequences.sequence_builder', sequence_id=seq.id, **org_query) }}">{{ seq.name }}</a></td>
-        <td>
-          {% if seq.is_active %}
-          <span class="badge badge-active-status">Aktiivinen</span>
-          {% else %}
-          <span class="badge">Ei aktiivinen</span>
-          {% endif %}
-        </td>
-        <td>{{ row.trigger_label }}</td>
-        <td>{{ c.enrolled }}</td>
-        <td>{{ c.active }}</td>
-        <td>{{ c.completed }}</td>
-        <td>{{ c.unsubscribed }}</td>
-        <td>
-          <a href="{{ url_for('sequences.sequence_builder', sequence_id=seq.id, **org_query) }}">Muokkaa</a>
-          &nbsp;|&nbsp;
-          <a href="{{ url_for('sequences.sequence_stats_page', sequence_id=seq.id, **org_query) }}">Tilastot</a>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="8">
-        {% call empty_state('Ei sekvenssjä', 'Luo ensimmäinen sekvenssi.') %}{% endcall %}
-      </td></tr>
+  {% for row in sequences %}
+  {% set seq = row.sequence %}
+  {% set c = row.counts %}
+  {% set steps = seq.steps | sort(attribute='order_index') %}
+  {% set step_open_rate = ((c.completed or 0) * 100 / (c.enrolled or 1)) | round | int if (c.enrolled or 0) > 0 else none %}
+  <div class="sequence-card">
+    <div class="sequence-card-header">
+      <div>
+        <div class="sequence-name">{{ seq.name }}</div>
+        <div class="sequence-meta">{{ steps|length }} askelta · {{ c.active or 0 }} aktiivista</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label class="toggle-switch">
+          <input type="checkbox" {% if seq.is_active %}checked{% endif %} onchange="toggleSequence({{ seq.id }}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <a href="{{ url_for('sequences.sequence_builder', sequence_id=seq.id, **org_query) }}" class="btn btn-secondary btn-sm">Muokkaa</a>
+      </div>
+    </div>
+
+    <div class="sequence-flow">
+      <div class="sequence-trigger">
+        <span class="seq-trigger-icon">⚡</span>
+        <span class="seq-trigger-label">{{ row.trigger_label }}</span>
+      </div>
+      {% for step in steps %}
+      <div class="seq-arrow">→</div>
+      <div class="sequence-step-pill {% if step_open_rate is not none and step_open_rate > 50 %}step-hot{% elif step_open_rate is not none and step_open_rate < 20 %}step-cold{% endif %}"
+           title="Avausprosentti: {{ step_open_rate or 0 }}%">
+        <div class="step-pill-delay">+{{ step.delay_days }}pv{% if step.delay_hours %} {{ step.delay_hours }}h{% endif %}</div>
+        <div class="step-pill-subject">{{ step.subject_template[:25] }}{% if step.subject_template|length > 25 %}...{% endif %}</div>
+        {% if step_open_rate is not none %}
+        <div class="step-pill-rate">{{ step_open_rate }}% auki</div>
+        {% endif %}
+      </div>
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+
+    <div class="sequence-stats-row">
+      <div class="seq-stat"><span class="seq-stat-num">{{ c.enrolled or 0 }}</span><span class="seq-stat-label">Ilmoittautuneita</span></div>
+      <div class="seq-stat"><span class="seq-stat-num">{{ c.active or 0 }}</span><span class="seq-stat-label">Aktiivisia</span></div>
+      <div class="seq-stat"><span class="seq-stat-num">{{ step_open_rate if step_open_rate is not none else 0 }}%</span><span class="seq-stat-label">Avausprosentti</span></div>
+      <div class="seq-stat"><span class="seq-stat-num text-success">{{ c.completed or 0 }}</span><span class="seq-stat-label">Valmistunut</span></div>
     </div>
   </div>
+  {% else %}
+  <div class="report-card">
+    <div class="report-card__body">
+      {% call empty_state('Ei sekvenssjä', 'Luo ensimmäinen sekvenssi.') %}{% endcall %}
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
 <div class="modal-backdrop" id="new-sequence-modal" aria-hidden="true">
@@ -164,5 +168,17 @@ document.getElementById('new-sequence-form')?.addEventListener('submit', async e
     errEl.classList.remove('hidden');
   }
 });
+async function toggleSequence(sequenceId, isActive) {
+  try {
+    await fetch('/sequences/' + sequenceId + orgQueryString(), {
+      method: 'PUT',
+      headers: csrfHeaders(),
+      body: JSON.stringify({ is_active: !!isActive }),
+      credentials: 'same-origin',
+    });
+  } catch {
+    window.location.reload();
+  }
+}
 </script>
 {% endblock %}
