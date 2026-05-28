@@ -1,4 +1,5 @@
 from flask import Blueprint, g, request
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.auth import require_api_key
 from app.api.rate_limit import api_rate_limit, api_rate_limit_key
@@ -77,11 +78,15 @@ def create_lead():
     try:
         lead, action = upsert_lead(g.organization_id, payload)
         segment_key = (payload.get("custom_fields") or {}).get("segment_key")
-        stream = LeadStreamService.find_matching_stream(
-            organization_id=g.organization_id,
-            source=(payload.get("source") or "n8n"),
-            segment_key=segment_key,
-        )
+        stream = None
+        try:
+            stream = LeadStreamService.find_matching_stream(
+                organization_id=g.organization_id,
+                source=(payload.get("source") or "n8n"),
+                segment_key=segment_key,
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
         if stream:
             LeadStreamService.apply_stream_to_lead(lead, stream)
         elif not lead.stage_id:
@@ -274,11 +279,15 @@ def pipeline_stages():
 @require_api_key
 @limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
 def list_streams():
-    streams = (
-        LeadStream.query.filter_by(organization_id=g.organization_id, is_active=True)
-        .order_by(LeadStream.priority.asc(), LeadStream.id.asc())
-        .all()
-    )
+    try:
+        streams = (
+            LeadStream.query.filter_by(organization_id=g.organization_id, is_active=True)
+            .order_by(LeadStream.priority.asc(), LeadStream.id.asc())
+            .all()
+        )
+    except SQLAlchemyError:
+        db.session.rollback()
+        return json_success({"streams": []})
     return json_success(
         {
             "streams": [

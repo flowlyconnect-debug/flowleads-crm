@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.audit import log_audit
 from app.core.permissions import require_role
@@ -37,6 +38,7 @@ def register_stream_settings_routes(settings_bp):
     def streams_index():
         organization_id = _scope_org_id()
         org_query = _org_query()
+        migration_needed = False
         if request.method == "POST":
             action = request.form.get("action", "create")
             stream_id = request.form.get("stream_id")
@@ -117,17 +119,30 @@ def register_stream_settings_routes(settings_bp):
             db.session.commit()
             return redirect(url_for("settings.streams_index", **org_query))
 
-        streams = (
-            LeadStream.query.filter_by(organization_id=organization_id)
-            .order_by(LeadStream.priority.asc(), LeadStream.id.asc())
-            .all()
-        )
+        try:
+            streams = (
+                LeadStream.query.filter_by(organization_id=organization_id)
+                .order_by(LeadStream.priority.asc(), LeadStream.id.asc())
+                .all()
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            streams = []
+            migration_needed = True
+            flash(
+                "Liidivirrat ei ole kaytettavissa viela. Suorita tietokantamigraatio (flask db upgrade).",
+                "warning",
+            )
         editing_stream = None
         edit_id = request.args.get("edit")
         if edit_id:
-            editing_stream = LeadStream.query.filter_by(
-                id=int(edit_id), organization_id=organization_id
-            ).first()
+            try:
+                editing_stream = LeadStream.query.filter_by(
+                    id=int(edit_id), organization_id=organization_id
+                ).first()
+            except (ValueError, SQLAlchemyError):
+                db.session.rollback()
+                editing_stream = None
         stages = (
             PipelineStage.query.filter_by(organization_id=organization_id)
             .order_by(PipelineStage.order_index.asc())
@@ -138,7 +153,12 @@ def register_stream_settings_routes(settings_bp):
             .order_by(User.email.asc())
             .all()
         )
-        stale_ids = {s.id for s in StreamHealthService.get_stale_streams(organization_id)}
+        try:
+            stale_ids = {s.id for s in StreamHealthService.get_stale_streams(organization_id)}
+        except SQLAlchemyError:
+            db.session.rollback()
+            stale_ids = set()
+            migration_needed = True
         return render_template(
             "streams/index.html",
             streams=streams,
@@ -149,4 +169,5 @@ def register_stream_settings_routes(settings_bp):
             now=datetime.now(timezone.utc),
             org_query=org_query,
             editing_stream=editing_stream,
+            migration_needed=migration_needed,
         )

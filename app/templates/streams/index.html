@@ -2,6 +2,8 @@
 {% from "_macros.html" import settings_nav with context %}
 {% block title %}Liidivirrat{% endblock %}
 {% block content %}
+{% set org_id_param = request.args.get('organization_id') %}
+{% set use_org = current_user.is_superadmin() and org_id_param %}
 <div class="settings-page">
   <div class="settings-layout">
     {{ settings_nav('streams') }}
@@ -11,6 +13,9 @@
           <h1 class="settings-panel__title">Liidivirrat</h1>
           <p class="settings-panel__subtitle">Hallinnoi miten saapuvat liidit reititetaan automaattisesti</p>
         </header>
+        {% if migration_needed %}
+        <div class="flash warning">Liidivirrat-taulua ei loydy tietokannasta. Aja <code>flask db upgrade</code> palvelimella.</div>
+        {% endif %}
 
         <h2 class="form-section-title">{{ "Muokkaa liidivirtaa" if editing_stream else "Uusi liidivirta" }}</h2>
         <form method="post" class="form-group">
@@ -57,7 +62,7 @@
           </label>
           <button type="submit" class="btn btn-primary">Tallenna liidivirta</button>
           {% if editing_stream %}
-          <a class="btn btn-secondary" href="{{ url_for('settings.streams_index', **org_query) }}">Peruuta</a>
+          <a class="btn btn-secondary" href="{% if use_org %}{{ url_for('settings.streams_index', organization_id=org_id_param) }}{% else %}{{ url_for('settings.streams_index') }}{% endif %}">Peruuta</a>
           {% endif %}
         </form>
 
@@ -90,7 +95,7 @@
                 </td>
                 <td>{% if stream.is_active %}<span class="badge badge-active">Aktiivinen</span>{% else %}<span class="badge badge-inactive">Pausella</span>{% endif %}</td>
                 <td>
-                  <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.streams_index', edit=stream.id, **org_query) }}">Muokkaa</a>
+                  <a class="btn btn-secondary btn-sm" href="{% if use_org %}{{ url_for('settings.streams_index', edit=stream.id, organization_id=org_id_param) }}{% else %}{{ url_for('settings.streams_index', edit=stream.id) }}{% endif %}">Muokkaa</a>
                   <form method="post" style="display:inline;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="action" value="toggle">
