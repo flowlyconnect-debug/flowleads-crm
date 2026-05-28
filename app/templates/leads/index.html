@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import score_badge, probability_badge %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Leads — FlowLeads{% endblock %}
 {% block content %}
 {% set has_active_filters = filters.search or filters.source or filters.stage_id or filters.assigned_to or filters.status or filters.score_min or filters.score_max or filters.gdpr_consent or filters.marketing_opt_in or filters.unsubscribed or filters.is_anonymized %}
@@ -134,51 +135,17 @@
 
   {% if show_onboarding %}
   <div class="leads-onboarding" role="region" aria-label="Aloita liidien kanssa">
-    <article class="leads-onboarding-card">
-      <div class="leads-onboarding-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      </div>
-      <h2 class="leads-onboarding-title">Aloita liidien seuranta</h2>
-      <p class="leads-onboarding-text">
-        Tämä on myyntityötilasi. Lisää ensimmäinen kontakti tai tuo liidejä automaattisesti integraatioista.
-      </p>
-      <div class="leads-onboarding-actions">
-        <a href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}" class="btn btn-primary btn-sm">
-          Lisää ensimmäinen liidi
-        </a>
-        <a href="{{ url_for('settings.api_keys', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.api_keys') }}" class="btn btn-secondary btn-sm">
-          Importtaa CSV
-        </a>
-        <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}" class="btn btn-ghost btn-sm">
-          Yhdistä n8n
-        </a>
-      </div>
-      <div class="leads-onboarding-suggestions">
-        <p class="leads-onboarding-suggestions-label">Nopeat tavat aloittaa</p>
-        <ul>
-          <li class="leads-onboarding-suggestion">
-            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
-            <a href="{{ url_for('settings.api_keys', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.api_keys') }}">Importtaa Excel/CSV</a>
-            <span class="leads-onboarding-suggestion-hint">API-avaimen kautta</span>
-          </li>
-          <li class="leads-onboarding-suggestion">
-            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
-            <a href="{{ url_for('forms.list_forms', organization_id=organization_id) if current_user.is_superadmin() else url_for('forms.list_forms') }}">Yhdistä webform</a>
-            <span class="leads-onboarding-suggestion-hint">Luo lomake liideille</span>
-          </li>
-          <li class="leads-onboarding-suggestion">
-            <span class="leads-onboarding-suggestion-dot" aria-hidden="true"></span>
-            <a href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.webhooks_list') }}">Tuo n8n-workflowsta</a>
-            <span class="leads-onboarding-suggestion-hint">Automaattinen synkronointi</span>
-          </li>
-        </ul>
-      </div>
-    </article>
+    {% call empty_state(
+      "🎯",
+      "Myyntityölistasi odottaa",
+      "Tämä on myyntityötilasi. Lisää ensimmäinen kontakti tai tuo liidejä automaattisesti integraatioista.",
+      "/leads/new",
+      "Lisää ensimmäinen liidi",
+      [
+        {"url": "/settings/api-keys", "label": "Tuo n8n-workflowsta"},
+        {"url": "/forms/new", "label": "Luo verkkolomake"}
+      ]
+    ) %}{% endcall %}
   </div>
 
   {% elif show_no_results %}
@@ -281,16 +248,16 @@
                 </span>
               </td>
               <td class="leads-cell-actions">
-                <div class="leads-row-actions" role="group" aria-label="Toiminnot">
+                <div class="leads-row-actions row-actions" role="group" aria-label="Toiminnot">
                   <a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}"
-                     class="leads-row-action">
+                     class="leads-row-action row-action-btn primary">
                     Avaa
                   </a>
                   <a href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}"
-                     class="leads-row-action">
+                     class="leads-row-action row-action-btn">
                     Muokkaa
                   </a>
-                  <button type="button" class="leads-row-action leads-row-action--icon" aria-label="Lisää toimintoja">
+                  <button type="button" class="leads-row-action leads-row-action--icon row-action-btn" aria-label="Lisää toimintoja">
                     ⋯
                   </button>
                 </div>

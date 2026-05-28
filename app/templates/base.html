@@ -307,6 +307,14 @@
   {% if current_user.is_authenticated %}
   <script defer>
   document.addEventListener('DOMContentLoaded', function() {
+    const pageContent = document.querySelector('.page-content');
+    const bodyRows = document.querySelectorAll('tbody tr').length;
+    if (bodyRows < 6) pageContent?.classList.add('page-compact');
+    document.querySelectorAll('table').forEach(function(tableEl) {
+      const rowCount = tableEl.querySelectorAll('tbody tr').length;
+      if (rowCount > 0 && rowCount < 6) tableEl.classList.add('table-compact');
+    });
+
     if (!window.aiContext) {
       const path = window.location.pathname || '';
       if (path.indexOf('/leads/pipeline') === 0) window.aiContext = 'pipeline';

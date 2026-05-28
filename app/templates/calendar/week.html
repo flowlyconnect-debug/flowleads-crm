@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Kalenteri — FlowLeads{% endblock %}
 {% block content %}
 <div class="list-page">
@@ -35,14 +35,16 @@
                 {% else %}—{% endif %}
               </td>
               <td>
-                {% if event.meeting_url %}
-                <a class="btn btn-secondary btn-sm" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
-                {% endif %}
+                <div class="row-actions">
+                  {% if event.meeting_url %}
+                  <a class="row-action-btn primary" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
+                  {% endif %}
+                </div>
               </td>
               <td>
                 <form method="post" action="{{ url_for('calendar.cancel_calendar_event', event_id=event.id) }}" class="form-row-inline" onsubmit="return confirm('Peruuta tapaaminen?');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn btn-ghost btn-sm">Peruuta</button>
+                  <button type="submit" class="row-action-btn action-destructive">Peruuta</button>
                 </form>
               </td>
             </tr>
@@ -51,7 +53,13 @@
         </table>
       </div>
       {% else %}
-      {% call empty_state('Ei tapaamisia tänään', 'Kalenterisi on vapaa tälle päivälle.') %}{% endcall %}
+      {% call empty_state(
+        "📅",
+        "Aikatauluta tapaaminen",
+        "Ei tapaamisia tänään. Kalenterisi on vapaa — hyvä hetki ottaa yhteyttä kuumaan liidiin.",
+        "/pipeline",
+        "Katso kuumat liidit"
+      ) %}{% endcall %}
       {% endif %}
     </div>
   </div>
@@ -79,9 +87,11 @@
                 {% else %}—{% endif %}
               </td>
               <td>
-                {% if event.meeting_url %}
-                <a class="btn btn-secondary btn-sm" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
-                {% endif %}
+                <div class="row-actions">
+                  {% if event.meeting_url %}
+                  <a class="row-action-btn primary" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
+                  {% endif %}
+                </div>
               </td>
             </tr>
             {% endfor %}
@@ -89,7 +99,13 @@
         </table>
       </div>
       {% else %}
-      {% call empty_state('Ei tapaamisia tällä viikolla', 'Aikatauluta tapaaminen liidiprofiilista.') %}{% endcall %}
+      {% call empty_state(
+        "🗓️",
+        "Viikko on avoin uusille tapaamisille",
+        "Kalenterissa on tilaa rakentaa momentumia. Varaa seuraava keskustelu aktiiviselle liidille.",
+        "/pipeline",
+        "Avaa pipeline"
+      ) %}{% endcall %}
       {% endif %}
     </div>
   </div>

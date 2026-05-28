@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Tehtävät — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
@@ -154,11 +154,29 @@
     <div class="report-card">
       <div class="report-card__body">
         {% if tab == 'today' %}
-        {% call empty_state('Ei tehtäviä tänään', 'Olet ajan tasalla — hyvä työ!') %}{% endcall %}
+        {% call empty_state(
+          "🎉",
+          "Ei tehtäviä tänään — olet ajan tasalla!",
+          "Olet suoriutunut kaikista tehtävistä. Haluatko katsoa liidit jotka tarvitsevat huomiota?",
+          "/leads?filter=no_contact_7d",
+          "Katso huomiota tarvitsevat liidit"
+        ) %}{% endcall %}
         {% elif tab == 'overdue' %}
-        {% call empty_state('Ei myöhässä olevia tehtäviä', 'Kaikki eräpäivät ovat hallinnassa.') %}{% endcall %}
+        {% call empty_state(
+          "✅",
+          "Ei myöhässä olevia tehtäviä",
+          "Kaikki eräpäivät ovat hallinnassa. Voit siirtyä uusiin aktiviteetteihin.",
+          "/leads",
+          "Avaa liidit"
+        ) %}{% endcall %}
         {% else %}
-        {% call empty_state('Ei tehtäviä', 'Lisää tehtävä pikalisäyksellä yllä.') %}{% endcall %}
+        {% call empty_state(
+          "📌",
+          "Luo seuraava tehtävä",
+          "Rakenna päivän fokus nopeasti pikalisäyksellä ja pidä myynti liikkeessä.",
+          "/tasks",
+          "Lisää uusi tehtävä"
+        ) %}{% endcall %}
         {% endif %}
       </div>
     </div>

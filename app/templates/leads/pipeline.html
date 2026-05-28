@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Myyntiputki — FlowLeads{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pipeline.css') }}">
@@ -94,19 +95,39 @@
 
   {% if not stages %}
     <div class="card pipeline-empty">
-      <div class="empty-state">
-        <div class="empty-state-title">Lisää ensimmäinen liidi</div>
-        <p class="empty-state-text">Aloita myyntiputki nopeasti: lisää liidi, tuo CSV tai yhdistä n8n — ja seuraa etenemistä vaiheittain.</p>
-        <div class="pipeline-empty__actions">
-          <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.webhooks_list', organization_id=organization_id) if is_superadmin else url_for('settings.webhooks_list') }}">Yhdistä n8n</a>
-        </div>
+      {% call empty_state(
+        "🚀",
+        "Lisää ensimmäinen liidi",
+        "Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n ja seuraa etenemistä vaiheittain.",
+        "/leads/new",
+        "+ Lisää liidi",
+        [
+          {"url": "/leads/import", "label": "Importtaa CSV"},
+          {"url": "/settings/api-keys", "label": "Yhdistä n8n"}
+        ]
+      ) %}
+      <div class="empty-state-quick-tips">
+        <strong>Nopeat tavat aloittaa:</strong> lisää käsin, tuo CSV:stä tai kytke automaatiot n8n:stä.
       </div>
+      {% endcall %}
     </div>
   {% elif ns.total_leads == 0 %}
-    <div class="pipeline-onboarding" role="status">
-      <p class="pipeline-onboarding__title">Putki on valmis — lisää uusi liidi</p>
-      <p class="pipeline-onboarding__text">Vedä liidejä vaiheesta toiseen tai lisää ensimmäinen liidi suoraan sarakkeesta.</p>
+    <div class="card pipeline-empty">
+      {% call empty_state(
+        "🚀",
+        "Lisää ensimmäinen liidi",
+        "Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n ja seuraa etenemistä vaiheittain.",
+        "/leads/new",
+        "+ Lisää liidi",
+        [
+          {"url": "/leads/import", "label": "Importtaa CSV"},
+          {"url": "/settings/api-keys", "label": "Yhdistä n8n"}
+        ]
+      ) %}
+      <div class="empty-state-quick-tips">
+        <strong>Nopeat tavat aloittaa:</strong> lisää käsin, tuo CSV:stä tai kytke automaatiot n8n:stä.
+      </div>
+      {% endcall %}
     </div>
   {% endif %}
 
@@ -132,7 +153,7 @@
         <div class="pipeline-col__list kanban-list" data-stage-id="{{ stage.id }}" role="list">
           {% if stage_count == 0 %}
             <div class="pipeline-col__placeholder">
-              <div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div>
+              <div class="pipeline-col__placeholder-title">Ei vielä liidejä tässä vaiheessa</div>
               <div class="pipeline-col__placeholder-text">Vedä liidi tänne</div>
             </div>
           {% endif %}
@@ -330,7 +351,7 @@
     if (listEl.querySelector('.pipeline-col__placeholder')) return;
     const placeholder = document.createElement('div');
     placeholder.className = 'pipeline-col__placeholder';
-    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidi tänne</div>';
+    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei vielä liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidi tänne</div>';
     listEl.prepend(placeholder);
   }
 

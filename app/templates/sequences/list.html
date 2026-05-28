@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Sekvenssit — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
@@ -62,7 +62,13 @@
   {% else %}
   <div class="report-card">
     <div class="report-card__body">
-      {% call empty_state('Ei sekvenssjä', 'Luo ensimmäinen sekvenssi.') %}{% endcall %}
+      {% call empty_state(
+        "⚡",
+        "Automatisoi liidien nurturointi",
+        "Luo sähköpostisekvenssi joka hoitaa follow-upit puolestasi — automaattisesti, oikeaan aikaan.",
+        "/sequences/new",
+        "Luo ensimmäinen sekvenssi"
+      ) %}{% endcall %}
     </div>
   </div>
   {% endfor %}

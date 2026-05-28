@@ -4538,3 +4538,123 @@ body.modal-open {
     display: none;
   }
 }
+
+.empty-state-card {
+  text-align: center;
+  padding: 48px 32px;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #E4E7EF;
+}
+
+.empty-state-icon {
+  font-size: 44px;
+  margin-bottom: 14px;
+  opacity: 0.8;
+}
+
+.empty-state-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0F1117;
+  margin-bottom: 8px;
+}
+
+.empty-state-desc {
+  font-size: 13px;
+  color: #6B7280;
+  max-width: 380px;
+  margin: 0 auto 20px;
+  line-height: 1.6;
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.empty-state-quick-tips {
+  margin-top: 18px;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* Compact mode: triggered when page has few items */
+.page-compact .card { margin-bottom: 12px; }
+.page-compact .card-body { padding: 14px 16px; }
+.page-compact .card-header { padding: 12px 16px; }
+.page-compact .metric-card { padding: 14px; min-height: 90px; }
+.page-compact .metric-value { font-size: 26px; }
+
+/* Auto-compact: when table has < 5 rows */
+.table-compact td { padding: 9px 12px; }
+.table-compact th { padding: 8px 12px; }
+
+/* Remove min-height from empty containers */
+.pipeline-cards { min-height: 40px !important; }
+
+tbody tr {
+  border-bottom: 1px solid #F0F2F8;
+  transition: background 100ms;
+  cursor: pointer;
+}
+
+tbody tr:hover { background: #F4F7FF; }
+
+.row-actions {
+  opacity: 0;
+  transition: opacity 120ms;
+  display: flex;
+  gap: 6px;
+}
+
+tbody tr:hover .row-actions { opacity: 1; }
+
+.row-action-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid #E4E7EF;
+  background: white;
+  color: #6B7280;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 120ms;
+  white-space: nowrap;
+}
+
+.row-action-btn:hover {
+  background: #1D6BF3;
+  color: white;
+  border-color: #1D6BF3;
+}
+
+.row-action-btn.primary {
+  background: #1D6BF3;
+  color: white;
+  border-color: #1D6BF3;
+}
+
+/* The number IS the message — make it huge */
+.stat-primary-number {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1.5px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+/* Destructive actions hidden by default */
+.action-destructive { display: none; }
+tr:hover .action-destructive,
+.card:hover .action-destructive { display: inline-flex; }

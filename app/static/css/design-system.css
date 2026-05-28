@@ -173,6 +173,23 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.app-main {
+  background-color: #F4F6FB;
+  background-image:
+    linear-gradient(rgba(29, 107, 243, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 107, 243, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.page-content::before {
+  content: '';
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(29, 107, 243, 0.15), transparent);
+  margin-bottom: 20px;
+  border-radius: 2px;
+}
+
 img {
   max-width: 100%;
   height: auto;
