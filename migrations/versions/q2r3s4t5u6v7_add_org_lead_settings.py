@@ -25,6 +25,8 @@ def upgrade():
         sa.Column("default_pipeline_stage_id", sa.Integer(), nullable=True),
         sa.Column("default_owner_id", sa.Integer(), nullable=True),
         sa.Column("default_tags", json_type, nullable=False, server_default="[]"),
+        sa.Column("default_industry", sa.String(length=100), nullable=True),
+        sa.Column("default_region", sa.String(length=100), nullable=True),
         sa.Column("last_lead_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("total_lead_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
@@ -51,9 +53,15 @@ def upgrade():
             ["organization_id"],
             unique=True,
         )
+    with op.batch_alter_table("leads", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("industry", sa.String(length=100), nullable=True))
+        batch_op.add_column(sa.Column("region", sa.String(length=100), nullable=True))
 
 
 def downgrade():
+    with op.batch_alter_table("leads", schema=None) as batch_op:
+        batch_op.drop_column("region")
+        batch_op.drop_column("industry")
     with op.batch_alter_table("org_lead_settings", schema=None) as batch_op:
         batch_op.drop_index("ix_org_lead_settings_organization_id")
     op.drop_table("org_lead_settings")

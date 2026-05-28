@@ -28,7 +28,6 @@
   {% if current_user.role in ('admin', 'superadmin') %}
   <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
   <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="settings-nav__item{% if active == 'webhooks' %} is-active{% endif %}">Webhooks</a>
-  <a href="{% if use_org %}{{ url_for('settings.streams_index', organization_id=org_id_param) }}{% else %}{{ url_for('settings.streams_index') }}{% endif %}" class="settings-nav__item{% if active == 'streams' %} is-active{% endif %}">Liidivirrat</a>
   <a href="{% if use_org %}{{ url_for('settings.lead_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.lead_settings') }}{% endif %}" class="settings-nav__item{% if active == 'lead_settings' %} is-active{% endif %}">Liidiasetukset</a>
   <a href="{% if use_org %}{{ url_for('settings.privacy_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.privacy_settings') }}{% endif %}" class="settings-nav__item{% if active == 'privacy' %} is-active{% endif %}">Tietosuoja</a>
   <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Laskutus</span>

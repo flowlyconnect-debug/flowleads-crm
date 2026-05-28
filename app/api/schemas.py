@@ -56,6 +56,8 @@ def serialize_lead(lead: Lead, *, custom_fields: dict | None = None) -> dict:
         "linkedin_url": lead.linkedin_url,
         "source": lead.source,
         "source_ref": lead.source_ref,
+        "industry": lead.industry,
+        "region": lead.region,
         "tags": list(lead.tags or []),
         "score": lead.score,
         "status": lead.status,

@@ -62,6 +62,7 @@ def test_apply_routing_sets_stage(app):
         settings = LeadRoutingService.get_settings(org.id)
         settings.default_pipeline_stage_id = stages[1].id
         lead = _make_lead(org.id, stages[0].id)
+        lead.stage_id = None
         LeadRoutingService.apply_to_lead(lead, settings)
         assert lead.stage_id == stages[1].id
 
@@ -154,10 +155,10 @@ def test_cross_tenant_settings_update_validation(client, app):
         db.session.commit()
 
     _login(client, admin_b_email)
-    response = client.post(
+    response = client.put(
         f"/settings/leads?organization_id={org_b_id}",
-        data={
-                "default_pipeline_stage_id": foreign_stage_id,
+        json={
+            "default_pipeline_stage_id": foreign_stage_id,
             "default_owner_id": "",
             "default_tags": "x",
         },
@@ -165,9 +166,9 @@ def test_cross_tenant_settings_update_validation(client, app):
     assert response.status_code == 400
     assert "Virheellinen vaihe" in response.get_data(as_text=True)
 
-    response2 = client.post(
+    response2 = client.put(
         f"/settings/leads?organization_id={org_b_id}",
-        data={
+        json={
             "default_pipeline_stage_id": local_stage_id,
             "default_owner_id": foreign_owner_id,
             "default_tags": "x",
@@ -215,3 +216,26 @@ def test_health_monitoring(app):
         assert old_org.id in org_ids
         assert fresh_org.id not in org_ids
         assert zero_org.id not in org_ids
+
+
+def test_apply_routing_sets_industry_region(app):
+    with app.app_context():
+        org, stages, _admin, _user = _setup_org("routing-industry-region")
+        settings = LeadRoutingService.get_settings(org.id)
+        settings.default_industry = "SaaS"
+        settings.default_region = "Uusimaa"
+        lead = _make_lead(org.id, stages[0].id, email="industry-region@example.com")
+        lead.industry = None
+        lead.region = None
+        LeadRoutingService.apply_to_lead(lead, settings)
+        assert lead.industry == "SaaS"
+        assert lead.region == "Uusimaa"
+
+        lead_with_values = _make_lead(
+            org.id, stages[0].id, email="industry-region-existing@example.com"
+        )
+        lead_with_values.industry = "Rakentaminen"
+        lead_with_values.region = "Pirkanmaa"
+        LeadRoutingService.apply_to_lead(lead_with_values, settings)
+        assert lead_with_values.industry == "Rakentaminen"
+        assert lead_with_values.region == "Pirkanmaa"

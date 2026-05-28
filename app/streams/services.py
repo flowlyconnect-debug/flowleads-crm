@@ -114,27 +114,20 @@ class LeadRoutingService:
 
     @staticmethod
     def apply_to_lead(lead, settings: OrgLeadSettings) -> None:
-        stage_attr = "pipeline_stage_id" if hasattr(lead, "pipeline_stage_id") else "stage_id"
-        owner_attr = "owner_id" if hasattr(lead, "owner_id") else "assigned_to"
-        current_stage_id = getattr(lead, stage_attr, None)
-        fallback_stage = LeadRoutingService.get_fallback_stage(settings.organization_id)
-        stage_is_default_fallback = bool(
-            current_stage_id
-            and fallback_stage
-            and current_stage_id == fallback_stage.id
-        )
+        if not getattr(lead, "stage_id", None) and settings.default_pipeline_stage_id:
+            lead.stage_id = settings.default_pipeline_stage_id
 
-        if (
-            (not current_stage_id or stage_is_default_fallback)
-            and settings.default_pipeline_stage_id
-        ):
-            setattr(lead, stage_attr, settings.default_pipeline_stage_id)
+        if not getattr(lead, "assigned_to", None) and settings.default_owner_id:
+            lead.assigned_to = settings.default_owner_id
 
-        if not getattr(lead, owner_attr, None) and settings.default_owner_id:
-            setattr(lead, owner_attr, settings.default_owner_id)
+        if not getattr(lead, "industry", None) and settings.default_industry:
+            lead.industry = settings.default_industry
 
-        existing_tags = list(lead.tags or [])
+        if not getattr(lead, "region", None) and settings.default_region:
+            lead.region = settings.default_region
+
         if settings.default_tags:
+            existing_tags = list(lead.tags or [])
             merged = list(dict.fromkeys(existing_tags + list(settings.default_tags)))
             lead.tags = merged
 

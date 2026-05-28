@@ -224,22 +224,13 @@
       </svg>
       <span class="sidebar-item__label">Asetukset</span>
     </a>
-    {% if current_user.role in ('admin', 'superadmin') %}
-    <a href="{{ nav_url('settings.streams_index') }}"
-       class="sidebar-item{% if ep == 'settings.streams_index' %} active{% endif %}">
-      <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h6v6H6V6Zm6 0h6v6h-6V6ZM6 12h6v6H6v-6Zm6 0h6v6h-6v-6Z" />
-      </svg>
-      <span class="sidebar-item__label">Liidivirrat</span>
-    </a>
     <a href="{{ nav_url('settings.lead_settings') }}"
        class="sidebar-item{% if ep == 'settings.lead_settings' %} active{% endif %}">
       <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5m-16.5 6.75h10.5m-10.5 6.75h16.5M18 12l2.25-2.25L18 7.5" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12 4.5-4.5 3 3L19.5 3m0 0v6.75M19.5 3h-6.75M4.5 21h15" />
       </svg>
       <span class="sidebar-item__label">Liidiasetukset</span>
     </a>
-    {% endif %}
 
     {% set user_initial = (current_user.email[0] if current_user.email else '?')|upper %}
     <div class="sidebar-user">

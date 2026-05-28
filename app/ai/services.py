@@ -330,14 +330,14 @@ def apply_score_tags(lead: Lead) -> None:
     if lead.score >= 80:
         if "hot" not in tags:
             tags.append("hot")
-        db.session.add(
-            Activity(
-                organization_id=lead.organization_id,
-                lead_id=lead.id,
-                type="ai_score",
-                content=f"AI score {lead.score}/100 — merkitty kuumaksi liidiksi",
+            db.session.add(
+                Activity(
+                    organization_id=lead.organization_id,
+                    lead_id=lead.id,
+                    type="ai_score",
+                    content=f"AI score {lead.score}/100 — merkitty kuumaksi liidiksi",
+                )
             )
-        )
     elif lead.score >= 60:
         if "warm" not in tags:
             tags.append("warm")

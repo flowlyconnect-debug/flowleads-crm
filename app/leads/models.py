@@ -169,6 +169,8 @@ class Lead(db.Model):
 
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
     source_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     ai_enriched: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ai_enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

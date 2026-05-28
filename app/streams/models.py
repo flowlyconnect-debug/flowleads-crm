@@ -30,6 +30,8 @@ class OrgLeadSettings(db.Model):
         Integer, ForeignKey("users.id"), nullable=True
     )
     default_tags: Mapped[list] = mapped_column(json_type, default=list, nullable=False)
+    default_industry: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
+    default_region: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     last_lead_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_lead_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
