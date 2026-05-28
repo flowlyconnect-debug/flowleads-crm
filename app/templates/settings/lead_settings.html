@@ -174,7 +174,7 @@
         default_tags: tagsInput.value || "",
       };
       const csrfToken = form.querySelector('input[name="csrf_token"]').value;
-      const resp = await fetch("{{ url_for('settings.lead_settings', **org_query) }}", {
+      const resp = await fetch("{% if org_query %}{{ url_for('settings.lead_settings', organization_id=org_query.organization_id) }}{% else %}{{ url_for('settings.lead_settings') }}{% endif %}", {
         method: "PUT",
         credentials: "same-origin",
         headers: {

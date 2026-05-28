@@ -450,8 +450,8 @@ def test_admin_can_open_streams_settings(client, app):
         data={"email": ctx["admin_email"], "password": "securepassword1"},
     )
     response = client.get("/settings/streams")
-    assert response.status_code == 200
-    assert b"Liidivirrat" in response.data
+    assert response.status_code == 302
+    assert "/settings/leads" in response.headers.get("Location", "")
 
 
 def test_superadmin_create_key_after_2fa(client, app):
