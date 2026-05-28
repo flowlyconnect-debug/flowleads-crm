@@ -15,6 +15,9 @@ FALLBACKS = {
     "lead_name": "",
     "lead_company": "",
     "assignee_name": "",
+    "org_name": "",
+    "last_lead_at": "",
+    "days": "",
 }
 
 

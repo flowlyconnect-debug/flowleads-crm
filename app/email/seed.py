@@ -128,6 +128,23 @@ SYSTEM_TEMPLATES = [
         "body_text_template": "Tarjous {{reference_number}} hylättiin. Asiakas: {{lead_name}}\n",
         "variables": sorted({"reference_number", "lead_name"}),
     },
+    {
+        "name": "lead_stale_alert",
+        "subject_template": "Ei uusia liideja {{ days }} paivaan — {{ org_name }}",
+        "body_html_template": (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Ei uusia liideja</h2>"
+            "<p>Viimeisin liidi saapui {{ last_lead_at }} — onko kaikki kunnossa?</p>"
+            "<p><a href='/settings/leads'>Tarkista liidiasetukset</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        ),
+        "body_text_template": (
+            "Viimeisin liidi saapui {{ last_lead_at }} — onko kaikki kunnossa?\n"
+            "Tarkista liidiasetukset: /settings/leads"
+        ),
+        "variables": sorted({"org_name", "last_lead_at", "days"}),
+    },
 ]
 
 

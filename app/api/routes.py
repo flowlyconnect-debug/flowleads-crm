@@ -37,7 +37,7 @@ from app.core.errors import json_error, json_success
 from app.core.audit import log_audit
 from app.extensions import db, limiter
 from app.leads.models import LeadStream
-from app.streams.services import LeadStreamService
+from app.streams.services import LeadRoutingService
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -77,30 +77,21 @@ def create_lead():
     payload = request.get_json(silent=True) or {}
     try:
         lead, action = upsert_lead(g.organization_id, payload)
-        segment_key = (payload.get("custom_fields") or {}).get("segment_key")
-        stream = None
-        try:
-            stream = LeadStreamService.find_matching_stream(
-                organization_id=g.organization_id,
-                source=(payload.get("source") or "n8n"),
-                segment_key=segment_key,
-            )
-        except SQLAlchemyError:
-            db.session.rollback()
-        if stream:
-            LeadStreamService.apply_stream_to_lead(lead, stream)
-        elif not lead.stage_id:
-            fallback = LeadStreamService.get_fallback_stage(g.organization_id)
+        settings = LeadRoutingService.get_settings(g.organization_id)
+        LeadRoutingService.apply_to_lead(lead, settings)
+        if not lead.stage_id:
+            fallback = LeadRoutingService.get_fallback_stage(g.organization_id)
             if fallback:
                 lead.stage_id = fallback.id
         log_audit(
-            "lead_stream_applied",
+            "lead_routing_applied",
             organization_id=g.organization_id,
             target_type="lead",
             target_id=lead.id,
             metadata={
-                "stream_id": stream.id if stream else None,
-                "stream_name": stream.name if stream else "fallback",
+                "stage_id": lead.stage_id,
+                "owner_id": lead.assigned_to,
+                "tags": lead.tags or [],
             },
         )
         db.session.commit()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -11,7 +11,7 @@ from app.core.permissions import require_role
 from app.extensions import db
 from app.api.models import APIKey
 from app.leads.models import LeadStream, PipelineStage
-from app.streams.services import StreamHealthService
+from app.streams.services import LeadHealthService, LeadRoutingService, StreamHealthService
 from app.users.models import User
 
 
@@ -40,7 +40,106 @@ def _format_user_label(user: User) -> str:
     return " ".join(part.capitalize() for part in parts)
 
 
+def _relative_time_fi(value, now: datetime) -> str:
+    if not value:
+        return "Ei viela"
+    diff = now - value
+    seconds = int(diff.total_seconds())
+    if seconds < 3600:
+        return f"{max(1, seconds // 60)} min sitten"
+    if seconds < 86400:
+        return f"{seconds // 3600}h sitten"
+    return f"{seconds // 86400} pv sitten"
+
+
 def register_stream_settings_routes(settings_bp):
+    @settings_bp.route("/leads", methods=["GET", "PUT", "POST"])
+    @login_required
+    @require_role("admin", "superadmin")
+    def lead_settings():
+        organization_id = _scope_org_id()
+        org_query = _org_query()
+
+        if request.method in ("PUT", "POST"):
+            settings = LeadRoutingService.get_settings(organization_id)
+            stage_raw = request.form.get("default_pipeline_stage_id") or request.form.get("pipeline_stage_id")
+            owner_raw = request.form.get("default_owner_id") or request.form.get("owner_id")
+            tags_raw = request.form.get("default_tags") or ""
+
+            stage_id = int(stage_raw) if stage_raw else None
+            owner_id = int(owner_raw) if owner_raw else None
+            tags = [item.strip() for item in tags_raw.split(",") if item.strip()]
+
+            if stage_id:
+                stage = PipelineStage.query.filter_by(
+                    id=stage_id,
+                    organization_id=organization_id,
+                ).first()
+                if not stage:
+                    return jsonify({"success": False, "error": "Virheellinen vaihe."}), 400
+
+            if owner_id:
+                owner = User.query.filter_by(
+                    id=owner_id,
+                    organization_id=organization_id,
+                    is_active=True,
+                ).first()
+                if not owner:
+                    return jsonify({"success": False, "error": "Virheellinen omistaja."}), 400
+
+            settings.default_pipeline_stage_id = stage_id
+            settings.default_owner_id = owner_id
+            settings.default_tags = tags
+            log_audit(
+                "lead_settings_updated",
+                user_id=current_user.id,
+                organization_id=organization_id,
+                target_type="org_lead_settings",
+                target_id=settings.id,
+                metadata={
+                    "default_pipeline_stage_id": stage_id,
+                    "default_owner_id": owner_id,
+                    "default_tags": tags,
+                },
+            )
+            db.session.commit()
+            if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
+                return jsonify({"success": True, "message": "Asetukset tallennettu"})
+            flash("Asetukset tallennettu", "success")
+            return redirect(url_for("settings.lead_settings", **org_query))
+
+        settings = LeadRoutingService.get_settings(organization_id)
+        stages = (
+            PipelineStage.query.filter_by(organization_id=organization_id)
+            .order_by(PipelineStage.order_index.asc())
+            .all()
+        )
+        users = (
+            User.query.filter_by(organization_id=organization_id, is_active=True)
+            .order_by(User.email.asc())
+            .all()
+        )
+        user_display_map = {user.id: _format_user_label(user) for user in users}
+        now = datetime.now(timezone.utc)
+        stale_cutoff = now - timedelta(days=LeadHealthService.STALE_DAYS)
+        is_stale = bool(
+            settings.last_lead_at
+            and settings.total_lead_count > 0
+            and settings.last_lead_at < stale_cutoff
+        )
+        return render_template(
+            "streams/settings.html",
+            settings=settings,
+            stages=stages,
+            users=users,
+            user_display_map=user_display_map,
+            org_query=org_query,
+            now=now,
+            stale_days=LeadHealthService.STALE_DAYS,
+            is_stale=is_stale,
+            relative_last_lead_at=_relative_time_fi(settings.last_lead_at, now),
+        )
+
     @settings_bp.route("/streams", methods=["GET", "POST"])
     @login_required
     @require_role("admin", "superadmin")

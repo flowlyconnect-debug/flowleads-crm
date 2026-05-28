@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Liidiasetukset{% endblock %}
+{% block content %}
+{% set org_id_param = request.args.get('organization_id') %}
+{% set use_org = current_user.is_superadmin() and org_id_param %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('lead_settings') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Liidiasetukset</h1>
+          <p class="settings-panel__subtitle">Hallinnoi miten automaattisesti saapuvat liidit reititetaan</p>
+        </header>
+
+        <section class="card p-4 mb-4" style="background:#F8FAFC;border:1px solid #E2E8F0;">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="card p-3">
+              <div class="text-muted text-sm">Liidit yhteensa</div>
+              <div class="text-xl font-semibold">{{ settings.total_lead_count }}</div>
+            </div>
+            <div class="card p-3">
+              <div class="text-muted text-sm">Viimeksi saapunut</div>
+              <div class="text-xl font-semibold">{{ relative_last_lead_at }}</div>
+            </div>
+            <div class="card p-3">
+              <div class="text-muted text-sm">Status</div>
+              {% if settings.total_lead_count == 0 %}
+              <span class="badge badge-inactive">Odottaa ensimmaista liidia</span>
+              {% elif is_stale %}
+              <span class="badge" style="background:#FEF3C7;color:#92400E;">Ei liideja 3+ paivaan</span>
+              {% else %}
+              <span class="badge badge-active">Vastaanottaa liideja</span>
+              {% endif %}
+            </div>
+          </div>
+        </section>
+
+        <section class="card p-4">
+          <h2 class="form-section-title mb-1">Reitityssaannot</h2>
+          <p class="form-helper mb-3">Nama asetukset koskevat kaikkia automaattisesti saapuvia liideja</p>
+          <form method="post" id="lead-settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="_method" value="PUT">
+            <label class="form-label">Minne uusi liidi menee?
+              <select class="form-select" name="default_pipeline_stage_id" id="stage-select">
+                <option value="">Käytä ensimmäistä vaihetta</option>
+                {% for stage in stages %}
+                <option value="{{ stage.id }}" {% if settings.default_pipeline_stage_id == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="form-label">Kenelle liidi osoitetaan?
+              <select class="form-select" name="default_owner_id" id="owner-select">
+                <option value="">Ei automaattista omistajaa</option>
+                {% for user in users %}
+                <option value="{{ user.id }}" {% if settings.default_owner_id == user.id %}selected{% endif %}>{{ user_display_map.get(user.id) }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="form-label">Lisaa automaattisesti tagit
+              <input class="form-input" id="tags-input" type="text" name="default_tags" value="{{ (settings.default_tags or [])|join(', ') }}" placeholder="b2b, saas...">
+            </label>
+            <p class="form-helper">Nama tagit lisataan jokaiseen saapuvaan liidiin</p>
+            <div id="tags-preview" class="mb-3"></div>
+
+            <div id="routing-preview" style="background:#F1F5F9;border-radius:8px;padding:10px 12px;margin:14px 0;">
+              Saapuva liidi → — → — → —
+            </div>
+
+            <button type="submit" class="btn btn-primary">Tallenna asetukset</button>
+          </form>
+        </section>
+
+        <section class="card p-4 mt-4" style="background:#F8FAFC;">
+          <h3 class="form-section-title mb-1">Automaattinen AI-pisteytys</h3>
+          <p class="form-helper mb-2">Tagit lisataan kun AI on analysoinut liidin</p>
+          <ul style="margin:0;padding-left:18px;">
+            <li>🔥 Score ≥ 80 → tagi "hot" lisataan automaattisesti</li>
+            <li>✓ Score ≥ 60 → tagi "warm"</li>
+            <li>❄ Score &lt; 30 → tagi "cold"</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const stageSelect = document.getElementById("stage-select");
+    const ownerSelect = document.getElementById("owner-select");
+    const tagsInput = document.getElementById("tags-input");
+    const previewEl = document.getElementById("routing-preview");
+    const tagsPreview = document.getElementById("tags-preview");
+
+    function parseTags(raw) {
+      return (raw || "").split(",").map((item) => item.trim()).filter(Boolean);
+    }
+
+    function renderTagPills(tags) {
+      tagsPreview.innerHTML = "";
+      tags.forEach((tag) => {
+        const pill = document.createElement("span");
+        pill.className = "badge badge-inactive mr-1";
+        pill.textContent = tag;
+        tagsPreview.appendChild(pill);
+      });
+    }
+
+    function updatePreview() {
+      const stage = stageSelect.selectedOptions.length ? stageSelect.selectedOptions[0].textContent.trim() : "—";
+      const owner = ownerSelect.selectedOptions.length ? ownerSelect.selectedOptions[0].textContent.trim() : "—";
+      const tags = parseTags(tagsInput.value);
+      renderTagPills(tags);
+      previewEl.textContent = `Saapuva liidi → ${stage === "Käytä ensimmäistä vaihetta" ? "—" : stage} → ${owner === "Ei automaattista omistajaa" ? "—" : owner} → ${tags.length ? tags.join(", ") : "—"}`;
+    }
+
+    [stageSelect, ownerSelect, tagsInput].forEach((el) => {
+      el.addEventListener("input", updatePreview);
+      el.addEventListener("change", updatePreview);
+    });
+    updatePreview();
+  })();
+</script>
+{% endblock %}

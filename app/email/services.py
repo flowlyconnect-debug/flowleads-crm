@@ -330,6 +330,49 @@ class EmailService:
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
+    @staticmethod
+    def send_lead_stale_alert(
+        *, to_email: str, org_name: str, last_lead_at: datetime, days: int
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        app_base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        settings_url = f"{app_base_url}/settings/leads" if app_base_url else "/settings/leads"
+        last_seen = (
+            last_lead_at.isoformat().replace("+00:00", "Z")
+            if isinstance(last_lead_at, datetime)
+            else str(last_lead_at or "")
+        )
+        subject = f"Ei uusia liideja {days} paivaan — {org_name}"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Ei uusia liideja</h2>"
+            f"<p>Viimeisin liidi saapui {html.escape(last_seen)} — onko kaikki kunnossa?</p>"
+            f"<p><a href='{html.escape(settings_url)}' "
+            "style='display:inline-block;background:#2563EB;color:#fff;padding:10px 16px;"
+            "text-decoration:none;border-radius:8px;'>Tarkista liidiasetukset</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = (
+            f"Viimeisin liidi saapui {last_seen} — onko kaikki kunnossa?\n"
+            f"Tarkista liidiasetukset: {settings_url}"
+        )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
 
 class TemplateService:
     @staticmethod

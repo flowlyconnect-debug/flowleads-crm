@@ -215,6 +215,15 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("Stream health check job failed")
 
+    def run_lead_health_check():
+        with app.app_context():
+            from app.streams.services import LeadHealthService
+
+            try:
+                LeadHealthService.check_all_orgs()
+            except Exception:
+                logger.exception("Lead health check job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -309,6 +318,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_stream_health_check,
         CronTrigger(hour=8, minute=0, timezone="UTC"),
         id="stream_health_check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_lead_health_check,
+        CronTrigger(hour=8, minute=0, timezone="UTC"),
+        id="lead_health_check",
         replace_existing=True,
     )
 

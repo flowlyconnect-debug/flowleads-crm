@@ -157,6 +157,9 @@ def create_organization(name: str, slug: str) -> Organization:
     from app.automations.seed import seed_default_automations
 
     seed_default_automations(org.id)
+    from app.streams.models import OrgLeadSettings
+
+    db.session.add(OrgLeadSettings(organization_id=org.id))
     return org
 
 

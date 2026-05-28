@@ -267,7 +267,7 @@ class AIEnrichmentService:
             content=f"AI enrichment completed. Score: {data['lead_score']}",
             metadata=metadata,
         )
-        apply_score_routing(lead, lead.organization_id)
+        apply_score_tags(lead)
         try:
             db.session.commit()
             return True
@@ -322,7 +322,7 @@ def _has_enrichment_fields(lead: Lead) -> bool:
     return False
 
 
-def apply_score_routing(lead: Lead, organization_id: int) -> None:
+def apply_score_tags(lead: Lead) -> None:
     if lead.score is None:
         return
 
@@ -330,12 +330,11 @@ def apply_score_routing(lead: Lead, organization_id: int) -> None:
     if lead.score >= 80:
         if "hot" not in tags:
             tags.append("hot")
-        lead.tags = tags
         db.session.add(
             Activity(
-                organization_id=organization_id,
+                organization_id=lead.organization_id,
                 lead_id=lead.id,
-                type="ai_enriched",
+                type="ai_score",
                 content=f"AI score {lead.score}/100 — merkitty kuumaksi liidiksi",
             )
         )
@@ -346,4 +345,10 @@ def apply_score_routing(lead: Lead, organization_id: int) -> None:
     elif lead.score < 30:
         if "cold" not in tags:
             tags.append("cold")
-        lead.tags = tags
+    lead.tags = tags
+
+
+# Backward-compatible alias for older imports/tests.
+def apply_score_routing(lead: Lead, organization_id: int) -> None:
+    del organization_id
+    apply_score_tags(lead)

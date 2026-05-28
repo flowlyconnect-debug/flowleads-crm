@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.extensions import db
 from app.leads.models import LeadStream, PipelineStage
+from app.streams.models import OrgLeadSettings
 from app.users.models import Organization, User
 
 
@@ -95,5 +96,93 @@ class StreamHealthService:
                     stale_streams=[
                         {"name": s.name, "last_lead_at": s.last_lead_at} for s in stale
                     ],
+                )
+        db.session.commit()
+
+
+class LeadRoutingService:
+    @staticmethod
+    def get_settings(organization_id: int) -> OrgLeadSettings:
+        settings = OrgLeadSettings.query.filter_by(organization_id=organization_id).first()
+        if settings:
+            return settings
+
+        settings = OrgLeadSettings(organization_id=organization_id)
+        db.session.add(settings)
+        db.session.flush()
+        return settings
+
+    @staticmethod
+    def apply_to_lead(lead, settings: OrgLeadSettings) -> None:
+        stage_attr = "pipeline_stage_id" if hasattr(lead, "pipeline_stage_id") else "stage_id"
+        owner_attr = "owner_id" if hasattr(lead, "owner_id") else "assigned_to"
+        current_stage_id = getattr(lead, stage_attr, None)
+        fallback_stage = LeadRoutingService.get_fallback_stage(settings.organization_id)
+        stage_is_default_fallback = bool(
+            current_stage_id
+            and fallback_stage
+            and current_stage_id == fallback_stage.id
+        )
+
+        if (
+            (not current_stage_id or stage_is_default_fallback)
+            and settings.default_pipeline_stage_id
+        ):
+            setattr(lead, stage_attr, settings.default_pipeline_stage_id)
+
+        if not getattr(lead, owner_attr, None) and settings.default_owner_id:
+            setattr(lead, owner_attr, settings.default_owner_id)
+
+        existing_tags = list(lead.tags or [])
+        if settings.default_tags:
+            merged = list(dict.fromkeys(existing_tags + list(settings.default_tags)))
+            lead.tags = merged
+
+        settings.last_lead_at = datetime.now(timezone.utc)
+        settings.total_lead_count = (settings.total_lead_count or 0) + 1
+
+    @staticmethod
+    def get_fallback_stage(organization_id: int) -> PipelineStage | None:
+        return (
+            PipelineStage.query.filter_by(organization_id=organization_id)
+            .order_by(PipelineStage.order_index.asc())
+            .first()
+        )
+
+
+class LeadHealthService:
+    STALE_DAYS = 3
+
+    @staticmethod
+    def get_stale_org_settings() -> list[OrgLeadSettings]:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=LeadHealthService.STALE_DAYS)
+        return (
+            OrgLeadSettings.query.filter(
+                OrgLeadSettings.last_lead_at.isnot(None),
+                OrgLeadSettings.last_lead_at < cutoff,
+                OrgLeadSettings.total_lead_count > 0,
+            )
+            .order_by(OrgLeadSettings.last_lead_at.asc())
+            .all()
+        )
+
+    @staticmethod
+    def check_all_orgs() -> None:
+        from app.email.services import EmailService
+
+        stale_orgs = LeadHealthService.get_stale_org_settings()
+        for org_settings in stale_orgs:
+            org = org_settings.organization
+            if not org:
+                continue
+            admins = User.query.filter_by(
+                organization_id=org.id, role="admin", is_active=True
+            ).all()
+            for admin in admins:
+                EmailService.send_lead_stale_alert(
+                    to_email=admin.email,
+                    org_name=org.name,
+                    last_lead_at=org_settings.last_lead_at,
+                    days=LeadHealthService.STALE_DAYS,
                 )
         db.session.commit()
