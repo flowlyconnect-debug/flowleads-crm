@@ -167,3 +167,23 @@ def register_cli(app):
 
         click.echo("Starting scheduler (backups, reminders every 15m, auto-tasks)...")
         run_scheduler(current_app._get_current_object())
+
+    @app.cli.command("list-streams")
+    @click.argument("org_slug")
+    @with_appcontext
+    def list_streams(org_slug):
+        """List all lead streams for an organization."""
+        from app.leads.models import LeadStream
+        from app.users.models import Organization
+
+        org = Organization.query.filter_by(slug=org_slug).first()
+        if not org:
+            click.echo("Organization not found.", err=True)
+            sys.exit(1)
+        streams = LeadStream.query.filter_by(organization_id=org.id).all()
+        for stream in streams:
+            status = "Y" if stream.is_active else "N"
+            click.echo(
+                f"{status} [{stream.priority}] {stream.name} - "
+                f"source:{stream.source_match} key:{stream.segment_key} leads:{stream.lead_count}"
+            )

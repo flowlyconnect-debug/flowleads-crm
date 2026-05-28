@@ -224,6 +224,15 @@
       </svg>
       <span class="sidebar-item__label">Asetukset</span>
     </a>
+    {% if current_user.role in ('admin', 'superadmin') %}
+    <a href="{{ nav_url('settings.streams_index') }}"
+       class="sidebar-item{% if ep == 'settings.streams_index' %} active{% endif %}">
+      <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h6v6H6V6Zm6 0h6v6h-6V6ZM6 12h6v6H6v-6Zm6 0h6v6h-6v-6Z" />
+      </svg>
+      <span class="sidebar-item__label">Liidivirrat</span>
+    </a>
+    {% endif %}
 
     {% set user_initial = (current_user.email[0] if current_user.email else '?')|upper %}
     <div class="sidebar-user">

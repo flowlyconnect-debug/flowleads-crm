@@ -105,3 +105,7 @@ register_proposal_settings_routes(settings_bp)
 from app.webhooks.routes import register_settings_webhook_routes  # noqa: E402
 
 register_settings_webhook_routes(settings_bp)
+
+from app.streams.routes import register_stream_settings_routes  # noqa: E402
+
+register_stream_settings_routes(settings_bp)

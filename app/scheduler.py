@@ -206,6 +206,15 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("Weekly prediction batch job failed")
 
+    def run_stream_health_check():
+        with app.app_context():
+            from app.streams.services import StreamHealthService
+
+            try:
+                StreamHealthService.check_all_orgs()
+            except Exception:
+                logger.exception("Stream health check job failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -294,6 +303,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_weekly_predictions,
         CronTrigger(day_of_week="sun", hour=23, minute=0, timezone="UTC"),
         id="weekly_predictions",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_stream_health_check,
+        CronTrigger(hour=8, minute=0, timezone="UTC"),
+        id="stream_health_check",
         replace_existing=True,
     )
 

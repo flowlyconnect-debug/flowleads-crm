@@ -33,7 +33,10 @@ from app.api.services import (
     upsert_lead,
 )
 from app.core.errors import json_error, json_success
+from app.core.audit import log_audit
 from app.extensions import db, limiter
+from app.leads.models import LeadStream
+from app.streams.services import LeadStreamService
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -70,8 +73,31 @@ def create_lead():
     if not request.is_json:
         return json_error("validation_error", "JSON body is required.", 400)
 
+    payload = request.get_json(silent=True) or {}
     try:
-        lead, action = upsert_lead(g.organization_id, request.get_json(silent=True))
+        lead, action = upsert_lead(g.organization_id, payload)
+        segment_key = (payload.get("custom_fields") or {}).get("segment_key")
+        stream = LeadStreamService.find_matching_stream(
+            organization_id=g.organization_id,
+            source=(payload.get("source") or "n8n"),
+            segment_key=segment_key,
+        )
+        if stream:
+            LeadStreamService.apply_stream_to_lead(lead, stream)
+        elif not lead.stage_id:
+            fallback = LeadStreamService.get_fallback_stage(g.organization_id)
+            if fallback:
+                lead.stage_id = fallback.id
+        log_audit(
+            "lead_stream_applied",
+            organization_id=g.organization_id,
+            target_type="lead",
+            target_id=lead.id,
+            metadata={
+                "stream_id": stream.id if stream else None,
+                "stream_name": stream.name if stream else "fallback",
+            },
+        )
         db.session.commit()
     except ApiServiceError as exc:
         db.session.rollback()
@@ -242,6 +268,35 @@ def enrich_lead(lead_id: int):
 def pipeline_stages():
     stages = list_pipeline_stages(g.organization_id)
     return json_success({"stages": [serialize_stage(s) for s in stages]})
+
+
+@api_bp.route("/streams", methods=["GET"])
+@require_api_key
+@limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
+def list_streams():
+    streams = (
+        LeadStream.query.filter_by(organization_id=g.organization_id, is_active=True)
+        .order_by(LeadStream.priority.asc(), LeadStream.id.asc())
+        .all()
+    )
+    return json_success(
+        {
+            "streams": [
+                {
+                    "id": stream.id,
+                    "name": stream.name,
+                    "source_match": stream.source_match,
+                    "segment_key": stream.segment_key,
+                    "is_active": stream.is_active,
+                    "lead_count": stream.lead_count,
+                    "last_lead_at": stream.last_lead_at.isoformat().replace("+00:00", "Z")
+                    if stream.last_lead_at
+                    else None,
+                }
+                for stream in streams
+            ]
+        }
+    )
 
 
 # --- Custom fields ---

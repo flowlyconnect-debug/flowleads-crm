@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.ai.prompts import build_enrichment_prompt
 from app.extensions import db
-from app.leads.models import Lead
+from app.leads.models import Activity, Lead
 from app.leads.services import LeadService
 
 logger = logging.getLogger(__name__)
@@ -267,6 +267,7 @@ class AIEnrichmentService:
             content=f"AI enrichment completed. Score: {data['lead_score']}",
             metadata=metadata,
         )
+        apply_score_routing(lead, lead.organization_id)
         try:
             db.session.commit()
             return True
@@ -319,3 +320,30 @@ def _has_enrichment_fields(lead: Lead) -> bool:
         if value and str(value).strip():
             return True
     return False
+
+
+def apply_score_routing(lead: Lead, organization_id: int) -> None:
+    if lead.score is None:
+        return
+
+    tags = list(lead.tags or [])
+    if lead.score >= 80:
+        if "hot" not in tags:
+            tags.append("hot")
+        lead.tags = tags
+        db.session.add(
+            Activity(
+                organization_id=organization_id,
+                lead_id=lead.id,
+                type="ai_enriched",
+                content=f"AI score {lead.score}/100 — merkitty kuumaksi liidiksi",
+            )
+        )
+    elif lead.score >= 60:
+        if "warm" not in tags:
+            tags.append("warm")
+        lead.tags = tags
+    elif lead.score < 30:
+        if "cold" not in tags:
+            tags.append("cold")
+        lead.tags = tags

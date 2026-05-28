@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav %}
+{% block title %}Liidivirrat{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('streams') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Liidivirrat</h1>
+          <p class="settings-panel__subtitle">Hallinnoi miten saapuvat liidit reititetaan automaattisesti</p>
+        </header>
+
+        <h2 class="form-section-title">{{ "Muokkaa liidivirtaa" if editing_stream else "Uusi liidivirta" }}</h2>
+        <form method="post" class="form-group">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="create">
+          {% if editing_stream %}<input type="hidden" name="stream_id" value="{{ editing_stream.id }}">{% endif %}
+          <label class="form-label">Nimi
+            <input class="form-input" type="text" name="name" required value="{{ editing_stream.name if editing_stream else '' }}">
+          </label>
+          <label class="form-label">Lahde
+            <input class="form-input" type="text" name="source_match" placeholder="linkedin, website, apollo..." value="{{ editing_stream.source_match if editing_stream else '' }}">
+          </label>
+          <p class="form-helper">Tama arvo tulee n8n:n lahettamasta source-kentasta</p>
+          <label class="form-label">Segmenttiavain
+            <input class="form-input" type="text" name="segment_key" value="{{ editing_stream.segment_key if editing_stream else '' }}">
+          </label>
+          <p class="form-helper">Vapaaehtoinen. n8n voi lahettaa custom_fields.segment_key arvon.</p>
+          <label class="form-label">Pipeline-vaihe
+            <select class="form-select" name="pipeline_stage_id">
+              <option value="">Ei automaattista</option>
+              {% for stage in stages %}
+              <option value="{{ stage.id }}" {% if editing_stream and editing_stream.pipeline_stage_id == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-label">Omistaja
+            <select class="form-select" name="owner_id">
+              <option value="">Ei automaattista</option>
+              {% for user in users %}
+              <option value="{{ user.id }}" {% if editing_stream and editing_stream.owner_id == user.id %}selected{% endif %}>{{ user.email }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-label">Oletustagit
+            <input class="form-input" type="text" name="default_tags" placeholder="b2b, saas, nordics" value="{{ (editing_stream.default_tags or [])|join(', ') if editing_stream else '' }}">
+          </label>
+          <label class="form-label">Prioriteetti
+            <input class="form-input" type="number" name="priority" value="{{ editing_stream.priority if editing_stream else 10 }}">
+          </label>
+          <p class="form-helper">Pienempi numero = tarkistetaan ensin</p>
+          <label class="form-check">
+            <input type="checkbox" name="is_active" {% if not editing_stream or editing_stream.is_active %}checked{% endif %}>
+            Aktiivinen
+          </label>
+          <button type="submit" class="btn btn-primary">Tallenna liidivirta</button>
+          {% if editing_stream %}
+          <a class="btn btn-secondary" href="{{ url_for('settings.streams_index', **org_query) }}">Peruuta</a>
+          {% endif %}
+        </form>
+
+        <h2 class="form-section-title">Liidivirrat</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nimi</th><th>Lahde</th><th>Segmenttiavain</th><th>Pipeline-vaihe</th><th>Omistaja</th>
+                <th>Tagit</th><th>Liidit</th><th>Viimeksi aktiivinen</th><th>Status</th><th>Toiminnot</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for stream in streams %}
+              <tr>
+                <td>{{ stream.name }}</td>
+                <td>{{ stream.source_match or "—" }}</td>
+                <td>{{ stream.segment_key or "—" }}</td>
+                <td>{{ stream.pipeline_stage.name if stream.pipeline_stage else "—" }}</td>
+                <td>{{ stream.owner.email if stream.owner else "—" }}</td>
+                <td>{{ (stream.default_tags or [])|join(", ") or "—" }}</td>
+                <td>{{ stream.lead_count }}</td>
+                <td>
+                  {% if stream.last_lead_at %}
+                    {{ stream.last_lead_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% if stream.id in stale_ids %}⚠ Ei liideja {{ stale_days }}+ paivaan{% endif %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>{% if stream.is_active %}<span class="badge badge-active">Aktiivinen</span>{% else %}<span class="badge badge-inactive">Pausella</span>{% endif %}</td>
+                <td>
+                  <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.streams_index', edit=stream.id, **org_query) }}">Muokkaa</a>
+                  <form method="post" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="toggle">
+                    <input type="hidden" name="stream_id" value="{{ stream.id }}">
+                    <button class="btn btn-ghost btn-sm" type="submit">Toggle</button>
+                  </form>
+                  <form method="post" style="display:inline;" onsubmit="return confirm('Poistetaanko liidivirta?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="stream_id" value="{{ stream.id }}">
+                    <button class="btn btn-ghost btn-sm" type="submit">Poista</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="10">
+                <div class="empty-state">
+                  <div class="empty-state-icon">⎇</div>
+                  <h3 class="empty-state-title">Ei liidivirtoja viela</h3>
+                  <p class="empty-state-text">Luo ensimmainen liidivirta ja FlowLeads reitittaa liidit automaattisesti oikeaan pipelineen.</p>
+                </div>
+              </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

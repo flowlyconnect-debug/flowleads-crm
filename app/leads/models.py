@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -90,6 +91,52 @@ class PipelineStage(db.Model):
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="stage")
+
+
+class LeadStream(db.Model):
+    __tablename__ = "lead_streams"
+    __table_args__ = (
+        Index("ix_lead_streams_org_active", "organization_id", "is_active"),
+        Index("ix_lead_streams_org_source", "organization_id", "source_match"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("organizations.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_match: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    segment_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+
+    pipeline_stage_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("pipeline_stages.id"), nullable=True
+    )
+    owner_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    default_tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_lead_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lead_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
+    pipeline_stage: Mapped["PipelineStage | None"] = relationship("PipelineStage")
+    owner: Mapped["User | None"] = relationship("User", foreign_keys=[owner_id])  # noqa: F821
 
 
 class Lead(db.Model):

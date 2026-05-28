@@ -286,6 +286,50 @@ class EmailService:
         )
         return {"success": False, "email_log_id": log.id, "error": error}
 
+    @staticmethod
+    def send_stream_health_alert(
+        *, to_email: str, org_name: str, stale_streams: list[dict]
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        app_base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        settings_url = f"{app_base_url}/settings/streams" if app_base_url else "/settings/streams"
+        rows_html = "".join(
+            "<tr>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('name') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('last_lead_at') or '—'))}</td>"
+            "</tr>"
+            for item in stale_streams
+        )
+        subject = f"\u26a0 Liidivirta ei ole vastaanottanut liideja - {org_name}"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Varoitus: liidivirran aktiivisuus</h2>"
+            "<p>Seuraavat liidivirrat eivat ole vastaanottaneet liideja 3+ paivaan:</p>"
+            "<table style='border-collapse:collapse;width:100%;'>"
+            "<thead><tr><th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Liidivirta</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Viimeksi aktiivinen</th></tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            f"<p style='margin-top:16px;'><a href='{html.escape(settings_url)}'>Tarkista n8n-workflow</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = "Seuraavat liidivirrat eivat ole vastaanottaneet liideja 3+ paivaan."
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
 
 class TemplateService:
     @staticmethod

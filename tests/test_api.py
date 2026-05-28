@@ -9,7 +9,7 @@ from app.api.services import create_api_key, revoke_api_key
 from app.core.permissions import TWO_FA_SESSION_KEY
 from app.core.security import hash_api_key
 from app.extensions import db
-from app.leads.models import Activity, Lead, PipelineStage
+from app.leads.models import Activity, Lead, LeadStream, PipelineStage
 from app.users.models import AuditLog
 from app.users.services import create_organization, create_user
 
@@ -320,6 +320,37 @@ def test_list_only_own_org_leads(client, app):
     emails = [item["email"] for item in response.get_json()["data"]["leads"]]
     assert "mine@example.com" in emails
     assert "theirs@example.com" not in emails
+
+
+def test_stream_cross_tenant(client, app):
+    ctx = _setup_org(app, "streams-cross")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    other_key, _ = _create_api_key_for_org(app, ctx["other_org_id"])
+    with app.app_context():
+        mine = LeadStream(
+            organization_id=ctx["org_id"],
+            name="Mine",
+            source_match="linkedin",
+            is_active=True,
+            lead_count=2,
+        )
+        other = LeadStream(
+            organization_id=ctx["other_org_id"],
+            name="Other",
+            source_match="website",
+            is_active=True,
+            lead_count=5,
+        )
+        db.session.add_all([mine, other])
+        db.session.commit()
+
+    mine_resp = client.get("/api/v1/streams", headers=_auth_headers(full_key))
+    other_resp = client.get("/api/v1/streams", headers=_auth_headers(other_key))
+    mine_names = {s["name"] for s in mine_resp.get_json()["data"]["streams"]}
+    other_names = {s["name"] for s in other_resp.get_json()["data"]["streams"]}
+    assert "Mine" in mine_names
+    assert "Other" not in mine_names
+    assert "Other" in other_names
 
 
 def test_detail_cross_tenant_404(client, app):
