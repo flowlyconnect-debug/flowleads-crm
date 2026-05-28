@@ -443,6 +443,17 @@ def test_normal_user_cannot_create_key(client, app):
     assert response.status_code == 403
 
 
+def test_admin_can_open_streams_settings(client, app):
+    ctx = _setup_org(app, "ui-streams")
+    client.post(
+        "/auth/login",
+        data={"email": ctx["admin_email"], "password": "securepassword1"},
+    )
+    response = client.get("/settings/streams")
+    assert response.status_code == 200
+    assert b"Liidivirrat" in response.data
+
+
 def test_superadmin_create_key_after_2fa(client, app):
     with app.app_context():
         sa = create_user("sa-api@test.com", "securepassword1", role="superadmin")
