@@ -1,5 +1,8 @@
-from flask import jsonify, render_template, request
+from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_limiter.errors import RateLimitExceeded
+from flask_login import current_user
+from sqlalchemy.exc import OperationalError, ProgrammingError
+from werkzeug.exceptions import HTTPException
 
 from app.extensions import db
 
@@ -37,7 +40,29 @@ def json_success(data=None, status: int = 200):
     )
 
 
+def _log_server_error(error, *, hint: str | None = None) -> None:
+    exc = error
+    if isinstance(error, HTTPException) and error.original_exception is not None:
+        exc = error.original_exception
+    message = f"{request.method} {request.path}"
+    if hint:
+        message = f"{message} — {hint}"
+    current_app.logger.exception("Server error: %s", message, exc_info=exc)
+
+
 def register_error_handlers(app):
+    @app.errorhandler(ProgrammingError)
+    @app.errorhandler(OperationalError)
+    def handle_database_error(error):
+        db.session.rollback()
+        _log_server_error(
+            error,
+            hint="Database schema/query failure — ensure `flask db upgrade` has been applied",
+        )
+        if wants_json_response():
+            return json_error("database_error", "A database error occurred.", 500)
+        return render_template("errors/500.html"), 500
+
     @app.errorhandler(RateLimitExceeded)
     def handle_rate_limit_exceeded(error: RateLimitExceeded):
         if wants_json_response():
@@ -73,6 +98,14 @@ def register_error_handlers(app):
 
     @app.errorhandler(404)
     def not_found(error):
+        if (
+            not wants_json_response()
+            and current_user.is_authenticated
+            and current_user.is_superadmin()
+            and getattr(error, "description", None) == "Organization not found."
+        ):
+            flash("Valittua organisaatiota ei löytynyt. Valitse organisaatio dashboardilta.", "warning")
+            return redirect(url_for("analytics.dashboard"))
         if wants_json_response():
             return json_error("not_found", "The requested resource was not found.", 404)
         return render_template("errors/404.html"), 404
@@ -104,6 +137,7 @@ def register_error_handlers(app):
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
+        _log_server_error(error)
         if wants_json_response():
             code = "server_error" if request.path.startswith("/api") else "internal_error"
             return json_error(code, "An unexpected error occurred.", 500)

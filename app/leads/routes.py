@@ -224,7 +224,9 @@ def list_leads():
     from app.analytics.currency import currency_symbol, get_default_currency
 
     org_currency = get_default_currency(organization_id)
-    form_args = {k: v for k, v in request.args.items() if v != ""}
+    form_args = request.args.copy()
+    for key in ("organization_id", "page"):
+        form_args.pop(key, None)
     filter_form = LeadFilterForm(form_args, meta={"csrf": False})
     stages = PipelineStage.query.filter_by(organization_id=organization_id).order_by(
         PipelineStage.order_index

@@ -55,11 +55,18 @@ def _get_cached_dashboard_stats(organization_id: int, period_days: int = 30) -> 
 
     timeout = int(current_app.config.get("DASHBOARD_CACHE_SECONDS", 300))
     cache_key = f"dashboard_stats:{organization_id}:{period_days}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
+    try:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+    except Exception as exc:
+        current_app.logger.warning("Dashboard cache read failed: %s", exc)
+
     data = AnalyticsService.get_dashboard_stats(organization_id, period_days=period_days)
-    cache.set(cache_key, data, timeout=timeout)
+    try:
+        cache.set(cache_key, data, timeout=timeout)
+    except Exception as exc:
+        current_app.logger.warning("Dashboard cache write failed: %s", exc)
     return data
 
 

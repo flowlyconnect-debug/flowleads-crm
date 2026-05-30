@@ -229,7 +229,7 @@
               </td>
               <td class="leads-cell-stage">
                 <span class="badge badge-neutral badge--dot leads-stage-badge">
-                  {{ lead.stage.name }}
+                  {{ lead.stage.name if lead.stage else '—' }}
                 </span>
               </td>
               <td class="leads-cell-score">
