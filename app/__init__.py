@@ -15,6 +15,8 @@ def create_app(config_object=None):
     if app.config.get("REDIS_URL"):
         app.config["CACHE_TYPE"] = "RedisCache"
         app.config["CACHE_REDIS_URL"] = app.config["REDIS_URL"]
+        app.config["RATELIMIT_STORAGE_URI"] = app.config["REDIS_URL"]
+        _configure_redis_fallback(app)
 
     if not app.config.get("SECRET_KEY"):
         if app.config.get("TESTING"):
@@ -32,8 +34,37 @@ def create_app(config_object=None):
     _register_root_routes(app)
     _init_ai_enrichment(app)
     _init_scheduler(app)
+    _log_db_health(app)
 
     return app
+
+
+def _configure_redis_fallback(app):
+    """Fall back to in-memory cache/rate limits when Redis is unreachable."""
+    redis_url = app.config.get("REDIS_URL")
+    if not redis_url:
+        return
+    try:
+        import redis
+
+        client = redis.from_url(redis_url, socket_connect_timeout=2)
+        client.ping()
+    except Exception as exc:
+        app.logger.warning(
+            "REDIS_URL unreachable (%s); using in-memory cache and rate-limit storage",
+            exc,
+        )
+        app.config["CACHE_TYPE"] = "SimpleCache"
+        app.config.pop("CACHE_REDIS_URL", None)
+        app.config["RATELIMIT_STORAGE_URI"] = "memory://"
+
+
+def _log_db_health(app):
+    if app.config.get("TESTING"):
+        return
+    from app.core.db_health import log_migration_status
+
+    log_migration_status(app)
 
 
 def _init_scheduler(app):

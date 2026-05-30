@@ -49,6 +49,17 @@ def health():
     return json_success({"status": "ok", "version": API_VERSION})
 
 
+@api_bp.route("/health/db", methods=["GET"])
+def health_db():
+    from app.core.db_health import full_health_report
+
+    report = full_health_report()
+    response, _status = json_success(report)
+    if not report["ok"]:
+        response.status_code = 503
+    return response
+
+
 @api_bp.route("/me", methods=["GET"])
 @require_api_key
 @limiter.limit(api_rate_limit, key_func=api_rate_limit_key)

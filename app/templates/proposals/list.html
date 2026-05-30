@@ -44,7 +44,7 @@
           <div class="proposal-ref">{{ proposal.reference_number }}</div>
           <div class="proposal-company">{{ company_name }}</div>
         </div>
-        <div class="proposal-value">€{{ '{:,.0f}'.format(proposal.total).replace(',', ' ') }}</div>
+        <div class="proposal-value">€{{ '{:,.0f}'.format(proposal.total or 0).replace(',', ' ') }}</div>
       </div>
 
       <div class="proposal-timeline">

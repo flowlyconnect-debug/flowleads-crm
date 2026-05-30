@@ -108,3 +108,12 @@ def test_leads_list_with_data_and_filters(client, app, org_admin):
     _login(client, org_admin["email"])
     response = client.get(f"/leads?created_from=2026-01-01&stage_id={stage_id}")
     _assert_page_ok(response)
+
+
+def test_health_db_reports_ok(client, app):
+    response = client.get("/api/v1/health/db")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert payload["data"]["ok"] is True
+    assert payload["data"]["schema"]["ok"] is True

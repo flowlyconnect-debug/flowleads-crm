@@ -8,7 +8,7 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     releaseCommand: flask db upgrade
-    startCommand: gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
+    startCommand: flask db upgrade && gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
     envVars:
       - key: FLASK_APP
         value: run.py
