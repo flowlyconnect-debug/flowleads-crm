@@ -1,4 +1,4 @@
-from flask import Blueprint, g, request
+from flask import Blueprint, abort, g, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.auth import require_api_key
@@ -58,6 +58,34 @@ def health_db():
     if not report["ok"]:
         response.status_code = 503
     return response
+
+
+@api_bp.route("/debug/last-error", methods=["GET"])
+def debug_last_error():
+    from app.core.diagnostics import diagnostics_enabled, get_last_error
+
+    if not diagnostics_enabled():
+        abort(404)
+    last_error = get_last_error()
+    if last_error is None:
+        return json_success(
+            {
+                "path": None,
+                "args": {},
+                "error_type": None,
+                "error_message": None,
+                "traceback": None,
+            }
+        )
+    return json_success(
+        {
+            "path": last_error.get("path"),
+            "args": last_error.get("args") or {},
+            "error_type": last_error.get("error_type"),
+            "error_message": last_error.get("error_message"),
+            "traceback": last_error.get("traceback"),
+        }
+    )
 
 
 @api_bp.route("/me", methods=["GET"])

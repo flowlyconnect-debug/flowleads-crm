@@ -2,8 +2,8 @@ from flask import current_app, flash, jsonify, redirect, render_template, reques
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import current_user
 from sqlalchemy.exc import OperationalError, ProgrammingError
-from werkzeug.exceptions import HTTPException
 
+from app.core.diagnostics import capture_server_error
 from app.extensions import db
 
 
@@ -40,14 +40,8 @@ def json_success(data=None, status: int = 200):
     )
 
 
-def _log_server_error(error, *, hint: str | None = None) -> None:
-    exc = error
-    if isinstance(error, HTTPException) and error.original_exception is not None:
-        exc = error.original_exception
-    message = f"{request.method} {request.path}"
-    if hint:
-        message = f"{message} — {hint}"
-    current_app.logger.exception("Server error: %s", message, exc_info=exc)
+def _log_server_error(error, *, hint: str | None = None, status_code: int = 500) -> None:
+    capture_server_error(error, hint=hint, status_code=status_code)
 
 
 def register_error_handlers(app):

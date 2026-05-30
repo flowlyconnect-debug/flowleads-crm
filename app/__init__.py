@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for
 from flask_login import current_user
 
 from app.config import apply_testing_defaults, get_config
+from app.core.diagnostics import configure_stdout_logging
 from app.core.errors import register_error_handlers
 from app.extensions import cache, csrf, db, limiter, login_manager, mail, migrate
 
@@ -11,6 +12,7 @@ def create_app(config_object=None):
     config = config_object or get_config()
     app.config.from_object(config)
     apply_testing_defaults(app)
+    configure_stdout_logging(app)
 
     if app.config.get("REDIS_URL"):
         app.config["CACHE_TYPE"] = "RedisCache"

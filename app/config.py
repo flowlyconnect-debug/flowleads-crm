@@ -85,6 +85,8 @@ class Config:
     MICROSOFT_CLIENT_SECRET = os.environ.get("MICROSOFT_CLIENT_SECRET")
     MICROSOFT_REDIRECT_URI = os.environ.get("MICROSOFT_REDIRECT_URI")
 
+    DEBUG_DIAGNOSTICS = os.environ.get("DEBUG_DIAGNOSTICS", "false").lower() == "true"
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
