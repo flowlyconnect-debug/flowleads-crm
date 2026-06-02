@@ -2,11 +2,14 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from app.core.errors import json_error, json_success, wants_json_response
 from app.extensions import db
+from app.leads.models import Lead
 from app.leads.permissions import can_assign_to_others, resolve_organization_id
 from app.tasks.forms import QuickTaskForm
+from app.tasks.models import Task
 from app.tasks.models import TASK_PRIORITIES, TASK_TYPES
 from app.tasks.services import TaskService, TaskServiceError, get_task_for_org
 from app.users.models import User
@@ -33,6 +36,14 @@ def _org_query_suffix(organization_id: int) -> dict:
     if current_user.is_superadmin():
         return {"organization_id": organization_id}
     return {}
+
+
+def _to_utc(dt):
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 @tasks_bp.before_request
@@ -62,12 +73,6 @@ def inject_overdue_count():
 @tasks_bp.route("")
 def list_tasks():
     organization_id = resolve_organization_id()
-    tab = request.args.get("tab", "today")
-    if tab not in ("today", "week", "all", "overdue"):
-        tab = "today"
-
-    task_type = request.args.get("type") or None
-    priority = request.args.get("priority") or None
     if can_assign_to_others():
         raw_assigned = request.args.get("assigned_to", str(current_user.id))
         if raw_assigned == "all":
@@ -80,28 +85,79 @@ def list_tasks():
     else:
         assigned_filter = current_user.id
 
-    tasks = TaskService.list_tasks(
-        organization_id,
-        tab=tab,
-        task_type=task_type,
-        priority=priority,
-        assigned_to=assigned_filter,
+    now = datetime.now(timezone.utc)
+    start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_today = start_today + timedelta(days=1)
+    start_week = start_today - timedelta(days=start_today.weekday())
+    end_week = start_week + timedelta(days=7)
+    tomorrow = end_today
+
+    open_query = Task.query.filter(
+        Task.organization_id == organization_id,
+        Task.status.in_(("pending", "in_progress")),
+    )
+    if assigned_filter is not None:
+        open_query = open_query.filter(Task.assigned_to == assigned_filter)
+    open_tasks = open_query.options(joinedload(Task.lead)).order_by(Task.due_date.asc()).all()
+
+    overdue_tasks = []
+    today_tasks = []
+    week_tasks = []
+    later_tasks = []
+    for task in open_tasks:
+        due_date = _to_utc(task.due_date)
+        if due_date is None:
+            continue
+        if due_date < start_today:
+            overdue_tasks.append(task)
+        elif due_date < end_today:
+            today_tasks.append(task)
+        elif tomorrow <= due_date < end_week:
+            week_tasks.append(task)
+        elif due_date >= end_week:
+            later_tasks.append(task)
+
+    completed_query = Task.query.filter(
+        Task.organization_id == organization_id,
+        Task.status == "completed",
+    )
+    if assigned_filter is not None:
+        completed_query = completed_query.filter(Task.assigned_to == assigned_filter)
+    completed_tasks = (
+        completed_query.options(joinedload(Task.lead))
+        .order_by(Task.completed_at.desc(), Task.updated_at.desc())
+        .limit(20)
+        .all()
     )
 
     quick_form = QuickTaskForm()
-    default_due = datetime.now(timezone.utc) + timedelta(days=1)
+    default_due = datetime.now(timezone.utc)
     quick_form.due_date.data = default_due.replace(tzinfo=None)
 
     users = _org_users(organization_id) if can_assign_to_others() else []
+    leads = (
+        Lead.query.filter_by(organization_id=organization_id)
+        .order_by(Lead.updated_at.desc())
+        .limit(200)
+        .all()
+    )
     return render_template(
         "tasks/list.html",
-        tasks=tasks,
-        tab=tab,
         quick_form=quick_form,
         task_types=TASK_TYPES,
         priorities=TASK_PRIORITIES,
         users=users,
+        leads=leads,
+        overdue_tasks=overdue_tasks,
+        today_tasks=today_tasks,
+        week_tasks=week_tasks,
+        later_tasks=later_tasks,
+        completed_tasks=completed_tasks,
+        today_date=start_today.date(),
+        week_start=start_week,
+        week_end=end_week - timedelta(days=1),
         organization_id=organization_id,
+        assigned_filter=assigned_filter,
         can_assign_others=can_assign_to_others(),
         org_query=_org_query_suffix(organization_id),
     )
@@ -133,13 +189,39 @@ def create_task():
                 actor_role=current_user.role,
             )
             db.session.commit()
+            due = _to_utc(task.due_date)
+            today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            tomorrow = today + timedelta(days=1)
+            week_end = today - timedelta(days=today.weekday()) + timedelta(days=7)
+            section = "later"
+            if due and due < today:
+                section = "overdue"
+            elif due and due < tomorrow:
+                section = "today"
+            elif due and due < week_end:
+                section = "week"
             return json_success(
                 {
                     "task": {
                         "id": task.id,
                         "title": task.title,
                         "lead_id": task.lead_id,
+                        "lead_name": (
+                            task.lead.company if task.lead and task.lead.company else (task.lead.display_name if task.lead else "")
+                        ),
                         "status": task.status,
+                        "priority": task.priority,
+                        "due_date": task.due_date.isoformat() if task.due_date else None,
+                        "due_time": due.strftime("%H:%M") if due else "",
+                        "due_day": due.strftime("%d.%m.") if due else "",
+                        "overdue_days": (today - due.replace(hour=0, minute=0, second=0, microsecond=0)).days if due and due < today else 0,
+                        "lead_url": (
+                            url_for("leads.detail", lead_id=task.lead_id, **_org_query_suffix(organization_id))
+                            if task.lead_id
+                            else None
+                        ),
+                        "complete_url": url_for("tasks.complete_task", task_id=task.id, **_org_query_suffix(organization_id)),
+                        "section": section,
                     }
                 },
                 status=201,

@@ -3680,6 +3680,141 @@ body.modal-open {
   transition: opacity 220ms ease, transform 220ms ease;
 }
 
+.tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tasks-inline-form {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.tasks-inline-form form {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tasks-inline-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.task-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.task-section--overdue {
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+}
+
+.task-section__header {
+  margin-bottom: 8px;
+}
+
+.task-section__header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.task-badge {
+  background: #e5e7eb;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.task-badge--danger {
+  background: #ef4444;
+  color: #fff;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #edf0f5;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.task-row__title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.task-row__meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.task-row__due {
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.task-row__due--danger {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.task-row__action {
+  font-size: 13px;
+}
+
+.task-week-range {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.task-toggle-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.priority-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+}
+
+.tasks-empty-inline {
+  color: #16a34a;
+  margin: 8px 0 0;
+}
+
+.task-row--muted {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 .task-card {
   display: flex;
   align-items: flex-start;

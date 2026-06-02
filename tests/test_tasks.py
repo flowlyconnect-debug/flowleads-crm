@@ -284,3 +284,144 @@ def test_api_create_lead_task(app, client):
 def test_tasks_page_requires_login(client):
     response = client.get("/tasks")
     assert response.status_code == 302
+
+
+def test_task_sections_overdue_visibility(app, client):
+    ctx = _setup_org_with_users(app, "sections-overdue")
+    _login(client, ctx["admin_email"])
+
+    response = client.get("/tasks")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-section="overdue"' not in html
+
+    with app.app_context():
+        TaskService.create(
+            {
+                "title": "Late now",
+                "due_date": datetime.now(timezone.utc) - timedelta(days=1),
+                "assigned_to": ctx["admin_id"],
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        db.session.commit()
+
+    response = client.get("/tasks")
+    html = response.get_data(as_text=True)
+    assert 'data-section="overdue"' in html
+    assert "Myöhässä" in html
+
+
+def test_task_sections_today_and_week_split(app, client):
+    ctx = _setup_org_with_users(app, "sections-today-week")
+    _login(client, ctx["admin_email"])
+    now = datetime.now(timezone.utc)
+    start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = start_today + timedelta(days=1, hours=10)
+    end_of_week = start_today - timedelta(days=start_today.weekday()) + timedelta(days=6, hours=12)
+    next_week = start_today - timedelta(days=start_today.weekday()) + timedelta(days=8, hours=9)
+    with app.app_context():
+        TaskService.create(
+            {"title": "Today task", "due_date": start_today + timedelta(hours=9), "assigned_to": ctx["admin_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        TaskService.create(
+            {"title": "Week task", "due_date": tomorrow, "assigned_to": ctx["admin_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        TaskService.create(
+            {"title": "Later task", "due_date": next_week, "assigned_to": ctx["admin_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        if tomorrow > end_of_week:
+            pytest.skip("Time boundary on Sunday; tomorrow is next week in UTC.")
+        db.session.commit()
+
+    response = client.get("/tasks")
+    html = response.get_data(as_text=True)
+    assert "Today task" in html
+    assert "Week task" in html
+    assert 'id="later-list"' in html
+    assert "Later task" in html
+
+
+def test_completed_tasks_hidden_by_default(app, client):
+    ctx = _setup_org_with_users(app, "sections-completed")
+    _login(client, ctx["admin_email"])
+    due = datetime.now(timezone.utc) + timedelta(hours=1)
+    with app.app_context():
+        task = TaskService.create(
+            {"title": "Complete me", "due_date": due, "assigned_to": ctx["admin_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        db.session.commit()
+        TaskService.complete(task.id, ctx["org_id"], ctx["admin_id"])
+        db.session.commit()
+
+    response = client.get("/tasks")
+    html = response.get_data(as_text=True)
+    assert "Näytä tehdyt tehtävät" in html
+    assert 'id="completed-list" class="is-hidden"' in html
+
+
+def test_checkbox_complete_updates_status_via_ajax(app, client):
+    ctx = _setup_org_with_users(app, "sections-complete-ajax")
+    _login(client, ctx["admin_email"])
+    with app.app_context():
+        task = TaskService.create(
+            {
+                "title": "Ajax complete",
+                "due_date": datetime.now(timezone.utc) + timedelta(hours=2),
+                "assigned_to": ctx["admin_id"],
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        db.session.commit()
+        task_id = task.id
+
+    response = client.post(
+        f"/tasks/{task_id}/complete",
+        headers={"Accept": "application/json"},
+    )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["success"] is True
+    with app.app_context():
+        refreshed = db.session.get(Task, task_id)
+        assert refreshed.status == "completed"
+
+
+def test_tasks_page_cross_tenant_isolated(app, client):
+    ctx = _setup_org_with_users(app, "sections-tenant")
+    _login(client, ctx["admin_email"])
+    with app.app_context():
+        TaskService.create(
+            {
+                "title": "Visible org task",
+                "due_date": datetime.now(timezone.utc) + timedelta(hours=3),
+                "assigned_to": ctx["admin_id"],
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+        )
+        TaskService.create(
+            {
+                "title": "Other org secret task",
+                "due_date": datetime.now(timezone.utc) + timedelta(hours=3),
+                "assigned_to": ctx["other_admin_id"],
+            },
+            ctx["other_org_id"],
+            ctx["other_admin_id"],
+        )
+        db.session.commit()
+
+    response = client.get("/tasks")
+    html = response.get_data(as_text=True)
+    assert "Visible org task" in html
+    assert "Other org secret task" not in html

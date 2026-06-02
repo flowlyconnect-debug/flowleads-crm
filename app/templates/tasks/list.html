@@ -1,229 +1,296 @@
 {% extends "base.html" %}
-{% from "components/empty_state.html" import empty_state %}
 {% block title %}Tehtävät — FlowLeads{% endblock %}
 {% block content %}
+{% set weekday_names = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su'] %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 <div class="tasks-page">
-  <header class="page-header">
-    <div class="page-header__main">
-      <h1>Tehtävät</h1>
-      <p class="page-subtitle">Nopea työtila — tänään, viikko ja myöhässä</p>
-    </div>
+  <header class="tasks-header">
+    <h1>Tehtävät</h1>
+    <button type="button" class="btn btn-primary" id="toggle-task-form">+ Uusi tehtävä</button>
   </header>
 
-  <section class="tasks-quick-add" aria-label="Pikalisäys">
-    <h2 class="tasks-quick-add__title">Pikalisäys</h2>
-    <form method="post" action="{{ url_for('tasks.create_task', **org_query) }}" class="tasks-quick-add__form">
-      {{ quick_form.hidden_tag() }}
-      <label class="form-label">{{ quick_form.title.label.text }}
-        {{ quick_form.title(placeholder='Tehtävän otsikko', class='form-input') }}
+  <section class="tasks-inline-form is-hidden" id="task-create-wrapper">
+    <form id="task-create-form" action="{{ url_for('tasks.create_task', **org_query) }}">
+      <label class="form-label">Title
+        <input type="text" name="title" class="form-input" placeholder="Tehtävän otsikko" required>
       </label>
-      <label class="form-label">{{ quick_form.type.label.text }}
-        {{ quick_form.type(class='form-select') }}
+
+      <label class="form-label">Liidi
+        <input type="text" class="form-input" id="lead-search" list="lead-options" placeholder="Hae liidiä">
+        <input type="hidden" name="lead_id" id="lead-id-input">
+        <datalist id="lead-options">
+          {% for lead in leads %}
+          <option value="{{ lead.company or lead.display_name }}" data-lead-id="{{ lead.id }}"></option>
+          {% endfor %}
+        </datalist>
       </label>
-      <label class="form-label">{{ quick_form.priority.label.text }}
-        {{ quick_form.priority(class='form-select') }}
+
+      <label class="form-label">Eräpäivä
+        <input type="date" name="due_date" class="form-input" value="{{ today_date.strftime('%Y-%m-%d') }}" required>
       </label>
-      <label class="form-label">{{ quick_form.due_date.label.text }}
-        {{ quick_form.due_date(class='form-input') }}
+
+      <label class="form-label">Prioriteetti
+        <select name="priority" class="form-select">
+          <option value="low">Low</option>
+          <option value="normal" selected>Normal</option>
+          <option value="high">High</option>
+        </select>
       </label>
-      <button type="submit" class="btn btn-primary">Lisää</button>
+
+      <div class="tasks-inline-form__actions">
+        <button type="submit" class="btn btn-primary">Lisää tehtävä</button>
+        <button type="button" class="btn btn-secondary" id="cancel-task-form">Peruuta</button>
+      </div>
     </form>
   </section>
 
-  <nav class="tasks-columns-nav" aria-label="Tehtäväjaksot">
-    {% set column_tabs = [
-      ('today', 'Tänään', false),
-      ('week', 'Tämä viikko', false),
-      ('overdue', 'Myöhässä', true),
-      ('all', 'Kaikki', false),
-    ] %}
-    {% for key, label, is_overdue in column_tabs %}
-    <a href="{{ url_for('tasks.list_tasks', tab=key, type=request.args.get('type'), priority=request.args.get('priority'), assigned_to=request.args.get('assigned_to'), **org_query) }}"
-       class="tasks-column-tab{% if tab == key %} is-active{% endif %}{% if is_overdue %} tasks-column-tab--overdue{% endif %}"
-       {% if tab == key %}aria-current="page"{% endif %}>
-      {{ label }}
-      {% if key == 'overdue' and nav_overdue_count %}
-      <span class="tasks-column-tab__count">{{ nav_overdue_count }}</span>
-      {% endif %}
-    </a>
-    {% endfor %}
-  </nav>
-
-  <form method="get" class="tasks-filters-bar">
-    {% if org_query.organization_id %}<input type="hidden" name="organization_id" value="{{ org_query.organization_id }}">{% endif %}
-    <input type="hidden" name="tab" value="{{ tab }}">
-    <label class="form-label">Tyyppi
-      <select name="type" class="form-select" onchange="this.form.submit()">
-        <option value="">Kaikki</option>
-        {% for t in task_types %}
-        <option value="{{ t }}" {% if request.args.get('type') == t %}selected{% endif %}>{{ t }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="form-label">Prioriteetti
-      <select name="priority" class="form-select" onchange="this.form.submit()">
-        <option value="">Kaikki</option>
-        {% for p in priorities %}
-        <option value="{{ p }}" {% if request.args.get('priority') == p %}selected{% endif %}>{{ p }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% if can_assign_others %}
-    <label class="form-label">Vastuuhenkilö
-      <select name="assigned_to" class="form-select" onchange="this.form.submit()">
-        <option value="{{ current_user.id }}" {% if request.args.get('assigned_to', current_user.id|string) == current_user.id|string %}selected{% endif %}>Minä</option>
-        <option value="all" {% if request.args.get('assigned_to') == 'all' %}selected{% endif %}>Kaikki</option>
-        {% for u in users %}
-        <option value="{{ u.id }}" {% if request.args.get('assigned_to') == u.id|string %}selected{% endif %}>{{ u.email }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-  </form>
-
-  {% set open_tasks = tasks | selectattr('status', 'ne', 'completed') | list %}
-  {% set focus_task = open_tasks[0] if open_tasks else none %}
-  {% set queued_tasks = open_tasks[1:] if open_tasks|length > 1 else [] %}
-
-  <section class="focus-card{% if focus_task and focus_task.is_overdue %} focus-overdue{% elif focus_task and tab == 'today' %} focus-today{% endif %}">
-    {% if focus_task %}
-    <div class="focus-card-label">
-      {% if focus_task.is_overdue %}⚠ MYÖHÄSSÄ{% else %}▶ TEE SEURAAVAKSI{% endif %}
+  {% if overdue_tasks %}
+  <section class="task-section task-section--overdue" data-section="overdue">
+    <header class="task-section__header">
+      <h2>Myöhässä <span class="task-badge task-badge--danger">{{ overdue_tasks|length }}</span></h2>
+    </header>
+    <div class="task-list">
+      {% for task in overdue_tasks %}
+      <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
+        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <div class="task-row__main">
+          <div class="task-row__title">{{ task.title }}</div>
+          <div class="task-row__meta">
+            {% if task.lead %}
+            <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">{{ task.lead.company or task.lead.display_name }}</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="task-row__due task-row__due--danger">Myöhässä {{ (today_date - task.due_date.date()).days }} pv</div>
+        <div class="task-row__action">
+          {% if task.lead %}<a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">Avaa liidi →</a>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
     </div>
-    <div class="focus-card-title">{{ focus_task.title }}</div>
-    <div class="focus-card-meta">
-      {% if focus_task.lead %}
-      <a href="#" onclick="openLeadDrawer({{ focus_task.lead.id }});return false;" class="focus-lead-link">{{ focus_task.lead.company or focus_task.lead.display_name }}</a>
-      {% endif %}
-      {% if focus_task.due_date %} · {{ focus_task.due_date.strftime('%d.%m. klo %H:%M') }}{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="task-section" data-section="today">
+    <header class="task-section__header">
+      <h2>Tänään <span class="task-badge">{{ today_tasks|length }}</span></h2>
+    </header>
+    <div class="task-list" id="today-list">
+      {% for task in today_tasks %}
+      <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
+        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <div class="task-row__main">
+          <div class="task-row__title">{{ task.title }}</div>
+          <div class="task-row__meta">
+            {% if task.lead %}
+            <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">{{ task.lead.company or task.lead.display_name }}</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="task-row__due">{{ task.due_date.strftime('%H:%M') if task.due_date.strftime('%H:%M') != '00:00' else 'Tänään' }}</div>
+        <div class="task-row__action">
+          {% if task.priority == 'high' or task.priority == 'urgent' %}
+          <span class="priority-dot" title="Korkea prioriteetti"></span>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
     </div>
-    <div class="focus-card-actions">
-      <button class="btn btn-primary"
-              data-complete-url="{{ url_for('tasks.complete_task', task_id=focus_task.id, **org_query) }}"
-              onclick="completeTask({{ focus_task.id }}, this, true)">
-        ✓ Merkitse valmiiksi
-      </button>
-      <a href="{{ url_for('tasks.list_tasks', tab=tab, type=request.args.get('type'), priority=request.args.get('priority'), assigned_to=request.args.get('assigned_to'), **org_query) }}" class="btn btn-secondary">
-        ⏰ Siirrä 1h
-      </a>
-      {% if focus_task.lead %}
-      <a href="{{ url_for('email.compose', lead_id=focus_task.lead.id, **org_query) }}" class="btn btn-secondary">✉ Sähköposti</a>
-      {% endif %}
-    </div>
-    {% else %}
-    {{ empty_state(
-      "ti-circle-check",
-      "Ei tehtäviä tänään — olet ajan tasalla!",
-      "",
-      "Lisää tehtävä",
-      "/tasks/new"
-    ) }}
-    {% endif %}
+    <p class="tasks-empty-inline{% if today_tasks %} is-hidden{% endif %}" id="today-empty">✅ Ei tehtäviä tänään — olet ajan tasalla!</p>
   </section>
 
-  <div class="task-queue" role="list">
-    {% for task in queued_tasks %}
-    <div class="task-queue-item priority-{{ task.priority }}" data-task-id="{{ task.id }}" role="listitem">
-      <button class="task-check"
-              data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"
-              onclick="completeTask({{ task.id }}, this)"
-              title="Merkitse valmiiksi">○</button>
-      <div class="task-queue-content">
-        <div class="task-queue-title">{{ task.title }}</div>
-        <div class="task-queue-meta">
-          {% if task.lead %}<span class="task-lead">{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
-          <span class="task-type-dot task-{{ task.type }}"></span>
-          <span class="task-due {% if task.is_overdue %}overdue{% endif %}">
-            {% if task.is_overdue %}
-            ⚠ Myöhässä
-            {% elif tab == 'today' and task.due_date %}
-            Tänään {{ task.due_date.strftime('%H:%M') }}
-            {% else %}
-            {{ task.due_date.strftime('%d.%m.') if task.due_date else '' }}
-            {% endif %}
-          </span>
+  <section class="task-section" data-section="week">
+    <header class="task-section__header">
+      <h2>Tämä viikko <span class="task-week-range">{{ week_start.strftime('%d.%m.') }} - {{ week_end.strftime('%d.%m.') }}</span></h2>
+    </header>
+    <div class="task-list" id="week-list">
+      {% for task in week_tasks %}
+      <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
+        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <div class="task-row__main">
+          <div class="task-row__title">{{ task.title }}</div>
+          <div class="task-row__meta">
+            {% if task.lead %}<span>{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
+          </div>
         </div>
-      </div>
-      <div class="task-queue-actions">
-        {% if task.lead %}
-        <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}" class="task-action-link" title="Avaa liidi">→</a>
-        {% endif %}
-      </div>
+        <div class="task-row__due">{{ weekday_names[task.due_date.weekday()] }} {{ task.due_date.strftime('%d.%m.') }}</div>
+      </article>
+      {% endfor %}
     </div>
-    {% else %}
-    {% if not focus_task %}
-    <div class="report-card">
-      <div class="report-card__body">
-        {% if tab == 'today' %}
-        {{ empty_state(
-          "ti-circle-check",
-          "Ei tehtäviä tänään — olet ajan tasalla!",
-          "",
-          "Lisää tehtävä",
-          "/tasks/new"
-        ) }}
-        {% elif tab == 'overdue' %}
-        {{ empty_state(
-          "ti-circle-check",
-          "Ei myöhässä olevia tehtäviä",
-          "Kaikki eräpäivät ovat hallinnassa. Voit siirtyä uusiin aktiviteetteihin.",
-          "Avaa liidit",
-          "/leads"
-        ) }}
-        {% else %}
-        {{ empty_state(
-          "ti-circle-check",
-          "Luo seuraava tehtävä",
-          "Rakenna päivän fokus nopeasti pikalisäyksellä ja pidä myynti liikkeessä.",
-          "Lisää uusi tehtävä",
-          "/tasks/new"
-        ) }}
-        {% endif %}
-      </div>
+    <p class="tasks-empty-inline{% if week_tasks %} is-hidden{% endif %}" id="week-empty">Ei tulevia tehtäviä tällä viikolla</p>
+  </section>
+
+  <section class="task-section" data-section="later">
+    <header class="task-section__header task-section__header--toggle">
+      <button type="button" id="toggle-later" class="task-toggle-btn">Myöhemmin ▾</button>
+    </header>
+    <div class="task-list is-hidden" id="later-list">
+      {% for task in later_tasks %}
+      <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
+        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <div class="task-row__main">
+          <div class="task-row__title">{{ task.title }}</div>
+          <div class="task-row__meta">
+            {% if task.lead %}<span>{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="task-row__due">{{ task.due_date.strftime('%d.%m.') }}</div>
+      </article>
+      {% endfor %}
     </div>
-    {% endif %}
-    {% endfor %}
-  </div>
+  </section>
+
+  <section class="task-section task-section--completed">
+    <a href="#" id="toggle-completed">Näytä tehdyt tehtävät</a>
+    <div id="completed-list" class="is-hidden">
+      {% for task in completed_tasks %}
+      <article class="task-row task-row--muted">
+        <div class="task-row__main">
+          <div class="task-row__title">{{ task.title }}</div>
+          <div class="task-row__meta">
+            {% if task.lead %}<span>{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 
 <script>
-function completeTask(taskId, btn, isFocus) {
-  var url = btn.getAttribute('data-complete-url') || ('/tasks/' + taskId + '/complete');
-  var token = document.getElementById('csrf-token') && document.getElementById('csrf-token').value;
-  fetch(url, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'X-CSRFToken': token || ''
-    },
-    credentials: 'same-origin'
-  })
-    .then(function(res) {
-      return res.json().then(function(data) {
-        return { ok: res.ok, data: data };
+(function() {
+  var csrf = document.getElementById('csrf-token') ? document.getElementById('csrf-token').value : '';
+  var createWrapper = document.getElementById('task-create-wrapper');
+  var toggleCreateBtn = document.getElementById('toggle-task-form');
+  var cancelCreateBtn = document.getElementById('cancel-task-form');
+  var createForm = document.getElementById('task-create-form');
+  var leadSearch = document.getElementById('lead-search');
+  var leadIdInput = document.getElementById('lead-id-input');
+  var laterList = document.getElementById('later-list');
+  var toggleLaterBtn = document.getElementById('toggle-later');
+  var toggleCompleted = document.getElementById('toggle-completed');
+  var completedList = document.getElementById('completed-list');
+
+  function wireCompleteButtons(scope) {
+    var root = scope || document;
+    root.querySelectorAll('.task-check').forEach(function(btn) {
+      if (btn.dataset.wired === '1') return;
+      btn.dataset.wired = '1';
+      btn.addEventListener('click', function() {
+        fetch(btn.dataset.completeUrl, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'X-CSRFToken': csrf },
+          credentials: 'same-origin'
+        }).then(function(res) {
+          return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+        }).then(function(result) {
+          if (!result.ok || !result.data.success) return;
+          var row = btn.closest('.task-row');
+          if (!row) return;
+          row.remove();
+          var section = btn.closest('.task-section');
+          if (section && section.dataset.section === 'today' && !section.querySelector('.task-row')) {
+            var e1 = document.getElementById('today-empty');
+            if (e1) e1.classList.remove('is-hidden');
+          }
+          if (section && section.dataset.section === 'week' && !section.querySelector('.task-row')) {
+            var e2 = document.getElementById('week-empty');
+            if (e2) e2.classList.remove('is-hidden');
+          }
+          if (section && section.dataset.section === 'overdue' && !section.querySelector('.task-row')) {
+            section.remove();
+          }
+        });
       });
-    })
-    .then(function(result) {
+    });
+  }
+
+  function buildTaskRow(task) {
+    var leadHtml = task.lead_url ? '<a href="' + task.lead_url + '">' + (task.lead_name || 'Liidi') + '</a>' : '';
+    var dueDate = task.due_date ? new Date(task.due_date) : null;
+    var weekday = dueDate ? dueDate.toLocaleDateString('fi-FI', { weekday: 'short' }) : '';
+    var dayMonth = dueDate ? (dueDate.getDate() + '.' + (dueDate.getMonth() + 1) + '.') : '';
+    var dueText = 'Tänään';
+    if (task.section === 'overdue') dueText = 'Myöhässä ' + task.overdue_days + ' pv';
+    if (task.section === 'today' && task.due_time) dueText = task.due_time;
+    if (task.section === 'week') dueText = weekday + ' ' + dayMonth;
+    if (task.section === 'later') dueText = dayMonth;
+    var action = task.lead_url ? '<a href="' + task.lead_url + '">Avaa liidi →</a>' : '';
+    var priorityDot = (task.priority === 'high' || task.priority === 'urgent') ? '<span class="priority-dot" title="Korkea prioriteetti"></span>' : '';
+    var html = '<article class="task-row priority-' + task.priority + '" data-task-id="' + task.id + '">' +
+      '<button class="task-check" type="button" data-complete-url="' + task.complete_url + '">○</button>' +
+      '<div class="task-row__main"><div class="task-row__title">' + task.title + '</div><div class="task-row__meta">' + leadHtml + '</div></div>' +
+      '<div class="task-row__due' + (task.section === 'overdue' ? ' task-row__due--danger' : '') + '">' + dueText + '</div>' +
+      '<div class="task-row__action">' + (task.section === 'today' ? priorityDot : action) + '</div>' +
+      '</article>';
+    var wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    return wrapper.firstChild;
+  }
+
+  toggleCreateBtn.addEventListener('click', function() {
+    createWrapper.classList.toggle('is-hidden');
+  });
+  cancelCreateBtn.addEventListener('click', function() {
+    createWrapper.classList.add('is-hidden');
+    createForm.reset();
+  });
+
+  leadSearch.addEventListener('input', function() {
+    var match = document.querySelector('#lead-options option[value="' + leadSearch.value.replace(/"/g, '\\"') + '"]');
+    leadIdInput.value = match ? (match.dataset.leadId || '') : '';
+  });
+
+  createForm.addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    var formData = new FormData(createForm);
+    var payload = {
+      title: formData.get('title'),
+      lead_id: formData.get('lead_id') || null,
+      due_date: formData.get('due_date'),
+      priority: formData.get('priority'),
+      type: 'follow_up'
+    };
+    fetch(createForm.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRFToken': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    }).then(function(res) {
+      return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    }).then(function(result) {
       if (!result.ok || !result.data.success) return;
-      if (isFocus) {
-        var focusCard = document.querySelector('.focus-card');
-        if (focusCard) {
-          focusCard.classList.add('task-queue-item--completing');
-        }
-        setTimeout(function() {
-          window.location.reload();
-        }, 320);
+      var task = result.data.data.task;
+      var row = buildTaskRow(task);
+      var target = document.getElementById(task.section + '-list');
+      if (target) {
+        target.prepend(row);
+      } else if (task.section === 'overdue') {
+        window.location.reload();
         return;
       }
-      var item = btn.closest('.task-queue-item');
-      if (!item) return;
-      item.classList.add('task-queue-item--completing');
-      setTimeout(function() {
-        item.remove();
-      }, 320);
-    })
-    .catch(function() {});
-}
+      wireCompleteButtons(row.parentNode || document);
+      var todayEmpty = document.getElementById('today-empty');
+      var weekEmpty = document.getElementById('week-empty');
+      if (task.section === 'today' && todayEmpty) todayEmpty.classList.add('is-hidden');
+      if (task.section === 'week' && weekEmpty) weekEmpty.classList.add('is-hidden');
+      createWrapper.classList.add('is-hidden');
+      createForm.reset();
+    });
+  });
+
+  toggleLaterBtn.addEventListener('click', function() {
+    laterList.classList.toggle('is-hidden');
+    toggleLaterBtn.textContent = laterList.classList.contains('is-hidden') ? 'Myöhemmin ▾' : 'Myöhemmin ▴';
+  });
+
+  toggleCompleted.addEventListener('click', function(ev) {
+    ev.preventDefault();
+    completedList.classList.toggle('is-hidden');
+    toggleCompleted.textContent = completedList.classList.contains('is-hidden') ? 'Näytä tehdyt tehtävät' : 'Piilota tehdyt tehtävät';
+  });
+
+  wireCompleteButtons(document);
+})();
 </script>
 {% endblock %}
