@@ -119,6 +119,43 @@ def test_fallback_stage(app):
         assert fallback_none is None
 
 
+def test_lead_settings_page_get_and_post(client, app):
+    with app.app_context():
+        org, stages, admin, _user = _setup_org("routing-ui")
+        org_id = org.id
+        admin_email = admin.email
+        stage_id = stages[0].id
+        db.session.commit()
+
+    _login(client, admin_email)
+    response = client.get("/settings/leads")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Liidiasetukset" in html
+    assert 'action="/settings/leads"' in html or "action=\"/settings/leads\"" in html
+
+    save_resp = client.post(
+        "/settings/leads",
+        data={
+            "default_pipeline_stage_id": str(stage_id),
+            "default_owner_id": "",
+            "default_tags": "b2b, saas",
+            "default_industry": "SaaS",
+            "default_region": "Uusimaa",
+        },
+        follow_redirects=True,
+    )
+    assert save_resp.status_code == 200
+    assert "Asetukset tallennettu" in save_resp.get_data(as_text=True)
+
+    with app.app_context():
+        settings = LeadRoutingService.get_settings(org_id)
+        assert settings.default_pipeline_stage_id == stage_id
+        assert settings.default_tags == ["b2b", "saas"]
+        assert settings.default_industry == "SaaS"
+        assert settings.default_region == "Uusimaa"
+
+
 def test_settings_auto_created(app):
     with app.app_context():
         org = create_organization("Auto settings", "routing-auto-settings")
@@ -155,26 +192,28 @@ def test_cross_tenant_settings_update_validation(client, app):
         db.session.commit()
 
     _login(client, admin_b_email)
-    response = client.put(
-        f"/settings/leads?organization_id={org_b_id}",
-        json={
+    response = client.post(
+        "/settings/leads",
+        data={
             "default_pipeline_stage_id": foreign_stage_id,
             "default_owner_id": "",
             "default_tags": "x",
         },
+        follow_redirects=True,
     )
-    assert response.status_code == 400
+    assert response.status_code == 200
     assert "Virheellinen vaihe" in response.get_data(as_text=True)
 
-    response2 = client.put(
-        f"/settings/leads?organization_id={org_b_id}",
-        json={
+    response2 = client.post(
+        "/settings/leads",
+        data={
             "default_pipeline_stage_id": local_stage_id,
             "default_owner_id": foreign_owner_id,
             "default_tags": "x",
         },
+        follow_redirects=True,
     )
-    assert response2.status_code == 400
+    assert response2.status_code == 200
     assert "Virheellinen omistaja" in response2.get_data(as_text=True)
 
 

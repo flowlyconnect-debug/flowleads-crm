@@ -6,202 +6,70 @@
   <div class="settings-layout">
     {{ settings_nav('lead_settings') }}
     <div class="settings-content">
-      <div class="settings-panel settings-panel--wide">
+      <div class="settings-panel">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Liidiasetukset</h1>
           <p class="settings-panel__subtitle">Hallinnoi miten automaattisesti saapuvat liidit reititetään</p>
         </header>
 
-        <section class="card p-4 mb-4" style="background:#F8FAFC;border:1px solid #E2E8F0;">
-          <div class="grid grid-cols-3 gap-3">
-            <div class="card p-3">
-              <div class="text-muted text-sm">Liidit yhteensä</div>
-              <div class="text-xl font-semibold">{{ settings.total_lead_count }}</div>
-            </div>
-            <div class="card p-3">
-              <div class="text-muted text-sm">Viimeksi saapunut</div>
-              <div class="text-xl font-semibold">{{ relative_last_lead_at }}</div>
-            </div>
-            <div class="card p-3">
-              <div class="text-muted text-sm">Status</div>
-              {% if settings.total_lead_count == 0 %}
-              <span class="badge badge-inactive">Odottaa ensimmäistä liidiä</span>
-              {% elif is_stale %}
-              <span class="badge" style="background:#FEF3C7;color:#92400E;">Ei liidejä 3+ päivään</span>
-              {% else %}
-              <span class="badge badge-active">Aktiivinen</span>
-              {% endif %}
-            </div>
-          </div>
-        </section>
-
-        <section class="card p-4 mb-4">
-          <h2 class="form-section-title mb-1">Reitityssäännöt</h2>
-          <p class="form-helper mb-3">Nämä asetukset koskevat kaikkia automaattisesti saapuvia liidejä</p>
-          <form id="lead-settings-form">
+        <div class="card p-4">
+          <form method="post" action="{{ url_for('settings.lead_settings') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="form-label">Minne uusi liidi menee?
-              <select class="form-select" name="default_pipeline_stage_id" id="stage-select">
+
+            <div class="form-group">
+              <label class="form-label">Minne uusi liidi menee?</label>
+              <select class="form-select" name="default_pipeline_stage_id">
                 <option value="">Käytä ensimmäistä vaihetta</option>
                 {% for stage in stages %}
-                <option value="{{ stage.id }}" {% if settings.default_pipeline_stage_id == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+                <option value="{{ stage.id }}" {% if settings.default_pipeline_stage_id == stage.id %}selected{% endif %}>
+                  {{ stage.name }}
+                </option>
                 {% endfor %}
               </select>
-            </label>
-
-            <label class="form-label">Kenelle liidi osoitetaan?
-              <select class="form-select" name="default_owner_id" id="owner-select">
-                <option value="">Ei automaattista omistajaa</option>
-                {% for user in users %}
-                <option value="{{ user.id }}" {% if settings.default_owner_id == user.id %}selected{% endif %}>{{ user_display_map.get(user.id) }}</option>
-                {% endfor %}
-              </select>
-            </label>
-
-            <label class="form-label">Toimiala
-              <input class="form-input" id="industry-input" type="text" name="default_industry" value="{{ settings.default_industry or '' }}" placeholder="esim. SaaS, Rakentaminen, Terveys...">
-            </label>
-            <p class="form-helper">Lisätään automaattisesti kaikkiin saapuviin liideihin</p>
-
-            <label class="form-label">Alue
-              <input class="form-input" id="region-input" type="text" name="default_region" value="{{ settings.default_region or '' }}" placeholder="esim. Uusimaa, Pirkanmaa, Koko Suomi...">
-            </label>
-            <p class="form-helper">Lisätään automaattisesti kaikkiin saapuviin liideihin</p>
-
-            <label class="form-label">Oletustagit
-              <input class="form-input" id="tags-input" type="text" name="default_tags" value="{{ (settings.default_tags or [])|join(', ') }}" placeholder="b2b, saas...">
-            </label>
-            <p class="form-helper">Nämä tagit lisätään jokaiseen saapuvaan liidiin</p>
-
-            <div id="routing-preview" style="background:#F1F5F9;border-radius:8px;padding:10px 12px;margin:14px 0;">
-              Saapuva liidi → — → — → — → — → tagit: —
             </div>
 
-            <button type="submit" class="btn btn-primary w-full">Tallenna asetukset</button>
-          </form>
-        </section>
-
-        {% if current_user.role in ('admin', 'superadmin') %}
-        <section class="card p-4 mb-4">
-          <h3 class="form-section-title mb-1">API-avain</h3>
-          <p class="form-helper mb-3">Käytetään automaation yhdistämiseen — älä jaa tätä muille</p>
-          {% if api_keys %}
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Nimi</th><th>Avain</th><th></th></tr>
-              </thead>
-              <tbody>
-                {% for key in api_keys %}
-                <tr>
-                  <td>{{ key.name }}</td>
-                  <td>
-                    <code>{{ key.key_prefix }}••••••••</code>
-                    <input type="hidden" id="key-full-{{ key.id }}" value="{{ key.key_prefix }}••••••••">
-                  </td>
-                  <td>
-                    <button class="btn btn-secondary btn-sm copy-key-btn" type="button" data-prefix="{{ key.key_prefix }}">Kopioi</button>
-                  </td>
-                </tr>
+            <div class="form-group">
+              <label class="form-label">Kenelle liidi osoitetaan?</label>
+              <select class="form-select" name="default_owner_id">
+                <option value="">Ei automaattista omistajaa</option>
+                {% for user in users %}
+                <option value="{{ user.id }}" {% if settings.default_owner_id == user.id %}selected{% endif %}>
+                  {{ user_display_map.get(user.id, user.email) }}
+                </option>
                 {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <p>Ei API-avaimia — luo avain <a href="{{ url_for('settings.api_keys') }}">API-avaimet-sivulla</a>.</p>
-          {% endif %}
-        </section>
-        {% endif %}
+              </select>
+            </div>
 
-        <section class="card p-4" style="background:#F8FAFC;">
-          <h3 class="form-section-title mb-1">Automaattinen AI-pisteytys</h3>
-          <p>Score ≥ 80 → tagi "hot" | Score ≥ 60 → tagi "warm" | Score &lt; 30 → tagi "cold"</p>
-          <p class="form-helper">Tagit lisätään kun AI on analysoinut liidin</p>
-        </section>
+            <div class="form-group">
+              <label class="form-label">Toimiala</label>
+              <input class="form-input" type="text" name="default_industry" value="{{ settings.default_industry or '' }}"
+                     placeholder="esim. SaaS, Rakentaminen...">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Alue</label>
+              <input class="form-input" type="text" name="default_region" value="{{ settings.default_region or '' }}"
+                     placeholder="esim. Uusimaa, Koko Suomi...">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Oletustagit</label>
+              <input class="form-input" type="text" name="default_tags"
+                     value="{{ settings.default_tags|join(', ') if settings.default_tags else '' }}"
+                     placeholder="b2b, saas... (pilkulla erotettuna)">
+              <p class="form-helper">Nämä tagit lisätään jokaiseen saapuvaan liidiin</p>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Tallenna asetukset</button>
+          </form>
+
+          <p class="form-helper" style="margin-top: 1.5rem;">
+            Liidit yhteensä: {{ settings.total_lead_count or 0 }}<br>
+            Viimeksi saapunut: {{ relative_last_lead_at }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
 </div>
-<script>
-  (function () {
-    const form = document.getElementById("lead-settings-form");
-    const stageSelect = document.getElementById("stage-select");
-    const ownerSelect = document.getElementById("owner-select");
-    const industryInput = document.getElementById("industry-input");
-    const regionInput = document.getElementById("region-input");
-    const tagsInput = document.getElementById("tags-input");
-    const previewEl = document.getElementById("routing-preview");
-
-    function parseTags(raw) {
-      return (raw || "").split(",").map((item) => item.trim()).filter(Boolean);
-    }
-
-    function selectedOrEmpty(select, emptyLabel) {
-      const value = select.selectedOptions.length ? select.selectedOptions[0].textContent.trim() : "";
-      return value === emptyLabel ? "—" : value;
-    }
-
-    function updatePreview() {
-      const stage = selectedOrEmpty(stageSelect, "Käytä ensimmäistä vaihetta");
-      const owner = selectedOrEmpty(ownerSelect, "Ei automaattista omistajaa");
-      const industry = (industryInput.value || "").trim() || "—";
-      const region = (regionInput.value || "").trim() || "—";
-      const tags = parseTags(tagsInput.value);
-      previewEl.textContent = `Saapuva liidi → ${stage} → ${owner} → ${industry} → ${region} → tagit: ${tags.length ? tags.join(", ") : "—"}`;
-    }
-
-    function showSuccessToast() {
-      const toast = document.createElement("div");
-      toast.textContent = "Asetukset tallennettu";
-      toast.style.cssText = "position:fixed;bottom:16px;right:16px;background:#16A34A;color:#fff;padding:10px 14px;border-radius:8px;z-index:9999;";
-      document.body.appendChild(toast);
-      window.setTimeout(() => toast.remove(), 2200);
-    }
-
-    [stageSelect, ownerSelect, industryInput, regionInput, tagsInput].forEach((el) => {
-      el.addEventListener("input", updatePreview);
-      el.addEventListener("change", updatePreview);
-    });
-    updatePreview();
-
-    form.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      const payload = {
-        default_pipeline_stage_id: stageSelect.value || "",
-        default_owner_id: ownerSelect.value || "",
-        default_industry: industryInput.value || "",
-        default_region: regionInput.value || "",
-        default_tags: tagsInput.value || "",
-      };
-      const csrfToken = form.querySelector('input[name="csrf_token"]').value;
-      const resp = await fetch("{% if org_query %}{{ url_for('settings.lead_settings', organization_id=org_query.organization_id) }}{% else %}{{ url_for('settings.lead_settings') }}{% endif %}", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrfToken,
-          "X-CSRF-Token": csrfToken,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.success) {
-        window.alert((data && data.error) || "Tallennus epäonnistui.");
-        return;
-      }
-      showSuccessToast();
-    });
-
-    document.querySelectorAll(".copy-key-btn").forEach((btn) => {
-      btn.addEventListener("click", async function () {
-        const keyPrefix = btn.getAttribute("data-prefix") || "";
-        await navigator.clipboard.writeText(keyPrefix);
-        btn.textContent = "Kopioitu";
-        window.setTimeout(() => {
-          btn.textContent = "Kopioi";
-        }, 1200);
-      });
-    });
-  })();
-</script>
 {% endblock %}
