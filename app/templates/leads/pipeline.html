@@ -163,8 +163,9 @@
           {% endif %}
 
           <article
-            class="lead-card"
+            class="lead-card sortable-lead"
             data-lead-id="{{ lead.id }}"
+            data-id="{{ lead.id }}"
             data-deal-value="{{ deal_amount }}"
             data-stage-name="{{ stage.name }}"
             data-probability="{{ lead.close_probability|default(0) }}"
@@ -242,7 +243,7 @@
   </div>
   {% endif %}
 </section>
-<div id="lost-reason-modal" class="pipeline-lost-modal" hidden>
+<div id="lost-reason-modal" class="pipeline-lost-modal" hidden style="display: none;">
   <div class="pipeline-lost-modal__dialog">
     <p class="pipeline-lost-modal__title">Miksi tämä liidi hävisi?</p>
     <select id="lost-reason-select" class="form-select">
@@ -369,26 +370,26 @@
     const errorEl = document.getElementById('lost-reason-error');
     if (!modal || !select || !note || !errorEl) return false;
 
-    const resolvedLeadId = parseLeadId(leadId);
-    const resolvedStageId = parseLeadId(stageId);
-    if (!resolvedLeadId || !resolvedStageId || !card || !fromColumn) {
-      console.error('Cannot open lost modal — missing lead, stage, card, or column');
-      console.error('leadId =', leadId);
-      console.error('stageId =', stageId);
-      console.error('card =', card);
-      console.error('fromColumn =', fromColumn);
-      toast('Virhe: liidin ID puuttuu', 'error');
+    if (!leadId || !stageId || !card || !fromColumn) {
+      console.error('showLostReasonModal missing args', { leadId, stageId, card, fromColumn });
       return false;
     }
 
-    currentDragLeadId = resolvedLeadId;
-    lostStageId = resolvedStageId;
+    const leadIdNum = parseLeadId(leadId);
+    const stageIdNum = parseLeadId(stageId);
+    if (!leadIdNum || !stageIdNum) {
+      console.error('showLostReasonModal invalid ids', { leadId, stageId, leadIdNum, stageIdNum });
+      return false;
+    }
+
+    currentDragLeadId = leadIdNum;
+    lostStageId = stageIdNum;
     draggedCard = card;
     originalColumn = fromColumn;
     originalIndex = fromIndex ?? null;
 
-    modal.dataset.pendingLeadId = String(resolvedLeadId);
-    modal.dataset.pendingStageId = String(resolvedStageId);
+    modal.dataset.pendingLeadId = String(leadIdNum);
+    modal.dataset.pendingStageId = String(stageIdNum);
 
     console.log('OPEN LOST MODAL WITH STATE', {
       currentDragLeadId,
@@ -399,17 +400,13 @@
       modalStageId: modal.dataset.pendingStageId,
     });
 
-    if (!currentDragLeadId || !lostStageId) {
-      console.error('Trying to open lost modal without required state');
-      return false;
-    }
-
-    modal.hidden = false;
     select.value = '';
     select.style.borderColor = '';
     note.style.display = 'none';
     note.value = '';
     errorEl.textContent = '';
+    modal.hidden = false;
+    modal.style.display = 'flex';
     return true;
   }
 
@@ -450,7 +447,10 @@
     const select = document.getElementById('lost-reason-select');
     const note = document.getElementById('lost-reason-note');
     const errorEl = document.getElementById('lost-reason-error');
-    if (modal) modal.hidden = true;
+    if (modal) {
+      modal.hidden = true;
+      modal.style.display = 'none';
+    }
     if (select) {
       select.value = '';
       select.style.borderColor = '';
@@ -472,6 +472,8 @@
     if (modal) {
       delete modal.dataset.pendingLeadId;
       delete modal.dataset.pendingStageId;
+      modal.hidden = true;
+      modal.style.display = 'none';
     }
   }
 
@@ -590,41 +592,73 @@
         group: 'leads',
         animation: 150,
         easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+        draggable: '.sortable-lead',
         dragClass: 'is-dragging',
         ghostClass: 'is-ghost',
         chosenClass: 'is-chosen',
         filter: '.pipeline-col__placeholder',
         onStart: (evt) => {
           document.body.classList.add('pipeline-is-dragging');
-          logSortableItemDebug(evt, 'start');
         },
         onEnd: async (evt) => {
           document.body.classList.remove('pipeline-is-dragging');
           root.querySelectorAll('.kanban-list.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
 
-          logSortableItemDebug(evt, 'end');
+          const card = evt.item;
+          console.log('SORTABLE EVT ITEM', {
+            itemTag: card?.tagName,
+            itemClass: card?.className,
+            itemDataset: card?.dataset,
+            itemHtml: card?.outerHTML,
+          });
 
-          const stageId = evt.to?.dataset?.stageId;
-          const leadId = readLeadIdFromCard(evt.item);
-          const cardEl = resolveLeadCardElement(evt.item) || evt.item;
-          const targetColumn = evt.to?.closest('.pipeline-col');
-          const newStageName = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim() || '';
+          const leadId = Number.parseInt(
+            card?.dataset?.leadId ||
+            card?.getAttribute('data-lead-id') ||
+            card?.querySelector('[data-lead-id]')?.getAttribute('data-lead-id'),
+            10,
+          );
+          const leadIdValid = Number.isInteger(leadId) && leadId > 0 ? leadId : null;
 
-          console.log('onEnd stageId raw =', stageId);
-          console.log('onEnd evt.to =', evt.to);
-          console.log('onEnd evt.to dataset.stageId =', evt.to?.dataset?.stageId);
-          console.log('onEnd targetColumn dataset =', targetColumn?.dataset);
-
-          if (!leadId || !stageId) {
-            console.error('Drag missing lead or stage id');
-            console.error('leadId =', leadId);
-            console.error('stageId =', stageId);
-            return;
-          }
+          const stageIdRaw =
+            evt.to?.dataset?.stageId ||
+            evt.to?.closest('.pipeline-col')?.dataset?.stageId;
+          const stageIdParsed = Number.parseInt(stageIdRaw, 10);
+          const stageIdValid = Number.isInteger(stageIdParsed) && stageIdParsed > 0 ? stageIdParsed : null;
 
           const prevList = evt.from;
           const prevIndex = evt.oldIndex;
-          const parsedStageId = Number.parseInt(stageId, 10);
+          const cardEl = card?.classList?.contains('lead-card') ? card : (resolveLeadCardElement(card) || card);
+          const targetColumn = evt.to?.closest('.pipeline-col');
+          const newStageName = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim() || '';
+
+          function revertDrag() {
+            if (prevList && card) {
+              prevList.insertBefore(card, prevList.children[prevIndex] || null);
+            }
+            updateColumnStats(evt.from);
+            updateColumnStats(evt.to);
+            updatePageStats(root);
+            if (cardEl) {
+              cardEl.classList.remove('is-updating');
+              cardEl.removeAttribute('aria-busy');
+            }
+            hideLostReasonModal();
+            resetLostDragState();
+          }
+
+          if (!leadIdValid || !stageIdValid) {
+            console.error('Drag rejected: missing leadId or stageId', {
+              leadId,
+              leadIdValid,
+              stageIdRaw,
+              stageIdValid,
+              card,
+            });
+            revertDrag();
+            toast('Virhe: liidin ID puuttuu', 'error');
+            return;
+          }
 
           updateColumnStats(evt.from);
           updateColumnStats(evt.to);
@@ -636,34 +670,30 @@
           try {
             if (isClosedLostStage(newStageName)) {
               console.log('LOST STAGE DETECTED', {
-                stageId,
+                stageId: stageIdValid,
                 stageName: newStageName,
                 columnDataset: targetColumn?.dataset,
               });
-              if (!showLostReasonModal({
-                leadId,
-                stageId: parsedStageId,
+              const opened = showLostReasonModal({
+                leadId: leadIdValid,
+                stageId: stageIdValid,
                 card: cardEl,
                 fromColumn: prevList,
                 fromIndex: prevIndex,
-              })) {
-                prevList?.insertBefore(evt.item, prevList.children[prevIndex] || null);
-                updateColumnStats(evt.from);
-                updateColumnStats(evt.to);
-                updatePageStats(root);
-                cardEl.classList.remove('is-updating');
-                cardEl.removeAttribute('aria-busy');
-                resetLostDragState();
+              });
+              if (!opened) {
+                revertDrag();
+                toast('Virhe: liidin ID puuttuu', 'error');
               }
               return;
             }
 
-            currentDragLeadId = leadId;
-            lostStageId = parsedStageId;
+            currentDragLeadId = leadIdValid;
+            lostStageId = stageIdValid;
             originalColumn = prevList;
             draggedCard = cardEl;
             originalIndex = prevIndex;
-            const moveUrl = buildStageUrl(leadId);
+            const moveUrl = buildStageUrl(leadIdValid);
             if (!moveUrl) {
               throw new Error('Liidin tunniste puuttuu');
             }
@@ -676,7 +706,7 @@
                 'Accept': 'application/json',
               },
               body: JSON.stringify({
-                stage_id: Number.parseInt(stageId, 10),
+                stage_id: stageIdValid,
               }),
             });
 
@@ -686,7 +716,7 @@
               throw new Error(data?.error?.message || 'Vaiheen päivitys epäonnistui');
             }
           } catch (err) {
-            prevList?.insertBefore(evt.item, prevList.children[prevIndex] || null);
+            prevList?.insertBefore(card, prevList.children[prevIndex] || null);
             updateColumnStats(evt.from);
             updateColumnStats(evt.to);
             updatePageStats(root);

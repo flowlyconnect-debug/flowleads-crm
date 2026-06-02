@@ -632,6 +632,8 @@ def test_pipeline_contains_lost_reason_modal(app, client):
     assert 'value="no_response"' in body
     assert 'id="lost-confirm"' in body
     assert 'data-lead-id="' in body
+    assert 'sortable-lead' in body
+    assert 'data-id="' in body
     assert "buildStageUrl" in body
     assert "parseLeadId" in body
     assert "resolveLeadCardElement" in body
