@@ -219,6 +219,44 @@
   white-space: nowrap;
 }
 
+.nav-group-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 16px 16px 6px;
+  margin-top: 4px;
+}
+
+.nav-item-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+  position: relative;
+}
+
+.nav-item-disabled::after {
+  content: "Tulossa pian";
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  display: none;
+}
+
+.nav-item-disabled:hover::after {
+  display: block;
+  pointer-events: none;
+}
+
 .sidebar-badge {
   margin-left: auto;
   flex-shrink: 0;
