@@ -335,9 +335,19 @@ class CalendarService:
 
     @staticmethod
     def get_week_events(user_id: int, organization_id: int) -> dict[str, list[CalendarEvent]]:
+        """Legacy split; prefer get_calendar_page_data for the unified calendar UI."""
+        data = CalendarService.get_calendar_page_data(user_id, organization_id)
+        return {"today": data["today_events"], "week": []}
+
+    @staticmethod
+    def get_calendar_page_data(user_id: int, organization_id: int) -> dict:
+        """Today list, Mon–Sun week grid, and next upcoming events for the calendar page."""
         now = _utc_now()
-        week_end = now + timedelta(days=7)
-        start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today = now.date()
+        week_start_date = today - timedelta(days=today.weekday())
+        week_start = datetime.combine(week_start_date, datetime.min.time(), tzinfo=timezone.utc)
+        week_end = week_start + timedelta(days=7)
+        weekday_labels = ("Ma", "Ti", "Ke", "To", "Pe", "La", "Su")
 
         events = (
             CalendarEvent.query.filter_by(user_id=user_id, organization_id=organization_id)
@@ -345,14 +355,45 @@ class CalendarService:
             .filter(
                 CalendarEvent.status != "cancelled",
                 CalendarEvent.start_at < week_end,
-                CalendarEvent.end_at >= start_of_today,
+                CalendarEvent.end_at >= week_start,
             )
             .order_by(CalendarEvent.start_at.asc())
             .all()
         )
-        today = [e for e in events if _ensure_tz(e.start_at).date() == now.date()]
-        week = [e for e in events if e not in today]
-        return {"today": today, "week": week}
+
+        today_events = [e for e in events if _ensure_tz(e.start_at).date() == today]
+
+        week_days = []
+        for offset in range(7):
+            day_date = week_start_date + timedelta(days=offset)
+            day_events = [e for e in events if _ensure_tz(e.start_at).date() == day_date]
+            week_days.append(
+                {
+                    "date": day_date,
+                    "label": f"{weekday_labels[offset]} {day_date.day}.{day_date.month}.",
+                    "is_today": day_date == today,
+                    "events": day_events,
+                }
+            )
+
+        upcoming_events = (
+            CalendarEvent.query.filter_by(user_id=user_id, organization_id=organization_id)
+            .options(joinedload(CalendarEvent.lead))
+            .filter(
+                CalendarEvent.status != "cancelled",
+                CalendarEvent.start_at >= now,
+            )
+            .order_by(CalendarEvent.start_at.asc())
+            .limit(5)
+            .all()
+        )
+
+        return {
+            "today_events": today_events,
+            "week_days": week_days,
+            "week_has_events": bool(events),
+            "upcoming_events": upcoming_events,
+        }
 
     @staticmethod
     def get_upcoming_meetings(
@@ -363,8 +404,8 @@ class CalendarService:
             CalendarEvent.query.filter_by(user_id=user_id, organization_id=organization_id)
             .options(joinedload(CalendarEvent.lead))
             .filter(
-                CalendarEvent.status == "scheduled",
-                CalendarEvent.end_at >= now,
+                CalendarEvent.status != "cancelled",
+                CalendarEvent.start_at >= now,
             )
             .order_by(CalendarEvent.start_at.asc())
             .limit(limit)

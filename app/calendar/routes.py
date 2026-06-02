@@ -163,11 +163,17 @@ def calendar_auth():
 @require_2fa
 def my_calendar():
     organization_id = resolve_organization_id()
-    events = CalendarService.get_week_events(current_user.id, organization_id)
+    view = request.args.get("view", "week")
+    if view not in ("day", "week"):
+        view = "week"
+    data = CalendarService.get_calendar_page_data(current_user.id, organization_id)
     return render_template(
         "calendar/week.html",
-        today_events=events["today"],
-        week_events=events["week"],
+        active_view=view,
+        today_events=data["today_events"],
+        week_days=data["week_days"],
+        week_has_events=data["week_has_events"],
+        upcoming_events=data["upcoming_events"],
         organization_id=organization_id,
     )
 

@@ -264,6 +264,105 @@ def test_calendar_test_route_returns_calendars(app, client):
     assert data["calendars"][0]["summary"] == "Primary"
 
 
+def _create_event_direct(app, *, user_id, org_id, title, start_at, end_at, lead_id=None):
+    with app.app_context():
+        event = CalendarEvent(
+            user_id=user_id,
+            organization_id=org_id,
+            lead_id=lead_id,
+            provider="google",
+            title=title,
+            start_at=start_at,
+            end_at=end_at,
+            status="scheduled",
+        )
+        db.session.add(event)
+        db.session.commit()
+        return event.id
+
+
+def test_calendar_tabs(app, client):
+    ctx = _setup_org(app, "cal-tabs")
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=10, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(hours=1)
+    tomorrow = today_start + timedelta(days=1)
+    other_org = _setup_org(app, "cal-tabs-other")
+
+    _create_event_direct(
+        app,
+        user_id=ctx["user_id"],
+        org_id=ctx["org_id"],
+        title="Today meeting",
+        start_at=today_start,
+        end_at=today_end,
+    )
+    _create_event_direct(
+        app,
+        user_id=ctx["user_id"],
+        org_id=ctx["org_id"],
+        title="Tomorrow meeting",
+        start_at=tomorrow,
+        end_at=tomorrow + timedelta(hours=1),
+    )
+    _create_event_direct(
+        app,
+        user_id=other_org["user_id"],
+        org_id=other_org["org_id"],
+        title="Other org secret",
+        start_at=today_start,
+        end_at=today_end,
+    )
+
+    for i in range(6):
+        future = now + timedelta(days=i + 1, hours=i + 2)
+        _create_event_direct(
+            app,
+            user_id=ctx["user_id"],
+            org_id=ctx["org_id"],
+            title=f"Upcoming {i}",
+            start_at=future,
+            end_at=future + timedelta(hours=1),
+        )
+
+    _login(client, ctx["user_email"])
+
+    day_resp = client.get("/calendar?view=day")
+    assert day_resp.status_code == 200
+    day_body = day_resp.get_data(as_text=True)
+    assert "Today meeting" in day_body
+    assert 'calendar-day-item__title">Tomorrow meeting' not in day_body
+    assert "Other org secret" not in day_body
+
+    week_resp = client.get("/calendar?view=week")
+    assert week_resp.status_code == 200
+    week_body = week_resp.get_data(as_text=True)
+    assert "calendar-week-grid" in week_body
+    assert "Ma " in week_body or "Ti " in week_body
+    assert "Today meeting" in week_body
+    assert "Tomorrow meeting" in week_body
+    assert "Other org secret" not in week_body
+
+    default_resp = client.get("/calendar")
+    assert default_resp.status_code == 200
+    assert "Viikko" in default_resp.get_data(as_text=True)
+
+    sidebar_resp = client.get("/calendar?view=week")
+    sidebar_body = sidebar_resp.get_data(as_text=True)
+    assert "Tulevat tapaamiset" in sidebar_body
+    upcoming_items = sidebar_body.count('class="calendar-upcoming-item"')
+    assert upcoming_items == 5
+    assert "Upcoming 0" in sidebar_body
+    assert "Upcoming 4" in sidebar_body
+    assert 'calendar-upcoming-item__title">Upcoming 5' not in sidebar_body
+
+    with app.app_context():
+        data = CalendarService.get_calendar_page_data(ctx["user_id"], ctx["org_id"])
+        assert all(e.organization_id == ctx["org_id"] for e in data["today_events"])
+        assert all(e.organization_id == ctx["org_id"] for e in data["upcoming_events"])
+        assert len(data["upcoming_events"]) == 5
+
+
 def test_disconnect_route(app, client):
     ctx = _setup_org(app, "cal-disc-route")
     _create_connection(app, ctx["user_id"], ctx["org_id"])

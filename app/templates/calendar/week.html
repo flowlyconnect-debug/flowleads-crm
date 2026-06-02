@@ -2,116 +2,123 @@
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Kalenteri — FlowLeads{% endblock %}
 {% block content %}
-<div class="list-page">
+<div class="list-page calendar-page">
   <header class="page-header">
     <div class="page-header__main">
       <h1>Kalenteri</h1>
-      <p class="page-subtitle">Tapaamiset tänään ja tällä viikolla</p>
+      <p class="page-subtitle">Tapaamiset päivän ja viikon näkymässä</p>
     </div>
     <div class="page-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.calendar_settings') }}">Kalenteriasetukset</a>
     </div>
   </header>
 
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Tänään</h2>
-    </div>
-    <div class="card-body">
-      {% if today_events %}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th><th></th></tr>
-          </thead>
-          <tbody>
-            {% for event in today_events %}
-            <tr>
-              <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
-              <td>{{ event.title }}</td>
-              <td>
-                {% if event.lead %}
-                <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
-                {% else %}—{% endif %}
-              </td>
-              <td>
-                <div class="row-actions">
-                  {% if event.meeting_url %}
-                  <a class="row-action-btn primary" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
-                  {% endif %}
-                </div>
-              </td>
-              <td>
-                <form method="post" action="{{ url_for('calendar.cancel_calendar_event', event_id=event.id) }}" class="form-row-inline" onsubmit="return confirm('Peruuta tapaaminen?');">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="row-action-btn action-destructive">Peruuta</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      {{ empty_state(
-        "ti-calendar-plus",
-        "Ei tapaamisia",
-        "Haluatko luoda tapaamisen kuumimmalle liidille?",
-        "Luo tapaaminen",
-        "/calendar/new",
-        "Yhdistä Google Kalenteri",
-        "/settings/calendar"
-      ) }}
-      {% endif %}
-    </div>
-  </div>
+  <div class="calendar-layout">
+    <div class="calendar-main">
+      <nav class="calendar-view-tabs" role="tablist" aria-label="Kalenterinäkymä">
+        <a href="{{ url_for('calendar.my_calendar', view='day', organization_id=organization_id) if current_user.is_superadmin() else url_for('calendar.my_calendar', view='day') }}"
+           class="calendar-view-tab{% if active_view == 'day' %} is-active{% endif %}"
+           role="tab"
+           aria-selected="{{ 'true' if active_view == 'day' else 'false' }}">Päivä</a>
+        <a href="{{ url_for('calendar.my_calendar', view='week', organization_id=organization_id) if current_user.is_superadmin() else url_for('calendar.my_calendar', view='week') }}"
+           class="calendar-view-tab{% if active_view == 'week' %} is-active{% endif %}"
+           role="tab"
+           aria-selected="{{ 'true' if active_view == 'week' else 'false' }}">Viikko</a>
+      </nav>
 
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Tämä viikko</h2>
-    </div>
-    <div class="card-body">
-      {% if week_events %}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Päivä</th><th>Aika</th><th>Otsikko</th><th>Liidi</th><th></th></tr>
-          </thead>
-          <tbody>
-            {% for event in week_events %}
-            <tr>
-              <td>{{ event.start_at.strftime('%a %d.%m.') }}</td>
-              <td>{{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}</td>
-              <td>{{ event.title }}</td>
-              <td>
+      {% if active_view == 'day' %}
+      <section class="card calendar-day-panel" role="tabpanel" aria-label="Päivän tapaamiset">
+        <div class="card-body">
+          {% if today_events %}
+          <ul class="calendar-day-list">
+            {% for event in today_events %}
+            <li class="calendar-day-item">
+              <div class="calendar-day-item__time">
+                {{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}
+              </div>
+              <div class="calendar-day-item__body">
+                <div class="calendar-day-item__title">{{ event.title }}</div>
                 {% if event.lead %}
-                <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
-                {% else %}—{% endif %}
-              </td>
-              <td>
-                <div class="row-actions">
+                <div class="calendar-day-item__lead">
+                  <a href="{{ url_for('leads.detail', lead_id=event.lead_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=event.lead_id) }}">{{ event.lead.display_name }}</a>
+                </div>
+                {% endif %}
+                <div class="calendar-day-item__meta">
                   {% if event.meeting_url %}
-                  <a class="row-action-btn primary" href="{{ event.meeting_url }}" target="_blank" rel="noopener">Liity</a>
+                  <span class="calendar-meet-badge">Google Meet</span>
+                  {% elif event.location %}
+                  <span class="calendar-location">{{ event.location }}</span>
                   {% endif %}
                 </div>
-              </td>
-            </tr>
+              </div>
+            </li>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          </ul>
+          {% else %}
+          <div class="calendar-empty-inline">
+            <p>Ei tapaamisia tänään. Haluatko luoda tapaamisen kuumimmalle liidille?</p>
+            <a href="/calendar/new" class="btn btn-primary btn-sm">Luo tapaaminen</a>
+          </div>
+          {% endif %}
+        </div>
+      </section>
       {% else %}
-      {{ empty_state(
-        "ti-calendar-plus",
-        "Ei tapaamisia",
-        "Haluatko luoda tapaamisen kuumimmalle liidille?",
-        "Luo tapaaminen",
-        "/calendar/new",
-        "Yhdistä Google Kalenteri",
-        "/settings/calendar"
-      ) }}
+      <section class="card calendar-week-panel" role="tabpanel" aria-label="Viikon tapaamiset">
+        <div class="card-body">
+          {% if week_has_events %}
+          <div class="calendar-week-grid">
+            {% for day in week_days %}
+            <div class="calendar-week-col{% if day.is_today %} is-today{% endif %}">
+              <div class="calendar-week-col__header">
+                <span class="calendar-week-col__label">{{ day.label }}</span>
+                {% if day.is_today %}<span class="calendar-week-col__today-dot" aria-hidden="true"></span>{% endif %}
+              </div>
+              <div class="calendar-week-col__events">
+                {% for event in day.events %}
+                <div class="calendar-event-block" title="{{ event.title }}">
+                  <div class="calendar-event-block__time">{{ event.start_at.strftime('%H:%M') }}</div>
+                  <div class="calendar-event-block__title">{{ event.title }}</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="calendar-empty-inline">
+            <p>Ei tapaamisia tällä viikolla</p>
+            <a href="/calendar/new" class="btn btn-primary btn-sm">Luo tapaaminen</a>
+          </div>
+          {% endif %}
+        </div>
+      </section>
       {% endif %}
     </div>
+
+    <aside class="card calendar-sidebar" aria-label="Tulevat tapaamiset">
+      <div class="card-header">
+        <h2 class="card-title">Tulevat tapaamiset</h2>
+      </div>
+      <div class="card-body">
+        {% if upcoming_events %}
+        <ul class="calendar-upcoming-list">
+          {% for event in upcoming_events %}
+          <li class="calendar-upcoming-item">
+            <div class="calendar-upcoming-item__when">
+              {{ event.start_at.strftime('%d.%m.') }} {{ event.start_at.strftime('%H:%M') }}
+            </div>
+            <div class="calendar-upcoming-item__title">{{ event.title }}</div>
+            {% if event.lead %}
+            <div class="calendar-upcoming-item__lead">{{ event.lead.display_name }}</div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted text-sm">Ei tulevia tapaamisia</p>
+        {% endif %}
+      </div>
+    </aside>
   </div>
 </div>
 {% endblock %}

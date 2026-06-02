@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -338,4 +339,78 @@ def test_company_lead_count(app, client):
     response = client.get(f"/companies/{company_id}")
     assert response.status_code == 200
     assert b"2" in response.data  # open = active + won (not lost/archived)
+
+
+def test_companies_filter(app, client):
+    ctx = _setup_org_with_users(app, "co-filter")
+    _create_company(app, ctx["org_id"], name="Asiakas Oy", type_="customer")
+    _create_company(app, ctx["org_id"], name="Prospekti Oy", type_="prospect")
+    _create_company(app, ctx["other_org_id"], name="Foreign Oy", type_="customer")
+
+    with app.app_context():
+        stage = get_default_stage(ctx["org_id"])
+        lost = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Hävitty").first()
+        company_id = Company.query.filter_by(organization_id=ctx["org_id"], name="Asiakas Oy").first().id
+
+        lead_open = LeadService.create(
+            {
+                "email": "open@asiakas.fi",
+                "company": "Asiakas Oy",
+                "stage_id": stage.id,
+                "source": "manual",
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+            actor_role="admin",
+        )
+        lead_open.company_id = company_id
+
+        lead_lost = LeadService.create(
+            {
+                "email": "lost@asiakas.fi",
+                "company": "Asiakas Oy",
+                "stage_id": stage.id,
+                "source": "manual",
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+            actor_role="admin",
+        )
+        lead_lost.company_id = company_id
+        LeadService.move_stage(
+            lead_lost.id,
+            lost.id,
+            ctx["org_id"],
+            ctx["admin_id"],
+            lost_reason="Ei budjettia",
+        )
+        db.session.commit()
+
+    _login(client, ctx["admin_email"])
+
+    with patch("app.companies.routes.CLIENT_FILTER_THRESHOLD", 0):
+        customer_resp = client.get("/companies?type=customer")
+        assert customer_resp.status_code == 200
+        body = customer_resp.get_data(as_text=True)
+        assert "Asiakas Oy" in body
+        assert "Prospekti Oy" not in body
+        assert "Foreign Oy" not in body
+
+        list_resp = client.get("/companies")
+        list_body = list_resp.get_data(as_text=True)
+        assert "1 liidi" in list_body
+        assert "2 liidi" not in list_body
+
+        search_resp = client.get("/companies?q=Prospekti")
+        search_body = search_resp.get_data(as_text=True)
+        assert "Prospekti Oy" in search_body
+        assert "Asiakas Oy" not in search_body
+
+    client.get("/auth/logout", follow_redirects=True)
+    _login(client, "user-co-filter-b@acme.com")
+    cross_resp = client.get("/companies")
+    cross_body = cross_resp.get_data(as_text=True)
+    assert "Foreign Oy" in cross_body
+    assert "Asiakas Oy" not in cross_body
+    assert "Prospekti Oy" not in cross_body
 

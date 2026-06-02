@@ -10,41 +10,119 @@
         <span>Yritykset</span>
       </div>
       <h1>Yritykset</h1>
-      <p class="page-subtitle">{{ companies|length }} yritystä</p>
+      <p class="page-subtitle">{{ total_count }} yritystä</p>
     </div>
   </header>
 
-  {% if companies|length == 0 %}
+  {% if total_count == 0 %}
     {{ empty_state(
       "ti-building",
       "Ei yrityksiä vielä",
       "Yritykset luodaan automaattisesti liidien pohjalta tai voit lisätä ne käsin.",
-      "Lisää yritys",
+      "+ Lisää yritys",
       "/companies/new"
     ) }}
   {% else %}
+    <div class="companies-toolbar">
+      <form method="get" class="companies-search" role="search" aria-label="Hae yrityksiä"
+            {% if use_client_filter %}data-client-search="1"{% endif %}>
+        {% if current_user.is_superadmin() %}
+        <input type="hidden" name="organization_id" value="{{ organization_id }}">
+        {% endif %}
+        {% if not use_client_filter and active_type %}
+        <input type="hidden" name="type" value="{{ active_type }}">
+        {% endif %}
+        <input type="search" name="q" class="companies-search__input" placeholder="Hae yrityksen nimellä"
+               value="{{ search_query }}"
+               {% if use_client_filter %}id="companies-search-input"{% endif %}>
+      </form>
+
+      <nav class="companies-filter-chips" aria-label="Yritystyypin suodatin"
+           {% if use_client_filter %}data-client-type-filter="1"{% endif %}>
+        {% for value, label in type_filters %}
+        {% if use_client_filter %}
+        <button type="button"
+                class="companies-filter-chip{% if value == active_type %} is-active{% endif %}"
+                data-type="{{ value }}">{{ label }}</button>
+        {% else %}
+        <a href="{{ url_for('companies.list_companies', organization_id=organization_id, type=value or none, q=search_query or none) if current_user.is_superadmin() else url_for('companies.list_companies', type=value or none, q=search_query or none) }}"
+           class="companies-filter-chip{% if value == active_type %} is-active{% endif %}">{{ label }}</a>
+        {% endif %}
+        {% endfor %}
+      </nav>
+    </div>
+
     <div class="card">
       <div class="card-body">
         <div class="table-responsive">
-          <table class="table">
+          <table class="table companies-table" id="companies-table">
             <thead>
               <tr>
-                <th>Nimi</th>
+                <th>Yritys</th>
                 <th>Toimiala</th>
-                <th>Tyyppi</th>
+                <th>Kaupunki</th>
+                <th>Kontaktit</th>
+                <th>Liidit</th>
+                <th>Omistaja</th>
+                <th>Luotu</th>
+                <th class="company-type-cell">Tyyppi</th>
+                <th aria-hidden="true"></th>
               </tr>
             </thead>
             <tbody>
-              {% for c in companies %}
-                <tr>
-                  <td>
-                    <a href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}">
-                      {{ c.name }}
+              {% for row in rows %}
+              {% set c = row.company %}
+              <tr class="companies-row"
+                  data-type="{{ c.type or 'prospect' }}"
+                  data-name="{{ c.name|lower }}">
+                <td>
+                  <a href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}">
+                    {{ c.name }}
+                  </a>
+                </td>
+                <td>{{ c.industry or "—" }}</td>
+                <td>{{ c.city or "—" }}</td>
+                <td>
+                  {% if row.contact_count == 1 %}1 kontakti
+                  {% elif row.contact_count %}{{ row.contact_count }} kontaktia
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if row.open_lead_count == 1 %}1 liidi
+                  {% elif row.open_lead_count %}{{ row.open_lead_count }} liidiä
+                  {% else %}—{% endif %}
+                </td>
+                <td>{{ row.owner_label or "—" }}</td>
+                <td>{{ relative_created_fi(c.created_at) }}</td>
+                <td class="company-type-cell">
+                  {% set ctype = c.type or 'prospect' %}
+                  <span class="company-type-badge company-type-badge--{{ ctype }}">
+                    {% if ctype == 'customer' %}Asiakas
+                    {% elif ctype == 'partner' %}Kumppani
+                    {% elif ctype == 'supplier' %}Toimittaja
+                    {% else %}Prospekti{% endif %}
+                  </span>
+                </td>
+                <td>
+                  <div class="row-actions companies-row-actions" role="group" aria-label="Toiminnot">
+                    <a class="row-action-btn"
+                       href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}"
+                       title="Muokkaa"
+                       aria-label="Muokkaa">
+                      <i class="ti ti-pencil" aria-hidden="true"></i>
                     </a>
-                  </td>
-                  <td>{{ c.industry or "—" }}</td>
-                  <td>{{ c.type or "prospect" }}</td>
-                </tr>
+                    <form method="post"
+                          action="{{ url_for('companies.delete_company', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.delete_company', company_id=c.id) }}"
+                          class="form-row-inline"
+                          onsubmit="return confirm('Poistetaanko yritys {{ c.name|e }}?');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="row-action-btn action-destructive" title="Poista" aria-label="Poista">
+                        <i class="ti ti-trash" aria-hidden="true"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -53,5 +131,42 @@
     </div>
   {% endif %}
 </section>
-{% endblock %}
 
+{% if use_client_filter and total_count > 0 %}
+<script>
+(function () {
+  const table = document.getElementById('companies-table');
+  if (!table) return;
+  const rows = Array.from(table.querySelectorAll('tbody tr.companies-row'));
+  const searchInput = document.getElementById('companies-search-input');
+  const chips = document.querySelectorAll('[data-client-type-filter] .companies-filter-chip');
+  let activeType = {{ active_type|tojson }};
+
+  function applyFilters() {
+    const q = (searchInput && searchInput.value || '').trim().toLowerCase();
+    rows.forEach((row) => {
+      const name = row.dataset.name || '';
+      const type = row.dataset.type || '';
+      const typeOk = !activeType || type === activeType;
+      const searchOk = !q || name.includes(q);
+      row.style.display = typeOk && searchOk ? '' : 'none';
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      activeType = chip.dataset.type || '';
+      chips.forEach((c) => c.classList.toggle('is-active', c === chip));
+      applyFilters();
+    });
+  });
+
+  applyFilters();
+})();
+</script>
+{% endif %}
+{% endblock %}
