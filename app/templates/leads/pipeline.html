@@ -362,22 +362,87 @@
   let draggedCard = null;
   let originalIndex = null;
 
-  function showLostReasonModal(leadId, stageId) {
+  function showLostReasonModal({ leadId, stageId, card, fromColumn, fromIndex }) {
     const modal = document.getElementById('lost-reason-modal');
     const select = document.getElementById('lost-reason-select');
     const note = document.getElementById('lost-reason-note');
     const errorEl = document.getElementById('lost-reason-error');
-    if (!modal || !select || !note || !errorEl) return;
-    const parsedLeadId = parseLeadId(leadId);
-    const parsedStageId = parseLeadId(stageId);
-    if (parsedLeadId) modal.dataset.pendingLeadId = String(parsedLeadId);
-    if (parsedStageId) modal.dataset.pendingStageId = String(parsedStageId);
+    if (!modal || !select || !note || !errorEl) return false;
+
+    const resolvedLeadId = parseLeadId(leadId);
+    const resolvedStageId = parseLeadId(stageId);
+    if (!resolvedLeadId || !resolvedStageId || !card || !fromColumn) {
+      console.error('Cannot open lost modal — missing lead, stage, card, or column');
+      console.error('leadId =', leadId);
+      console.error('stageId =', stageId);
+      console.error('card =', card);
+      console.error('fromColumn =', fromColumn);
+      toast('Virhe: liidin ID puuttuu', 'error');
+      return false;
+    }
+
+    currentDragLeadId = resolvedLeadId;
+    lostStageId = resolvedStageId;
+    draggedCard = card;
+    originalColumn = fromColumn;
+    originalIndex = fromIndex ?? null;
+
+    modal.dataset.pendingLeadId = String(resolvedLeadId);
+    modal.dataset.pendingStageId = String(resolvedStageId);
+
+    console.log('OPEN LOST MODAL WITH STATE', {
+      currentDragLeadId,
+      lostStageId,
+      draggedCard,
+      originalColumn,
+      modalLeadId: modal.dataset.pendingLeadId,
+      modalStageId: modal.dataset.pendingStageId,
+    });
+
+    if (!currentDragLeadId || !lostStageId) {
+      console.error('Trying to open lost modal without required state');
+      return false;
+    }
+
     modal.hidden = false;
     select.value = '';
     select.style.borderColor = '';
     note.style.display = 'none';
     note.value = '';
     errorEl.textContent = '';
+    return true;
+  }
+
+  function resolveLostConfirmLeadId() {
+    const modal = document.getElementById('lost-reason-modal');
+    const fromModal = parseLeadId(modal?.dataset?.pendingLeadId);
+    if (fromModal) return fromModal;
+
+    const fromDraggedCard = readLeadIdFromCard(draggedCard);
+    if (fromDraggedCard) return fromDraggedCard;
+
+    const activeCard =
+      document.querySelector('.lead-card.is-dragging') ||
+      document.querySelector('.lead-card.dragging') ||
+      document.querySelector('.pipeline .lead-card.is-updating[aria-busy="true"]');
+    const fromActiveCard = readLeadIdFromCard(activeCard);
+    if (fromActiveCard) return fromActiveCard;
+
+    const pendingHost = document.querySelector('[data-pending-lead-id]');
+    const fromPendingAttr = parseLeadId(
+      pendingHost?.dataset?.pendingLeadId || pendingHost?.getAttribute?.('data-pending-lead-id')
+    );
+    if (fromPendingAttr) return fromPendingAttr;
+
+    return null;
+  }
+
+  function resolveLostConfirmStageId() {
+    const modal = document.getElementById('lost-reason-modal');
+    return (
+      parseLeadId(modal?.dataset?.pendingStageId) ||
+      parseLeadId(lostStageId)
+    );
   }
 
   function hideLostReasonModal() {
@@ -542,24 +607,24 @@
           const stageId = evt.to?.dataset?.stageId;
           const leadId = readLeadIdFromCard(evt.item);
           const cardEl = resolveLeadCardElement(evt.item) || evt.item;
-          const newStageName = evt.to?.closest('.pipeline-col')?.querySelector('.pipeline-col__title')?.textContent || '';
+          const targetColumn = evt.to?.closest('.pipeline-col');
+          const newStageName = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim() || '';
+
+          console.log('onEnd stageId raw =', stageId);
+          console.log('onEnd evt.to =', evt.to);
+          console.log('onEnd evt.to dataset.stageId =', evt.to?.dataset?.stageId);
+          console.log('onEnd targetColumn dataset =', targetColumn?.dataset);
+
           if (!leadId || !stageId) {
-            console.error('Drag missing lead or stage id', {
-              leadId,
-              stageId,
-              item: evt.item,
-              cardEl,
-            });
+            console.error('Drag missing lead or stage id');
+            console.error('leadId =', leadId);
+            console.error('stageId =', stageId);
             return;
           }
 
           const prevList = evt.from;
           const prevIndex = evt.oldIndex;
-          currentDragLeadId = leadId;
-          lostStageId = Number.parseInt(stageId, 10);
-          originalColumn = prevList;
-          draggedCard = cardEl;
-          originalIndex = prevIndex;
+          const parsedStageId = Number.parseInt(stageId, 10);
 
           updateColumnStats(evt.from);
           updateColumnStats(evt.to);
@@ -570,9 +635,34 @@
 
           try {
             if (isClosedLostStage(newStageName)) {
-              showLostReasonModal(leadId, lostStageId);
+              console.log('LOST STAGE DETECTED', {
+                stageId,
+                stageName: newStageName,
+                columnDataset: targetColumn?.dataset,
+              });
+              if (!showLostReasonModal({
+                leadId,
+                stageId: parsedStageId,
+                card: cardEl,
+                fromColumn: prevList,
+                fromIndex: prevIndex,
+              })) {
+                prevList?.insertBefore(evt.item, prevList.children[prevIndex] || null);
+                updateColumnStats(evt.from);
+                updateColumnStats(evt.to);
+                updatePageStats(root);
+                cardEl.classList.remove('is-updating');
+                cardEl.removeAttribute('aria-busy');
+                resetLostDragState();
+              }
               return;
             }
+
+            currentDragLeadId = leadId;
+            lostStageId = parsedStageId;
+            originalColumn = prevList;
+            draggedCard = cardEl;
+            originalIndex = prevIndex;
             const moveUrl = buildStageUrl(leadId);
             if (!moveUrl) {
               throw new Error('Liidin tunniste puuttuu');
@@ -627,141 +717,143 @@
     });
   }
 
+  async function handleLostConfirmClick() {
+    const root = document.querySelector('.pipeline');
+    const confirmBtn = document.getElementById('lost-confirm');
+    const reasonSelect = document.getElementById('lost-reason-select');
+    const noteField = document.getElementById('lost-reason-note');
+    const errorEl = document.getElementById('lost-reason-error');
+    if (!confirmBtn || !reasonSelect || !noteField || !errorEl) return;
+
+    const modal = document.getElementById('lost-reason-modal');
+    const resolvedLeadId = currentDragLeadId || parseLeadId(modal?.dataset?.pendingLeadId);
+    const resolvedStageId = lostStageId || parseLeadId(modal?.dataset?.pendingStageId);
+    const url = buildStageUrl(resolvedLeadId);
+
+    if (!resolvedLeadId || !resolvedStageId || !url) {
+      console.error('Missing drag state on confirm');
+      console.error('currentDragLeadId =', currentDragLeadId);
+      console.error('lostStageId =', lostStageId);
+      console.error('modalLeadId =', modal?.dataset?.pendingLeadId);
+      console.error('modalStageId =', modal?.dataset?.pendingStageId);
+      toast('Virhe: liidin ID puuttuu', 'error');
+      return;
+    }
+
+    const reason = reasonSelect.value;
+    if (!reason) {
+      reasonSelect.style.borderColor = '#EF4444';
+      errorEl.textContent = 'Valitse häviösyy ennen vahvistusta.';
+      return;
+    }
+    reasonSelect.style.borderColor = '';
+    errorEl.textContent = '';
+
+    const note = noteField.value || '';
+    confirmBtn.disabled = true;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+          'Accept': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          stage_id: resolvedStageId,
+          lost_reason: reason,
+          lost_reason_note: note,
+        }),
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        data = null;
+      }
+
+      if (response.status === 404) {
+        console.error('Stage update 404:', url, data);
+        toast('Virhe: Liidia tai polkua ei löytynyt', 'error');
+        return;
+      }
+
+      if (response.ok && data && data.success === true) {
+        hideLostReasonModal();
+        if (draggedCard) {
+          draggedCard.classList.remove('is-updating');
+          draggedCard.removeAttribute('aria-busy');
+        }
+        resetLostDragState();
+        if (root) refreshAllStats(root);
+        toast('Liidi merkitty hävityksi');
+      } else {
+        const errMsg = data?.error?.message || 'Vaiheen päivitys epäonnistui';
+        toast(`Virhe: ${errMsg}`, 'error');
+      }
+    } catch (e) {
+      console.error('Stage update failed:', url, e);
+      toast('Verkkovirhe — yritä uudelleen', 'error');
+    } finally {
+      confirmBtn.disabled = false;
+    }
+  }
+
+  function handleLostCancelClick() {
+    const root = document.querySelector('.pipeline');
+    if (originalColumn && draggedCard) {
+      originalColumn.insertBefore(draggedCard, originalColumn.children[originalIndex] || null);
+      updateColumnStats(originalColumn);
+    }
+    if (draggedCard) {
+      const currentList = draggedCard.closest('.kanban-list');
+      updateColumnStats(currentList);
+      draggedCard.classList.remove('is-updating');
+      draggedCard.removeAttribute('aria-busy');
+    }
+    if (root) updatePageStats(root);
+    hideLostReasonModal();
+    resetLostDragState();
+  }
+
+  function handleLostReasonSelectChange() {
+    const noteField = document.getElementById('lost-reason-note');
+    const errorEl = document.getElementById('lost-reason-error');
+    const isOther = this.value === 'other';
+    if (noteField) {
+      noteField.style.display = isOther ? 'block' : 'none';
+      if (!isOther) noteField.value = '';
+    }
+    this.style.borderColor = '';
+    if (errorEl) errorEl.textContent = '';
+  }
+
   function initLostReasonActions(root) {
     const confirmBtn = document.getElementById('lost-confirm');
     const cancelBtn = document.getElementById('lost-cancel');
     const reasonSelect = document.getElementById('lost-reason-select');
-    const noteField = document.getElementById('lost-reason-note');
-    const errorEl = document.getElementById('lost-reason-error');
-    if (!confirmBtn || !cancelBtn || !reasonSelect || !noteField || !errorEl || confirmBtn.__flBound) return;
-    confirmBtn.__flBound = true;
+    if (!confirmBtn || !cancelBtn || !reasonSelect) return;
 
-    confirmBtn.addEventListener('click', async function() {
-      const modal = document.getElementById('lost-reason-modal');
-      const busyCard = document.querySelector('.pipeline .lead-card.is-updating[aria-busy="true"]');
-      const leadId =
-        readLeadIdFromCard(draggedCard) ||
-        readLeadIdFromCard(busyCard) ||
-        parseLeadId(modal?.dataset?.pendingLeadId) ||
-        parseLeadId(currentDragLeadId);
-      const stageId =
-        parseLeadId(lostStageId) ||
-        parseLeadId(modal?.dataset?.pendingStageId);
-      const url = buildStageUrl(leadId);
-      const apiProbeUrl = leadId ? `/api/leads/${leadId}/stage` : null;
+    if (confirmBtn.__flLostHandler) {
+      confirmBtn.removeEventListener('click', confirmBtn.__flLostHandler);
+    }
+    confirmBtn.__flLostHandler = handleLostConfirmClick;
+    confirmBtn.addEventListener('click', confirmBtn.__flLostHandler);
 
-      console.log('Lost confirm debug', {
-        currentDragLeadId,
-        lostStageId,
-        resolvedLeadId: leadId,
-        resolvedStageId: stageId,
-        draggedCardLeadId: draggedCard?.dataset?.leadId,
-        modalPendingLeadId: modal?.dataset?.pendingLeadId,
-        url,
-        apiProbeUrl,
-        stageUrlTemplate,
-      });
+    if (cancelBtn.__flLostHandler) {
+      cancelBtn.removeEventListener('click', cancelBtn.__flLostHandler);
+    }
+    cancelBtn.__flLostHandler = handleLostCancelClick;
+    cancelBtn.addEventListener('click', cancelBtn.__flLostHandler);
 
-      if (!leadId || !stageId || !url) {
-        console.error('Missing drag state', {
-          leadId,
-          stageId,
-          currentDragLeadId,
-          lostStageId,
-          draggedCard,
-          modal,
-        });
-        toast('Virhe: liidin tai vaiheen tunniste puuttuu', 'error');
-        return;
-      }
-
-      const reason = reasonSelect.value;
-      if (!reason) {
-        reasonSelect.style.borderColor = '#EF4444';
-        errorEl.textContent = 'Valitse häviösyy ennen vahvistusta.';
-        return;
-      }
-      reasonSelect.style.borderColor = '';
-      errorEl.textContent = '';
-
-      const note = noteField.value || '';
-      confirmBtn.disabled = true;
-
-      try {
-        const response = await fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken,
-            'Accept': 'application/json',
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            stage_id: stageId,
-            lost_reason: reason,
-            lost_reason_note: note,
-          }),
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch (parseErr) {
-          data = null;
-        }
-
-        console.log('Lost confirm response', response.status, response.url, data);
-
-        if (response.status === 404) {
-          console.error('Stage update 404:', url, data);
-          toast('Virhe: Liidia tai polkua ei löytynyt', 'error');
-          return;
-        }
-
-        if (response.ok && data && data.success === true) {
-          hideLostReasonModal();
-          if (draggedCard) {
-            draggedCard.classList.remove('is-updating');
-            draggedCard.removeAttribute('aria-busy');
-          }
-          resetLostDragState();
-          refreshAllStats(root);
-          toast('Liidi merkitty hävityksi');
-        } else {
-          const errMsg = data?.error?.message || 'Vaiheen päivitys epäonnistui';
-          toast(`Virhe: ${errMsg}`, 'error');
-        }
-      } catch (e) {
-        console.error('Stage update failed:', url, e);
-        toast('Verkkovirhe — yritä uudelleen', 'error');
-      } finally {
-        confirmBtn.disabled = false;
-      }
-    });
-
-    cancelBtn.addEventListener('click', function() {
-      if (originalColumn && draggedCard) {
-        originalColumn.insertBefore(draggedCard, originalColumn.children[originalIndex] || null);
-        updateColumnStats(originalColumn);
-      }
-      if (draggedCard) {
-        const currentList = draggedCard.closest('.kanban-list');
-        updateColumnStats(currentList);
-        draggedCard.classList.remove('is-updating');
-        draggedCard.removeAttribute('aria-busy');
-      }
-      updatePageStats(root);
-      hideLostReasonModal();
-      resetLostDragState();
-    });
-
-    reasonSelect.addEventListener('change', function() {
-      const isOther = this.value === 'other';
-      noteField.style.display = isOther ? 'block' : 'none';
-      if (!isOther) noteField.value = '';
-      this.style.borderColor = '';
-      errorEl.textContent = '';
-    });
+    if (reasonSelect.__flLostHandler) {
+      reasonSelect.removeEventListener('change', reasonSelect.__flLostHandler);
+    }
+    reasonSelect.__flLostHandler = handleLostReasonSelectChange;
+    reasonSelect.addEventListener('change', reasonSelect.__flLostHandler);
   }
 
   function initSearch(root) {

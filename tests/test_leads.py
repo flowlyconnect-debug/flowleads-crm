@@ -636,6 +636,8 @@ def test_pipeline_contains_lost_reason_modal(app, client):
     assert "parseLeadId" in body
     assert "resolveLeadCardElement" in body
     assert "readLeadIdFromCard" in body
+    assert "OPEN LOST MODAL WITH STATE" in body
+    assert "resolveLostConfirmLeadId" in body
 
 
 def test_undefined_lead_stage_url_returns_flask_404_not_route_match(app, client):
