@@ -201,6 +201,7 @@ class Lead(db.Model):
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     lost_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     lost_reason_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    stage_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -262,6 +263,15 @@ class Lead(db.Model):
         if self.phone:
             return self.phone
         return f"Lead #{self.id}"
+
+    @property
+    def days_in_current_stage(self) -> int:
+        ref = self.stage_changed_at or self.created_at
+        if not ref:
+            return 0
+        if ref.tzinfo is None:
+            ref = ref.replace(tzinfo=timezone.utc)
+        return max((datetime.now(timezone.utc) - ref).days, 0)
 
 
 class Activity(db.Model):

@@ -1,7 +1,9 @@
 import json
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import event
 
 from app.extensions import db
 from app.leads.models import Activity, Lead, PipelineStage
@@ -9,6 +11,20 @@ from app.leads.services import LeadService, LeadServiceError, get_default_stage,
 from app.tasks.models import Task
 from app.users.models import AuditLog
 from app.users.services import create_organization, create_user
+
+
+@contextmanager
+def _capture_query_count():
+    count = {"value": 0}
+
+    def before_cursor_execute(*_args, **_kwargs):
+        count["value"] += 1
+
+    event.listen(db.engine, "before_cursor_execute", before_cursor_execute)
+    try:
+        yield count
+    finally:
+        event.remove(db.engine, "before_cursor_execute", before_cursor_execute)
 
 
 def _setup_org_with_users(app, slug="org-a"):
@@ -157,6 +173,8 @@ def test_move_stage_success(app):
         db.session.commit()
         lead = db.session.get(Lead, lead_id)
         assert lead.stage_id == contacted.id
+        assert lead.stage_changed_at is not None
+        assert lead.days_in_current_stage >= 0
         assert Activity.query.filter_by(lead_id=lead_id, type="stage_changed").count() == 1
 
 
@@ -473,11 +491,13 @@ def test_pipeline_card_data(app):
         )
         db.session.commit()
 
-        data = LeadService.get_pipeline_data(ctx["org_id"], {})
+        with _capture_query_count() as query_counter:
+            data = LeadService.get_pipeline_data(ctx["org_id"], {})
+        assert query_counter["value"] <= 12
         stage_items = data["leads_by_stage"].get(ctx["stage_id"], [])
         mine = next(item for item in stage_items if item["lead"].id == lead_id)
-        assert mine["last_activity_days"] == 0
-        assert mine["stage_days"] == 5
+        assert mine["days_since_last_activity"] == 0
+        assert mine["stage_days"] == lead.days_in_current_stage
         assert mine["next_task"] is not None
         assert mine["next_task"].lead_id == lead_id
         all_emails = {
@@ -525,7 +545,7 @@ def test_lost_reason_required(app, client):
     assert ok.status_code == 200
     with app.app_context():
         lead = db.session.get(Lead, lead_id)
-        assert lead.lost_reason == "Ei vastannut"
+        assert lead.lost_reason == "no_response"
 
     back_to_contacted = client.post(
         f"/leads/{lead_id}/stage",
@@ -546,3 +566,27 @@ def test_seed_default_stages_idempotent(app):
         count2 = PipelineStage.query.filter_by(organization_id=org.id).count()
         assert count1 == 6
         assert count2 == 6
+
+
+def test_days_in_current_stage_uses_stage_changed_at(app):
+    ctx = _setup_org_with_users(app, "stage-days")
+    with app.app_context():
+        lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="days@a.com")
+        lead = db.session.get(Lead, lead_id)
+        lead.created_at = datetime.now(timezone.utc) - timedelta(days=30)
+        lead.stage_changed_at = datetime.now(timezone.utc) - timedelta(days=4)
+        db.session.commit()
+        assert lead.days_in_current_stage == 4
+
+
+def test_pipeline_contains_lost_reason_modal(app, client):
+    ctx = _setup_org_with_users(app, "lost-modal")
+    _create_lead(app, ctx["org_id"], ctx["stage_id"], email="modal@a.com", company="ModalCo")
+    _login(client, ctx["admin_email"])
+    response = client.get("/leads/pipeline")
+    assert response.status_code == 200
+    body = response.data.decode("utf-8")
+    assert 'id="lost-reason-modal"' in body
+    assert 'id="lost-reason-select"' in body
+    assert 'value="no_response"' in body
+    assert 'id="lost-confirm"' in body

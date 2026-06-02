@@ -49,6 +49,15 @@ LAST_ACTIVITY_TYPES = (
     "ai_score",
     "ai_enriched",
 )
+LOST_REASON_LABELS = {
+    "no_response": "Ei vastannut",
+    "wrong_target": "Väärä kohderyhmä",
+    "no_budget": "Ei budjettia",
+    "not_timely": "Ei ajankohtainen",
+    "competitor": "Kilpailija voitti",
+    "other": "Muu syy",
+}
+LOST_REASON_LABEL_TO_KEY = {label.lower(): key for key, label in LOST_REASON_LABELS.items()}
 
 
 def _safe_dispatch_webhook(event_type: str, payload: dict, organization_id: int, triggered_by=None) -> None:
@@ -174,6 +183,16 @@ def _status_from_stage_name(stage_name: str) -> str:
 
 def _is_closed_lost_stage_name(stage_name: str | None) -> bool:
     return (stage_name or "").strip().lower() in {"lost", "closed lost", "hävitty"}
+
+
+def _normalize_lost_reason(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    if not normalized:
+        return None
+    key = normalized.lower()
+    if key in LOST_REASON_LABELS:
+        return key
+    return LOST_REASON_LABEL_TO_KEY.get(key)
 
 
 def _activity_change_value(value):
@@ -305,6 +324,7 @@ class LeadService:
             ai_summary=data.get("ai_summary"),
             ai_company_info=data.get("ai_company_info"),
             ai_contact_info=data.get("ai_contact_info"),
+            stage_changed_at=datetime.now(timezone.utc),
         )
         db.session.add(lead)
         try:
@@ -475,6 +495,7 @@ class LeadService:
                 old_stage = lead.stage
                 lead.stage_id = new_stage.id
                 lead.status = _status_from_stage_name(new_stage.name)
+                lead.stage_changed_at = datetime.now(timezone.utc)
                 LeadService.log_activity(
                     lead.id,
                     user_id,
@@ -616,13 +637,15 @@ class LeadService:
         lead.stage_id = new_stage.id
         lead.status = _status_from_stage_name(new_stage.name)
         lead.updated_at = datetime.now(timezone.utc)
+        lead.stage_changed_at = datetime.now(timezone.utc)
         if _is_closed_lost_stage_name(new_stage.name):
-            if not (lost_reason or "").strip():
+            normalized_reason = _normalize_lost_reason(lost_reason)
+            if not normalized_reason:
                 raise LeadServiceError(
                     "lost_reason on pakollinen siirrettäessä hävittyyn vaiheeseen.",
                     "validation_error",
                 )
-            lead.lost_reason = (lost_reason or "").strip()[:100]
+            lead.lost_reason = normalized_reason
             lead.lost_reason_note = (lost_reason_note or "").strip() or None
         elif lead.status != "lost":
             lead.lost_reason = None
@@ -633,7 +656,7 @@ class LeadService:
             user_id,
             "stage_changed",
             content=(
-                f"Liidi hävisi: {(lost_reason or '').strip()[:100]}"
+                f"Hävitty: {LOST_REASON_LABELS.get(lead.lost_reason or '', lead.lost_reason or '')}"
                 if _is_closed_lost_stage_name(new_stage.name)
                 else None
             ),
@@ -652,7 +675,7 @@ class LeadService:
                 organization_id=organization_id,
                 target_type="lead",
                 target_id=lead.id,
-                metadata={"reason": lead.lost_reason},
+                metadata={"reason": lead.lost_reason, "note": lead.lost_reason_note},
             )
 
         db.session.flush()
@@ -917,7 +940,6 @@ class LeadService:
         open_tasks_by_lead: dict[int, int] = {}
         next_task_by_lead: dict[int, object] = {}
         last_activity_by_lead: dict[int, Activity] = {}
-        stage_entered_at_by_lead: dict[int, datetime] = {}
         sequence_active_by_lead: dict[int, bool] = {}
         proposals_count_by_lead: dict[int, int] = {}
         old_unviewed_proposal_lead_ids: set[int] = set()
@@ -947,7 +969,10 @@ class LeadService:
                     Task.id.label("id"),
                     Task.lead_id.label("lead_id"),
                     func.row_number()
-                    .over(partition_by=Task.lead_id, order_by=Task.due_date.asc())
+                    .over(
+                        partition_by=Task.lead_id,
+                        order_by=(Task.created_at.desc(), Task.id.desc()),
+                    )
                     .label("rn"),
                 )
                 .filter(
@@ -986,28 +1011,6 @@ class LeadService:
                 .all()
             )
             last_activity_by_lead = {activity.lead_id: activity for activity in latest_activities if activity.lead_id}
-
-            stage_events = (
-                Activity.query.filter(
-                    Activity.organization_id == organization_id,
-                    Activity.lead_id.in_(lead_ids),
-                    Activity.type == "stage_changed",
-                )
-                .order_by(Activity.lead_id.asc(), Activity.created_at.desc())
-                .all()
-            )
-            stage_by_lead_id = {lead.id: lead.stage_id for lead in leads}
-            for activity in stage_events:
-                current_stage_id = stage_by_lead_id.get(activity.lead_id)
-                if not current_stage_id or activity.lead_id in stage_entered_at_by_lead:
-                    continue
-                metadata = activity.metadata_json or {}
-                try:
-                    new_stage_id = int(metadata.get("new_stage_id"))
-                except (TypeError, ValueError):
-                    continue
-                if new_stage_id == current_stage_id:
-                    stage_entered_at_by_lead[activity.lead_id] = activity.created_at
 
             sequence_rows = (
                 db.session.query(EmailSequenceEnrollment.lead_id)
@@ -1106,15 +1109,13 @@ class LeadService:
                     if last_activity_at
                     else None
                 )
-                entered_at = _to_utc(
-                    stage_entered_at_by_lead.get(lead.id) or lead.updated_at or lead.created_at
-                )
-                stage_days = (now - entered_at).days if entered_at else 0
+                stage_days = lead.days_in_current_stage
                 by_stage[lead.stage_id].append(
                     {
                         "lead": lead,
                         "last_activity": last_activity,
                         "last_activity_days": last_activity_days,
+                        "days_since_last_activity": last_activity_days,
                         "stage_days": stage_days,
                         "next_task": next_task_by_lead.get(lead.id),
                         "ai_recommendation": lead.ai_recommendation,

@@ -151,13 +151,13 @@
           {% set stage_days = item.get('stage_days', 0) if item is mapping else 0 %}
           {% set ai_rec = item.get('ai_recommendation') if item is mapping else none %}
           {% set next_task = item.get('next_task') if item is mapping else none %}
-          {% set last_activity_days = item.get('last_activity_days') if item is mapping else none %}
+          {% set last_activity_days = item.get('days_since_last_activity') if item is mapping else none %}
           {% if lead.score is not none and lead.score >= 80 %}
             {% set accent_color = '#EF4444' %}
           {% elif lead.score is not none and lead.score >= 60 %}
             {% set accent_color = '#F59E0B' %}
           {% elif lead.score is not none and lead.score >= 40 %}
-            {% set accent_color = '#38BDF8' %}
+            {% set accent_color = '#1D6BF3' %}
           {% else %}
             {% set accent_color = '#E5E7EB' %}
           {% endif %}
@@ -175,23 +175,22 @@
           >
             <div class="lead-card__accent" aria-hidden="true"></div>
             <div class="lead-card__body">
-              <a class="lead-card__company" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) }}">
-                {{ company_label }} — {{ contact_label }}
-              </a>
+              <a class="lead-card__company" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) }}">{{ company_label }}</a>
+              <div class="lead-card__contact">{{ contact_label }}</div>
               <div class="lead-card__meta-row">
                 {% if lead.score is not none %}
                   {% if lead.score >= 80 %}
                     <span class="lead-pill lead-pill--red">🔥 {{ lead.score }}</span>
                   {% elif lead.score >= 60 %}
-                    <span class="lead-pill lead-pill--amber">↑ {{ lead.score }}</span>
+                    <span class="lead-pill lead-pill--amber">{{ lead.score }}</span>
                   {% elif lead.score < 40 %}
                     <span class="lead-pill lead-pill--gray">{{ lead.score }}</span>
                   {% endif %}
                 {% endif %}
-                {% if stage_days >= 14 %}
-                  <span class="lead-pill lead-pill--red">14+ pv — hälytys</span>
-                {% elif stage_days > 7 %}
-                  <span class="lead-pill lead-pill--amber">7+ pv — siirry eteenpäin</span>
+                {% if stage_days > 14 %}
+                  <span class="lead-pill lead-pill--red">{{ stage_days }} pv — siirrä eteenpäin</span>
+                {% elif stage_days >= 8 %}
+                  <span class="lead-pill lead-pill--amber">{{ stage_days }} pv vaiheessa</span>
                 {% elif stage_days >= 3 %}
                   <span class="lead-pill lead-pill--gray">{{ stage_days }} pv vaiheessa</span>
                 {% endif %}
@@ -205,18 +204,18 @@
                 {% else %}
                   <i class="ti ti-star" aria-hidden="true"></i>
                 {% endif %}
-                {{ ai_rec.get('text')|truncate(30, True, '...') }}
+                {{ ai_rec.get('text')|truncate(32, True, '...') }}
               </div>
               {% endif %}
               {% if next_task %}
               {% set task_days = (next_task.due_date.date() - now.date()).days if next_task.due_date else none %}
               <div class="lead-next-task {% if task_days is not none and task_days < 0 %}lead-next-task--overdue{% elif task_days == 0 %}lead-next-task--today{% else %}lead-next-task--future{% endif %}">
-                📋 {{ next_task.title }} —
-                {% if task_days is not none and task_days < 0 %}myöhässä {{ (task_days * -1) }} pv
-                {% elif task_days == 0 %}tänään
-                {% elif task_days == 1 %}huomenna
-                {% elif task_days is not none %}{{ task_days }} pv päästä
-                {% else %}ei eräpäivää{% endif %}
+                {{ next_task.title|truncate(32, True, '...') }}
+                {% if task_days is not none and task_days < 0 %}(myöhässä)
+                {% elif task_days == 0 %}(tänään)
+                {% elif task_days == 1 %}(huomenna)
+                {% elif task_days is not none %}({{ task_days }} pv päästä)
+                {% else %}(ei eräpäivää){% endif %}
               </div>
               {% endif %}
               {% if last_activity_days is not none and last_activity_days > 0 %}
@@ -243,6 +242,26 @@
   </div>
   {% endif %}
 </section>
+<div id="lost-reason-modal" class="pipeline-lost-modal" hidden>
+  <div class="pipeline-lost-modal__dialog">
+    <p class="pipeline-lost-modal__title">Miksi tämä liidi hävisi?</p>
+    <select id="lost-reason-select" class="form-select">
+      <option value="">Valitse syy...</option>
+      <option value="no_response">Ei vastannut</option>
+      <option value="wrong_target">Väärä kohderyhmä</option>
+      <option value="no_budget">Ei budjettia</option>
+      <option value="not_timely">Ei ajankohtainen</option>
+      <option value="competitor">Kilpailija voitti</option>
+      <option value="other">Muu syy</option>
+    </select>
+    <input type="text" id="lost-reason-note" class="form-input" placeholder="Lisätietoja..." style="display:none">
+    <p id="lost-reason-error" class="pipeline-lost-modal__error" aria-live="polite"></p>
+    <div class="pipeline-lost-modal__actions">
+      <button id="lost-confirm" type="button" class="btn btn-sm">Vahvista</button>
+      <button id="lost-cancel" type="button" class="btn btn-secondary btn-sm">Peruuta</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -253,14 +272,6 @@
   const currencySymbol = {{ currency_symbol|tojson }};
   const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if is_superadmin else url_for('leads.move_stage', lead_id=0) }}";
   const stageUrl = (leadId) => stageUrlTemplate.replace('/0/', `/${leadId}/`);
-  const lostReasonChoices = [
-    'Ei vastannut',
-    'Väärä kohderyhmä',
-    'Ei budjettia',
-    'Ei ajankohtainen',
-    'Kilpailija voitti',
-    'Muu syy',
-  ];
   const isClosedLostStage = (stageName) => {
     const normalized = String(stageName || '').trim().toLowerCase();
     return (
@@ -271,48 +282,53 @@
   };
   function askLostReason() {
     return new Promise((resolve) => {
-      const modal = document.createElement('div');
-      modal.className = 'pipeline-lost-modal';
-      modal.innerHTML = `
-        <div class="pipeline-lost-modal__dialog">
-          <h3>Miksi tämä liidi hävisi?</h3>
-          <select class="form-select" id="lost-reason-select">
-            <option value="">Valitse syy</option>
-            ${lostReasonChoices.map((label) => `<option value="${label}">${label}</option>`).join('')}
-          </select>
-          <textarea id="lost-reason-note" class="form-input" rows="3" placeholder="Kirjoita tarkennus..." style="display:none;margin-top:8px;"></textarea>
-          <div class="pipeline-lost-modal__actions">
-            <button type="button" class="btn btn-secondary btn-sm" data-action="cancel">Peruuta</button>
-            <button type="button" class="btn btn-sm" data-action="confirm">Vahvista</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      const select = modal.querySelector('#lost-reason-select');
-      const note = modal.querySelector('#lost-reason-note');
+      const modal = document.getElementById('lost-reason-modal');
+      const select = document.getElementById('lost-reason-select');
+      const note = document.getElementById('lost-reason-note');
+      const errorEl = document.getElementById('lost-reason-error');
+      const confirmBtn = document.getElementById('lost-confirm');
+      const cancelBtn = document.getElementById('lost-cancel');
+      if (!modal || !select || !note || !confirmBtn || !cancelBtn || !errorEl) {
+        resolve(null);
+        return;
+      }
+      modal.hidden = false;
+      select.value = '';
+      note.value = '';
+      note.style.display = 'none';
+      errorEl.textContent = '';
+
       const close = (result) => {
-        modal.remove();
+        modal.hidden = true;
+        select.removeEventListener('change', onChange);
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
         resolve(result);
       };
-      select?.addEventListener('change', () => {
-        const isOther = select.value === 'Muu syy';
+
+      const onChange = () => {
+        const isOther = select.value === 'other';
         note.style.display = isOther ? 'block' : 'none';
         if (!isOther) note.value = '';
-      });
-      modal.querySelector('[data-action="cancel"]')?.addEventListener('click', () => close(null));
-      modal.querySelector('[data-action="confirm"]')?.addEventListener('click', () => {
-        const reason = (select?.value || '').trim();
-        const reasonNote = (note?.value || '').trim();
+      };
+      const onCancel = () => close(null);
+      const onConfirm = () => {
+        const reason = (select.value || '').trim();
+        const reasonNote = (note.value || '').trim();
         if (!reason) {
-          toast('Valitse häviösyy ennen vahvistusta.', 'error');
+          errorEl.textContent = 'Valitse häviösyy ennen vahvistusta.';
           return;
         }
-        if (reason === 'Muu syy' && !reasonNote) {
-          toast('Kirjoita tarkennus kohdalle "Muu syy".', 'error');
+        if (reason === 'other' && !reasonNote) {
+          errorEl.textContent = 'Kirjoita tarkennus kohdalle "Muu syy".';
           return;
         }
+        errorEl.textContent = '';
         close({ lost_reason: reason, lost_reason_note: reasonNote || null });
-      });
+      };
+      select.addEventListener('change', onChange);
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
     });
   }
 
@@ -465,7 +481,7 @@
               lostPayload = result;
             }
             const res = await fetch(stageUrl(leadId), {
-              method: 'POST',
+              method: 'PATCH',
               credentials: 'same-origin',
               headers: {
                 'Content-Type': 'application/json',

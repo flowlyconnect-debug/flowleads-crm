@@ -578,7 +578,7 @@ def delete_lead(lead_id):
         return json_error(exc.code, exc.message, 400)
 
 
-@leads_bp.route("/<int:lead_id>/stage", methods=["POST"])
+@leads_bp.route("/<int:lead_id>/stage", methods=["POST", "PATCH"])
 def move_stage(lead_id):
     organization_id = resolve_organization_id()
     payload = request.get_json(silent=True) or {}
