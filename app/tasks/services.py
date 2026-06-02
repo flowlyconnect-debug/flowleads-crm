@@ -436,7 +436,7 @@ class TaskService:
         if trigger_type == "stage_change":
             if not settings.auto_task_stage_change:
                 return None
-            if not lead.stage or lead.stage.name != "Proposal Sent":
+            if not lead.stage or lead.stage.name not in {"Tarjous lähetetty", "Proposal Sent"}:
                 return None
             assignee_id = lead.assigned_to
             if not assignee_id:

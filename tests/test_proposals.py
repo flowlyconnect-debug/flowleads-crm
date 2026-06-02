@@ -403,7 +403,7 @@ def test_lead_moved_to_won_on_accept(app):
             ProposalService.accept(p.view_token, "Buyer", {})
         db.session.commit()
         lead = db.session.get(Lead, lead_id)
-        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Won").first()
+        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Voitettu").first()
         assert lead.stage_id == won.id
         assert lead.status == "won"
 

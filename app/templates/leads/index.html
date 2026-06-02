@@ -95,10 +95,10 @@
         </div>
       </div>
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">
-        Pipeline
+        Myyntiputki
       </a>
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">
-        Export CSV
+        Vie CSV
       </a>
       <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
         + Liidi

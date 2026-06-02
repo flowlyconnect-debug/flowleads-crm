@@ -477,7 +477,7 @@
 
 .page-header h1 {
   font-size: 22px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.4px;
   margin-bottom: var(--space-1);
 }
@@ -629,8 +629,8 @@
 }
 
 .card-title {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-size: 16px;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   margin: 0;
 }
@@ -1869,7 +1869,7 @@ details.ai-insights {
 
 details.ai-insights summary {
   cursor: pointer;
-  color: var(--color-accent);
+  color: var(--color-highlight);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -2204,7 +2204,7 @@ details.ai-insights summary {
 }
 
 .leads-table tbody tr:hover {
-  background: var(--color-card-hover);
+  background: #F4F6FB;
 }
 
 .leads-table td {
@@ -2584,8 +2584,9 @@ details.ai-insights summary {
 }
 
 .ai-insights-card {
-  background: linear-gradient(135deg, #F5F3FF, #EEF2FF);
-  border: 1px solid var(--color-accent-border);
+  background: var(--color-card);
+  border: 1px solid color-mix(in srgb, var(--color-highlight) 35%, var(--color-border));
+  border-left: 3px solid var(--color-highlight);
 }
 
 .ai-score-gauge {
@@ -2610,7 +2611,7 @@ details.ai-insights summary {
 .ai-score-gauge__fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--color-accent), var(--color-highlight));
+  background: var(--color-highlight);
 }
 
 .ai-signal-list {
@@ -2692,6 +2693,13 @@ details.ai-insights summary {
   font-size: 2.5rem;
   margin-bottom: var(--space-4);
   opacity: 0.4;
+}
+
+.empty-state-hero-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-4);
+  opacity: 0.4;
+  color: var(--color-text-muted);
 }
 
 .empty-state-title {
@@ -4596,7 +4604,7 @@ tbody tr {
   cursor: pointer;
 }
 
-tbody tr:hover { background: #F4F7FF; }
+tbody tr:hover { background: #F4F6FB; }
 
 .row-actions {
   opacity: 0;
@@ -4656,8 +4664,28 @@ tr:hover .action-destructive,
 
 /* AI Playbook card (lead detail) */
 .playbook-card {
-  border-left: 3px solid #1D6BF3;
+  border-left: 3px solid var(--color-highlight);
   margin-top: 1rem;
+}
+
+.playbook-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--color-highlight);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .playbook-card__header {
@@ -4703,13 +4731,13 @@ tr:hover .action-destructive,
 }
 
 .playbook-pill--opportunity {
-  background: rgba(29, 107, 243, 0.12);
-  color: #1D6BF3;
+  background: rgba(56, 189, 248, 0.1);
+  color: #38BDF8;
 }
 
 .playbook-pill--risk {
-  background: var(--color-danger-soft);
-  color: var(--color-danger-emphasis);
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
 }
 
 .playbook-pill--followup {

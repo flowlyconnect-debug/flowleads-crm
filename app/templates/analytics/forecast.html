@@ -25,7 +25,7 @@
   </header>
 
   <nav class="reports-tabs" aria-label="Raporttityypit">
-    <a href="{{ url_for('analytics.reports', report='pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='pipeline') }}">Pipeline</a>
+    <a href="{{ url_for('analytics.reports', report='pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='pipeline') }}">Myyntiputki</a>
     <a href="{{ url_for('analytics.reports', report='source', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='source') }}">Lähteet</a>
     <a href="{{ url_for('analytics.reports', report='team', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='team') }}">Tiimi</a>
     <a href="{{ url_for('analytics.reports', report='ai', organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report='ai') }}">AI-rikastus</a>

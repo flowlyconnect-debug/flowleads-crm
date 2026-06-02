@@ -21,7 +21,7 @@
     </div>
     <div class="page-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">
-        Pipeline
+        Myyntiputki
       </a>
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}">
         Muokkaa
@@ -107,7 +107,10 @@
 
       <article class="card playbook-card" id="ai-playbook-card">
         <header class="playbook-card__header">
-          <h2 class="playbook-card__title">AI-myyntisuunnitelma</h2>
+          <div class="playbook-card__title-row">
+            <span class="ai-badge" aria-hidden="true">AI</span>
+            <h2 class="playbook-card__title">AI-myyntisuunnitelma</h2>
+          </div>
         </header>
         <div class="playbook-card__body">
           <section class="playbook-section">
@@ -554,7 +557,7 @@
               <div class="table-wrap mt-3">
                 <table class="leads-table">
                   <thead>
-                    <tr><th>Viite</th><th>Otsikko</th><th>Status</th><th>Summa</th><th></th></tr>
+                    <tr><th>Viite</th><th>Otsikko</th><th>Tila</th><th>Summa</th><th></th></tr>
                   </thead>
                   <tbody>
                     {% for p in lead_proposals %}
@@ -652,7 +655,7 @@
     <aside class="lead-sidebar-column" aria-label="AI-ennuste ja signaalit">
       <section class="card lead-sidebar-card">
         <header class="card-header">
-          <h2 class="card-title">Pipeline & tila</h2>
+          <h2 class="card-title">Myyntiputki & tila</h2>
         </header>
         <div class="card-body">
           <form method="post" action="{{ url_for('leads.move_stage', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=lead.id) }}" id="stage-form">
@@ -672,7 +675,7 @@
 
       <section class="card ai-insights-card mt-4">
         <header class="card-header">
-          <h2 class="card-title">AI-insights</h2>
+          <h2 class="card-title">AI-havainnot</h2>
         </header>
         <div class="card-body">
           {% set prob = lead.close_probability %}

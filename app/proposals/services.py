@@ -526,8 +526,12 @@ class ProposalService:
         if not settings.proposal_move_lead_to_won_on_accept:
             return
         won_stage = PipelineStage.query.filter_by(
-            organization_id=proposal.organization_id, name="Won"
+            organization_id=proposal.organization_id, name="Voitettu"
         ).first()
+        if not won_stage:
+            won_stage = PipelineStage.query.filter_by(
+                organization_id=proposal.organization_id, name="Won"
+            ).first()
         if not won_stage:
             return
         try:

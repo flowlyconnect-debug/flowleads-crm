@@ -96,8 +96,13 @@ def seed_default_automations(organization_id: int, created_by: int | None = None
         created.append(automation)
 
     proposal_stage = PipelineStage.query.filter_by(
-        organization_id=organization_id, name="Proposal Sent"
+        organization_id=organization_id, name="Tarjous lähetetty"
     ).first()
+    if not proposal_stage:
+        # Backwards compatibility for existing orgs / older default seeds.
+        proposal_stage = PipelineStage.query.filter_by(
+            organization_id=organization_id, name="Proposal Sent"
+        ).first()
     follow_up = EmailSequence.query.filter_by(
         organization_id=organization_id, name="Follow-up"
     ).first()
@@ -106,7 +111,7 @@ def seed_default_automations(organization_id: int, created_by: int | None = None
         automation = Automation(
             organization_id=organization_id,
             name="Tarjous lähetetty",
-            description="Lisää liidi Follow-up-sekvenssiin kun vaihe on Proposal Sent.",
+                description="Lisää liidi Follow-up-sekvenssiin kun vaihe on Tarjous lähetetty.",
             is_active=True,
             trigger_type="lead_stage_changed",
             trigger_config={"to_stage_id": proposal_stage.id},

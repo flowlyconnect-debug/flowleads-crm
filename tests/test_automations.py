@@ -101,7 +101,7 @@ def test_stage_changed_condition(app):
     ctx = _setup_org(app, "stage-cond")
     with app.app_context():
         stages = PipelineStage.query.filter_by(organization_id=ctx["org_id"]).all()
-        target = next(s for s in stages if s.name == "Contacted")
+        target = next(s for s in stages if s.name == "Kontaktoitu")
         _create_automation(
             ctx["org_id"],
             ctx["admin_id"],
@@ -182,7 +182,7 @@ def test_change_stage_action(app):
     ctx = _setup_org(app, "change-stage")
     with app.app_context():
         stages = PipelineStage.query.filter_by(organization_id=ctx["org_id"]).all()
-        won = next(s for s in stages if s.name == "Won")
+        won = next(s for s in stages if s.name == "Voitettu")
         _create_automation(
             ctx["org_id"],
             ctx["admin_id"],

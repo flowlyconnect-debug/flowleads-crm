@@ -53,12 +53,12 @@ ACTIVITY_TYPES = (
 )
 
 DEFAULT_PIPELINE_STAGES = [
-    ("New Lead", 0, "#3B82F6"),
-    ("Contacted", 1, "#8B5CF6"),
-    ("Interested", 2, "#F59E0B"),
-    ("Proposal Sent", 3, "#06B6D4"),
-    ("Won", 4, "#22C55E"),
-    ("Lost", 5, "#EF4444"),
+    ("Uusi liidi", 0, "#3B82F6"),
+    ("Kontaktoitu", 1, "#8B5CF6"),
+    ("Kvalifioitu", 2, "#F59E0B"),
+    ("Tarjous lähetetty", 3, "#06B6D4"),
+    ("Voitettu", 4, "#22C55E"),
+    ("Hävitty", 5, "#EF4444"),
 ]
 
 

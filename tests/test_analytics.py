@@ -414,7 +414,7 @@ def test_dashboard_renders_normal_user(client, app):
     _login(client, ctx["user_email"])
     resp = client.get("/dashboard")
     assert resp.status_code == 200
-    assert b"Dashboard" in resp.data
+    assert b"Kojelauta" in resp.data or b"Dashboard" in resp.data
 
 
 def test_reports_renders_normal_user(client, app):
@@ -422,7 +422,7 @@ def test_reports_renders_normal_user(client, app):
     _login(client, ctx["user_email"])
     resp = client.get("/reports")
     assert resp.status_code == 200
-    assert b"Reports" in resp.data
+    assert b"Raportit" in resp.data or b"Reports" in resp.data
 
 
 def test_api_client_cannot_access_analytics(client, app):

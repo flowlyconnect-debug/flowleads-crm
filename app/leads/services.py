@@ -148,9 +148,9 @@ def _validate_assignment_permission(
 
 def _status_from_stage_name(stage_name: str) -> str:
     lower = stage_name.strip().lower()
-    if lower == "won":
+    if lower in {"won", "voitettu"}:
         return "won"
-    if lower == "lost":
+    if lower in {"lost", "hävitty"}:
         return "lost"
     if lower == "closed won":
         return "won"
@@ -160,7 +160,7 @@ def _status_from_stage_name(stage_name: str) -> str:
 
 
 def _is_closed_lost_stage_name(stage_name: str | None) -> bool:
-    return (stage_name or "").strip().lower() in {"lost", "closed lost"}
+    return (stage_name or "").strip().lower() in {"lost", "closed lost", "hävitty"}
 
 
 def _activity_change_value(value):
@@ -276,7 +276,7 @@ class LeadService:
             website=data.get("website"),
             linkedin_url=data.get("linkedin_url"),
             stage_id=stage.id,
-            status=_status_from_stage_name(stage.name) if stage.name.lower() in ("won", "lost") else "active",
+            status=_status_from_stage_name(stage.name) if stage.name.lower() in ("won", "lost", "voitettu", "hävitty") else "active",
             source=data.get("source", "manual"),
             source_ref=data.get("source_ref"),
             score=data.get("score") if data.get("score") is not None and data.get("score") != "" else None,
@@ -606,7 +606,7 @@ class LeadService:
         if _is_closed_lost_stage_name(new_stage.name):
             if not (lost_reason or "").strip():
                 raise LeadServiceError(
-                    "lost_reason is required when moving to Closed Lost.",
+                    "lost_reason on pakollinen siirrettäessä hävittyyn vaiheeseen.",
                     "validation_error",
                 )
             lead.lost_reason = (lost_reason or "").strip()[:100]

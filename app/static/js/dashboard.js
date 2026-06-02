@@ -113,12 +113,12 @@
   }
 
   var PIPELINE_COLORS = {
-    'New Lead': '#1D6BF3',
-    Contacted: '#38BDF8',
-    Qualified: '#10B981',
-    Proposal: '#F59E0B',
-    'Closed Won': '#22C55E',
-    'Closed Lost': '#EF4444',
+    'Uusi liidi': '#1D6BF3',
+    'Kontaktoitu': '#38BDF8',
+    'Kvalifioitu': '#10B981',
+    'Tarjous lähetetty': '#F59E0B',
+    'Voitettu': '#22C55E',
+    'Hävitty': '#EF4444',
   };
 
   function destroyPipelineChart(canvas) {

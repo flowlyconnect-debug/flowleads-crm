@@ -13,7 +13,9 @@ from app.leads.services import LeadService, get_default_stage
 from app.proposals.models import Proposal
 from app.tasks.models import Task
 
-CLOSED_STAGE_NAMES = frozenset({"Won", "Lost", "Closed Won", "Closed Lost"})
+CLOSED_STAGE_NAMES = frozenset(
+    {"Won", "Lost", "Closed Won", "Closed Lost", "Voitettu", "Hävitty"}
+)
 RISK_RECOMMENDATIONS = frozenset(
     {"Ota yhteyttä nyt", "Muistuta tarjouksesta", "Seuraa välittömästi"}
 )

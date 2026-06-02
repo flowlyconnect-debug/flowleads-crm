@@ -5,11 +5,11 @@
 <div class="reports-page">
   <header class="page-header">
     <div class="page-header__main">
-      <h1>Reports · Raportit</h1>
+      <h1>Raportit</h1>
       <p class="page-subtitle">Analytiikkatyötila — pipeline, lähteet, tiimi ja AI</p>
     </div>
     <div class="page-header__actions">
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.dashboard') }}">Dashboard</a>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.dashboard') }}">Kojelauta</a>
     </div>
   </header>
 
@@ -38,7 +38,7 @@
 
   <nav class="reports-tabs" aria-label="Raporttityypit">
     {% set tabs = [
-      ('pipeline', 'Pipeline'),
+      ('pipeline', 'Myyntiputki'),
       ('source', 'Lähteet'),
       ('team', 'Tiimi'),
       ('ai', 'AI-rikastus'),
@@ -86,7 +86,7 @@
   <article class="report-card">
     <header class="report-card__header">
       <h2 class="report-card__title">
-        {% if report_type == 'pipeline' %}Pipeline-raportti
+        {% if report_type == 'pipeline' %}Myyntiputki-raportti
         {% elif report_type == 'source' %}Lähteet
         {% elif report_type == 'team' %}Tiimiaktiviteetti
         {% elif report_type == 'ai' %}AI-rikastus

@@ -158,7 +158,7 @@ def test_post_creates_lead(client, app):
         lead = Lead.query.filter_by(email="john@example.com").first()
         assert lead.organization_id == ctx["org_id"]
         stage = db.session.get(PipelineStage, lead.stage_id)
-        assert stage.name == "New Lead"
+        assert stage.name == "Uusi liidi"
         assert Activity.query.filter_by(lead_id=lead.id, type="created").count() == 1
         assert "API" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
 
@@ -405,10 +405,10 @@ def test_api_lost_reason_required(client, app):
     lead_id = created.get_json()["data"]["lead"]["id"]
     with app.app_context():
         lost_stage = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Lost"
+            organization_id=ctx["org_id"], name="Hävitty"
         ).first()
         contacted = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Contacted"
+            organization_id=ctx["org_id"], name="Kontaktoitu"
         ).first()
         lost_stage_id = lost_stage.id
         contacted_stage_id = contacted.id

@@ -157,7 +157,7 @@
           {% elif lead.score is not none and lead.score >= 60 %}
             {% set accent_color = '#F59E0B' %}
           {% elif lead.score is not none and lead.score >= 40 %}
-            {% set accent_color = '#1D6BF3' %}
+            {% set accent_color = '#38BDF8' %}
           {% else %}
             {% set accent_color = '#E5E7EB' %}
           {% endif %}
@@ -263,7 +263,11 @@
   ];
   const isClosedLostStage = (stageName) => {
     const normalized = String(stageName || '').trim().toLowerCase();
-    return normalized === 'closed lost' || normalized === 'lost';
+    return (
+      normalized === 'closed lost' ||
+      normalized === 'lost' ||
+      normalized === 'hävitty'
+    );
   };
   function askLostReason() {
     return new Promise((resolve) => {

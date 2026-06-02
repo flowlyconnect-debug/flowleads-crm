@@ -479,8 +479,8 @@
   gap: 5px;
 }
 
-.lead-recommendation--risk { color: #DC2626; }
-.lead-recommendation--opportunity { color: #1D4ED8; }
+.lead-recommendation--risk { color: #EF4444; }
+.lead-recommendation--opportunity { color: #38BDF8; }
 .lead-recommendation--followup { color: #B45309; }
 
 .lead-next-task {
@@ -600,7 +600,7 @@
   background: #E5E7EB;
 }
 
-.eng-dot.filled { background: #1D6BF3; }
+.eng-dot.filled { background: #38BDF8; }
 
 .lead-urgency-badge {
   font-size: 10px;

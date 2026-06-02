@@ -151,7 +151,7 @@ def test_move_stage_success(app):
     with app.app_context():
         lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="move@a.com")
         contacted = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Contacted"
+            organization_id=ctx["org_id"], name="Kontaktoitu"
         ).first()
         LeadService.move_stage(lead_id, contacted.id, ctx["org_id"], ctx["admin_id"])
         db.session.commit()
@@ -193,7 +193,7 @@ def test_move_to_won_sets_status(app):
     ctx = _setup_org_with_users(app, "won-org")
     with app.app_context():
         lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="won@a.com")
-        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Won").first()
+        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Voitettu").first()
         LeadService.move_stage(lead_id, won.id, ctx["org_id"], ctx["admin_id"])
         db.session.commit()
         assert db.session.get(Lead, lead_id).status == "won"
@@ -321,7 +321,7 @@ def test_stage_move_json_endpoint(app, client):
     with app.app_context():
         lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="json@a.com")
         contacted = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Contacted"
+            organization_id=ctx["org_id"], name="Kontaktoitu"
         ).first()
         contacted_id = contacted.id
     _login(client, ctx["admin_email"])
@@ -425,11 +425,11 @@ def test_lost_reason_required(app, client):
     with app.app_context():
         lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="lost@a.com")
         lost_stage = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Lost"
+            organization_id=ctx["org_id"], name="Hävitty"
         ).first()
         lost_stage_id = lost_stage.id
         contacted = PipelineStage.query.filter_by(
-            organization_id=ctx["org_id"], name="Contacted"
+            organization_id=ctx["org_id"], name="Kontaktoitu"
         ).first()
         contacted_id = contacted.id
     _login(client, ctx["admin_email"])

@@ -3,7 +3,7 @@
 <div class="dashboard-page dashboard-org-picker">
   <div class="page-header">
     <div>
-      <h1>Dashboard</h1>
+      <h1>Kojelauta</h1>
       <p class="page-subtitle">Valitse organisaatio nähdäksesi komentokeskuksen.</p>
     </div>
   </div>
@@ -75,7 +75,7 @@
 
   <header class="page-header command-header">
     <div>
-      <h1>Sales Command Center</h1>
+      <h1>Myynnin komentokeskus</h1>
       <p class="page-subtitle">Hei, {{ (current_user.first_name or current_user.email.split('@')[0]) }} — <time id="dashboard-current-date" datetime=""></time></p>
     </div>
     <div class="dashboard-header-extra">
@@ -142,7 +142,7 @@
   </div>
 
   <section class="metrics-grid-row1" aria-label="Keskeiset mittarit">
-    <div class="metric-card" style="--card-color: #1D6BF3;">
+    <div class="metric-card" style="--card-color: #1D2B4F;">
       <div class="metric-card-inner">
         <div class="metric-label">Uudet liidit</div>
         <div class="metric-value">{{ stats.leads_this_month if stats and stats.leads_this_month is not none else 0 }}</div>
@@ -157,7 +157,7 @@
       </div>
     </div>
 
-    <div class="metric-card" style="--card-color: #0EA5E9;">
+    <div class="metric-card" style="--card-color: #1A3A5C;">
       <div class="metric-card-inner">
         <div class="metric-label">Voitetut kaupat</div>
         <div class="metric-value">{{ stats.won_count if stats and stats.won_count is not none else 0 }}</div>
@@ -174,7 +174,7 @@
       </div>
     </div>
 
-    <div class="metric-card" style="--card-color: #7C3AED;">
+    <div class="metric-card" style="--card-color: #0F2744;">
       <div class="metric-card-inner">
         <div class="metric-label">Pipeline-arvo</div>
         {% if row1_pipeline > 0 %}
@@ -187,7 +187,7 @@
       </div>
     </div>
 
-    <div class="metric-card" style="--card-color: #0F766E;">
+    <div class="metric-card" style="--card-color: #1A3A5C;">
       <div class="metric-card-inner">
         <div class="metric-label">Avg. päiviä sulkuun</div>
         <div class="metric-value">{% if ext.avg_days_to_close is not none %}{{ ext.avg_days_to_close }}{% else %}—{% endif %}</div>
@@ -202,7 +202,8 @@
         <div class="card-header">
           <div class="ai-pulse-header-title">
             <div class="ai-pulse-indicator" aria-hidden="true"></div>
-            <span class="card-title">AI Pulse</span>
+            <span class="ai-badge" aria-hidden="true">AI</span>
+            <span class="card-title">AI-pulssi</span>
           </div>
           <span class="ai-pulse-header-time">Juuri nyt</span>
         </div>

@@ -1,6 +1,6 @@
 {% macro empty_state(icon, title, body, cta_text, cta_url, secondary_text=None, secondary_url=None) %}
 <div class="empty-state">
-  <i class="ti {{ icon }}" style="font-size:48px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+  <i class="ti {{ icon }} empty-state-hero-icon" aria-hidden="true"></i>
   <h3>{{ title }}</h3>
   {% if body %}
   <p>{{ body }}</p>

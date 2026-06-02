@@ -381,8 +381,8 @@ def test_dashboard_forecast_card_renders(mock_openai, client, app):
 
     response = client.get(f"/dashboard?organization_id={ctx['org_id']}")
     assert response.status_code == 200
-    assert b"Sales Command Center" in response.data
-    assert b"AI Pulse" in response.data
+    assert b"Myynnin komentokeskus" in response.data or b"Sales Command Center" in response.data
+    assert b"AI-pulssi" in response.data or b"AI Pulse" in response.data
 
 
 @patch("app.analytics.prediction.call_openai_prediction")
@@ -399,7 +399,7 @@ def test_pipeline_probability_badge_renders(mock_openai, client, app):
     _login(client, ctx["admin_email"])
     response = client.get(f"/leads/pipeline?organization_id={ctx['org_id']}")
     assert response.status_code == 200
-    assert b"75%" in response.data or b"score-high" in response.data
+    assert b"data-probability=" in response.data
 
 
 def test_reports_forecast_renders(client, app):

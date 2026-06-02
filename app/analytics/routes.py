@@ -76,21 +76,21 @@ def _pipeline_bucket_label(stage_name: str | None, status: str | None) -> str | 
     if not status:
         return None
     if status == "won":
-        return "Closed Won"
+        return "Voitettu"
     if status == "lost":
-        return "Closed Lost"
+        return "Hävitty"
     # Non-closed: bucket by stage name
     name = (stage_name or "").strip()
     if not name:
         return None
-    if name == "New Lead":
-        return "New Lead"
-    if name == "Contacted":
-        return "Contacted"
-    if name in {"Interested", "Qualified"}:
-        return "Qualified"
-    if name in {"Proposal Sent", "Proposal"}:
-        return "Proposal"
+    if name in {"Uusi liidi", "New Lead"}:
+        return "Uusi liidi"
+    if name in {"Kontaktoitu", "Contacted"}:
+        return "Kontaktoitu"
+    if name in {"Kvalifioitu", "Qualified", "Interested"}:
+        return "Kvalifioitu"
+    if name in {"Tarjous lähetetty", "Proposal Sent", "Proposal"}:
+        return "Tarjous lähetetty"
     return None
 
 
@@ -410,12 +410,12 @@ def dashboard_pipeline_distribution():
     )
 
     buckets = {
-        "New Lead": 0,
-        "Contacted": 0,
-        "Qualified": 0,
-        "Proposal": 0,
-        "Closed Won": 0,
-        "Closed Lost": 0,
+        "Uusi liidi": 0,
+        "Kontaktoitu": 0,
+        "Kvalifioitu": 0,
+        "Tarjous lähetetty": 0,
+        "Voitettu": 0,
+        "Hävitty": 0,
     }
 
     for stage_name, status, count in rows:

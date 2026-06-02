@@ -14,100 +14,105 @@ from wtforms.validators import Length, NumberRange, Optional
 
 
 class LeadForm(FlaskForm):
-    first_name = StringField("First name", validators=[Optional(), Length(max=100)])
-    last_name = StringField("Last name", validators=[Optional(), Length(max=100)])
-    email = StringField("Email", validators=[Optional(), Length(max=255)])
-    phone = StringField("Phone", validators=[Optional(), Length(max=50)])
-    company = StringField("Company", validators=[Optional(), Length(max=255)])
-    title = StringField("Title", validators=[Optional(), Length(max=150)])
-    website = StringField("Website", validators=[Optional(), Length(max=500)])
+    first_name = StringField("Etunimi", validators=[Optional(), Length(max=100)])
+    last_name = StringField("Sukunimi", validators=[Optional(), Length(max=100)])
+    email = StringField("Sähköposti", validators=[Optional(), Length(max=255)])
+    phone = StringField("Puhelin", validators=[Optional(), Length(max=50)])
+    company = StringField("Yritys", validators=[Optional(), Length(max=255)])
+    title = StringField("Ammatti", validators=[Optional(), Length(max=150)])
+    website = StringField("Kotisivu", validators=[Optional(), Length(max=500)])
     linkedin_url = StringField("LinkedIn", validators=[Optional(), Length(max=500)])
-    stage_id = SelectField("Stage", coerce=int, validators=[Optional()])
-    assigned_to = SelectField("Assigned to", coerce=int, validators=[Optional()])
+    stage_id = SelectField("Vaihe", coerce=int, validators=[Optional()])
+    assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[Optional()])
     source = SelectField(
-        "Source",
-        choices=[("manual", "Manual"), ("n8n", "n8N"), ("import", "Import")],
+        "Lähde",
+        choices=[("manual", "Manuaalinen"), ("n8n", "n8n"), ("import", "Tuonti")],
         default="manual",
     )
-    source_ref = StringField("Source reference", validators=[Optional(), Length(max=255)])
-    score = IntegerField("Score", validators=[Optional(), NumberRange(min=0, max=100)])
+    score_reason = TextAreaField("Pistemäärän perustelu", validators=[Optional()])
+    notes = TextAreaField("Muistiinpanot", validators=[Optional()])
+    tags = StringField("Tunnisteet (pilkuin eroteltuna)", validators=[Optional(), Length(max=1000)])
+    score = IntegerField("Pisteet", validators=[Optional(), NumberRange(min=0, max=100)])
     deal_value = DecimalField("Kaupan arvo", places=2, validators=[Optional(), NumberRange(min=0)])
-    score_reason = TextAreaField("Score reason", validators=[Optional()])
-    notes = TextAreaField("Notes", validators=[Optional()])
-    tags = StringField("Tags (comma-separated)", validators=[Optional(), Length(max=1000)])
-    submit = SubmitField("Save")
+    source_ref = StringField("Lähteen viite", validators=[Optional(), Length(max=255)])
+    submit = SubmitField("Tallenna")
 
 
 class LeadFilterForm(FlaskForm):
-    search = StringField("Search", validators=[Optional(), Length(max=255)])
-    stage_id = SelectField("Stage", coerce=int, validators=[Optional()])
+    search = StringField("Haku", validators=[Optional(), Length(max=255)])
+    stage_id = SelectField("Vaihe", coerce=int, validators=[Optional()])
     source = SelectField(
-        "Source",
-        choices=[("", "All"), ("manual", "Manual"), ("n8n", "n8N"), ("import", "Import")],
+        "Lähde",
+        choices=[("", "Kaikki"), ("manual", "Manuaalinen"), ("n8n", "n8n"), ("import", "Tuonti")],
         validators=[Optional()],
     )
-    assigned_to = SelectField("Assigned to", coerce=int, validators=[Optional()])
+    assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[Optional()])
     status = SelectField(
-        "Status",
-        choices=[("", "Active only"), ("archived", "Archived"), ("won", "Won"), ("lost", "Lost")],
+        "Tila",
+        choices=[
+            ("", "Ainoastaan aktiiviset"),
+            ("archived", "Arkistoitu"),
+            ("won", "Voitettu"),
+            ("lost", "Hävitty"),
+        ],
         validators=[Optional()],
     )
-    score_min = IntegerField("Min score", validators=[Optional(), NumberRange(min=0, max=100)])
-    score_max = IntegerField("Max score", validators=[Optional(), NumberRange(min=0, max=100)])
-    created_from = DateField("Created from", validators=[Optional()])
-    created_to = DateField("Created to", validators=[Optional()])
+    score_min = IntegerField("Min. pisteet", validators=[Optional(), NumberRange(min=0, max=100)])
+    score_max = IntegerField("Max. pisteet", validators=[Optional(), NumberRange(min=0, max=100)])
+    created_from = DateField("Luotu alkaen", validators=[Optional()])
+    created_to = DateField("Luotu asti", validators=[Optional()])
     gdpr_consent = SelectField(
-        "GDPR consent",
-        choices=[("", "All"), ("1", "Consented only")],
+        "GDPR-suostumus",
+        choices=[("", "Kaikki"), ("1", "Suostuneet vain")],
         validators=[Optional()],
     )
     marketing_opt_in = SelectField(
-        "Marketing opt-in",
-        choices=[("", "All"), ("1", "Opt-in only")],
+        "Markkinointilupa",
+        choices=[("", "Kaikki"), ("1", "Markkinointi: sallittu")],
         validators=[Optional()],
     )
     unsubscribed = SelectField(
-        "Unsubscribed",
-        choices=[("", "All"), ("1", "Unsubscribed only")],
+        "Uutiskirjeestä pois",
+        choices=[("", "Kaikki"), ("1", "Uutiskirjeestä pois")],
         validators=[Optional()],
     )
     is_anonymized = SelectField(
-        "Anonymized",
-        choices=[("", "All"), ("1", "Anonymized only")],
+        "Anonymisoitu",
+        choices=[("", "Kaikki"), ("1", "Anonymisoidut vain")],
         validators=[Optional()],
     )
     sort = SelectField(
-        "Sort",
+        "Järjestä",
         choices=[
-            ("created_at", "Created"),
-            ("name", "Name"),
-            ("company", "Company"),
-            ("stage", "Stage"),
-            ("score", "Score"),
-            ("source", "Source"),
+            ("created_at", "Luontiaika"),
+            ("name", "Nimi"),
+            ("company", "Yritys"),
+            ("stage", "Vaihe"),
+            ("score", "Pisteet"),
+            ("source", "Lähde"),
         ],
         default="created_at",
     )
-    dir = SelectField("Direction", choices=[("desc", "Desc"), ("asc", "Asc")], default="desc")
-    submit = SubmitField("Filter")
+    dir = SelectField("Suunta", choices=[("desc", "Laskeva"), ("asc", "Nouseva")], default="desc")
+    submit = SubmitField("Suodata")
 
 
 class QuickNoteForm(FlaskForm):
-    content = TextAreaField("Note", validators=[Optional(), Length(max=5000)])
-    submit = SubmitField("Add note")
+    content = TextAreaField("Muistiinpano", validators=[Optional(), Length(max=5000)])
+    submit = SubmitField("Lisää muistiinpano")
 
 
 class BulkActionForm(FlaskForm):
     action = SelectField(
-        "Action",
+        "Toiminto",
         choices=[
-            ("assign", "Assign"),
-            ("change_stage", "Change stage"),
-            ("archive", "Archive"),
-            ("export", "Export"),
+            ("assign", "Määritä vastuuhenkilö"),
+            ("change_stage", "Vaihda vaihe"),
+            ("archive", "Arkistoi"),
+            ("export", "Vie"),
         ],
     )
     lead_ids = HiddenField()
-    assigned_to = SelectField("Assign to", coerce=int, validators=[Optional()])
-    stage_id = SelectField("Stage", coerce=int, validators=[Optional()])
-    submit = SubmitField("Apply")
+    assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[Optional()])
+    stage_id = SelectField("Vaihe", coerce=int, validators=[Optional()])
+    submit = SubmitField("Toteuta")

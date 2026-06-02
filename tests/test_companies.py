@@ -257,8 +257,8 @@ def test_company_lead_count(app, client):
     ctx = _setup_org_with_users(app, "lead-count")
     with app.app_context():
         stage_a = get_default_stage(ctx["org_id"])
-        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Won").first()
-        lost = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Lost").first()
+        won = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Voitettu").first()
+        lost = PipelineStage.query.filter_by(organization_id=ctx["org_id"], name="Hävitty").first()
         assert won is not None
         assert lost is not None
 
@@ -309,7 +309,13 @@ def test_company_lead_count(app, client):
             actor_role="admin",
         )
         lead_lost.company_id = company_id
-        LeadService.move_stage(lead_lost.id, lost.id, ctx["org_id"], ctx["admin_id"])
+        LeadService.move_stage(
+            lead_lost.id,
+            lost.id,
+            ctx["org_id"],
+            ctx["admin_id"],
+            lost_reason="Ei budjettia",
+        )
 
         # Archived lead
         lead_archived = LeadService.create(
