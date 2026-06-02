@@ -123,6 +123,7 @@ def _init_extensions(app):
         from app.webhooks import models as webhooks_models  # noqa: F401
         from app.forms import models as forms_models  # noqa: F401
         from app.streams import models as streams_models  # noqa: F401
+        from app.search import models as search_models  # noqa: F401
 
 
 def _register_blueprints(app):
