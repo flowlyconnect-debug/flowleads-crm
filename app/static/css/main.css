@@ -2312,6 +2312,10 @@ details.ai-insights summary {
   color: var(--color-text-secondary);
 }
 
+.leads-last-activity-amber {
+  color: #B45309;
+}
+
 .leads-row-actions {
   display: inline-flex;
   align-items: center;

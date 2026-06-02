@@ -89,6 +89,7 @@ class LeadFilterForm(FlaskForm):
             ("company", "Yritys"),
             ("stage", "Vaihe"),
             ("score", "Pisteet"),
+            ("last_activity", "Viimeisin aktiviteetti"),
             ("source", "Lähde"),
         ],
         default="created_at",

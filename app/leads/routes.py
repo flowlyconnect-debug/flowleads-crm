@@ -44,6 +44,9 @@ def _require_ui_role():
 
 
 def _filters_from_request() -> dict:
+    sort_dir = request.args.get("dir")
+    if not sort_dir:
+        sort_dir = request.args.get("order")
     return {
         "search": request.args.get("search", ""),
         "stage_id": request.args.get("stage_id", type=int) or None,
@@ -55,7 +58,8 @@ def _filters_from_request() -> dict:
         "created_from": _parse_date(request.args.get("created_from")),
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
         "sort": request.args.get("sort", "created_at"),
-        "dir": request.args.get("dir", "desc"),
+        "dir": sort_dir or "desc",
+        "no_contact_7": request.args.get("no_contact_7") == "1",
         "gdpr_consent": request.args.get("gdpr_consent") == "1",
         "marketing_opt_in": request.args.get("marketing_opt_in") == "1",
         "unsubscribed": request.args.get("unsubscribed") == "1",
@@ -139,6 +143,22 @@ def _engagement_level_from_last_activity(last_activity: Activity | None) -> int:
     if days_ago <= 14:
         return 2
     return 1
+
+
+def _last_activity_label(activity_type: str | None) -> str:
+    mapping = {
+        "email": "Sähköposti",
+        "email_sent": "Sähköposti",
+        "call": "Soitettu",
+        "note": "Muistiinpano",
+        "meeting": "Tapaaminen",
+        "meeting_scheduled": "Tapaaminen",
+        "stage_change": "Vaihe muuttunut",
+        "stage_changed": "Vaihe muuttunut",
+        "ai_score": "AI pisteytys",
+        "ai_enriched": "AI pisteytys",
+    }
+    return mapping.get((activity_type or "").strip(), "Aktiviteetti")
 
 
 def _populate_lead_form_choices(form: LeadForm, organization_id: int):
@@ -226,6 +246,8 @@ def list_leads():
 
     org_currency = get_default_currency(organization_id)
     form_args = request.args.copy()
+    if "dir" not in form_args and "order" in form_args:
+        form_args["dir"] = form_args.get("order")
     for key in ("organization_id", "page"):
         form_args.pop(key, None)
     filter_form = LeadFilterForm(form_args, meta={"csrf": False})
@@ -241,6 +263,7 @@ def list_leads():
     bulk_form = BulkActionForm()
     bulk_form.stage_id.choices = [(s.id, s.name) for s in stages]
     bulk_form.assigned_to.choices = [(u.id, u.email) for u in users]
+    now = datetime.now(timezone.utc)
 
     return render_template(
         "leads/list.html",
@@ -254,6 +277,8 @@ def list_leads():
         can_assign_others=can_assign_to_others(),
         org_currency=org_currency,
         currency_symbol=currency_symbol(org_currency),
+        now=now,
+        last_activity_label=_last_activity_label,
     )
 
 

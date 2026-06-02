@@ -35,7 +35,20 @@ LEAD_SORT_COLUMNS = {
     "deal_value": "deal_value",
     "source": "source",
     "created_at": "created_at",
+    "last_activity": "last_activity_at",
 }
+LAST_ACTIVITY_TYPES = (
+    "email",
+    "email_sent",
+    "call",
+    "note",
+    "meeting",
+    "meeting_scheduled",
+    "stage_change",
+    "stage_changed",
+    "ai_score",
+    "ai_enriched",
+)
 
 
 def _safe_dispatch_webhook(event_type: str, payload: dict, organization_id: int, triggered_by=None) -> None:
@@ -717,7 +730,7 @@ class LeadService:
         return LeadService.log_activity(lead.id, user_id, "note", content=content.strip())
 
     @staticmethod
-    def _apply_filters(query, organization_id: int, filters: dict | None):
+    def _apply_filters(query, organization_id: int, filters: dict | None, latest_activity=None):
         filters = filters or {}
         query = query.filter(Lead.organization_id == organization_id)
 
@@ -751,6 +764,36 @@ class LeadService:
             query = query.filter(Lead.unsubscribed.is_(True))
         if filters.get("is_anonymized"):
             query = query.filter(Lead.is_anonymized.is_(True))
+        if filters.get("no_contact_7"):
+            if latest_activity is None:
+                seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+                latest_activity_max = (
+                    db.session.query(
+                        Activity.lead_id.label("lead_id"),
+                        func.max(Activity.created_at).label("last_activity_at"),
+                    )
+                    .filter(
+                        Activity.organization_id == organization_id,
+                        Activity.type.in_(LAST_ACTIVITY_TYPES),
+                    )
+                    .group_by(Activity.lead_id)
+                    .subquery()
+                )
+                query = query.outerjoin(latest_activity_max, Lead.id == latest_activity_max.c.lead_id)
+                query = query.filter(
+                    or_(
+                        latest_activity_max.c.last_activity_at.is_(None),
+                        latest_activity_max.c.last_activity_at < seven_days_ago,
+                    )
+                )
+            else:
+                seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+                query = query.filter(
+                    or_(
+                        latest_activity.c.last_activity_at.is_(None),
+                        latest_activity.c.last_activity_at < seven_days_ago,
+                    )
+                )
 
         search = (filters.get("search") or "").strip()
         if search:
@@ -770,8 +813,39 @@ class LeadService:
         page = max(1, int(page))
         per_page = max(1, min(100, int(per_page)))
 
-        query = Lead.query.options(joinedload(Lead.stage), joinedload(Lead.assignee))
-        query = LeadService._apply_filters(query, organization_id, filters)
+        ranked_activities = (
+            db.session.query(
+                Activity.lead_id.label("lead_id"),
+                Activity.created_at.label("last_activity_at"),
+                Activity.type.label("last_activity_type"),
+                func.row_number()
+                .over(partition_by=Activity.lead_id, order_by=Activity.created_at.desc())
+                .label("rn"),
+            )
+            .filter(
+                Activity.organization_id == organization_id,
+                Activity.type.in_(LAST_ACTIVITY_TYPES),
+            )
+            .subquery()
+        )
+        latest_activity = (
+            db.session.query(
+                ranked_activities.c.lead_id,
+                ranked_activities.c.last_activity_at,
+                ranked_activities.c.last_activity_type,
+            )
+            .filter(ranked_activities.c.rn == 1)
+            .subquery()
+        )
+        query = (
+            Lead.query.options(joinedload(Lead.stage), joinedload(Lead.assignee))
+            .outerjoin(latest_activity, Lead.id == latest_activity.c.lead_id)
+            .add_columns(
+                latest_activity.c.last_activity_at,
+                latest_activity.c.last_activity_type,
+            )
+        )
+        query = LeadService._apply_filters(query, organization_id, filters, latest_activity)
 
         sort_col = filters.get("sort") if filters else None
         sort_dir = (filters.get("dir") or "desc").lower() if filters else "desc"
@@ -785,11 +859,31 @@ class LeadService:
                 query = query.order_by(Lead.first_name.asc(), Lead.last_name.asc())
             else:
                 query = query.order_by(Lead.first_name.desc(), Lead.last_name.desc())
+        elif sort_col == "last_activity":
+            col = latest_activity.c.last_activity_at
+            if sort_dir == "asc":
+                query = query.order_by(col.asc().nullsfirst(), Lead.created_at.desc())
+            else:
+                query = query.order_by(col.desc().nullslast(), Lead.created_at.desc())
         else:
             col = getattr(Lead, LEAD_SORT_COLUMNS[sort_col])
             query = query.order_by(col.asc() if sort_dir == "asc" else col.desc())
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        hydrated_items = []
+        for item in pagination.items:
+            if isinstance(item, Lead):
+                lead = item
+                last_activity_at = None
+                last_activity_type = None
+            else:
+                lead, last_activity_at, last_activity_type = item
+            if last_activity_at and getattr(last_activity_at, "tzinfo", None) is None:
+                last_activity_at = last_activity_at.replace(tzinfo=timezone.utc)
+            lead.last_activity_at = last_activity_at
+            lead.last_activity_type = last_activity_type
+            hydrated_items.append(lead)
+        pagination.items = hydrated_items
         return pagination
 
     @staticmethod

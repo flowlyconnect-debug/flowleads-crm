@@ -231,6 +231,74 @@ def test_pipeline_only_own_organization(app, client):
     assert b"TheirCo" not in response.data
 
 
+def test_last_activity_column(app, client):
+    ctx = _setup_org_with_users(app, "last-activity")
+    now = datetime.now(timezone.utc)
+    with app.app_context():
+        _create_lead(
+            app, ctx["org_id"], ctx["stage_id"], email="noactivity@a.com", first_name="No"
+        )
+        today_id = _create_lead(
+            app, ctx["org_id"], ctx["stage_id"], email="today@a.com", first_name="Today"
+        )
+        old_id = _create_lead(
+            app, ctx["org_id"], ctx["stage_id"], email="old@a.com", first_name="Old"
+        )
+        db.session.add(
+            Activity(
+                lead_id=today_id,
+                user_id=ctx["admin_id"],
+                organization_id=ctx["org_id"],
+                type="email_sent",
+                created_at=now,
+            )
+        )
+        db.session.add(
+            Activity(
+                lead_id=old_id,
+                user_id=ctx["admin_id"],
+                organization_id=ctx["org_id"],
+                type="call",
+                created_at=now - timedelta(days=15),
+            )
+        )
+        # Ensure cross-tenant activity records never affect current-org list logic.
+        db.session.add(
+            Activity(
+                lead_id=today_id,
+                user_id=ctx["other_user_id"],
+                organization_id=ctx["other_org_id"],
+                type="call",
+                created_at=now - timedelta(minutes=10),
+            )
+        )
+        db.session.commit()
+
+    _login(client, ctx["admin_email"])
+    response = client.get("/leads")
+    assert response.status_code == 200
+    body = response.data.decode("utf-8")
+    assert "Ei kontaktia" in body
+    assert "Sähköposti tänään" in body
+    assert "Ei kontaktia 15 pv" in body
+
+    sorted_desc = client.get("/leads?sort=last_activity&order=desc")
+    assert sorted_desc.status_code == 200
+    desc_body = sorted_desc.data.decode("utf-8")
+    assert desc_body.index("today@a.com") < desc_body.index("old@a.com")
+
+    sorted_asc = client.get("/leads?sort=last_activity&order=asc")
+    assert sorted_asc.status_code == 200
+    asc_body = sorted_asc.data.decode("utf-8")
+    assert asc_body.index("noactivity@a.com") < asc_body.index("old@a.com")
+
+    no_contact = client.get("/leads?no_contact_7=1")
+    assert no_contact.status_code == 200
+    assert b"today@a.com" not in no_contact.data
+    assert b"old@a.com" in no_contact.data
+    assert b"noactivity@a.com" in no_contact.data
+
+
 def test_export_only_own_organization(app, client):
     ctx = _setup_org_with_users(app, "iso-export")
     _create_lead(app, ctx["org_id"], ctx["stage_id"], email="exportmine@a.com")
