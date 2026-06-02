@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+
+{% block title %}{{ company.name }} — Yritykset — FlowLeads{% endblock %}
+
+{% block content %}
+<section class="company-detail-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <div class="breadcrumbs">
+        <a href="{{ url_for('companies.list_companies', organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.list_companies') }}">Yritykset</a>
+        <span class="breadcrumbs__sep">/</span>
+        <span>{{ company.name }}</span>
+      </div>
+      <h1>{{ company.name }}</h1>
+      <p class="page-subtitle">
+        {% if company.industry %}{{ company.industry }} · {% endif %}
+        {% if company.region %}{{ company.region }}{% endif %}
+      </p>
+    </div>
+    <div class="page-header__actions">
+      {% if company.website %}
+        <a class="btn btn-secondary btn-sm" href="{{ company.website }}" target="_blank" rel="noopener">Website</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="card md:col-span-1">
+      <div class="card-body">
+        <h2 class="card-title">Yrityksen tiedot</h2>
+        <dl>
+          <div>
+            <dt>Nimi</dt>
+            <dd>{{ company.name }}</dd>
+          </div>
+          <div>
+            <dt>Toimiala</dt>
+            <dd>{{ company.industry or "—" }}</dd>
+          </div>
+          <div>
+            <dt>Tyyppi</dt>
+            <dd>{{ company.type or "prospect" }}</dd>
+          </div>
+          <div>
+            <dt>Alue</dt>
+            <dd>{{ company.region or "—" }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card md:col-span-1">
+      <div class="card-body">
+        <h2 class="card-title">Kontaktit</h2>
+        <p class="text-sm text-secondary">Ei toteutettu tässä vaiheessa.</p>
+      </div>
+    </div>
+
+    <div class="card md:col-span-1">
+      <div class="card-body">
+        <h2 class="card-title">Avoimet liidit</h2>
+        <p class="open-leads-count">
+          {{ open_leads_count }}
+        </p>
+        <p class="text-sm text-secondary">Avoimet = active/won (ei Closed Lost).</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+

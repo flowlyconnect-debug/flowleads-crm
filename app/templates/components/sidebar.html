@@ -58,6 +58,26 @@
           </a>
         </li>
         <li>
+          <a href="{{ nav_url('companies.list_companies') }}"
+             class="sidebar-item{% if ep and (ep.startswith('companies.')) %} active{% endif %}"
+             {% if ep and ep.startswith('companies.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 20.25V4.5A2.25 2.25 0 0 1 6.75 2.25h10.5A2.25 2.25 0 0 1 19.5 4.5v15.75M9 20.25v-7.5m6 7.5v-12M6.75 2.25v18" />
+            </svg>
+            <span class="sidebar-item__label">Yritykset</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ nav_url('contacts.list_contacts') }}"
+             class="sidebar-item{% if ep and (ep.startswith('contacts.')) %} active{% endif %}"
+             {% if ep and ep.startswith('contacts.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 7.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 20.25a7.5 7.5 0 0 0-15 0M21 20.25a4.5 4.5 0 0 0-4.5-4.5M3 20.25a4.5 4.5 0 0 1 4.5-4.5" />
+            </svg>
+            <span class="sidebar-item__label">Kontaktit</span>
+          </a>
+        </li>
+        <li>
           <a href="{{ nav_url('tasks.list_tasks') }}"
              class="sidebar-item{% if ep and ep.startswith('tasks.') %} active{% endif %}"
              {% if ep and ep.startswith('tasks.') %}aria-current="page"{% endif %}>

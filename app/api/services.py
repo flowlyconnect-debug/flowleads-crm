@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from flask import current_app
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
@@ -266,6 +267,28 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         _apply_custom_fields_from_payload(
             existing, organization_id, raw_payload, partial=True
         )
+        if existing.company_id is None and existing.company:
+            company_name = str(existing.company).strip()
+            if company_name:
+                from app.companies.models import Company
+
+                existing_company = (
+                    Company.query.filter(
+                        Company.organization_id == organization_id,
+                        func.lower(Company.name) == func.lower(company_name),
+                    ).first()
+                )
+                if existing_company:
+                    existing.company_id = existing_company.id
+                else:
+                    new_company = Company(
+                        name=company_name,
+                        organization_id=organization_id,
+                        type="prospect",
+                    )
+                    db.session.add(new_company)
+                    db.session.flush()
+                    existing.company_id = new_company.id
         return _load_lead(existing.id, organization_id), "updated"
 
     stage = get_default_stage(organization_id)
@@ -296,6 +319,29 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
             from app.gdpr.consent import apply_gdpr_consent_fields
 
             apply_gdpr_consent_fields(lead, raw_payload, consent_source="api")
+
+        if lead.company_id is None and lead.company:
+            company_name = str(lead.company).strip()
+            if company_name:
+                from app.companies.models import Company
+
+                existing_company = (
+                    Company.query.filter(
+                        Company.organization_id == organization_id,
+                        func.lower(Company.name) == func.lower(company_name),
+                    ).first()
+                )
+                if existing_company:
+                    lead.company_id = existing_company.id
+                else:
+                    new_company = Company(
+                        name=company_name,
+                        organization_id=organization_id,
+                        type="prospect",
+                    )
+                    db.session.add(new_company)
+                    db.session.flush()
+                    lead.company_id = new_company.id
     except IntegrityError:
         db.session.rollback()
         dup = find_lead_for_upsert(

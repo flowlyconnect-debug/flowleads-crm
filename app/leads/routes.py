@@ -212,7 +212,8 @@ def block_api_client():
     _require_ui_role()
 
 
-@leads_bp.route("")
+@leads_bp.route("", methods=["GET"])
+@leads_bp.route("/", methods=["GET"])
 def list_leads():
     organization_id = resolve_organization_id()
     filters = _filters_from_request()

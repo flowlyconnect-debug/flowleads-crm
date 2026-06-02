@@ -108,6 +108,7 @@ def _init_extensions(app):
         from app.auth import models as auth_models  # noqa: F401
         from app.email import models as email_models  # noqa: F401
         from app.leads import models as leads_models  # noqa: F401
+        from app.companies import models as companies_models  # noqa: F401
         from app.tasks import models as tasks_models  # noqa: F401
         from app.users import models as user_models  # noqa: F401
         from app.custom_fields import models as custom_fields_models  # noqa: F401
@@ -130,6 +131,8 @@ def _register_blueprints(app):
     from app.api import api_bp
     from app.auth.routes import auth_bp
     from app.backups import backups_bp
+    from app.companies import companies_bp, contacts_bp
+    import app.companies.routes as companies_routes  # noqa: F401
     from app.email import email_bp, webhooks_bp
     from app.leads.routes import leads_bp
     from app.settings import settings_bp
@@ -146,6 +149,8 @@ def _register_blueprints(app):
     app.register_blueprint(admin_bp)
     app.register_blueprint(backups_bp, url_prefix="/admin")
     app.register_blueprint(leads_bp)
+    app.register_blueprint(companies_bp)
+    app.register_blueprint(contacts_bp)
     app.register_blueprint(tasks_bp)
     app.register_blueprint(sequences_bp)
     app.register_blueprint(email_bp)

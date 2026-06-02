@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+
+{% block title %}Kontaktit — FlowLeads{% endblock %}
+
+{% block content %}
+<section class="contacts-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <div class="breadcrumbs">
+        <span>Kontaktit</span>
+      </div>
+      <h1>Kontaktit</h1>
+      <p class="page-subtitle">{{ contacts|length }} kontaktia</p>
+    </div>
+  </header>
+
+  {% if contacts|length == 0 %}
+    {{ empty_state("👤", "Ei kontakteja vielä", "Kun kontakteja lisätään, ne näkyvät tässä.", primary_action_url=url_for("leads.list_leads") if not current_user.is_superadmin() else url_for("leads.list_leads", organization_id=organization_id), primary_action_label="Siirry liideihin") }}
+  {% else %}
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nimi</th>
+                <th>Titteli</th>
+                <th>Yritys</th>
+                <th>Sähköposti</th>
+                <th>Puhelin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in contacts %}
+                <tr>
+                  <td>{{ c.first_name }} {{ c.last_name or "" }}</td>
+                  <td>{{ c.title or "—" }}</td>
+                  <td>
+                    {% if c.company_id and companies_by_id.get(c.company_id) %}
+                      {{ companies_by_id.get(c.company_id).name }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>{{ c.email or "—" }}</td>
+                  <td>{{ c.phone or "—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+

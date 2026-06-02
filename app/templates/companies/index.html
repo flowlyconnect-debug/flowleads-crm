@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{% block title %}Yritykset — FlowLeads{% endblock %}
+
+{% block content %}
+<section class="companies-page">
+  <header class="page-header">
+    <div class="page-header__main">
+      <div class="breadcrumbs">
+        <span>Yritykset</span>
+      </div>
+      <h1>Yritykset</h1>
+      <p class="page-subtitle">{{ companies|length }} yritystä</p>
+    </div>
+  </header>
+
+  {% if companies|length == 0 %}
+    {{ empty_state(
+      "🏢",
+      "Ei yrityksiä vielä",
+      "Luo ensimmäinen yritys tai liidit linkitetään automaattisesti kun niissä on yrityksen nimi.",
+      primary_action_url=url_for("leads.list_leads", organization_id=organization_id) if current_user.is_superadmin() else url_for("leads.list_leads"),
+      primary_action_label="Siirry liideihin",
+      secondary_actions=[]
+    ) }}
+  {% else %}
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nimi</th>
+                <th>Toimiala</th>
+                <th>Tyyppi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in companies %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}">
+                      {{ c.name }}
+                    </a>
+                  </td>
+                  <td>{{ c.industry or "—" }}</td>
+                  <td>{{ c.type or "prospect" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+

@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    and_,
     Numeric,
     String,
     Text,
@@ -18,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
+from app.companies.models import lead_contacts
 
 LEAD_STATUSES = ("active", "won", "lost", "archived")
 LEAD_SOURCES = ("n8n", "manual", "import", "webform")
@@ -158,6 +160,9 @@ class Lead(db.Model):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     company: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("companies.id"), nullable=True, index=True
+    )
     title: Mapped[str | None] = mapped_column(String(150), nullable=True)
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -227,6 +232,21 @@ class Lead(db.Model):
     activities: Mapped[list["Activity"]] = relationship(
         "Activity", back_populates="lead", order_by="Activity.created_at.desc()"
     )
+    company_rel: Mapped["Company | None"] = relationship(
+        "Company", back_populates="leads", foreign_keys=[company_id]
+    )  # noqa: F821
+
+    contacts: Mapped[list["Contact"]] = relationship(
+        "Contact",
+        secondary=lead_contacts,
+        back_populates="leads",
+        primaryjoin=lambda: db.metadata.tables["leads"].c.id == lead_contacts.c.lead_id,
+        secondaryjoin=lambda: and_(
+            db.metadata.tables["contacts"].c.id == lead_contacts.c.contact_id,
+            db.metadata.tables["contacts"].c.organization_id
+            == db.metadata.tables["leads"].c.organization_id,
+        ),
+    )  # noqa: F821
 
     @property
     def display_name(self) -> str:
