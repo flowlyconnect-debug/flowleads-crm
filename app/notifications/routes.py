@@ -8,6 +8,7 @@ from app.core.errors import json_error, json_success
 from app.extensions import db
 from app.leads.models import Activity, Lead
 from app.leads.permissions import resolve_organization_id
+from app.leads.services import LeadServiceError, get_lead_for_org
 from app.notifications.services import NotificationService, NotificationServiceError
 from app.tasks.models import Task
 
@@ -144,6 +145,19 @@ def mark_all_notifications_read():
     count = NotificationService.mark_all_read(current_user.id, org_id)
     db.session.commit()
     return json_success({"marked_read": count})
+
+
+@notifications_bp.route("/leads/<int:lead_id>/playbook", methods=["GET"])
+@login_required
+def lead_playbook(lead_id: int):
+    from app.leads.playbook import get_playbook_data
+
+    organization_id = resolve_organization_id()
+    try:
+        lead = get_lead_for_org(lead_id, organization_id)
+    except LeadServiceError:
+        return json_error("not_found", "Lead not found.", 404)
+    return json_success(get_playbook_data(lead, organization_id, current_user))
 
 
 @notifications_bp.route("/leads/<int:lead_id>/preview", methods=["GET"])

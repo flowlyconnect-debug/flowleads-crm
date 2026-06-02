@@ -105,6 +105,84 @@
         </div>
       </article>
 
+      <article class="card playbook-card" id="ai-playbook-card">
+        <header class="playbook-card__header">
+          <h2 class="playbook-card__title">AI-myyntisuunnitelma</h2>
+        </header>
+        <div class="playbook-card__body">
+          <section class="playbook-section">
+            <h3 class="playbook-section__label">Miksi tämä liidi on relevantti?</h3>
+            {% if lead.ai_enrichment_status in ('pending', 'processing') %}
+            <div class="playbook-skeleton" aria-busy="true">
+              <div class="playbook-skeleton__line"></div>
+              <div class="playbook-skeleton__line playbook-skeleton__line--short"></div>
+              <p class="playbook-pending-msg">AI analysoi liidiä…</p>
+            </div>
+            {% elif lead.ai_enrichment_status == 'failed' %}
+            <div class="playbook-failed">
+              <p>Analyysi ei onnistunut</p>
+              <form method="post" action="{{ url_for('leads.enrich_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.enrich_lead', lead_id=lead.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-secondary btn-sm">Yritä uudelleen</button>
+              </form>
+            </div>
+            {% elif playbook.ai_summary %}
+            <p class="playbook-summary">{{ playbook.ai_summary }}</p>
+            {% else %}
+            <p class="playbook-summary text-muted">Ei AI-yhteenvetoa vielä. Rikasta liidi saadaksesi analyysin.</p>
+            {% endif %}
+          </section>
+
+          {% if playbook.ai_recommendation %}
+          <section class="playbook-section">
+            <h3 class="playbook-section__label">Suositeltu seuraava askel</h3>
+            <span class="playbook-pill {{ playbook.recommendation_pill_class }}">{{ playbook.ai_recommendation }}</span>
+          </section>
+          {% endif %}
+
+          <section class="playbook-section">
+            <h3 class="playbook-section__label">Voittotodennäköisyys{% if playbook.score is not none %} {{ playbook.score }}%{% endif %}</h3>
+            <div class="playbook-score-bar {{ playbook.score_bar_class }}" role="progressbar"
+                 aria-valuenow="{{ playbook.score or 0 }}" aria-valuemin="0" aria-valuemax="100">
+              <div class="playbook-score-bar__fill" style="width: {{ playbook.score or 0 }}%;"></div>
+            </div>
+            <p class="playbook-score-label">{{ playbook.score_label }}</p>
+          </section>
+
+          <section class="playbook-section playbook-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="playbook-toggle-email">
+              ✉ Kopioi sähköpostipohja
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="playbook-toggle-call">
+              📞 Näytä soittoavaus
+            </button>
+          </section>
+
+          <div class="playbook-panel" id="playbook-email-panel" hidden>
+            <label class="playbook-panel__label" for="playbook-email-subject">Aihe</label>
+            <input type="text" id="playbook-email-subject" class="playbook-input" readonly
+                   value="{{ playbook.email_template.subject }}">
+            <label class="playbook-panel__label" for="playbook-email-body">Viesti</label>
+            <textarea id="playbook-email-body" class="playbook-textarea" rows="8" readonly>{{ playbook.email_template.body }}</textarea>
+            <div class="playbook-panel__actions">
+              <button type="button" class="btn btn-secondary btn-sm" id="playbook-copy-email">Kopioi</button>
+              {% if lead.email %}
+              <button type="button" class="btn btn-primary btn-sm" id="playbook-send-email" data-open-modal="playbook-email-modal">
+                Lähetä sähköpostina
+              </button>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="playbook-panel playbook-call-card" id="playbook-call-panel" hidden>
+            <pre class="playbook-call-script" id="playbook-call-script">{{ playbook.call_script }}</pre>
+            <button type="button" class="btn btn-secondary btn-sm" id="playbook-copy-call-note">
+              Kopioi muistiinpanoihin
+            </button>
+          </div>
+        </div>
+      </article>
+
       <section class="card">
         <header class="card-header">
           <h2 class="card-title">Yhteys & profiili</h2>
@@ -706,6 +784,27 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="playbook-email-modal">
+  <div class="modal">
+    <h2 class="modal-title">Lähetä sähköposti</h2>
+    <form method="post" action="{{ url_for('email.send', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.send', lead_id=lead.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="template_id" value="0">
+      <label>Aihe
+        <input type="text" name="subject" id="playbook-modal-subject" class="playbook-input" required maxlength="255">
+      </label>
+      <input type="hidden" name="body_html" id="playbook-modal-body-html">
+      <label>Viesti
+        <textarea id="playbook-modal-body" class="playbook-textarea" rows="10" required></textarea>
+      </label>
+      <div class="mt-3 flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">Lähetä</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-close-modal="playbook-email-modal">Peruuta</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="task-modal">
   <div class="modal">
     <h2 class="modal-title">Uusi tehtävä</h2>
@@ -838,6 +937,67 @@
         showSeqMsg((data.error && data.error.message) || 'Poisto epäonnistui.', false);
       }
     });
+  });
+
+  const emailPanel = root.getElementById('playbook-email-panel');
+  const callPanel = root.getElementById('playbook-call-panel');
+  root.getElementById('playbook-toggle-email')?.addEventListener('click', function() {
+    if (emailPanel) emailPanel.hidden = !emailPanel.hidden;
+  });
+  root.getElementById('playbook-toggle-call')?.addEventListener('click', function() {
+    if (callPanel) callPanel.hidden = !callPanel.hidden;
+  });
+
+  root.getElementById('playbook-copy-email')?.addEventListener('click', async function() {
+    const subject = root.getElementById('playbook-email-subject')?.value || '';
+    const body = root.getElementById('playbook-email-body')?.value || '';
+    const text = 'Aihe: ' + subject + '\n\n' + body;
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = root.getElementById('playbook-copy-email');
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = 'Kopioitu!';
+        setTimeout(function() { btn.textContent = prev; }, 1500);
+      }
+    } catch (e) {
+      alert('Kopiointi epäonnistui.');
+    }
+  });
+
+  root.getElementById('playbook-send-email')?.addEventListener('click', function() {
+    const subject = root.getElementById('playbook-email-subject')?.value || '';
+    const body = root.getElementById('playbook-email-body')?.value || '';
+    const modalSubject = root.getElementById('playbook-modal-subject');
+    const modalBody = root.getElementById('playbook-modal-body');
+    const modalBodyHtml = root.getElementById('playbook-modal-body-html');
+    if (modalSubject) modalSubject.value = subject;
+    if (modalBody) modalBody.value = body;
+    if (modalBodyHtml) {
+      modalBodyHtml.value = body.split('\n').map(function(line) {
+        return line ? '<p>' + line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : '<p><br></p>';
+      }).join('');
+    }
+  });
+
+  root.getElementById('playbook-copy-call-note')?.addEventListener('click', async function() {
+    const script = root.getElementById('playbook-call-script')?.textContent || '';
+    const btn = root.getElementById('playbook-copy-call-note');
+    const res = await fetch('/leads/' + leadId + '/note' + leadOrgQueryString(), {
+      method: 'POST',
+      headers: leadCsrfHeaders(),
+      body: JSON.stringify({ content: script }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = 'Tallennettu!';
+        setTimeout(function() { btn.textContent = prev; }, 1500);
+      }
+    } else {
+      alert((data.error && data.error.message) || 'Tallennus epäonnistui.');
+    }
   });
 })();
 </script>
