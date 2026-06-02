@@ -110,6 +110,47 @@ def list_tasks():
 @tasks_bp.route("", methods=["POST"])
 def create_task():
     organization_id = resolve_organization_id()
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        lead_id = payload.get("lead_id")
+        raw_due = payload.get("due_date")
+        if not raw_due:
+            raw_due = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        task_data = {
+            "title": payload.get("title") or "Follow-up",
+            "type": payload.get("type") or "follow_up",
+            "priority": payload.get("priority") or "normal",
+            "due_date": raw_due,
+            "assigned_to": payload.get("assigned_to") or current_user.id,
+            "description": payload.get("description"),
+        }
+        try:
+            task = TaskService.create(
+                task_data,
+                organization_id,
+                current_user.id,
+                lead_id=int(lead_id) if lead_id else None,
+                actor_role=current_user.role,
+            )
+            db.session.commit()
+            return json_success(
+                {
+                    "task": {
+                        "id": task.id,
+                        "title": task.title,
+                        "lead_id": task.lead_id,
+                        "status": task.status,
+                    }
+                },
+                status=201,
+            )
+        except (TypeError, ValueError):
+            db.session.rollback()
+            return json_error("validation_error", "Invalid lead_id.", 400)
+        except TaskServiceError as exc:
+            db.session.rollback()
+            return json_error(exc.code, exc.message, 404 if exc.code == "not_found" else 400)
+
     quick_form = QuickTaskForm()
     if not quick_form.validate_on_submit():
         flash("Invalid task data.", "danger")
@@ -134,18 +175,19 @@ def create_task():
     return redirect(url_for("tasks.list_tasks", tab="today", **_org_query_suffix(organization_id)))
 
 
-@tasks_bp.route("/<int:task_id>/complete", methods=["POST"])
+@tasks_bp.route("/<int:task_id>/complete", methods=["POST", "PATCH"])
 def complete_task(task_id: int):
     organization_id = resolve_organization_id()
+    wants_json = request.method == "PATCH" or wants_json_response() or request.is_json
     try:
         TaskService.complete(task_id, organization_id, current_user.id)
         db.session.commit()
-        if wants_json_response() or request.is_json:
+        if wants_json:
             return json_success({"task_id": task_id, "status": "completed"})
         flash("Task completed.", "success")
     except TaskServiceError as exc:
         db.session.rollback()
-        if wants_json_response() or request.is_json:
+        if wants_json:
             return json_error(exc.code, exc.message, 404 if exc.code == "not_found" else 400)
         flash(exc.message, "danger")
 

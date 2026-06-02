@@ -11,6 +11,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func
+from sqlalchemy.orm import aliased
 
 from app.admin.services import get_accessible_organizations
 from app.analytics.date_ranges import resolve_report_dates
@@ -20,7 +21,7 @@ from app.analytics.services import AnalyticsService
 from app.core.errors import json_success
 from app.core.permissions import require_2fa, require_role
 from app.extensions import cache, db
-from app.leads.models import Lead, PipelineStage
+from app.leads.models import Activity, Lead, PipelineStage
 from app.leads.permissions import resolve_organization_id
 
 analytics_bp = Blueprint("analytics", __name__)
@@ -340,6 +341,225 @@ def _ai_recommendations_for_context(organization_id: int, context: str) -> list[
     return recs[:5]
 
 
+def _to_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _risk_recommendation_text(value: str | None) -> bool:
+    text = (value or "").strip().lower()
+    if not text:
+        return False
+    risk_terms = (
+        "risk",
+        "riski",
+        "churn",
+        "danger",
+        "warning",
+        "varoitus",
+        "stalled",
+        "without contact",
+        "ei kontaktia",
+    )
+    return any(term in text for term in risk_terms)
+
+
+def _build_ai_alerts(organization_id: int) -> list[dict]:
+    from app.analytics.models import PredictionLog
+    from app.tasks.models import Task
+
+    now = datetime.now(timezone.utc)
+    alerts: list[dict] = []
+    seen_lead_ids: set[int] = set()
+
+    overdue_tasks = (
+        Task.query.filter(
+            Task.organization_id == organization_id,
+            Task.status.in_(("pending", "in_progress")),
+            Task.due_date < now,
+        )
+        .order_by(Task.due_date.asc())
+        .limit(5)
+        .all()
+    )
+    for task in overdue_tasks:
+        if not task.lead_id:
+            continue
+        lead = task.lead
+        if lead is None:
+            continue
+        due_date = _to_utc(task.due_date)
+        overdue_days = max(1, (now - due_date).days) if due_date else 1
+        lead_name = lead.display_name
+        alerts.append(
+            {
+                "type": "overdue_task",
+                "task_id": task.id,
+                "lead_id": lead.id,
+                "lead_name": lead_name,
+                "company": lead.company,
+                "message": f"Follow-up myöhässä {overdue_days} pv",
+                "reason": "Myöhässä oleva tehtävä voi heikentää konversiota.",
+                "actions": ["view_lead", "complete_task"],
+            }
+        )
+        seen_lead_ids.add(lead.id)
+        if len(alerts) >= 5:
+            return alerts
+
+    first_stage = (
+        PipelineStage.query.filter_by(organization_id=organization_id)
+        .order_by(PipelineStage.order_index.asc(), PipelineStage.id.asc())
+        .first()
+    )
+    if first_stage and len(alerts) < 5:
+        has_non_created_activity = (
+            db.session.query(Activity.lead_id.label("lead_id"))
+            .filter(
+                Activity.organization_id == organization_id,
+                Activity.type != "created",
+            )
+            .subquery()
+        )
+        cutoff = now - timedelta(hours=24)
+        new_leads = (
+            Lead.query.filter(
+                Lead.organization_id == organization_id,
+                Lead.status == "active",
+                Lead.stage_id == first_stage.id,
+                Lead.created_at >= cutoff,
+                ~Lead.id.in_(db.session.query(has_non_created_activity.c.lead_id)),
+            )
+            .order_by(Lead.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        for lead in new_leads:
+            if lead.id in seen_lead_ids:
+                continue
+            alerts.append(
+                {
+                    "type": "new_lead",
+                    "lead_id": lead.id,
+                    "lead_name": lead.display_name,
+                    "company": lead.company,
+                    "message": "Uusi liidi saapunut - ei vielä käsitelty",
+                    "reason": "Nopea ensikontakti kasvattaa vastausastetta.",
+                    "actions": ["view_lead", "create_task"],
+                }
+            )
+            seen_lead_ids.add(lead.id)
+            if len(alerts) >= 5:
+                return alerts
+
+    if len(alerts) < 5:
+        last_activity_subquery = (
+            db.session.query(
+                Activity.lead_id.label("lead_id"),
+                func.max(Activity.created_at).label("last_activity_at"),
+            )
+            .filter(Activity.organization_id == organization_id)
+            .group_by(Activity.lead_id)
+            .subquery()
+        )
+        hot_cutoff = now - timedelta(days=7)
+        hot_leads = (
+            Lead.query.outerjoin(
+                last_activity_subquery, last_activity_subquery.c.lead_id == Lead.id
+            )
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.status == "active",
+                Lead.score.isnot(None),
+                Lead.score >= 70,
+                ~Lead.id.in_(seen_lead_ids),
+                func.coalesce(Lead.last_contacted_at, last_activity_subquery.c.last_activity_at)
+                <= hot_cutoff,
+            )
+            .order_by(Lead.score.desc(), Lead.updated_at.desc())
+            .limit(5)
+            .all()
+        )
+        for lead in hot_leads:
+            baseline = _to_utc(lead.last_contacted_at)
+            if baseline is None:
+                baseline = (
+                    db.session.query(func.max(Activity.created_at))
+                    .filter(
+                        Activity.organization_id == organization_id,
+                        Activity.lead_id == lead.id,
+                    )
+                    .scalar()
+                )
+                baseline = _to_utc(baseline)
+            days_no_contact = max(7, (now - baseline).days) if baseline else 7
+            alerts.append(
+                {
+                    "type": "hot_lead_no_contact",
+                    "lead_id": lead.id,
+                    "lead_name": lead.display_name,
+                    "company": lead.company,
+                    "score": lead.score,
+                    "days_no_contact": days_no_contact,
+                    "message": f"Kuuma liidi - ei kontaktia {days_no_contact} pv",
+                    "reason": "Korkean pistemäärän liidi kylmenee ilman yhteydenottoa.",
+                    "actions": ["view_lead", "send_email"],
+                }
+            )
+            seen_lead_ids.add(lead.id)
+            if len(alerts) >= 5:
+                return alerts
+
+    if len(alerts) < 5:
+        latest_prediction = aliased(PredictionLog)
+        latest_prediction_id = (
+            db.session.query(
+                PredictionLog.lead_id.label("lead_id"),
+                func.max(PredictionLog.id).label("max_id"),
+            )
+            .filter(PredictionLog.organization_id == organization_id)
+            .group_by(PredictionLog.lead_id)
+            .subquery()
+        )
+        risk_rows = (
+            db.session.query(Lead, latest_prediction.recommendation)
+            .join(latest_prediction_id, latest_prediction_id.c.lead_id == Lead.id)
+            .join(
+                latest_prediction,
+                latest_prediction.id == latest_prediction_id.c.max_id,
+            )
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.status == "active",
+                ~Lead.id.in_(seen_lead_ids),
+            )
+            .order_by(latest_prediction.created_at.desc())
+            .limit(10)
+            .all()
+        )
+        for lead, recommendation in risk_rows:
+            if not _risk_recommendation_text(recommendation):
+                continue
+            alerts.append(
+                {
+                    "type": "ai_risk",
+                    "lead_id": lead.id,
+                    "lead_name": lead.display_name,
+                    "company": lead.company,
+                    "message": "AI havaitsi riskin - liidi vaatii huomiota",
+                    "reason": (recommendation or "AI-analyysi nosti riskisignaalin.")[:160],
+                    "actions": ["view_lead", "create_task"],
+                }
+            )
+            if len(alerts) >= 5:
+                break
+
+    return alerts[:5]
+
+
 @analytics_bp.before_request
 @login_required
 def block_api_client():
@@ -354,6 +574,14 @@ def ai_recommendations():
     context = (request.args.get("context") or "dashboard").strip().lower()
     recommendations = _ai_recommendations_for_context(organization_id, context)
     return json_success({"recommendations": recommendations})
+
+
+@analytics_bp.route("/api/ai/alerts", methods=["GET"])
+def ai_alerts():
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success({"alerts": []})
+    return json_success({"alerts": _build_ai_alerts(organization_id)})
 
 
 @analytics_bp.route("/api/dashboard/today", methods=["GET"])

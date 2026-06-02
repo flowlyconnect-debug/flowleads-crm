@@ -29,9 +29,9 @@
     }
     .ai-fab-icon { font-size: 16px; }
     .ai-fab-badge {
-      position: absolute; top: -4px; right: -4px;
+      position: absolute; top: -6px; right: -6px;
       background: #EF4444; color: #fff;
-      font-size: 10px; font-weight: 800;
+      font-size: 11px; font-weight: 800;
       width: 18px; height: 18px;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
@@ -62,22 +62,54 @@
       background: linear-gradient(135deg, #EBF2FF, #F4F6FB);
     }
     .ai-drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
-    .ai-recommendation {
+    .ai-drawer-subtitle { margin-top: 3px; font-size: 12px; color: #5C6170; }
+    .ai-empty-state { text-align: center; padding: 28px 12px; color: #5C6170; }
+    .ai-empty-state-icon { font-size: 32px; color: #22C55E; margin-bottom: 8px; }
+    .ai-empty-state-title { font-size: 14px; font-weight: 700; color: #0F1117; margin-bottom: 4px; }
+    .ai-empty-state-note { margin-top: 8px; font-size: 12px; color: #9CA3AF; }
+    .ai-alert-card {
       background: #fff;
       border: 1px solid #E4E7EF;
-      border-left: 3px solid #38BDF8;
+      border-left: 4px solid #38BDF8;
       border-radius: 8px;
       padding: 12px 14px;
       margin-bottom: 10px;
+      opacity: 1;
+      transition: opacity 180ms ease, transform 180ms ease;
     }
-    .ai-recommendation.urgent { border-left-color: #EF4444; background: #FFF8F8; }
-    .ai-recommendation.hot { border-left-color: #10B981; background: #F0FDF4; }
-    .ai-rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-    .ai-rec-icon { font-size: 16px; }
-    .ai-rec-title { font-size: 13px; font-weight: 700; color: #0F1117; }
-    .ai-rec-body { font-size: 12px; color: #5C6170; line-height: 1.5; margin-bottom: 8px; }
-    .ai-rec-action { font-size: 12px; font-weight: 600; color: #38BDF8; text-decoration: none; }
-    .ai-rec-action:hover { text-decoration: underline; }
+    .ai-alert-card--overdue, .ai-alert-card--risk { border-left-color: #EF4444; background: #FFF8F8; }
+    .ai-alert-card--new { border-left-color: #3B82F6; background: #F5F9FF; }
+    .ai-alert-card--hot { border-left-color: #F59E0B; background: #FFFBEB; }
+    .ai-alert-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ai-alert-icon { font-size: 16px; color: #374151; }
+    .ai-alert-message { font-size: 14px; font-weight: 700; color: #0F1117; line-height: 1.35; margin-bottom: 6px; }
+    .ai-alert-reason { font-size: 12px; color: #5C6170; margin-bottom: 9px; line-height: 1.45; }
+    .ai-alert-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ai-alert-btn {
+      font-size: 12px;
+      line-height: 1.1;
+      border: 1px solid #D1D5DB;
+      background: #fff;
+      color: #111827;
+      border-radius: 999px;
+      padding: 6px 9px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .ai-alert-btn:hover { border-color: #9CA3AF; }
+    .ai-drawer-footer {
+      border-top: 1px solid #E4E7EF;
+      padding: 12px 20px;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .ai-drawer-footer-link {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2563EB;
+      text-decoration: none;
+    }
+    .ai-drawer-footer-link:hover { text-decoration: underline; }
     .ai-pulse-indicator {
       width: 8px; height: 8px; border-radius: 50%;
       background: #38BDF8; box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
@@ -238,16 +270,22 @@
     <div class="ai-drawer-header">
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="ai-pulse-indicator"></div>
-        <span style="font-size:14px;font-weight:700;color:#0F1117;">FlowLeads AI</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0F1117;">FlowLeads AI</div>
+          <div class="ai-drawer-subtitle" id="aiDrawerSubtitle">Ladataan...</div>
+        </div>
       </div>
       <button onclick="toggleAIDrawer()" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:18px;">✕</button>
     </div>
     <div class="ai-drawer-body" id="aiDrawerBody">
       <div class="ai-drawer-loading">
-        <div class="skeleton" style="height:60px;border-radius:8px;margin-bottom:10px;"></div>
-        <div class="skeleton" style="height:60px;border-radius:8px;margin-bottom:10px;"></div>
-        <div class="skeleton" style="height:60px;border-radius:8px;"></div>
+        <div class="skeleton" style="height:96px;border-radius:8px;margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:96px;border-radius:8px;margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:96px;border-radius:8px;"></div>
       </div>
+    </div>
+    <div class="ai-drawer-footer">
+      <a href="/leads?filter=ai_priority" class="ai-drawer-footer-link">Näytä kaikki →</a>
     </div>
   </div>
   <div class="ai-drawer-overlay" id="aiOverlay" onclick="toggleAIDrawer()"></div>
@@ -416,7 +454,7 @@
       });
     }
     loadNotifications();
-    loadAIRecommendations(false);
+    loadAIAlerts(false);
   });
 
   function toggleAIDrawer() {
@@ -426,7 +464,7 @@
     const isOpen = drawer.classList.contains('open');
     drawer.classList.toggle('open', !isOpen);
     overlay.classList.toggle('visible', !isOpen);
-    if (!isOpen) loadAIRecommendations(true);
+    if (!isOpen) loadAIAlerts(true);
   }
 
   function escapeAIHtml(value) {
@@ -435,37 +473,138 @@
     return div.innerHTML;
   }
 
-  function loadAIRecommendations(updateDrawer = false) {
-    const ctx = window.aiContext || 'dashboard';
-    fetch('/api/ai/recommendations?context=' + encodeURIComponent(ctx), { credentials: 'same-origin' })
+  function renderAIAlertSkeletons() {
+    return '<div class="ai-drawer-loading">' +
+      '<div class="skeleton" style="height:96px;border-radius:8px;margin-bottom:10px;"></div>' +
+      '<div class="skeleton" style="height:96px;border-radius:8px;margin-bottom:10px;"></div>' +
+      '<div class="skeleton" style="height:96px;border-radius:8px;"></div></div>';
+  }
+
+  function aiAlertKind(alert) {
+    const type = (alert && alert.type) || '';
+    if (type === 'overdue_task') return { cls: 'ai-alert-card--overdue', icon: '<i class="ti ti-alert-triangle"></i>' };
+    if (type === 'new_lead') return { cls: 'ai-alert-card--new', icon: '<i class="ti ti-user-plus"></i>' };
+    if (type === 'hot_lead_no_contact') return { cls: 'ai-alert-card--hot', icon: '<i class="ti ti-flame"></i>' };
+    return { cls: 'ai-alert-card--risk', icon: '<i class="ti ti-alert-triangle"></i>' };
+  }
+
+  async function createTaskFromAlert(leadId, event) {
+    if (event) event.preventDefault();
+    const csrf = document.querySelector('meta[name=csrf-token]')?.content || document.getElementById('csrf-token')?.value;
+    const button = event?.currentTarget;
+    if (button) button.disabled = true;
+    try {
+      const response = await fetch(withOrgQuery('/tasks'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: Object.assign(
+          {'Content-Type': 'application/json'},
+          csrf ? {'X-CSRFToken': csrf} : {}
+        ),
+        body: JSON.stringify({ lead_id: leadId, title: 'Follow-up', type: 'follow_up', priority: 'high' })
+      });
+      if (!response.ok) throw new Error('request_failed');
+      if (button) button.textContent = 'Luotu';
+    } catch (e) {
+      if (button) button.textContent = 'Virhe';
+    }
+    setTimeout(() => {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Luo tehtävä';
+      }
+    }, 1200);
+  }
+
+  async function completeTaskFromAlert(taskId, event) {
+    if (event) event.preventDefault();
+    const csrf = document.querySelector('meta[name=csrf-token]')?.content || document.getElementById('csrf-token')?.value;
+    try {
+      const response = await fetch(withOrgQuery('/tasks/' + taskId + '/complete'), {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: csrf ? {'X-CSRFToken': csrf} : {}
+      });
+      if (!response.ok) throw new Error('request_failed');
+      const card = document.getElementById('ai-alert-task-' + taskId);
+      if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(8px)';
+        setTimeout(() => card.remove(), 180);
+      }
+      setTimeout(() => loadAIAlerts(true), 220);
+    } catch (e) {}
+  }
+
+  function alertActionsHtml(alert) {
+    const actions = Array.isArray(alert.actions) ? alert.actions : [];
+    const leadId = Number(alert.lead_id || 0);
+    const taskId = Number(alert.task_id || 0);
+    const items = [];
+    actions.forEach((action) => {
+      if (action === 'view_lead' && leadId) {
+        items.push('<a class="ai-alert-btn" href="' + withOrgQuery('/leads/' + leadId) + '">Avaa liidi →</a>');
+      } else if (action === 'send_email' && leadId) {
+        items.push('<a class="ai-alert-btn" href="' + withOrgQuery('/leads/' + leadId + '?action=email') + '">Kirjoita sähköposti</a>');
+      } else if (action === 'create_task' && leadId) {
+        items.push('<button class="ai-alert-btn" onclick="createTaskFromAlert(' + leadId + ', event)">Luo tehtävä</button>');
+      } else if (action === 'complete_task' && taskId) {
+        items.push('<button class="ai-alert-btn" onclick="completeTaskFromAlert(' + taskId + ', event)">Merkitse tehdyksi</button>');
+      }
+    });
+    return items.join('');
+  }
+
+  function renderAIAlerts(alerts) {
+    if (!alerts.length) {
+      return '<div class="ai-empty-state">' +
+        '<div class="ai-empty-state-icon"><i class="ti ti-circle-check"></i></div>' +
+        '<div class="ai-empty-state-title">Kaikki kunnossa</div>' +
+        '<div>Ei kiireellisiä toimia tällä hetkellä. Palaa myöhemmin.</div>' +
+        '<div class="ai-empty-state-note">Palaa myöhemmin</div>' +
+      '</div>';
+    }
+    return alerts.map((alert) => {
+      const kind = aiAlertKind(alert);
+      const cardId = alert.task_id ? ('ai-alert-task-' + Number(alert.task_id)) : '';
+      return '<div class="ai-alert-card ' + kind.cls + '" id="' + escapeAIHtml(cardId) + '">' +
+        '<div class="ai-alert-header"><span class="ai-alert-icon">' + kind.icon + '</span></div>' +
+        '<div class="ai-alert-message">' + escapeAIHtml(alert.message || '') + '</div>' +
+        '<div class="ai-alert-reason">Syy: ' + escapeAIHtml(alert.reason || '') + '</div>' +
+        '<div class="ai-alert-actions">' + alertActionsHtml(alert) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function loadAIAlerts(updateDrawer = false) {
+    if (updateDrawer) {
+      const body = document.getElementById('aiDrawerBody');
+      if (body) body.innerHTML = renderAIAlertSkeletons();
+    }
+    fetch(withOrgQuery('/api/ai/alerts'), { credentials: 'same-origin' })
       .then((r) => r.json())
       .then((data) => {
-        const recommendations = data?.success ? (data.data?.recommendations || []) : [];
+        const alerts = data?.success ? (data.data?.alerts || []) : [];
+        const count = alerts.length;
         const badge = document.getElementById('aiFabBadge');
         if (badge) {
-          if (recommendations.length > 0) {
-            badge.textContent = String(recommendations.length);
+          if (count > 0) {
+            badge.textContent = String(count);
             badge.style.display = 'flex';
           } else {
             badge.style.display = 'none';
           }
         }
+        const subtitle = document.getElementById('aiDrawerSubtitle');
+        if (subtitle) {
+          subtitle.textContent = count > 0
+            ? (count + ' asiaa vaatii huomiota')
+            : 'Kaikki kunnossa - ei kiireellisiä toimia';
+        }
         if (!updateDrawer) return;
         const body = document.getElementById('aiDrawerBody');
         if (!body) return;
-        if (recommendations.length === 0) {
-          body.innerHTML = '<div style="text-align:center;padding:32px;color:#9CA3AF;font-size:13px;">Kaikki näyttää hyvältä ✓</div>';
-          return;
-        }
-        body.innerHTML = recommendations.map((rec) => {
-          const action = rec.action_url
-            ? '<a href="' + escapeAIHtml(rec.action_url) + '" class="ai-rec-action">' + escapeAIHtml(rec.action_label || 'Avaa') + ' →</a>'
-            : '';
-          return '<div class="ai-recommendation ' + escapeAIHtml(rec.priority || '') + '">' +
-            '<div class="ai-rec-header"><span class="ai-rec-icon">' + escapeAIHtml(rec.icon || '✦') + '</span>' +
-            '<span class="ai-rec-title">' + escapeAIHtml(rec.title || '') + '</span></div>' +
-            '<div class="ai-rec-body">' + escapeAIHtml(rec.body || '') + '</div>' + action + '</div>';
-        }).join('');
+        body.innerHTML = renderAIAlerts(alerts);
       })
       .catch(() => {});
   }
