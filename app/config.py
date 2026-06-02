@@ -87,6 +87,9 @@ class Config:
 
     DEBUG_DIAGNOSTICS = os.environ.get("DEBUG_DIAGNOSTICS", "false").lower() == "true"
 
+    N8N_MASTER_SECRET = os.environ.get("N8N_MASTER_SECRET")
+    APP_BASE_URL = os.environ.get("APP_BASE_URL")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -132,6 +135,8 @@ class TestingConfig(Config):
     MAILGUN_API_KEY = _env_or_default("MAILGUN_API_KEY", "test-key")
     MAILGUN_DOMAIN = _env_or_default("MAILGUN_DOMAIN", "example.com")
     MAILGUN_WEBHOOK_SIGNING_KEY = _env_or_default("MAILGUN_WEBHOOK_SIGNING_KEY", "test-webhook-key")
+    N8N_MASTER_SECRET = _env_or_default("N8N_MASTER_SECRET", "test-n8n-secret")
+    APP_BASE_URL = _env_or_default("APP_BASE_URL", "http://localhost")
     MAIL_USERNAME = MAILGUN_FROM_EMAIL
     MAIL_PASSWORD = MAILGUN_API_KEY
     MAIL_DEFAULT_SENDER = (MAILGUN_FROM_NAME, MAILGUN_FROM_EMAIL)
