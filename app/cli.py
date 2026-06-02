@@ -168,6 +168,16 @@ def register_cli(app):
         click.echo("Starting scheduler (backups, reminders every 15m, auto-tasks)...")
         run_scheduler(current_app._get_current_object())
 
+    @app.cli.command("debug-lead-routes")
+    @with_appcontext
+    def debug_lead_routes():
+        """Print registered lead/stage routes (debug 404 on stage PATCH)."""
+        for rule in sorted(current_app.url_map.iter_rules(), key=lambda r: r.rule):
+            rule_l = rule.rule.lower()
+            if "lead" in rule_l or "stage" in rule_l:
+                methods = ", ".join(sorted(m for m in rule.methods if m not in {"HEAD", "OPTIONS"}))
+                click.echo(f"{methods:12} {rule.rule}")
+
     @app.cli.command("list-streams")
     @click.argument("org_slug")
     @with_appcontext

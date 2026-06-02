@@ -271,7 +271,83 @@
   const csrfToken = "{{ csrf_token() }}";
   const currencySymbol = {{ currency_symbol|tojson }};
   const stageUrlTemplate = "{{ url_for('leads.move_stage', lead_id=0, organization_id=organization_id) if is_superadmin else url_for('leads.move_stage', lead_id=0) }}";
-  const stageUrl = (leadId) => stageUrlTemplate.replace('/0/', `/${leadId}/`);
+
+  function parseLeadId(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number.parseInt(String(value), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  function readLeadIdFromCard(card) {
+    if (!card) return null;
+
+    const candidates = [
+      card,
+      card.closest?.('.lead-card'),
+      card.querySelector?.('.lead-card'),
+      card.closest?.('[data-lead-id]'),
+      card.querySelector?.('[data-lead-id]'),
+    ].filter(Boolean);
+
+    const seen = new Set();
+    for (const el of candidates) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      const raw = el.dataset?.leadId || el.getAttribute?.('data-lead-id');
+      const id = Number.parseInt(raw, 10);
+      if (Number.isInteger(id) && id > 0) return id;
+    }
+
+    console.error('Could not resolve lead id from card', {
+      card,
+      outerHTML: card.outerHTML,
+    });
+    return null;
+  }
+
+  function resolveLeadCardElement(item) {
+    if (!item) return null;
+    const candidates = [
+      item,
+      item.closest?.('.lead-card'),
+      item.querySelector?.('.lead-card'),
+      item.closest?.('[data-lead-id]'),
+      item.querySelector?.('[data-lead-id]'),
+    ].filter(Boolean);
+
+    const seen = new Set();
+    for (const el of candidates) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      const raw = el.dataset?.leadId || el.getAttribute?.('data-lead-id');
+      const id = Number.parseInt(raw, 10);
+      if (Number.isInteger(id) && id > 0) {
+        return el.classList?.contains('lead-card') ? el : (el.closest?.('.lead-card') || el);
+      }
+    }
+    return null;
+  }
+
+  function logSortableItemDebug(evt, phase) {
+    console.log(`Sortable item debug (${phase})`, {
+      item: evt.item,
+      itemClasses: evt.item?.className,
+      itemDataset: evt.item ? { ...evt.item.dataset } : null,
+      itemHtml: evt.item?.outerHTML,
+      resolvedLeadId: readLeadIdFromCard(evt.item),
+      resolvedCard: resolveLeadCardElement(evt.item),
+    });
+  }
+
+  function buildStageUrl(leadId) {
+    const id = parseLeadId(leadId);
+    if (id === null) return null;
+    if (!stageUrlTemplate.includes('/leads/0/stage')) {
+      console.error('Invalid stageUrlTemplate', stageUrlTemplate);
+      return null;
+    }
+    return stageUrlTemplate.replace(/\/leads\/0\/stage/, `/leads/${id}/stage`);
+  }
   const isClosedLostStage = (stageName) => {
     const normalized = String(stageName || '').trim().toLowerCase();
     return (
@@ -286,12 +362,16 @@
   let draggedCard = null;
   let originalIndex = null;
 
-  function showLostReasonModal() {
+  function showLostReasonModal(leadId, stageId) {
     const modal = document.getElementById('lost-reason-modal');
     const select = document.getElementById('lost-reason-select');
     const note = document.getElementById('lost-reason-note');
     const errorEl = document.getElementById('lost-reason-error');
     if (!modal || !select || !note || !errorEl) return;
+    const parsedLeadId = parseLeadId(leadId);
+    const parsedStageId = parseLeadId(stageId);
+    if (parsedLeadId) modal.dataset.pendingLeadId = String(parsedLeadId);
+    if (parsedStageId) modal.dataset.pendingStageId = String(parsedStageId);
     modal.hidden = false;
     select.value = '';
     select.style.borderColor = '';
@@ -323,6 +403,11 @@
     originalColumn = null;
     draggedCard = null;
     originalIndex = null;
+    const modal = document.getElementById('lost-reason-modal');
+    if (modal) {
+      delete modal.dataset.pendingLeadId;
+      delete modal.dataset.pendingStageId;
+    }
   }
 
   function toast(message, kind = 'info') {
@@ -444,37 +529,55 @@
         ghostClass: 'is-ghost',
         chosenClass: 'is-chosen',
         filter: '.pipeline-col__placeholder',
-        onStart: () => document.body.classList.add('pipeline-is-dragging'),
+        onStart: (evt) => {
+          document.body.classList.add('pipeline-is-dragging');
+          logSortableItemDebug(evt, 'start');
+        },
         onEnd: async (evt) => {
           document.body.classList.remove('pipeline-is-dragging');
           root.querySelectorAll('.kanban-list.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
 
-          const leadId = evt.item?.dataset?.leadId;
+          logSortableItemDebug(evt, 'end');
+
           const stageId = evt.to?.dataset?.stageId;
+          const leadId = readLeadIdFromCard(evt.item);
+          const cardEl = resolveLeadCardElement(evt.item) || evt.item;
           const newStageName = evt.to?.closest('.pipeline-col')?.querySelector('.pipeline-col__title')?.textContent || '';
-          if (!leadId || !stageId) return;
+          if (!leadId || !stageId) {
+            console.error('Drag missing lead or stage id', {
+              leadId,
+              stageId,
+              item: evt.item,
+              cardEl,
+            });
+            return;
+          }
 
           const prevList = evt.from;
           const prevIndex = evt.oldIndex;
           currentDragLeadId = leadId;
           lostStageId = Number.parseInt(stageId, 10);
           originalColumn = prevList;
-          draggedCard = evt.item;
+          draggedCard = cardEl;
           originalIndex = prevIndex;
 
           updateColumnStats(evt.from);
           updateColumnStats(evt.to);
           updatePageStats(root);
 
-          evt.item.classList.add('is-updating');
-          evt.item.setAttribute('aria-busy', 'true');
+          cardEl.classList.add('is-updating');
+          cardEl.setAttribute('aria-busy', 'true');
 
           try {
             if (isClosedLostStage(newStageName)) {
-              showLostReasonModal();
+              showLostReasonModal(leadId, lostStageId);
               return;
             }
-            const res = await fetch(stageUrl(leadId), {
+            const moveUrl = buildStageUrl(leadId);
+            if (!moveUrl) {
+              throw new Error('Liidin tunniste puuttuu');
+            }
+            const res = await fetch(moveUrl, {
               method: 'PATCH',
               credentials: 'same-origin',
               headers: {
@@ -497,15 +600,15 @@
             updateColumnStats(evt.from);
             updateColumnStats(evt.to);
             updatePageStats(root);
-            evt.item.classList.add('is-error');
+            cardEl.classList.add('is-error');
             if ((err?.message || '').toLowerCase() !== 'siirto peruutettu') {
               toast(err?.message || 'Liidin siirto epäonnistui.', 'error');
             }
-            window.setTimeout(() => evt.item.classList.remove('is-error'), 1400);
+            window.setTimeout(() => cardEl.classList.remove('is-error'), 1400);
           } finally {
             if (!isClosedLostStage(newStageName)) {
-              evt.item.classList.remove('is-updating');
-              evt.item.removeAttribute('aria-busy');
+              cardEl.classList.remove('is-updating');
+              cardEl.removeAttribute('aria-busy');
               resetLostDragState();
             }
           }
@@ -534,8 +637,41 @@
     confirmBtn.__flBound = true;
 
     confirmBtn.addEventListener('click', async function() {
-      if (!currentDragLeadId || !lostStageId) {
-        toast('Virhe: Liidin tietoja puuttuu — päivitä sivu ja yritä uudelleen', 'error');
+      const modal = document.getElementById('lost-reason-modal');
+      const busyCard = document.querySelector('.pipeline .lead-card.is-updating[aria-busy="true"]');
+      const leadId =
+        readLeadIdFromCard(draggedCard) ||
+        readLeadIdFromCard(busyCard) ||
+        parseLeadId(modal?.dataset?.pendingLeadId) ||
+        parseLeadId(currentDragLeadId);
+      const stageId =
+        parseLeadId(lostStageId) ||
+        parseLeadId(modal?.dataset?.pendingStageId);
+      const url = buildStageUrl(leadId);
+      const apiProbeUrl = leadId ? `/api/leads/${leadId}/stage` : null;
+
+      console.log('Lost confirm debug', {
+        currentDragLeadId,
+        lostStageId,
+        resolvedLeadId: leadId,
+        resolvedStageId: stageId,
+        draggedCardLeadId: draggedCard?.dataset?.leadId,
+        modalPendingLeadId: modal?.dataset?.pendingLeadId,
+        url,
+        apiProbeUrl,
+        stageUrlTemplate,
+      });
+
+      if (!leadId || !stageId || !url) {
+        console.error('Missing drag state', {
+          leadId,
+          stageId,
+          currentDragLeadId,
+          lostStageId,
+          draggedCard,
+          modal,
+        });
+        toast('Virhe: liidin tai vaiheen tunniste puuttuu', 'error');
         return;
       }
 
@@ -549,7 +685,6 @@
       errorEl.textContent = '';
 
       const note = noteField.value || '';
-      const url = stageUrl(currentDragLeadId);
       confirmBtn.disabled = true;
 
       try {
@@ -562,7 +697,7 @@
           },
           credentials: 'same-origin',
           body: JSON.stringify({
-            stage_id: lostStageId,
+            stage_id: stageId,
             lost_reason: reason,
             lost_reason_note: note,
           }),
@@ -575,13 +710,15 @@
           data = null;
         }
 
+        console.log('Lost confirm response', response.status, response.url, data);
+
         if (response.status === 404) {
           console.error('Stage update 404:', url, data);
           toast('Virhe: Liidia tai polkua ei löytynyt', 'error');
           return;
         }
 
-        if (response.ok && data && data.success) {
+        if (response.ok && data && data.success === true) {
           hideLostReasonModal();
           if (draggedCard) {
             draggedCard.classList.remove('is-updating');

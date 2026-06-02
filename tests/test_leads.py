@@ -631,3 +631,24 @@ def test_pipeline_contains_lost_reason_modal(app, client):
     assert 'id="lost-reason-select"' in body
     assert 'value="no_response"' in body
     assert 'id="lost-confirm"' in body
+    assert 'data-lead-id="' in body
+    assert "buildStageUrl" in body
+    assert "parseLeadId" in body
+    assert "resolveLeadCardElement" in body
+    assert "readLeadIdFromCard" in body
+
+
+def test_undefined_lead_stage_url_returns_flask_404_not_route_match(app, client):
+    """PATCH /leads/undefined/stage 404s because <int:lead_id> does not match — not missing blueprint."""
+    ctx = _setup_org_with_users(app, "undef-stage")
+    _login(client, ctx["admin_email"])
+    response = client.patch(
+        "/leads/undefined/stage",
+        data=json.dumps({"stage_id": 1, "lost_reason": "no_budget"}),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert response.status_code == 404
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["message"] == "The requested resource was not found."
