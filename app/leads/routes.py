@@ -599,7 +599,9 @@ def move_stage(lead_id):
         )
         db.session.commit()
         if wants_json_response() or request.is_json:
+            stage_name = lead.stage.name if lead.stage else ""
             return json_success({
+                "stage": stage_name,
                 "lead_id": lead.id,
                 "stage_id": lead.stage_id,
                 "status": lead.status,

@@ -556,6 +556,47 @@ def test_lost_reason_required(app, client):
     assert back_to_contacted.status_code == 200
 
 
+def test_web_api_lead_stage_patch(app, client):
+    ctx = _setup_org_with_users(app, "web-api-stage")
+    with app.app_context():
+        lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="webapi@a.com")
+        lost_stage = PipelineStage.query.filter_by(
+            organization_id=ctx["org_id"], name="Hävitty"
+        ).first()
+        lost_stage_id = lost_stage.id
+    _login(client, ctx["admin_email"])
+
+    missing = client.patch(
+        f"/api/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": lost_stage_id}),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert missing.status_code == 400
+    assert missing.get_json()["success"] is False
+
+    ok = client.patch(
+        f"/api/leads/{lead_id}/stage",
+        data=json.dumps(
+            {
+                "stage_id": lost_stage_id,
+                "lost_reason": "no_budget",
+                "lost_reason_note": "Q2 budjetti käytetty",
+            }
+        ),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert ok.status_code == 200
+    payload = ok.get_json()
+    assert payload["success"] is True
+    assert payload["data"]["stage"] == "Hävitty"
+    with app.app_context():
+        lead = db.session.get(Lead, lead_id)
+        assert lead.lost_reason == "no_budget"
+        assert lead.lost_reason_note == "Q2 budjetti käytetty"
+
+
 def test_seed_default_stages_idempotent(app):
     with app.app_context():
         org = create_organization("Seed Co", "seed-co")

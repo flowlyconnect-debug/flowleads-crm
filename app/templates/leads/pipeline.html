@@ -534,6 +534,11 @@
     confirmBtn.__flBound = true;
 
     confirmBtn.addEventListener('click', async function() {
+      if (!currentDragLeadId || !lostStageId) {
+        toast('Virhe: Liidin tietoja puuttuu — päivitä sivu ja yritä uudelleen', 'error');
+        return;
+      }
+
       const reason = reasonSelect.value;
       if (!reason) {
         reasonSelect.style.borderColor = '#EF4444';
@@ -544,9 +549,11 @@
       errorEl.textContent = '';
 
       const note = noteField.value || '';
+      const url = stageUrl(currentDragLeadId);
+      confirmBtn.disabled = true;
 
       try {
-        const response = await fetch(`/api/leads/${currentDragLeadId}/stage`, {
+        const response = await fetch(url, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -560,8 +567,21 @@
             lost_reason_note: note,
           }),
         });
-        const data = await response.json();
-        if (response.ok && data.success) {
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (parseErr) {
+          data = null;
+        }
+
+        if (response.status === 404) {
+          console.error('Stage update 404:', url, data);
+          toast('Virhe: Liidia tai polkua ei löytynyt', 'error');
+          return;
+        }
+
+        if (response.ok && data && data.success) {
           hideLostReasonModal();
           if (draggedCard) {
             draggedCard.classList.remove('is-updating');
@@ -571,11 +591,14 @@
           refreshAllStats(root);
           toast('Liidi merkitty hävityksi');
         } else {
-          const errMsg = data?.error?.message || 'Tuntematon virhe';
+          const errMsg = data?.error?.message || 'Vaiheen päivitys epäonnistui';
           toast(`Virhe: ${errMsg}`, 'error');
         }
       } catch (e) {
+        console.error('Stage update failed:', url, e);
         toast('Verkkovirhe — yritä uudelleen', 'error');
+      } finally {
+        confirmBtn.disabled = false;
       }
     });
 

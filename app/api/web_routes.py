@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from flask_login import current_user, login_required
 
 from app.core.errors import json_error, json_success
+from app.core.tenant import resolve_organization_id
 from app.extensions import db
 from app.leads.services import LeadService, LeadServiceError
 
@@ -20,10 +21,11 @@ def update_lead_stage(lead_id: int):
         return json_error("validation_error", "stage_id is required.", 400)
 
     try:
+        organization_id = resolve_organization_id()
         lead = LeadService.move_stage(
             lead_id=lead_id,
             stage_id=int(stage_id),
-            organization_id=current_user.organization_id,
+            organization_id=organization_id,
             user_id=current_user.id,
             lost_reason=payload.get("lost_reason"),
             lost_reason_note=payload.get("lost_reason_note"),
@@ -37,4 +39,5 @@ def update_lead_stage(lead_id: int):
         status = 404 if exc.code == "not_found" else 400
         return json_error(exc.code, exc.message, status)
 
-    return json_success({"lead_id": lead.id, "stage_id": lead.stage_id, "status": lead.status})
+    stage_name = lead.stage.name if lead.stage else ""
+    return json_success({"stage": stage_name})
