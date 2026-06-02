@@ -224,6 +224,42 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("Lead health check job failed")
 
+    def run_create_daily_search_jobs():
+        with app.app_context():
+            from datetime import datetime, timezone
+
+            from app.extensions import db
+            from app.search.models import SearchJob, SearchProfile
+
+            try:
+                today = datetime.now(timezone.utc).date()
+                active_profiles = SearchProfile.query.filter_by(
+                    is_active=True, schedule_description="daily"
+                ).all()
+                created = 0
+                for profile in active_profiles:
+                    existing = SearchJob.query.filter(
+                        SearchJob.search_profile_id == profile.id,
+                        SearchJob.scheduled_at >= today,
+                        SearchJob.status.in_(["pending", "running"]),
+                    ).first()
+                    if not existing:
+                        db.session.add(
+                            SearchJob(
+                                search_profile_id=profile.id,
+                                organization_id=profile.organization_id,
+                                status="pending",
+                                scheduled_at=datetime.now(timezone.utc),
+                            )
+                        )
+                        created += 1
+                db.session.commit()
+                if created:
+                    logger.info("Created %s daily search job(s)", created)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Daily search job creation failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -326,6 +362,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="lead_health_check",
         replace_existing=True,
     )
+    scheduler.add_job(
+        run_create_daily_search_jobs,
+        CronTrigger(hour=6, minute=0, timezone="UTC"),
+        id="create_search_jobs",
+        replace_existing=True,
+    )
 
 
 def create_scheduler(app=None) -> BlockingScheduler:
@@ -350,5 +392,5 @@ def run_scheduler(app) -> None:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "false":
         return
     scheduler = create_scheduler(app)
-    logger.info("Starting scheduler (backups, tasks, segments, sequences)")
+    logger.info("Starting scheduler (backups, tasks, segments, sequences, search)")
     scheduler.start()
