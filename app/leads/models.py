@@ -199,6 +199,8 @@ class Lead(db.Model):
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    lost_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    lost_reason_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

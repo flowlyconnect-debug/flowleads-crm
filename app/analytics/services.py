@@ -559,6 +559,24 @@ class AnalyticsService:
         return result
 
     @staticmethod
+    def get_lost_reason_counts(organization_id: int) -> list[dict]:
+        rows = (
+            db.session.query(Lead.lost_reason, func.count(Lead.id))
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.lost_reason.isnot(None),
+            )
+            .group_by(Lead.lost_reason)
+            .order_by(func.count(Lead.id).desc(), Lead.lost_reason.asc())
+            .all()
+        )
+        return [
+            {"reason": str(reason), "count": int(count)}
+            for reason, count in rows
+            if reason
+        ]
+
+    @staticmethod
     def get_recent_activity(organization_id: int, limit: int = 20) -> list[dict]:
         rows = (
             _activity_base(organization_id)

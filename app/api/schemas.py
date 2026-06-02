@@ -62,6 +62,8 @@ def serialize_lead(lead: Lead, *, custom_fields: dict | None = None) -> dict:
         "score": lead.score,
         "status": lead.status,
         "stage": stage_name,
+        "lost_reason": lead.lost_reason,
+        "lost_reason_note": lead.lost_reason_note,
         "created_at": _iso(lead.created_at),
         "updated_at": _iso(lead.updated_at),
         "gdpr_consent": lead.gdpr_consent,

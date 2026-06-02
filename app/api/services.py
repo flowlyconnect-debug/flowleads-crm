@@ -47,7 +47,7 @@ API_UPDATABLE_FIELDS = (
 )
 
 API_PATCH_FORBIDDEN = frozenset(
-    {"organization_id", "assigned_to", "stage_id", "status", "id", "stage"}
+    {"organization_id", "assigned_to", "status", "id", "stage"}
 )
 
 MAX_BULK_LEADS = 100
@@ -498,6 +498,19 @@ def patch_lead(organization_id: int, lead_id: int, payload: dict) -> Lead:
         raise ApiServiceError(msg, "validation_error")
 
     changed = _apply_partial_update(lead, data)
+    if "stage_id" in payload and payload.get("stage_id"):
+        try:
+            LeadService.move_stage(
+                lead.id,
+                int(payload.get("stage_id")),
+                organization_id,
+                None,
+                lost_reason=payload.get("lost_reason"),
+                lost_reason_note=payload.get("lost_reason_note"),
+            )
+            changed = True
+        except LeadServiceError as exc:
+            raise ApiServiceError(exc.message, exc.code) from None
     if changed:
         lead.updated_at = datetime.now(timezone.utc)
         LeadService.log_activity(lead.id, None, "updated", content="Updated via API")

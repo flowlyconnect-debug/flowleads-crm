@@ -17,7 +17,7 @@ from flask_wtf.csrf import generate_csrf
 
 from app.core.errors import json_error, json_success, wants_json_response
 from app.core.permissions import require_role
-from app.extensions import db
+from app.extensions import cache, db
 from app.leads.forms import BulkActionForm, LeadFilterForm, LeadForm, QuickNoteForm
 from app.leads.models import Activity, Lead, PipelineStage
 from app.leads.permissions import (
@@ -268,39 +268,19 @@ def pipeline():
         "created_from": _parse_date(request.args.get("created_from")),
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
     }
-    data = LeadService.get_pipeline_data(organization_id, filters)
-    lead_ids: list[int] = []
-    for stage in data.get("stages", []):
-        for item in data.get("leads_by_stage", {}).get(stage.id, []):
-            lead = item.get("lead") if isinstance(item, dict) else item
-            if lead and lead.id:
-                lead_ids.append(lead.id)
-    last_activity_by_lead: dict[int, Activity] = {}
-    if lead_ids:
-        activities = (
-            Activity.query.filter(
-                Activity.organization_id == organization_id,
-                Activity.lead_id.in_(lead_ids),
-            )
-            .order_by(Activity.lead_id.asc(), Activity.created_at.desc())
-            .all()
-        )
-        for activity in activities:
-            if activity.lead_id not in last_activity_by_lead:
-                last_activity_by_lead[activity.lead_id] = activity
-    for stage in data.get("stages", []):
-        for item in data.get("leads_by_stage", {}).get(stage.id, []):
-            lead = item.get("lead") if isinstance(item, dict) else item
-            if not lead:
-                continue
-            last_activity = last_activity_by_lead.get(lead.id)
-            lead.last_activity = last_activity
-            lead.last_activity_days_ago = (
-                (datetime.now(timezone.utc) - _ensure_utc(last_activity.created_at)).days
-                if last_activity and last_activity.created_at
-                else None
-            )
-            lead.engagement_level = _engagement_level_from_last_activity(last_activity)
+    cache_key = (
+        f"pipeline_data:{organization_id}:"
+        f"{filters.get('assigned_to') or ''}:"
+        f"{filters.get('source') or ''}:"
+        f"{filters.get('score_min') or ''}:"
+        f"{filters.get('score_max') or ''}:"
+        f"{filters.get('created_from') or ''}:"
+        f"{filters.get('created_to') or ''}"
+    )
+    data = cache.get(cache_key)
+    if data is None:
+        data = LeadService.get_pipeline_data(organization_id, filters)
+        cache.set(cache_key, data, timeout=30)
     users = _org_users(organization_id)
     from app.analytics.currency import currency_symbol, get_default_currency
 
@@ -581,8 +561,17 @@ def move_stage(lead_id):
     if not stage_id:
         return json_error("validation_error", "stage_id is required.", 400)
 
+    lost_reason = payload.get("lost_reason") or request.form.get("lost_reason")
+    lost_reason_note = payload.get("lost_reason_note") or request.form.get("lost_reason_note")
     try:
-        lead = LeadService.move_stage(lead_id, int(stage_id), organization_id, current_user.id)
+        lead = LeadService.move_stage(
+            lead_id,
+            int(stage_id),
+            organization_id,
+            current_user.id,
+            lost_reason=lost_reason,
+            lost_reason_note=lost_reason_note,
+        )
         db.session.commit()
         if wants_json_response() or request.is_json:
             return json_success({

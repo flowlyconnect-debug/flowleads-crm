@@ -174,6 +174,29 @@ def test_pipeline_empty_org(app):
         assert report["conversion_rate"] == 0.0
 
 
+def test_lost_reason_analytics_scoped(app):
+    ctx = _setup_org(app, "lost-analytics")
+    with app.app_context():
+        mine1 = LeadService.create({"email": "lost1@test.com"}, ctx["org_id"], ctx["admin_id"])
+        mine2 = LeadService.create({"email": "lost2@test.com"}, ctx["org_id"], ctx["admin_id"])
+        other = LeadService.create(
+            {"email": "lost-other@test.com"},
+            ctx["other_org_id"],
+            ctx["other_user_id"],
+        )
+        mine1.status = "lost"
+        mine1.lost_reason = "Ei vastannut"
+        mine2.status = "lost"
+        mine2.lost_reason = "Ei vastannut"
+        other.status = "lost"
+        other.lost_reason = "Kilpailija voitti"
+        db.session.commit()
+        counts = AnalyticsService.get_lost_reason_counts(ctx["org_id"])
+        counts_map = {item["reason"]: item["count"] for item in counts}
+        assert counts_map["Ei vastannut"] == 2
+        assert "Kilpailija voitti" not in counts_map
+
+
 # --- Source report ---
 
 

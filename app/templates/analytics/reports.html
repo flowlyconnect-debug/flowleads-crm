@@ -243,6 +243,17 @@
     </div>
   </article>
 
+  <article class="report-card">
+    <header class="report-card__header">
+      <h2 class="report-card__title">Häviösyyt</h2>
+    </header>
+    <div class="report-card__body">
+      <div class="report-chart-wrap">
+        <canvas id="lost-reasons-chart" role="img" aria-label="Häviösyyt kaavio"></canvas>
+      </div>
+    </div>
+  </article>
+
   {% elif not range_error %}
   <div class="report-card">
     <div class="report-card__body">
@@ -291,6 +302,41 @@
 } | tojson }}
 {% endif %}
 </script>
+<script type="application/json" id="lost-reasons-chart-data">
+{{ {
+  'labels': lost_reason_counts | map(attribute='reason') | list,
+  'values': lost_reason_counts | map(attribute='count') | list
+} | tojson }}
+</script>
 <script src="{{ url_for('static', filename='js/reports.js') }}" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var el = document.getElementById('lost-reasons-chart-data');
+  var canvas = document.getElementById('lost-reasons-chart');
+  if (!el || !canvas || typeof Chart === 'undefined') return;
+  var payload = JSON.parse(el.textContent || '{}');
+  var labels = payload.labels || [];
+  var values = payload.values || [];
+  if (!labels.length) return;
+  new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Häviöt',
+        data: values,
+        backgroundColor: '#EF4444',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+});
+</script>
 {% endif %}
 {% endblock %}

@@ -451,6 +451,88 @@
   padding: 8px 9px 7px;
 }
 
+.lead-card__meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.lead-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+.lead-pill--red { background: #FEE2E2; color: #991B1B; }
+.lead-pill--amber { background: #FEF3C7; color: #92400E; }
+.lead-pill--gray { background: #F3F4F6; color: #6B7280; }
+
+.lead-recommendation {
+  margin-top: 7px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lead-recommendation--risk { color: #DC2626; }
+.lead-recommendation--opportunity { color: #1D4ED8; }
+.lead-recommendation--followup { color: #B45309; }
+
+.lead-next-task {
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.lead-next-task--overdue { color: #DC2626; }
+.lead-next-task--today { color: #B45309; }
+.lead-next-task--future { color: #6B7280; }
+
+.lead-last-contact {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.lead-last-contact--gray { color: #6B7280; }
+.lead-last-contact--amber { color: #B45309; }
+.lead-last-contact--red { color: #DC2626; }
+
+.pipeline-lost-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.pipeline-lost-modal__dialog {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+}
+
+.pipeline-lost-modal__dialog h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.pipeline-lost-modal__actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .lead-card__company {
   display: block;
   overflow: hidden;

@@ -152,7 +152,15 @@ def _status_from_stage_name(stage_name: str) -> str:
         return "won"
     if lower == "lost":
         return "lost"
+    if lower == "closed won":
+        return "won"
+    if lower == "closed lost":
+        return "lost"
     return "active"
+
+
+def _is_closed_lost_stage_name(stage_name: str | None) -> bool:
+    return (stage_name or "").strip().lower() in {"lost", "closed lost"}
 
 
 def _activity_change_value(value):
@@ -574,7 +582,15 @@ class LeadService:
         return lead
 
     @staticmethod
-    def move_stage(lead_id: int, stage_id: int, organization_id: int, user_id: int | None) -> Lead:
+    def move_stage(
+        lead_id: int,
+        stage_id: int,
+        organization_id: int,
+        user_id: int | None,
+        *,
+        lost_reason: str | None = None,
+        lost_reason_note: str | None = None,
+    ) -> Lead:
         lead = get_lead_for_org(lead_id, organization_id)
         if lead.status == "archived":
             raise LeadServiceError("Cannot move archived lead.", "archived")
@@ -587,18 +603,45 @@ class LeadService:
         lead.stage_id = new_stage.id
         lead.status = _status_from_stage_name(new_stage.name)
         lead.updated_at = datetime.now(timezone.utc)
+        if _is_closed_lost_stage_name(new_stage.name):
+            if not (lost_reason or "").strip():
+                raise LeadServiceError(
+                    "lost_reason is required when moving to Closed Lost.",
+                    "validation_error",
+                )
+            lead.lost_reason = (lost_reason or "").strip()[:100]
+            lead.lost_reason_note = (lost_reason_note or "").strip() or None
+        elif lead.status != "lost":
+            lead.lost_reason = None
+            lead.lost_reason_note = None
 
         LeadService.log_activity(
             lead.id,
             user_id,
             "stage_changed",
+            content=(
+                f"Liidi hävisi: {(lost_reason or '').strip()[:100]}"
+                if _is_closed_lost_stage_name(new_stage.name)
+                else None
+            ),
             metadata={
                 "old_stage_id": old_stage.id,
                 "new_stage_id": new_stage.id,
                 "old_stage_name": old_stage.name,
                 "new_stage_name": new_stage.name,
+                "lost_reason": lead.lost_reason if _is_closed_lost_stage_name(new_stage.name) else None,
             },
         )
+        if _is_closed_lost_stage_name(new_stage.name):
+            log_audit(
+                "lead_lost",
+                user_id=user_id,
+                organization_id=organization_id,
+                target_type="lead",
+                target_id=lead.id,
+                metadata={"reason": lead.lost_reason},
+            )
+
         db.session.flush()
 
         from app.tasks.services import TaskService
@@ -778,6 +821,9 @@ class LeadService:
         lead_ids = [lead.id for lead in leads]
 
         open_tasks_by_lead: dict[int, int] = {}
+        next_task_by_lead: dict[int, object] = {}
+        last_activity_by_lead: dict[int, Activity] = {}
+        stage_entered_at_by_lead: dict[int, datetime] = {}
         sequence_active_by_lead: dict[int, bool] = {}
         proposals_count_by_lead: dict[int, int] = {}
         old_unviewed_proposal_lead_ids: set[int] = set()
@@ -801,6 +847,73 @@ class LeadService:
                 .all()
             )
             open_tasks_by_lead = {int(lead_id): int(count) for lead_id, count in task_rows if lead_id}
+
+            ranked_tasks = (
+                db.session.query(
+                    Task.id.label("id"),
+                    Task.lead_id.label("lead_id"),
+                    func.row_number()
+                    .over(partition_by=Task.lead_id, order_by=Task.due_date.asc())
+                    .label("rn"),
+                )
+                .filter(
+                    Task.organization_id == organization_id,
+                    Task.lead_id.in_(lead_ids),
+                    Task.status.in_(("pending", "in_progress")),
+                )
+                .subquery()
+            )
+            next_tasks = (
+                db.session.query(Task)
+                .join(ranked_tasks, Task.id == ranked_tasks.c.id)
+                .filter(ranked_tasks.c.rn == 1)
+                .all()
+            )
+            next_task_by_lead = {task.lead_id: task for task in next_tasks if task.lead_id}
+
+            ranked_activities = (
+                db.session.query(
+                    Activity.id.label("id"),
+                    Activity.lead_id.label("lead_id"),
+                    func.row_number()
+                    .over(partition_by=Activity.lead_id, order_by=Activity.created_at.desc())
+                    .label("rn"),
+                )
+                .filter(
+                    Activity.organization_id == organization_id,
+                    Activity.lead_id.in_(lead_ids),
+                )
+                .subquery()
+            )
+            latest_activities = (
+                db.session.query(Activity)
+                .join(ranked_activities, Activity.id == ranked_activities.c.id)
+                .filter(ranked_activities.c.rn == 1)
+                .all()
+            )
+            last_activity_by_lead = {activity.lead_id: activity for activity in latest_activities if activity.lead_id}
+
+            stage_events = (
+                Activity.query.filter(
+                    Activity.organization_id == organization_id,
+                    Activity.lead_id.in_(lead_ids),
+                    Activity.type == "stage_changed",
+                )
+                .order_by(Activity.lead_id.asc(), Activity.created_at.desc())
+                .all()
+            )
+            stage_by_lead_id = {lead.id: lead.stage_id for lead in leads}
+            for activity in stage_events:
+                current_stage_id = stage_by_lead_id.get(activity.lead_id)
+                if not current_stage_id or activity.lead_id in stage_entered_at_by_lead:
+                    continue
+                metadata = activity.metadata_json or {}
+                try:
+                    new_stage_id = int(metadata.get("new_stage_id"))
+                except (TypeError, ValueError):
+                    continue
+                if new_stage_id == current_stage_id:
+                    stage_entered_at_by_lead[activity.lead_id] = activity.created_at
 
             sequence_rows = (
                 db.session.query(EmailSequenceEnrollment.lead_id)
@@ -857,25 +970,62 @@ class LeadService:
                 int(lead_id) for (lead_id,) in heavily_viewed_rows if lead_id
             }
 
+        def _to_utc(dt: datetime | None) -> datetime | None:
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
+        def recommendation_type(text: str | None) -> str:
+            if not text:
+                return "opportunity"
+            if text in {"Muistuta tarjouksesta", "Seuraa välittömästi"}:
+                return "followup"
+            if text == "Ota yhteyttä nyt" or "hiljaa" in text.lower():
+                return "risk"
+            return "opportunity"
+
         by_stage = {s.id: [] for s in stages}
         stage_totals = {s.id: Decimal("0") for s in stages}
         for lead in leads:
             if lead.stage_id in by_stage:
                 lead.open_tasks_count = open_tasks_by_lead.get(lead.id, 0)
                 lead.sequence_active = sequence_active_by_lead.get(lead.id, False)
-                lead.ai_recommendation = LeadService._pipeline_ai_recommendation(
+                rec_text = LeadService._pipeline_ai_recommendation(
                     lead,
                     now=now,
                     has_any_proposal=proposals_count_by_lead.get(lead.id, 0) > 0,
                     has_old_unviewed_proposal=lead.id in old_unviewed_proposal_lead_ids,
                     has_heavily_viewed_proposal=lead.id in heavily_viewed_proposal_lead_ids,
                 )
-                last_activity = (
-                    Activity.query.filter_by(lead_id=lead.id, organization_id=organization_id)
-                    .order_by(Activity.created_at.desc())
-                    .first()
+                rec_type = recommendation_type(rec_text)
+                lead.ai_recommendation = (
+                    {"type": rec_type, "text": rec_text}
+                    if rec_text
+                    else None
                 )
-                by_stage[lead.stage_id].append({"lead": lead, "last_activity": last_activity})
+                last_activity = last_activity_by_lead.get(lead.id)
+                last_activity_at = _to_utc(last_activity.created_at) if last_activity else None
+                last_activity_days = (
+                    (now - last_activity_at).days
+                    if last_activity_at
+                    else None
+                )
+                entered_at = _to_utc(
+                    stage_entered_at_by_lead.get(lead.id) or lead.updated_at or lead.created_at
+                )
+                stage_days = (now - entered_at).days if entered_at else 0
+                by_stage[lead.stage_id].append(
+                    {
+                        "lead": lead,
+                        "last_activity": last_activity,
+                        "last_activity_days": last_activity_days,
+                        "stage_days": stage_days,
+                        "next_task": next_task_by_lead.get(lead.id),
+                        "ai_recommendation": lead.ai_recommendation,
+                    }
+                )
                 if lead.deal_value is not None:
                     stage_totals[lead.stage_id] += lead.deal_value
 

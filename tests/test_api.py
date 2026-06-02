@@ -398,6 +398,44 @@ def test_patch_rejects_forbidden_fields(client, app):
     assert "not allowed" in response.get_json()["error"]["message"].lower()
 
 
+def test_api_lost_reason_required(client, app):
+    ctx = _setup_org(app, "api-lost-reason")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    created = _post_lead(client, full_key, {"email": "api-lost@test.com"})
+    lead_id = created.get_json()["data"]["lead"]["id"]
+    with app.app_context():
+        lost_stage = PipelineStage.query.filter_by(
+            organization_id=ctx["org_id"], name="Lost"
+        ).first()
+        contacted = PipelineStage.query.filter_by(
+            organization_id=ctx["org_id"], name="Contacted"
+        ).first()
+        lost_stage_id = lost_stage.id
+        contacted_stage_id = contacted.id
+
+    missing = client.patch(
+        f"/api/v1/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": lost_stage_id}),
+        headers=_auth_headers(full_key),
+    )
+    assert missing.status_code == 400
+
+    ok = client.patch(
+        f"/api/v1/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": lost_stage_id, "lost_reason": "Ei budjettia"}),
+        headers=_auth_headers(full_key),
+    )
+    assert ok.status_code == 200
+    assert ok.get_json()["data"]["lead"]["lost_reason"] == "Ei budjettia"
+
+    no_reason_needed = client.patch(
+        f"/api/v1/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": contacted_stage_id}),
+        headers=_auth_headers(full_key),
+    )
+    assert no_reason_needed.status_code == 200
+
+
 # --- Rate limit ---
 
 

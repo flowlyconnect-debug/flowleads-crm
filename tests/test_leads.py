@@ -1,10 +1,12 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.extensions import db
 from app.leads.models import Activity, Lead, PipelineStage
 from app.leads.services import LeadService, LeadServiceError, get_default_stage, seed_default_pipeline_stages
+from app.tasks.models import Task
 from app.users.models import AuditLog
 from app.users.services import create_organization, create_user
 
@@ -333,6 +335,137 @@ def test_stage_move_json_endpoint(app, client):
     payload = json.loads(response.data)
     assert payload["success"] is True
     assert payload["data"]["stage_id"] == contacted_id
+
+
+def test_pipeline_card_data(app):
+    ctx = _setup_org_with_users(app, "pipe-card")
+    with app.app_context():
+        lead_id = _create_lead(
+            app,
+            ctx["org_id"],
+            ctx["stage_id"],
+            email="card@a.com",
+            company="CardCo",
+            score=82,
+        )
+        other_lead_id = _create_lead(
+            app,
+            ctx["other_org_id"],
+            ctx["other_stage_id"],
+            email="other-card@b.com",
+            company="OtherCardCo",
+            score=50,
+        )
+        lead = db.session.get(Lead, lead_id)
+        two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        five_days_ago = datetime.now(timezone.utc) - timedelta(days=5)
+        db.session.add(
+            Activity(
+                lead_id=lead.id,
+                user_id=ctx["admin_id"],
+                organization_id=ctx["org_id"],
+                type="note",
+                content="Follow-up note",
+                created_at=two_days_ago,
+            )
+        )
+        db.session.add(
+            Activity(
+                lead_id=lead.id,
+                user_id=ctx["admin_id"],
+                organization_id=ctx["org_id"],
+                type="stage_changed",
+                metadata_json={"new_stage_id": lead.stage_id},
+                created_at=five_days_ago,
+            )
+        )
+        db.session.add(
+            Task(
+                organization_id=ctx["org_id"],
+                lead_id=lead.id,
+                assigned_to=ctx["admin_id"],
+                title="Soita asiakkaalle",
+                status="pending",
+                type="call",
+                priority="normal",
+                due_date=datetime.now(timezone.utc) + timedelta(days=1),
+            )
+        )
+        db.session.add(
+            Task(
+                organization_id=ctx["other_org_id"],
+                lead_id=other_lead_id,
+                assigned_to=ctx["other_user_id"],
+                title="Other task",
+                status="pending",
+                type="call",
+                priority="normal",
+                due_date=datetime.now(timezone.utc) + timedelta(days=1),
+            )
+        )
+        db.session.commit()
+
+        data = LeadService.get_pipeline_data(ctx["org_id"], {})
+        stage_items = data["leads_by_stage"].get(ctx["stage_id"], [])
+        mine = next(item for item in stage_items if item["lead"].id == lead_id)
+        assert mine["last_activity_days"] == 0
+        assert mine["stage_days"] == 5
+        assert mine["next_task"] is not None
+        assert mine["next_task"].lead_id == lead_id
+        all_emails = {
+            entry["lead"].email
+            for entries in data["leads_by_stage"].values()
+            for entry in entries
+        }
+        assert "other-card@b.com" not in all_emails
+
+
+def test_lost_reason_required(app, client):
+    ctx = _setup_org_with_users(app, "lost-required")
+    with app.app_context():
+        lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"], email="lost@a.com")
+        lost_stage = PipelineStage.query.filter_by(
+            organization_id=ctx["org_id"], name="Lost"
+        ).first()
+        lost_stage_id = lost_stage.id
+        contacted = PipelineStage.query.filter_by(
+            organization_id=ctx["org_id"], name="Contacted"
+        ).first()
+        contacted_id = contacted.id
+    _login(client, ctx["admin_email"])
+
+    missing_reason = client.post(
+        f"/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": lost_stage_id}),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert missing_reason.status_code == 400
+
+    ok = client.post(
+        f"/leads/{lead_id}/stage",
+        data=json.dumps(
+            {
+                "stage_id": lost_stage_id,
+                "lost_reason": "Ei vastannut",
+                "lost_reason_note": "",
+            }
+        ),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert ok.status_code == 200
+    with app.app_context():
+        lead = db.session.get(Lead, lead_id)
+        assert lead.lost_reason == "Ei vastannut"
+
+    back_to_contacted = client.post(
+        f"/leads/{lead_id}/stage",
+        data=json.dumps({"stage_id": contacted_id}),
+        content_type="application/json",
+        headers={"Accept": "application/json"},
+    )
+    assert back_to_contacted.status_code == 200
 
 
 def test_seed_default_stages_idempotent(app):

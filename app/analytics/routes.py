@@ -584,6 +584,7 @@ def reports():
     start_dt, end_dt, range_error = resolve_report_dates(range_key, start=start_param, end=end_param)
 
     report_data = None
+    lost_reason_counts = []
     if organization_id is not None and not range_error:
         loaders = {
             "pipeline": AnalyticsService.get_pipeline_report,
@@ -592,6 +593,7 @@ def reports():
             "ai": AnalyticsService.get_ai_report,
         }
         report_data = loaders[report_type](organization_id, start_dt, end_dt)
+        lost_reason_counts = AnalyticsService.get_lost_reason_counts(organization_id)
 
     return render_template(
         "analytics/reports.html",
@@ -603,6 +605,7 @@ def reports():
         end_date=end_param or end_dt.date().isoformat(),
         range_error=range_error,
         report_data=report_data,
+        lost_reason_counts=lost_reason_counts,
     )
 
 
