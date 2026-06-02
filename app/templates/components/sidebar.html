@@ -10,6 +10,8 @@
     {{- url_for(endpoint) -}}
   {%- endif -%}
 {%- endmacro %}
+{% set companies_enabled = has_endpoint('companies.list_companies') %}
+{% set contacts_enabled = has_endpoint('contacts.list_contacts') %}
 
 <aside class="sidebar" id="app-sidebar" aria-label="Päänavigaatio">
   <div class="sidebar-logo">
@@ -57,6 +59,7 @@
             <span class="sidebar-item__label">Liidit</span>
           </a>
         </li>
+        {% if companies_enabled %}
         <li>
           <a href="{{ nav_url('companies.list_companies') }}"
              class="sidebar-item{% if ep and (ep.startswith('companies.')) %} active{% endif %}"
@@ -67,6 +70,8 @@
             <span class="sidebar-item__label">Yritykset</span>
           </a>
         </li>
+        {% endif %}
+        {% if contacts_enabled %}
         <li>
           <a href="{{ nav_url('contacts.list_contacts') }}"
              class="sidebar-item{% if ep and (ep.startswith('contacts.')) %} active{% endif %}"
@@ -77,6 +82,7 @@
             <span class="sidebar-item__label">Kontaktit</span>
           </a>
         </li>
+        {% endif %}
         <li>
           <a href="{{ nav_url('tasks.list_tasks') }}"
              class="sidebar-item{% if ep and ep.startswith('tasks.') %} active{% endif %}"

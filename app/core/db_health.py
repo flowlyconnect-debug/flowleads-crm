@@ -52,8 +52,16 @@ def get_schema_probe() -> dict:
             }
         lead_columns = {column["name"] for column in inspector.get_columns("leads")}
         tables = set(inspector.get_table_names())
-        missing_lead_columns = [name for name in ("industry", "region") if name not in lead_columns]
-        missing_tables = [name for name in ("org_lead_settings",) if name not in tables]
+        missing_lead_columns = [
+            name
+            for name in ("industry", "region", "company_id")
+            if name not in lead_columns
+        ]
+        missing_tables = [
+            name
+            for name in ("org_lead_settings", "companies", "contacts", "lead_contacts")
+            if name not in tables
+        ]
         ok = not missing_lead_columns and not missing_tables
         return {
             "ok": ok,

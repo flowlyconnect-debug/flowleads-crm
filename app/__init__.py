@@ -172,6 +172,13 @@ def _register_blueprints(app):
 
 
 def _register_root_routes(app):
+    @app.context_processor
+    def inject_ui_helpers():
+        def has_endpoint(endpoint_name: str) -> bool:
+            return endpoint_name in app.view_functions
+
+        return {"has_endpoint": has_endpoint}
+
     @app.route("/")
     def index():
         if current_user.is_authenticated:
