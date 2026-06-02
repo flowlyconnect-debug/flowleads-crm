@@ -322,12 +322,15 @@
         if (!result.ok || !result.data.success) return;
 
         btn.classList.add('done');
-        var item = btn.closest('.priority-action-item');
+        var item =
+          btn.closest('.priority-action-item') || btn.closest('.today-item');
         if (!item) return;
 
         item.classList.add('completing');
         setTimeout(function () {
           item.remove();
+          refreshTodaySection();
+          refreshAiWorklist();
         }, 400);
 
         var badge = document.getElementById('todayTaskCount');
@@ -337,6 +340,234 @@
       })
       .catch(function () {});
   };
+
+  function getOrgQueryParams() {
+    var root = document.getElementById('dashboard-command-center');
+    if (!root) return '';
+    var orgQuery = {};
+    try {
+      orgQuery = JSON.parse(root.getAttribute('data-org-query') || '{}');
+    } catch (e) {
+      orgQuery = {};
+    }
+    var params = new URLSearchParams(orgQuery);
+    return params.toString() ? '?' + params.toString() : '';
+  }
+
+  function fetchDashboardJson(path) {
+    return fetch(path + getOrgQueryParams(), { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('request failed');
+      return r.json();
+    });
+  }
+
+  function renderHotLeads(leads) {
+    var body = document.querySelector('#todayHotLeads .today-card-body');
+    if (!body) return;
+    if (!leads || !leads.length) {
+      body.innerHTML = '<div class="today-empty">Ei kuumia liidejä juuri nyt.</div>';
+      return;
+    }
+    body.innerHTML = leads
+      .map(function (lead) {
+        var badgeClass = lead.score_tier === 'hot' ? 'score-badge-hot' : 'score-badge-warm';
+        var contactMeta =
+          lead.days_since_contact != null
+            ? 'Viimeisin kontakti ' + lead.days_since_contact + ' pv sitten'
+            : 'Ei kontaktia vielä';
+        return (
+          '<div class="today-item">' +
+          '<div class="today-item-head">' +
+          '<div><div class="today-item-name">' +
+          escapeHtml(lead.name) +
+          '</div>' +
+          (lead.company
+            ? '<div class="today-item-company">' + escapeHtml(lead.company) + '</div>'
+            : '') +
+          '</div>' +
+          '<span class="score-badge ' +
+          badgeClass +
+          '">' +
+          escapeHtml(lead.score_label || '') +
+          '</span></div>' +
+          '<div class="today-item-meta">' +
+          escapeHtml(contactMeta) +
+          '</div>' +
+          '<div class="today-item-actions">' +
+          '<a class="btn-today" href="' +
+          escapeHtml(lead.url) +
+          '">Avaa</a></div></div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderOverdueTasks(tasks) {
+    var body = document.querySelector('#todayOverdueTasks .today-card-body');
+    if (!body) return;
+    if (!tasks || !tasks.length) {
+      body.innerHTML = '<div class="today-empty">Ei myöhässä olevia tehtäviä.</div>';
+      return;
+    }
+    body.innerHTML = tasks
+      .map(function (task) {
+        var leadLink = task.lead_url
+          ? '<a class="btn-today" href="' +
+            escapeHtml(task.lead_url) +
+            '">Avaa liidi</a>'
+          : '';
+        return (
+          '<div class="today-item" data-task-id="' +
+          escapeHtml(task.id) +
+          '">' +
+          '<div class="today-item-name">' +
+          escapeHtml(task.lead_name) +
+          '</div>' +
+          '<div class="today-item-company">' +
+          escapeHtml(task.title) +
+          '</div>' +
+          '<div class="today-item-meta text-danger">' +
+          escapeHtml(task.days_overdue) +
+          ' pv myöhässä</div>' +
+          '<div class="today-item-actions">' +
+          '<button type="button" class="btn-today btn-today-complete" ' +
+          'data-complete-url="' +
+          escapeHtml(task.complete_url) +
+          '" onclick="completeTask(' +
+          task.id +
+          ', this)">Merkitse tehdyksi</button>' +
+          leadLink +
+          '</div></div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderUnprocessedLeads(leads) {
+    var body = document.querySelector('#todayUnprocessed .today-card-body');
+    if (!body) return;
+    if (!leads || !leads.length) {
+      body.innerHTML = '<div class="today-empty">Ei uusia käsittelemättömiä liidejä.</div>';
+      return;
+    }
+    body.innerHTML = leads
+      .map(function (lead) {
+        return (
+          '<div class="today-item">' +
+          '<div class="today-item-name">' +
+          escapeHtml(lead.name) +
+          '</div>' +
+          (lead.company
+            ? '<div class="today-item-company">' + escapeHtml(lead.company) + '</div>'
+            : '') +
+          '<div class="today-item-meta">' +
+          escapeHtml(lead.created_at_relative) +
+          (lead.source ? ' · ' + escapeHtml(lead.source) : '') +
+          '</div>' +
+          '<div class="today-item-actions">' +
+          '<a class="btn-today" href="' +
+          escapeHtml(lead.url) +
+          '">Aloita</a></div></div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderAiRecommendations(recs) {
+    var body = document.querySelector('#todayAiRecs .today-card-body');
+    if (!body) return;
+    if (!recs || !recs.length) {
+      body.innerHTML = '<div class="today-empty">Ei AI-suosituksia tällä hetkellä.</div>';
+      return;
+    }
+    body.innerHTML = recs
+      .map(function (rec) {
+        var badgeClass =
+          rec.type === 'risk' ? 'rec-badge-risk' : 'rec-badge-opportunity';
+        return (
+          '<div class="today-item">' +
+          '<div class="today-item-head">' +
+          '<div><div class="today-item-name">' +
+          escapeHtml(rec.name) +
+          '</div>' +
+          (rec.company
+            ? '<div class="today-item-company">' + escapeHtml(rec.company) + '</div>'
+            : '') +
+          '</div>' +
+          '<span class="rec-badge ' +
+          badgeClass +
+          '">' +
+          (rec.type === 'risk' ? 'Riski' : 'Mahdollisuus') +
+          '</span></div>' +
+          '<div class="today-item-rec">' +
+          escapeHtml(rec.recommendation) +
+          '</div>' +
+          '<div class="today-item-actions">' +
+          '<a class="btn-today" href="' +
+          escapeHtml(rec.url) +
+          '">Avaa</a></div></div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderAiWorklist(items) {
+    var body = document.getElementById('aiWorklistBody');
+    if (!body) return;
+    if (!items || !items.length) {
+      body.innerHTML =
+        '<div class="today-empty">Ei priorisoituja toimintoja — hyvä työ!</div>';
+      return;
+    }
+    body.innerHTML = items
+      .map(function (item, index) {
+        return (
+          '<div class="ai-worklist-item">' +
+          '<span class="ai-worklist-rank">' +
+          (index + 1) +
+          '</span>' +
+          '<span class="ai-worklist-text">' +
+          escapeHtml(item.suggestion) +
+          '</span>' +
+          '<a class="btn-today" href="' +
+          escapeHtml(item.url) +
+          '">Avaa</a></div>'
+        );
+      })
+      .join('');
+  }
+
+  function refreshTodaySection() {
+    fetchDashboardJson('/api/dashboard/today')
+      .then(function (data) {
+        if (!data.success || !data.data) return;
+        var payload = data.data;
+        renderHotLeads(payload.hot_leads);
+        renderOverdueTasks(payload.overdue_tasks);
+        renderUnprocessedLeads(payload.unprocessed_leads);
+        renderAiRecommendations(payload.ai_recommendations);
+      })
+      .catch(function () {
+        ['#todayHotLeads', '#todayOverdueTasks', '#todayUnprocessed', '#todayAiRecs'].forEach(
+          function (sel) {
+            var body = document.querySelector(sel + ' .today-card-body');
+            if (body) body.innerHTML = '<div class="today-empty">Lataus epäonnistui.</div>';
+          }
+        );
+      });
+  }
+
+  function refreshAiWorklist() {
+    fetchDashboardJson('/api/dashboard/ai-worklist')
+      .then(function (data) {
+        if (!data.success || !data.data) return;
+        renderAiWorklist(data.data.items);
+      })
+      .catch(function () {
+        var body = document.getElementById('aiWorklistBody');
+        if (body) body.innerHTML = '<div class="today-empty">Lataus epäonnistui.</div>';
+      });
+  }
 
   function initAlertStrip() {
     var strip = document.getElementById('alertStrip');
@@ -351,6 +582,8 @@
   function init() {
     setCurrentDate();
     initAlertStrip();
+    refreshTodaySection();
+    refreshAiWorklist();
     refreshActivityStream();
     setInterval(refreshActivityStream, 30000);
     refreshPipelineDonut();

@@ -95,6 +95,51 @@
     </div>
   </header>
 
+  <section class="today-section" aria-label="Tänään">
+    <h2 class="today-section-title">Tänään</h2>
+    <div class="today-grid" id="todayGrid">
+      <div class="today-card card" id="todayHotLeads">
+        <div class="today-card-header">
+          <span class="today-card-icon" aria-hidden="true">🔥</span>
+          <span class="card-title">Kuumat liidit</span>
+        </div>
+        <div class="today-card-body today-card-loading">Ladataan…</div>
+      </div>
+      <div class="today-card card" id="todayOverdueTasks">
+        <div class="today-card-header">
+          <span class="today-card-icon" aria-hidden="true">⏰</span>
+          <span class="card-title">Myöhässä olevat follow-upit</span>
+        </div>
+        <div class="today-card-body today-card-loading">Ladataan…</div>
+      </div>
+      <div class="today-card card" id="todayUnprocessed">
+        <div class="today-card-header">
+          <span class="today-card-icon" aria-hidden="true">✨</span>
+          <span class="card-title">Uudet käsittelemättömät liidit</span>
+        </div>
+        <p class="today-card-subtitle">Uusia liidejä — ei vielä käsitelty</p>
+        <div class="today-card-body today-card-loading">Ladataan…</div>
+      </div>
+      <div class="today-card card" id="todayAiRecs">
+        <div class="today-card-header">
+          <span class="today-card-icon" aria-hidden="true">🤖</span>
+          <span class="card-title">AI suosittelee toimintoa</span>
+        </div>
+        <div class="today-card-body today-card-loading">Ladataan…</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="card ai-worklist-card" id="aiWorklistCard">
+    <div class="card-header">
+      <div>
+        <span class="card-title">AI:n ehdottama järjestys tänään</span>
+        <p class="ai-worklist-subtitle">Aloita näistä — järjestetty tärkeyden mukaan</p>
+      </div>
+    </div>
+    <div class="ai-worklist-body today-card-loading" id="aiWorklistBody">Ladataan…</div>
+  </div>
+
   <section class="metrics-grid-row1" aria-label="Keskeiset mittarit">
     <div class="metric-card" style="--card-color: #1D6BF3;">
       <div class="metric-card-inner">

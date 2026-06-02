@@ -15,6 +15,7 @@ from sqlalchemy import func
 from app.admin.services import get_accessible_organizations
 from app.analytics.date_ranges import resolve_report_dates
 from app.analytics.exports import export_report_csv
+from app.analytics.dashboard_today import DashboardTodayService
 from app.analytics.services import AnalyticsService
 from app.core.errors import json_success
 from app.core.permissions import require_2fa, require_role
@@ -353,6 +354,33 @@ def ai_recommendations():
     context = (request.args.get("context") or "dashboard").strip().lower()
     recommendations = _ai_recommendations_for_context(organization_id, context)
     return json_success({"recommendations": recommendations})
+
+
+@analytics_bp.route("/api/dashboard/today", methods=["GET"])
+def dashboard_today():
+    """Today's priority cards — hot leads, overdue tasks, unprocessed, AI recommendations."""
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success(
+            {
+                "hot_leads": [],
+                "overdue_tasks": [],
+                "unprocessed_leads": [],
+                "ai_recommendations": [],
+            }
+        )
+    data = DashboardTodayService.get_today_data(organization_id)
+    return json_success(data)
+
+
+@analytics_bp.route("/api/dashboard/ai-worklist", methods=["GET"])
+def dashboard_ai_worklist():
+    """Rule-based ranked worklist for today."""
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success({"items": []})
+    items = DashboardTodayService.get_ai_worklist(organization_id)
+    return json_success({"items": items})
 
 
 @analytics_bp.route("/api/dashboard/pipeline-distribution", methods=["GET"])
