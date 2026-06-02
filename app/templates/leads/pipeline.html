@@ -280,56 +280,49 @@
       normalized === 'hävitty'
     );
   };
-  function askLostReason() {
-    return new Promise((resolve) => {
-      const modal = document.getElementById('lost-reason-modal');
-      const select = document.getElementById('lost-reason-select');
-      const note = document.getElementById('lost-reason-note');
-      const errorEl = document.getElementById('lost-reason-error');
-      const confirmBtn = document.getElementById('lost-confirm');
-      const cancelBtn = document.getElementById('lost-cancel');
-      if (!modal || !select || !note || !confirmBtn || !cancelBtn || !errorEl) {
-        resolve(null);
-        return;
-      }
-      modal.hidden = false;
+  let currentDragLeadId = null;
+  let lostStageId = null;
+  let originalColumn = null;
+  let draggedCard = null;
+  let originalIndex = null;
+
+  function showLostReasonModal() {
+    const modal = document.getElementById('lost-reason-modal');
+    const select = document.getElementById('lost-reason-select');
+    const note = document.getElementById('lost-reason-note');
+    const errorEl = document.getElementById('lost-reason-error');
+    if (!modal || !select || !note || !errorEl) return;
+    modal.hidden = false;
+    select.value = '';
+    select.style.borderColor = '';
+    note.style.display = 'none';
+    note.value = '';
+    errorEl.textContent = '';
+  }
+
+  function hideLostReasonModal() {
+    const modal = document.getElementById('lost-reason-modal');
+    const select = document.getElementById('lost-reason-select');
+    const note = document.getElementById('lost-reason-note');
+    const errorEl = document.getElementById('lost-reason-error');
+    if (modal) modal.hidden = true;
+    if (select) {
       select.value = '';
-      note.value = '';
+      select.style.borderColor = '';
+    }
+    if (note) {
       note.style.display = 'none';
-      errorEl.textContent = '';
+      note.value = '';
+    }
+    if (errorEl) errorEl.textContent = '';
+  }
 
-      const close = (result) => {
-        modal.hidden = true;
-        select.removeEventListener('change', onChange);
-        confirmBtn.removeEventListener('click', onConfirm);
-        cancelBtn.removeEventListener('click', onCancel);
-        resolve(result);
-      };
-
-      const onChange = () => {
-        const isOther = select.value === 'other';
-        note.style.display = isOther ? 'block' : 'none';
-        if (!isOther) note.value = '';
-      };
-      const onCancel = () => close(null);
-      const onConfirm = () => {
-        const reason = (select.value || '').trim();
-        const reasonNote = (note.value || '').trim();
-        if (!reason) {
-          errorEl.textContent = 'Valitse häviösyy ennen vahvistusta.';
-          return;
-        }
-        if (reason === 'other' && !reasonNote) {
-          errorEl.textContent = 'Kirjoita tarkennus kohdalle "Muu syy".';
-          return;
-        }
-        errorEl.textContent = '';
-        close({ lost_reason: reason, lost_reason_note: reasonNote || null });
-      };
-      select.addEventListener('change', onChange);
-      confirmBtn.addEventListener('click', onConfirm);
-      cancelBtn.addEventListener('click', onCancel);
-    });
+  function resetLostDragState() {
+    currentDragLeadId = null;
+    lostStageId = null;
+    originalColumn = null;
+    draggedCard = null;
+    originalIndex = null;
   }
 
   function toast(message, kind = 'info') {
@@ -463,6 +456,11 @@
 
           const prevList = evt.from;
           const prevIndex = evt.oldIndex;
+          currentDragLeadId = leadId;
+          lostStageId = Number.parseInt(stageId, 10);
+          originalColumn = prevList;
+          draggedCard = evt.item;
+          originalIndex = prevIndex;
 
           updateColumnStats(evt.from);
           updateColumnStats(evt.to);
@@ -472,13 +470,9 @@
           evt.item.setAttribute('aria-busy', 'true');
 
           try {
-            let lostPayload = {};
             if (isClosedLostStage(newStageName)) {
-              const result = await askLostReason();
-              if (!result) {
-                throw new Error('Siirto peruutettu');
-              }
-              lostPayload = result;
+              showLostReasonModal();
+              return;
             }
             const res = await fetch(stageUrl(leadId), {
               method: 'PATCH',
@@ -490,7 +484,6 @@
               },
               body: JSON.stringify({
                 stage_id: Number.parseInt(stageId, 10),
-                ...lostPayload,
               }),
             });
 
@@ -510,8 +503,11 @@
             }
             window.setTimeout(() => evt.item.classList.remove('is-error'), 1400);
           } finally {
-            evt.item.classList.remove('is-updating');
-            evt.item.removeAttribute('aria-busy');
+            if (!isClosedLostStage(newStageName)) {
+              evt.item.classList.remove('is-updating');
+              evt.item.removeAttribute('aria-busy');
+              resetLostDragState();
+            }
           }
         },
         onMove: (evt) => {
@@ -525,6 +521,86 @@
         },
       });
       list.__flSortable = inst;
+    });
+  }
+
+  function initLostReasonActions(root) {
+    const confirmBtn = document.getElementById('lost-confirm');
+    const cancelBtn = document.getElementById('lost-cancel');
+    const reasonSelect = document.getElementById('lost-reason-select');
+    const noteField = document.getElementById('lost-reason-note');
+    const errorEl = document.getElementById('lost-reason-error');
+    if (!confirmBtn || !cancelBtn || !reasonSelect || !noteField || !errorEl || confirmBtn.__flBound) return;
+    confirmBtn.__flBound = true;
+
+    confirmBtn.addEventListener('click', async function() {
+      const reason = reasonSelect.value;
+      if (!reason) {
+        reasonSelect.style.borderColor = '#EF4444';
+        errorEl.textContent = 'Valitse häviösyy ennen vahvistusta.';
+        return;
+      }
+      reasonSelect.style.borderColor = '';
+      errorEl.textContent = '';
+
+      const note = noteField.value || '';
+
+      try {
+        const response = await fetch(`/api/leads/${currentDragLeadId}/stage`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+            'Accept': 'application/json',
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            stage_id: lostStageId,
+            lost_reason: reason,
+            lost_reason_note: note,
+          }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          hideLostReasonModal();
+          if (draggedCard) {
+            draggedCard.classList.remove('is-updating');
+            draggedCard.removeAttribute('aria-busy');
+          }
+          resetLostDragState();
+          refreshAllStats(root);
+          toast('Liidi merkitty hävityksi');
+        } else {
+          const errMsg = data?.error?.message || 'Tuntematon virhe';
+          toast(`Virhe: ${errMsg}`, 'error');
+        }
+      } catch (e) {
+        toast('Verkkovirhe — yritä uudelleen', 'error');
+      }
+    });
+
+    cancelBtn.addEventListener('click', function() {
+      if (originalColumn && draggedCard) {
+        originalColumn.insertBefore(draggedCard, originalColumn.children[originalIndex] || null);
+        updateColumnStats(originalColumn);
+      }
+      if (draggedCard) {
+        const currentList = draggedCard.closest('.kanban-list');
+        updateColumnStats(currentList);
+        draggedCard.classList.remove('is-updating');
+        draggedCard.removeAttribute('aria-busy');
+      }
+      updatePageStats(root);
+      hideLostReasonModal();
+      resetLostDragState();
+    });
+
+    reasonSelect.addEventListener('change', function() {
+      const isOther = this.value === 'other';
+      noteField.style.display = isOther ? 'block' : 'none';
+      if (!isOther) noteField.value = '';
+      this.style.borderColor = '';
+      errorEl.textContent = '';
     });
   }
 
@@ -582,6 +658,7 @@
     if (!root) return;
     initFilters(root);
     initSearch(root);
+    initLostReasonActions(root);
     destroySortables(root);
     initSortable(root);
     refreshAllStats(root);
