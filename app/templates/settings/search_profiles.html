@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% from "_macros.html" import empty_state %}
+{% block title %}Hakuprofiilit{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('search_profiles') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Hakuprofiilit</h1>
+          <p class="settings-panel__subtitle">Määritä automaattiset Oikotie-haut — n8n ajaa profiilit ja lähettää liidit CRM:ään.</p>
+        </header>
+
+        <div class="search-profiles-layout">
+          <aside class="search-profiles-list" aria-label="Hakuprofiilit">
+            <div class="search-profiles-list__header">
+              <span class="text-sm font-medium">Profiilit</span>
+              <a href="{{ url_for('settings.search_profiles_list', id='new', **org_query) }}"
+                 class="btn btn-secondary btn-sm">+ Uusi</a>
+            </div>
+            {% if profiles %}
+            <ul class="search-profiles-list__items">
+              {% for profile in profiles %}
+              <li>
+                <a href="{{ url_for('settings.search_profiles_list', id=profile.id, **org_query) }}"
+                   class="search-profiles-list__item{% if selected_profile and selected_profile.id == profile.id %} is-active{% endif %}">
+                  <span class="search-profiles-list__name">{{ profile.name }}</span>
+                  {% if profile.is_active %}
+                  <span class="badge badge-active">Aktiivinen</span>
+                  {% else %}
+                  <span class="badge badge-inactive">Pois</span>
+                  {% endif %}
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted text-sm">Ei profiileja vielä.</p>
+            {% endif %}
+          </aside>
+
+          <div class="search-profiles-main">
+            {% set is_new = not selected_profile and request.args.get('id') == 'new' %}
+            {% if selected_profile or is_new %}
+            <form method="post"
+                  action="{% if selected_profile %}{{ url_for('settings.search_profiles_update', profile_id=selected_profile.id, **org_query) }}{% else %}{{ url_for('settings.search_profiles_create', **org_query) }}{% endif %}"
+                  class="form-group search-profiles-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% if selected_profile %}
+              <input type="hidden" name="profile_id" value="{{ selected_profile.id }}">
+              {% endif %}
+
+              <label class="form-label">Nimi
+                <input type="text" name="name" class="form-input" maxlength="100" required
+                       placeholder="esim. Lukkoremontti Uusimaa"
+                       value="{{ selected_profile.name if selected_profile else '' }}">
+              </label>
+
+              <label class="form-label">Remonttityyppi
+                <select name="remonttityyppi" class="form-select" required>
+                  <option value="">Valitse…</option>
+                  {% for option in remonttityypit %}
+                  <option value="{{ option }}"
+                    {% if selected_profile and selected_profile.remonttityyppi == option %}selected{% endif %}>{{ option }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+
+              <fieldset class="search-profiles-regions">
+                <legend class="form-label">Alueet</legend>
+                <p class="form-helper mb-2">Valitse maakunnat (vähintään yksi)</p>
+                <div class="search-profiles-regions__grid">
+                  {% set selected_regions = selected_profile.regions if selected_profile else [] %}
+                  {% for region in finnish_regions %}
+                  <label class="form-check">
+                    <input type="checkbox" name="regions" value="{{ region }}"
+                      {% if region in selected_regions %}checked{% endif %}>
+                    {{ region }}
+                  </label>
+                  {% endfor %}
+                </div>
+              </fieldset>
+
+              <label class="form-label">CRM API-avain
+                <input type="text" name="crm_api_key" class="form-input" maxlength="200" autocomplete="off"
+                       placeholder="fl_live_…"
+                       value="{{ selected_profile.crm_api_key if selected_profile and selected_profile.crm_api_key else '' }}">
+              </label>
+              <p class="form-helper">
+                Kopioi avain
+                <a href="{{ url_for('settings.lead_settings', **org_query) }}">Liidiasetukset-sivulta</a>
+                tai <a href="{{ url_for('settings.api_keys', **org_query) }}">API-avaimet</a>-sivulta.
+              </p>
+
+              <label class="form-label">Aikataulu
+                <select name="schedule_description" class="form-select" required>
+                  {% for value, label in schedule_labels.items() %}
+                  <option value="{{ value }}"
+                    {% if (selected_profile and selected_profile.schedule_description == value) or (is_new and value == 'daily') %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+
+              <label class="form-check search-profiles-active-toggle">
+                <input type="checkbox" name="is_active" value="y"
+                  {% if is_new or (selected_profile and selected_profile.is_active) %}checked{% endif %}>
+                Aktiivinen
+              </label>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                  {{ "Tallenna" if selected_profile else "Luo profiili" }}
+                </button>
+                {% if selected_profile %}
+                <a class="btn btn-secondary" href="{{ url_for('settings.search_profiles_list', **org_query) }}">Peruuta</a>
+                {% endif %}
+              </div>
+            </form>
+
+            {% if selected_profile %}
+            <form method="post"
+                  action="{{ url_for('settings.search_profiles_delete', profile_id=selected_profile.id, **org_query) }}"
+                  class="mt-3"
+                  onsubmit="return confirm('Poistetaanko hakuprofiili {{ selected_profile.name|e }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:#FECACA;">Poista profiili</button>
+            </form>
+            {% endif %}
+            {% else %}
+            {{ empty_state(
+              "Valitse tai luo profiili",
+              "Luo ensimmäinen hakuprofiili aloittaaksesi automaattisen liidien haun.",
+              icon="🔍"
+            ) }}
+            <div class="empty-state-actions mt-3">
+              <a href="{{ url_for('settings.search_profiles_list', id='new', **org_query) }}" class="btn btn-primary">+ Luo profiili</a>
+            </div>
+            {% endif %}
+          </div>
+
+          <aside class="search-profiles-sidepanel" aria-label="Ajotilanne">
+            <h2 class="form-section-title">Viimeisin ajo</h2>
+            {% if selected_profile %}
+            <dl class="search-profiles-stats">
+              <div>
+                <dt>Viimeisin ajo</dt>
+                <dd>{{ relative_last_run }}</dd>
+              </div>
+              <div>
+                <dt>Lähetetyt liidit</dt>
+                <dd>
+                  {% if latest_job and latest_job.status == 'completed' %}
+                  {{ latest_job.leads_sent }} (viimeisin ajo)
+                  {% else %}
+                  {{ selected_profile.total_leads_sent }} yhteensä
+                  {% endif %}
+                </dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>
+                  {% if not selected_profile.is_active %}
+                  <span class="badge badge-inactive">Profiili pois käytöstä</span>
+                  {% elif latest_job %}
+                  {% set status_label = job_status_labels.get(latest_job.status, latest_job.status) %}
+                  {% if latest_job.status == 'completed' %}
+                  <span class="badge badge-active">{{ status_label }}</span>
+                  {% elif latest_job.status == 'failed' %}
+                  <span class="badge" style="background:#FEE2E2;color:#991B1B;">{{ status_label }}</span>
+                  {% elif latest_job.status == 'running' %}
+                  <span class="badge" style="background:#DBEAFE;color:#1E40AF;">{{ status_label }}</span>
+                  {% else %}
+                  <span class="badge" style="background:#FEF3C7;color:#92400E;">{{ status_label }}</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="badge badge-inactive">Ei ajoja vielä</span>
+                  {% endif %}
+                </dd>
+              </div>
+              {% if latest_job and latest_job.leads_found %}
+              <div>
+                <dt>Löydetyt</dt>
+                <dd>{{ latest_job.leads_found }}</dd>
+              </div>
+              {% endif %}
+              {% if latest_job and latest_job.error_message %}
+              <div>
+                <dt>Virhe</dt>
+                <dd class="text-sm" style="color:#991B1B;">{{ latest_job.error_message }}</dd>
+              </div>
+              {% endif %}
+              <div>
+                <dt>Ajoja yhteensä</dt>
+                <dd>{{ selected_profile.total_runs }}</dd>
+              </div>
+            </dl>
+            {% else %}
+            <p class="text-muted text-sm">Valitse profiili nähdäksesi ajotilanteen.</p>
+            {% endif %}
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
