@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from app.extensions import db
 from app.leads.models import Lead
 from app.leads.services import LeadService, get_default_stage
+from app.tasks.models import Task
 from app.tasks.services import TaskService
 from app.users.services import create_organization, create_user
 
@@ -277,7 +278,7 @@ def test_ai_worklist_ranking_overdue_before_warm(client, app):
     payload = resp.get_json()["data"]["items"]
     assert payload
     assert payload[0]["kind"] == "overdue_task"
-    assert "Very late" in payload[0]["suggestion"]
+    assert "Follow-up" in payload[0]["reason"]
 
     kinds = [item["kind"] for item in payload]
     if "warm_lead" in kinds and "overdue_task" in kinds:
@@ -310,4 +311,182 @@ def test_ai_worklist_cross_tenant(client, app):
     resp = client.get("/api/dashboard/ai-worklist")
     payload = resp.get_json()["data"]["items"]
     for item in payload:
-        assert "Other org task" not in item["suggestion"]
+        assert "Other org task" not in item["action_text"]
+
+
+def test_dashboard_metrics(client, app):
+    ctx = _setup_org(app, "dash-metrics")
+    now = datetime.now(timezone.utc)
+    with app.app_context():
+        # This org: 3 leads in current 7d, 1 lead in previous 7d
+        current_a = _create_lead_without_activities(
+            app,
+            ctx,
+            "metric-a@test.com",
+            score=72,
+            created_at=now - timedelta(days=2),
+            company="Current A",
+        )
+        current_b = _create_lead_without_activities(
+            app,
+            ctx,
+            "metric-b@test.com",
+            score=40,
+            created_at=now - timedelta(days=3),
+            company="Current B",
+        )
+        current_c = _create_lead_without_activities(
+            app,
+            ctx,
+            "metric-c@test.com",
+            score=85,
+            created_at=now - timedelta(hours=5),
+            company="Current C",
+        )
+        _create_lead_without_activities(
+            app,
+            ctx,
+            "metric-prev@test.com",
+            score=75,
+            created_at=now - timedelta(days=10),
+            company="Previous",
+        )
+
+        # Other org should never affect counts
+        other_stage_id = ctx["other_stage_id"]
+        other_lead = Lead(
+            organization_id=ctx["other_org_id"],
+            stage_id=other_stage_id,
+            status="active",
+            source="manual",
+            email="other-metric@test.com",
+            first_name="Other",
+            last_name="Metric",
+            score=99,
+            created_at=now - timedelta(days=1),
+            deal_value=20000,
+        )
+        db.session.add(other_lead)
+
+        # Tasks: one due today + one overdue in this org
+        due_today = now.replace(hour=15, minute=0, second=0, microsecond=0)
+        TaskService.create(
+            {"title": "Today task", "due_date": due_today, "assigned_to": ctx["user_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+            lead_id=current_a,
+        )
+        TaskService.create(
+            {"title": "Overdue task", "due_date": now - timedelta(days=2), "assigned_to": ctx["user_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+            lead_id=current_b,
+        )
+        TaskService.create(
+            {"title": "Other org today", "due_date": due_today, "assigned_to": ctx["other_user_id"]},
+            ctx["other_org_id"],
+            ctx["other_user_id"],
+            lead_id=other_lead.id,
+        )
+
+        # Pipeline value should sum only open leads in current org
+        lead_a = Lead.query.get(current_a)
+        lead_b = Lead.query.get(current_b)
+        lead_c = Lead.query.get(current_c)
+        lead_a.deal_value = 1000
+        lead_b.deal_value = 3000
+        lead_c.deal_value = None
+        db.session.commit()
+
+    _login(client, ctx["user_email"])
+    resp = client.get("/api/dashboard/metrics")
+    assert resp.status_code == 200
+    payload = resp.get_json()["data"]
+
+    assert payload["new_leads_7d"] == 3
+    assert payload["hot_leads"] == 3
+    assert payload["tasks_today"] == 1
+    assert payload["pipeline_value"] == 4000.0
+
+
+def test_ai_worklist(client, app):
+    ctx = _setup_org(app, "dash-worklist")
+    now = datetime.now(timezone.utc)
+    with app.app_context():
+        hot = _create_lead_without_activities(
+            app,
+            ctx,
+            "hot-wl@test.com",
+            score=84,
+            created_at=now - timedelta(days=8),
+            last_contacted_at=now - timedelta(days=9),
+            company="Revealuxury",
+        )
+        warm = _create_lead_without_activities(
+            app,
+            ctx,
+            "warm-wl@test.com",
+            score=65,
+            created_at=now - timedelta(days=20),
+            last_contacted_at=now - timedelta(days=15),
+            company="Warm Oy",
+        )
+        new_lead = _create_lead_without_activities(
+            app,
+            ctx,
+            "new-wl@test.com",
+            score=71,
+            created_at=now - timedelta(hours=6),
+            company="New Oy",
+        )
+
+        TaskService.create(
+            {"title": "Follow-up A", "due_date": now - timedelta(days=5), "assigned_to": ctx["user_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+            lead_id=hot,
+        )
+        TaskService.create(
+            {"title": "Follow-up B", "due_date": now - timedelta(days=6), "assigned_to": ctx["user_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+            lead_id=warm,
+        )
+        TaskService.create(
+            {"title": "Follow-up C", "due_date": now - timedelta(days=7), "assigned_to": ctx["user_id"]},
+            ctx["org_id"],
+            ctx["admin_id"],
+            lead_id=new_lead,
+        )
+        # Other org item must not appear
+        other_lead = LeadService.create(
+            {"email": "other-worklist@test.com", "score": 90},
+            ctx["other_org_id"],
+            ctx["other_user_id"],
+        )
+        TaskService.create(
+            {"title": "Other org task", "due_date": now - timedelta(days=8), "assigned_to": ctx["other_user_id"]},
+            ctx["other_org_id"],
+            ctx["other_user_id"],
+            lead_id=other_lead.id,
+        )
+        db.session.commit()
+
+    _login(client, ctx["user_email"])
+    resp = client.get("/api/dashboard/ai-worklist")
+    assert resp.status_code == 200
+    payload = resp.get_json()["data"]["items"]
+
+    assert isinstance(payload, list)
+    assert len(payload) <= 5
+    for item in payload:
+        assert "Other org task" not in item["action_text"]
+
+    # Empty list should be [] not null
+    with app.app_context():
+        Task.query.filter(Task.organization_id == ctx["org_id"]).delete()
+        Lead.query.filter(Lead.organization_id == ctx["org_id"]).delete()
+        db.session.commit()
+    resp_empty = client.get("/api/dashboard/ai-worklist")
+    assert resp_empty.status_code == 200
+    assert resp_empty.get_json()["data"]["items"] == []

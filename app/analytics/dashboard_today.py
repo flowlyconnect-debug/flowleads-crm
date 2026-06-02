@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import exists, not_
+from sqlalchemy import exists, func, not_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -161,6 +161,93 @@ def _recommendation_type(text: str) -> str:
 
 class DashboardTodayService:
     @staticmethod
+    def get_dashboard_metrics(organization_id: int) -> dict:
+        now = _utc_now()
+        window_start = now - timedelta(days=7)
+        prev_window_start = window_start - timedelta(days=7)
+        today_date = now.date()
+
+        new_leads_7d = (
+            Lead.query.filter(
+                Lead.organization_id == organization_id,
+                Lead.created_at >= window_start,
+            )
+            .with_entities(db.func.count(Lead.id))
+            .scalar()
+            or 0
+        )
+        previous_new_leads_7d = (
+            Lead.query.filter(
+                Lead.organization_id == organization_id,
+                Lead.created_at >= prev_window_start,
+                Lead.created_at < window_start,
+            )
+            .with_entities(db.func.count(Lead.id))
+            .scalar()
+            or 0
+        )
+
+        hot_leads = (
+            Lead.query.filter(
+                *_active_lead_filter(organization_id),
+                Lead.score.isnot(None),
+                Lead.score >= 70,
+                _exclude_closed_stages(),
+            )
+            .with_entities(db.func.count(Lead.id))
+            .scalar()
+            or 0
+        )
+
+        tasks_today = (
+            Task.query.filter(
+                Task.organization_id == organization_id,
+                Task.status.in_(("pending", "in_progress")),
+                func.date(Task.due_date) == today_date.isoformat(),
+            )
+            .with_entities(db.func.count(Task.id))
+            .scalar()
+            or 0
+        )
+        overdue_tasks = (
+            Task.query.filter(
+                Task.organization_id == organization_id,
+                Task.status.in_(("pending", "in_progress")),
+                Task.due_date < now,
+            )
+            .with_entities(db.func.count(Task.id))
+            .scalar()
+            or 0
+        )
+
+        pipeline_value_raw = (
+            Lead.query.filter(
+                *_active_lead_filter(organization_id),
+                _exclude_closed_stages(),
+            )
+            .with_entities(db.func.sum(Lead.deal_value))
+            .scalar()
+        )
+        pipeline_value = float(pipeline_value_raw) if pipeline_value_raw is not None else None
+
+        delta_pct = 0
+        if previous_new_leads_7d > 0:
+            delta_pct = round(
+                ((new_leads_7d - previous_new_leads_7d) / previous_new_leads_7d) * 100
+            )
+        elif new_leads_7d > 0:
+            delta_pct = 100
+
+        return {
+            "new_leads_7d": int(new_leads_7d),
+            "new_leads_delta_pct": int(delta_pct),
+            "hot_leads": int(hot_leads),
+            "tasks_today": int(tasks_today),
+            "overdue_tasks": int(overdue_tasks),
+            "pipeline_value": pipeline_value,
+        }
+
+    @staticmethod
     def get_today_data(organization_id: int) -> dict:
         now = _utc_now()
         hot_leads = DashboardTodayService._get_hot_leads(organization_id, now)
@@ -305,109 +392,128 @@ class DashboardTodayService:
     @staticmethod
     def get_ai_worklist(organization_id: int) -> list[dict]:
         now = _utc_now()
-        today = DashboardTodayService.get_today_data(organization_id)
+        ranked: list[tuple[int, datetime, dict]] = []
+        seen_lead_ids: set[int] = set()
 
-        ranked: list[tuple[int, dict]] = []
-
-        for task in today["overdue_tasks"]:
-            if task["days_overdue"] > 2:
-                ranked.append(
-                    (
-                        1,
-                        {
-                            "suggestion": (
-                                f"Tee tehtävä: {task['title']} — "
-                                f"{task['days_overdue']} pv myöhässä. "
-                                f"Liidi: {task['lead_name']}"
-                            ),
-                            "url": task["lead_url"] or f"/tasks",
-                            "kind": "overdue_task",
-                        },
-                    )
-                )
-
-        for lead in today["hot_leads"]:
-            if lead["score"] is not None and lead["score"] >= 80:
-                contact_days = lead.get("days_since_contact")
-                if contact_days is not None and contact_days >= 7:
-                    ranked.append(
-                        (
-                            2,
-                            {
-                                "suggestion": (
-                                    f"Ota yhteyttä {lead['name']} ({lead['company']}) — "
-                                    f"kuuma liidi, ei kontaktia {contact_days} pv"
-                                ),
-                                "url": lead["url"],
-                                "kind": "hot_lead",
-                            },
-                        )
-                    )
-
-        for lead in today["unprocessed_leads"]:
-            created_at = (
-                Lead.query.filter_by(id=lead["id"], organization_id=organization_id)
-                .with_entities(Lead.created_at)
-                .scalar()
+        overdue_tasks = (
+            Task.query.options(joinedload(Task.lead))
+            .filter(
+                Task.organization_id == organization_id,
+                Task.status.in_(("pending", "in_progress")),
+                Task.due_date < now,
             )
-            if created_at:
-                created_at = _ensure_aware(created_at)
-                if (now - created_at).total_seconds() < 86400:
-                    ranked.append(
-                        (
-                            3,
-                            {
-                                "suggestion": (
-                                    f"Käy läpi uusi liidi: {lead['name']} ({lead['company']}) — "
-                                    f"saapui {lead['created_at_relative']}"
-                                ),
-                                "url": lead["url"],
-                                "kind": "unprocessed_lead",
-                            },
-                        )
-                    )
+            .order_by(Task.due_date.asc())
+            .all()
+        )
+        for task in overdue_tasks:
+            due = _ensure_aware(task.due_date)
+            days_overdue = days_since(due, now=now) or 0
+            if days_overdue <= 2:
+                continue
+            lead = task.lead
+            lead_name = lead.display_name if lead else "liidille"
+            company = f" ({lead.company})" if lead and lead.company else ""
+            ranked.append(
+                (
+                    1,
+                    due or now,
+                    {
+                        "kind": "overdue_task",
+                        "action_text": f"Lähetä follow-up {lead_name}{company}",
+                        "reason": f"Follow-up tehtävä myöhässä {days_overdue} pv",
+                        "url": f"/leads/{lead.id}" if lead else "/tasks",
+                    },
+                )
+            )
+            if lead:
+                seen_lead_ids.add(lead.id)
 
-        warm_leads = (
+        default_stage = get_default_stage(organization_id)
+        has_non_created_activity = (
+            db.session.query(Activity.lead_id.label("lead_id"))
+            .filter(
+                Activity.organization_id == organization_id,
+                Activity.type != "created",
+            )
+            .subquery()
+        )
+        new_cutoff = now - timedelta(hours=24)
+        new_unprocessed = (
             Lead.query.filter(
+                Lead.organization_id == organization_id,
+                Lead.status == "active",
+                Lead.stage_id == default_stage.id,
+                Lead.created_at >= new_cutoff,
+                ~Lead.id.in_(db.session.query(has_non_created_activity.c.lead_id)),
+            )
+            .order_by(Lead.created_at.desc())
+            .all()
+        )
+
+        active_leads = (
+            Lead.query.options(joinedload(Lead.stage))
+            .filter(
                 *_active_lead_filter(organization_id),
-                Lead.score.isnot(None),
-                Lead.score >= 60,
-                Lead.score <= 79,
                 _exclude_closed_stages(),
             )
             .all()
         )
-        for lead in warm_leads:
+        for lead in active_leads:
+            if lead.id in seen_lead_ids:
+                continue
             contact_days = _days_since_contact(lead, organization_id, now)
-            if contact_days is not None and contact_days >= 14:
+            if contact_days is None:
+                contact_days = max(0, (now - _ensure_aware(lead.created_at)).days)
+
+            if lead.score is not None and lead.score >= 70 and contact_days > 7:
+                company = f" ({lead.company})" if lead.company else ""
+                ranked.append(
+                    (
+                        2,
+                        _ensure_aware(lead.updated_at) or now,
+                        {
+                            "kind": "hot_lead_no_contact",
+                            "action_text": f"Soita {lead.display_name}{company}",
+                            "reason": f"Ei kontaktia {contact_days} pv, score {lead.score}",
+                            "url": f"/leads/{lead.id}",
+                        },
+                    )
+                )
+                seen_lead_ids.add(lead.id)
+                continue
+
+            if lead.score is not None and 60 <= lead.score < 70 and contact_days > 14:
+                company = f" ({lead.company})" if lead.company else ""
                 ranked.append(
                     (
                         4,
+                        _ensure_aware(lead.updated_at) or now,
                         {
-                            "suggestion": (
-                                f"Ota yhteyttä {lead.display_name} ({lead.company or ''}) — "
-                                f"lämmin liidi, ei kontaktia {contact_days} pv"
-                            ),
+                            "kind": "warm_lead_no_contact",
+                            "action_text": f"Käy läpi {lead.display_name}{company}",
+                            "reason": f"Ei kontaktia {contact_days} pv, score {lead.score}",
                             "url": f"/leads/{lead.id}",
-                            "kind": "warm_lead",
                         },
                     )
                 )
+                seen_lead_ids.add(lead.id)
 
-        for rec in today["ai_recommendations"]:
-            if rec["type"] == "risk":
-                ranked.append(
-                    (
-                        5,
-                        {
-                            "suggestion": (
-                                f"{rec['recommendation']} — {rec['name']} ({rec['company']})"
-                            ),
-                            "url": rec["url"],
-                            "kind": "ai_risk",
-                        },
-                    )
+        for lead in new_unprocessed:
+            if lead.id in seen_lead_ids:
+                continue
+            company = f" ({lead.company})" if lead.company else ""
+            ranked.append(
+                (
+                    3,
+                    _ensure_aware(lead.created_at) or now,
+                    {
+                        "kind": "new_unprocessed_lead",
+                        "action_text": f"Soita {lead.display_name}{company}",
+                        "reason": "Uusi liidi, ei kontaktia",
+                        "url": f"/leads/{lead.id}",
+                    },
                 )
+            )
 
-        ranked.sort(key=lambda item: item[0])
-        return [item[1] for item in ranked[:5]]
+        ranked.sort(key=lambda item: (item[0], item[1]))
+        return [item[2] for item in ranked[:5]]

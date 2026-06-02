@@ -24,27 +24,12 @@
   </div>
 </div>
 {% else %}
-{% set pipeline_ns = namespace(total=0) %}
-{% if sales_forecast and sales_forecast.by_stage %}
-  {% for stage_data in sales_forecast.by_stage.values() %}
-    {% set pipeline_ns.total = pipeline_ns.total + (stage_data.deal_value or 0) %}
-  {% endfor %}
-{% endif %}
-{% set ext = extended or {} %}
-{% set row1_pipeline = ext.pipeline_value if ext.pipeline_value is not none else pipeline_ns.total %}
-
 {% set alert_ns = namespace(count=0) %}
 {% if tasks_overdue_count > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 {% if open_proposals_count > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 {% if form_submissions_today > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 
-{% set action_tasks = recent_tasks|selectattr('status', 'in', ['pending', 'in_progress'])|list %}
 {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
-
-{% set wf_new_leads = stats.leads_this_month if stats and stats.leads_this_month is not none else 0 %}
-{% set wf_pending = (tasks_today_count or 0) + (tasks_overdue_count or 0) %}
-{% set wf_proposals = open_proposals_count or 0 %}
-{% set wf_won = stats.won_count if stats and stats.won_count is not none else 0 %}
 
 <div class="dashboard-page dashboard-command-center" id="dashboard-command-center"
      data-activity-feed='{{ activity_feed | tojson }}'
@@ -96,109 +81,55 @@
     </div>
   </header>
 
-  <section class="today-section" aria-label="Tänään">
-    <h2 class="today-section-title">Tänään</h2>
-    <div class="today-grid" id="todayGrid">
-      <div class="today-card card" id="todayHotLeads">
-        <div class="today-card-header">
-          <span class="today-card-icon" aria-hidden="true">🔥</span>
-          <span class="card-title">Kuumat liidit</span>
-        </div>
-        <div class="today-card-body today-card-loading">Ladataan…</div>
-      </div>
-      <div class="today-card card" id="todayOverdueTasks">
-        <div class="today-card-header">
-          <span class="today-card-icon" aria-hidden="true">⏰</span>
-          <span class="card-title">Myöhässä olevat follow-upit</span>
-        </div>
-        <div class="today-card-body today-card-loading">Ladataan…</div>
-      </div>
-      <div class="today-card card" id="todayUnprocessed">
-        <div class="today-card-header">
-          <span class="today-card-icon" aria-hidden="true">✨</span>
-          <span class="card-title">Uudet käsittelemättömät liidit</span>
-        </div>
-        <p class="today-card-subtitle">Uusia liidejä — ei vielä käsitelty</p>
-        <div class="today-card-body today-card-loading">Ladataan…</div>
-      </div>
-      <div class="today-card card" id="todayAiRecs">
-        <div class="today-card-header">
-          <span class="today-card-icon" aria-hidden="true">🤖</span>
-          <span class="card-title">AI suosittelee toimintoa</span>
-        </div>
-        <div class="today-card-body today-card-loading">Ladataan…</div>
-      </div>
-    </div>
-  </section>
-
-  <div class="card ai-worklist-card" id="aiWorklistCard">
-    <div class="card-header">
-      <div>
-        <span class="card-title">AI:n ehdottama järjestys tänään</span>
-        <p class="ai-worklist-subtitle">Aloita näistä — järjestetty tärkeyden mukaan</p>
-      </div>
-    </div>
-    <div class="ai-worklist-body today-card-loading" id="aiWorklistBody">Ladataan…</div>
-  </div>
-
-  <section class="metrics-grid-row1" aria-label="Keskeiset mittarit">
-    <div class="metric-card" style="--card-color: #1D2B4F;">
+  <section class="dashboard-row-1" aria-label="Keskeiset mittarit">
+    <div class="metric-card metric-card-dark">
       <div class="metric-card-inner">
-        <div class="metric-label">Uudet liidit</div>
-        <div class="metric-value">{{ stats.leads_this_month if stats and stats.leads_this_month is not none else 0 }}</div>
-        {% if stats and stats.leads_month_pct_change is not none %}
-        <div class="metric-delta {% if stats.leads_month_pct_change >= 0 %}up{% else %}down{% endif %}">
-          {% if stats.leads_month_pct_change >= 0 %}▲{% else %}▼{% endif %}
-          {{ stats.leads_month_pct_change | abs }}% vs. edellinen kk
-        </div>
-        {% else %}
-        <div class="metric-delta">Ei vertailudataa</div>
-        {% endif %}
+        <div class="metric-value" id="metricNewLeads">0</div>
+        <div class="metric-label">Uudet liidit (7 pv)</div>
+        <div class="metric-sub" id="metricNewLeadsTrend">0% vs edellinen vko</div>
       </div>
     </div>
-
-    <div class="metric-card" style="--card-color: #1A3A5C;">
+    <div class="metric-card metric-card-dark">
       <div class="metric-card-inner">
-        <div class="metric-label">Voitetut kaupat</div>
-        <div class="metric-value">{{ stats.won_count if stats and stats.won_count is not none else 0 }}</div>
-        {% if ext.won_month_pct_change is not none %}
-        <div class="metric-delta {% if ext.won_month_pct_change >= 0 %}up{% else %}down{% endif %}">
-          {% if ext.won_month_pct_change >= 0 %}▲{% else %}▼{% endif %}
-          {{ ext.won_month_pct_change | abs }}% vs. edellinen kk
-        </div>
-        {% elif stats and stats.conversion_rate is not none %}
-        <div class="metric-delta">{{ stats.conversion_rate }}% konversio</div>
-        {% else %}
-        <div class="metric-delta">Ei dataa</div>
-        {% endif %}
+        <div class="metric-value" id="metricHotLeads">0</div>
+        <div class="metric-label">Kuumat liidit</div>
+        <div class="metric-sub">Score ≥ 70</div>
       </div>
     </div>
-
-    <div class="metric-card" style="--card-color: #0F2744;">
+    <div class="metric-card metric-card-dark">
       <div class="metric-card-inner">
+        <div class="metric-value" id="metricTasksToday">0</div>
+        <div class="metric-label">Tehtävät tänään</div>
+        <div class="metric-sub" id="metricTasksOverdue"></div>
+      </div>
+    </div>
+    <div class="metric-card metric-card-dark">
+      <div class="metric-card-inner">
+        <div class="metric-value" id="metricPipelineValue">Ei dataa</div>
         <div class="metric-label">Pipeline-arvo</div>
-        {% if row1_pipeline > 0 %}
-        <div class="metric-value">{{ currency_symbol }}{{ '{:,.0f}'.format(row1_pipeline).replace(',', ' ') }}</div>
-        <div class="metric-delta">{{ ext.open_deals if ext.open_deals is not none else (sales_forecast.leads_count if sales_forecast else 0) }} aktiivista liidiä</div>
-        {% else %}
-        <div class="metric-value">—</div>
-        <div class="metric-delta">Ei dataa</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="metric-card" style="--card-color: #1A3A5C;">
-      <div class="metric-card-inner">
-        <div class="metric-label">Avg. päiviä sulkuun</div>
-        <div class="metric-value">{% if ext.avg_days_to_close is not none %}{{ ext.avg_days_to_close }}{% else %}—{% endif %}</div>
-        <div class="metric-delta">{% if ext.avg_days_to_close is not none %}päivää keskimäärin{% else %}Ei dataa{% endif %}</div>
+        <div class="metric-sub">&nbsp;</div>
       </div>
     </div>
   </section>
 
-  <div class="command-main-grid">
-    <div class="command-main-left">
-      <div class="card ai-pulse-card">
+  <section class="dashboard-row-2">
+    <div class="card ai-worklist-card" id="aiWorklistCard">
+      <div class="card-header">
+        <div>
+          <span class="card-title">AI:n ehdottama järjestys tänään</span>
+          <p class="ai-worklist-subtitle">Aloita näistä</p>
+        </div>
+      </div>
+      <div class="ai-worklist-body ai-worklist-loading" id="aiWorklistBody">
+        <div class="ai-worklist-skeleton-line"></div>
+        <div class="ai-worklist-skeleton-line"></div>
+        <div class="ai-worklist-skeleton-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dashboard-row-3">
+    <div class="card ai-pulse-card">
         <div class="card-header">
           <div class="ai-pulse-header-title">
             <div class="ai-pulse-indicator" aria-hidden="true"></div>
@@ -249,52 +180,7 @@
           {% endif %}
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Tehtäväsi tänään</span>
-          <span class="badge badge-accent" id="todayTaskCount">{{ tasks_today_count or 0 }}</span>
-        </div>
-        <div class="priority-actions-list">
-          {% for task in action_tasks[:5] %}
-          <div class="priority-action-item" data-task-id="{{ task.id }}">
-            <button type="button" class="priority-complete-btn"
-                    onclick="completeTask({{ task.id }}, this)"
-                    data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_q) }}"
-                    title="Merkitse valmiiksi">
-              <span class="check-circle" aria-hidden="true">○</span>
-            </button>
-            <div class="priority-action-content">
-              <div class="priority-action-title">{{ task.title }}</div>
-              <div class="priority-action-meta">
-                {% if task.lead %}
-                <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_q) }}" class="priority-lead-link">{{ task.lead.company or task.lead.display_name }}</a> ·
-                {% endif %}
-                <span class="{% if task.is_overdue %}text-danger{% else %}text-warning{% endif %}">
-                  {% if task.due_date %}{{ task.due_date.strftime('%H:%M') }}{% endif %}
-                </span>
-              </div>
-            </div>
-            <span class="priority-type-badge priority-{{ task.type }}">{{ task.type }}</span>
-          </div>
-          {% else %}
-          {{ empty_state(
-            "ti-circle-check",
-            "Ei tehtäviä tänään — olet ajan tasalla!",
-            "",
-            "Lisää tehtävä",
-            "/tasks/new"
-          ) }}
-          {% endfor %}
-          {% if (tasks_today_count or 0) > 5 %}
-          <a href="{{ url_for('tasks.list_tasks', tab='today', **org_q) }}" class="priority-show-more">+ {{ (tasks_today_count or 0) - 5 }} lisää tehtävää</a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <aside class="command-main-right">
-      <div class="card activity-stream-card">
+    <div class="card activity-stream-card">
         <div class="card-header">
           <span class="card-title">Live aktiviteetti</span>
           <span class="activity-live-dot" aria-hidden="true" title="Live"></span>
@@ -325,46 +211,7 @@
           {% endfor %}
         </div>
       </div>
-
-      <div class="card pipeline-donut-card">
-        <div class="card-header">
-          <span class="card-title">Myyntiputki</span>
-        </div>
-        <div class="pipeline-donut-body">
-          <div class="pipeline-donut-chart-wrapper">
-            <canvas id="pipelineDonutChart" width="220" height="220" aria-label="Myyntiputki" role="img"></canvas>
-            <div class="pipeline-donut-empty" id="pipelineDonutEmpty">Ei liidejä vielä</div>
-          </div>
-          <div class="pipeline-donut-legend" id="pipelineDonutLegend"></div>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <div class="workflow-context-bar workflow-context-bar--page">
-    <span class="wf-label">Workflow:</span>
-    <div class="wf-steps">
-      <a href="{{ url_for('leads.pipeline', **org_q) }}" class="wf-step {% if wf_new_leads > 0 %}has-data{% endif %}">
-        <span class="wf-step-count">{{ wf_new_leads }}</span>
-        <span class="wf-step-name">Uudet liidit</span>
-      </a>
-      <span class="wf-arrow" aria-hidden="true">→</span>
-      <a href="{{ url_for('tasks.list_tasks', tab='today', **org_q) }}" class="wf-step {% if wf_pending > 0 %}has-data{% endif %}">
-        <span class="wf-step-count">{{ wf_pending }}</span>
-        <span class="wf-step-name">Tehtävät</span>
-      </a>
-      <span class="wf-arrow" aria-hidden="true">→</span>
-      <a href="{{ url_for('proposals.list_proposals', **org_q) }}" class="wf-step {% if wf_proposals > 0 %}has-data{% endif %}">
-        <span class="wf-step-count">{{ wf_proposals }}</span>
-        <span class="wf-step-name">Tarjoukset</span>
-      </a>
-      <span class="wf-arrow" aria-hidden="true">→</span>
-      <a href="{{ url_for('leads.pipeline', **org_q) }}" class="wf-step success">
-        <span class="wf-step-count">{{ wf_won }}</span>
-        <span class="wf-step-name">Voitettu kk</span>
-      </a>
-    </div>
-  </div>
+  </section>
 </div>
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 {% endif %}

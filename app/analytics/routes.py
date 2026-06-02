@@ -611,6 +611,23 @@ def dashboard_ai_worklist():
     return json_success({"items": items})
 
 
+@analytics_bp.route("/api/dashboard/metrics", methods=["GET"])
+def dashboard_metrics():
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        return json_success(
+            {
+                "new_leads_7d": 0,
+                "new_leads_delta_pct": 0,
+                "hot_leads": 0,
+                "tasks_today": 0,
+                "overdue_tasks": 0,
+                "pipeline_value": None,
+            }
+        )
+    return json_success(DashboardTodayService.get_dashboard_metrics(organization_id))
+
+
 @analytics_bp.route("/api/dashboard/pipeline-distribution", methods=["GET"])
 def dashboard_pipeline_distribution():
     """Return pipeline distribution for the current organization as JSON."""

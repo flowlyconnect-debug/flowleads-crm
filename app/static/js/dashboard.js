@@ -329,7 +329,7 @@
         item.classList.add('completing');
         setTimeout(function () {
           item.remove();
-          refreshTodaySection();
+          refreshDashboardMetrics();
           refreshAiWorklist();
         }, 400);
 
@@ -516,44 +516,63 @@
     if (!body) return;
     if (!items || !items.length) {
       body.innerHTML =
-        '<div class="today-empty">Ei priorisoituja toimintoja — hyvä työ!</div>';
+        '<div class="ai-worklist-empty"><span class="ai-worklist-empty-icon">✓</span>Ei kiireellisiä toimia tänään — hyvää työtä!</div>';
       return;
     }
     body.innerHTML = items
       .map(function (item, index) {
         return (
           '<div class="ai-worklist-item">' +
-          '<span class="ai-worklist-rank">' +
-          (index + 1) +
-          '</span>' +
-          '<span class="ai-worklist-text">' +
-          escapeHtml(item.suggestion) +
-          '</span>' +
-          '<a class="btn-today" href="' +
-          escapeHtml(item.url) +
-          '">Avaa</a></div>'
+          '<span class="ai-worklist-rank">' + (index + 1) + '</span>' +
+          '<div class="ai-worklist-content">' +
+          '<div class="ai-worklist-text">' + escapeHtml(item.action_text || '') + '</div>' +
+          '<div class="ai-worklist-reason">' + escapeHtml(item.reason || '') + '</div>' +
+          '</div>' +
+          '<a class="btn-today" href="' + escapeHtml(item.url) + '">Avaa →</a></div>'
         );
       })
       .join('');
   }
 
-  function refreshTodaySection() {
-    fetchDashboardJson('/api/dashboard/today')
+  function renderDashboardMetrics(metrics) {
+    if (!metrics) return;
+    var newLeads = document.getElementById('metricNewLeads');
+    var trend = document.getElementById('metricNewLeadsTrend');
+    var hotLeads = document.getElementById('metricHotLeads');
+    var tasksToday = document.getElementById('metricTasksToday');
+    var overdue = document.getElementById('metricTasksOverdue');
+    var pipeline = document.getElementById('metricPipelineValue');
+
+    if (newLeads) newLeads.textContent = metrics.new_leads_7d || 0;
+    if (trend) {
+      var delta = Number(metrics.new_leads_delta_pct || 0);
+      var sign = delta >= 0 ? '+' : '-';
+      trend.textContent = sign + Math.abs(delta) + '% vs edellinen vko';
+    }
+    if (hotLeads) hotLeads.textContent = metrics.hot_leads || 0;
+    if (tasksToday) tasksToday.textContent = metrics.tasks_today || 0;
+    if (overdue) {
+      var overdueCount = metrics.overdue_tasks || 0;
+      overdue.textContent = overdueCount > 0 ? overdueCount + ' myöhässä' : '';
+    }
+    if (pipeline) {
+      if (metrics.pipeline_value == null || Number(metrics.pipeline_value) <= 0) {
+        pipeline.textContent = 'Ei dataa';
+      } else {
+        pipeline.textContent =
+          '€' + new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 0 }).format(metrics.pipeline_value);
+      }
+    }
+  }
+
+  function refreshDashboardMetrics() {
+    fetchDashboardJson('/api/dashboard/metrics')
       .then(function (data) {
         if (!data.success || !data.data) return;
-        var payload = data.data;
-        renderHotLeads(payload.hot_leads);
-        renderOverdueTasks(payload.overdue_tasks);
-        renderUnprocessedLeads(payload.unprocessed_leads);
-        renderAiRecommendations(payload.ai_recommendations);
+        renderDashboardMetrics(data.data);
       })
       .catch(function () {
-        ['#todayHotLeads', '#todayOverdueTasks', '#todayUnprocessed', '#todayAiRecs'].forEach(
-          function (sel) {
-            var body = document.querySelector(sel + ' .today-card-body');
-            if (body) body.innerHTML = '<div class="today-empty">Lataus epäonnistui.</div>';
-          }
-        );
+        /* metrics fallback keeps SSR defaults */
       });
   }
 
@@ -582,11 +601,10 @@
   function init() {
     setCurrentDate();
     initAlertStrip();
-    refreshTodaySection();
+    refreshDashboardMetrics();
     refreshAiWorklist();
     refreshActivityStream();
     setInterval(refreshActivityStream, 30000);
-    refreshPipelineDonut();
   }
 
   if (document.readyState === 'loading') {
