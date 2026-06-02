@@ -471,6 +471,38 @@ def test_admin_can_create_own_org_key(client, app):
         assert AuditLog.query.filter_by(action="api_key_created").count() >= 1
 
 
+def test_superadmin_can_create_key_for_selected_org(client, app):
+    ctx = _setup_org(app, "ui-sa")
+    with app.app_context():
+        sa = create_user("sa-settings-api@test.com", "securepassword1", role="superadmin")
+        sa.totp_enabled = True
+        db.session.commit()
+
+    client.post(
+        "/auth/login",
+        data={"email": "sa-settings-api@test.com", "password": "securepassword1"},
+    )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+
+    list_resp = client.get(f"/settings/api-keys?organization_id={ctx['org_id']}")
+    assert list_resp.status_code == 200
+    page = list_resp.get_data(as_text=True)
+    assert f'name="organization_id" value="{ctx["org_id"]}"' in page
+
+    create_resp = client.post(
+        "/settings/api-keys",
+        data={"name": "n8n sa", "organization_id": ctx["org_id"]},
+        follow_redirects=True,
+    )
+    assert create_resp.status_code == 200
+    assert "Organization is required" not in create_resp.get_data(as_text=True)
+    assert b"Kopioi avain nyt" in create_resp.data or b"Nayta ja kopioi API-avain" in create_resp.data
+    with app.app_context():
+        key = APIKey.query.filter_by(organization_id=ctx["org_id"], name="n8n sa").first()
+        assert key is not None
+
+
 def test_normal_user_cannot_create_key(client, app):
     ctx = _setup_org(app, "ui-user")
     client.post(

@@ -24,6 +24,9 @@
         <h2 class="form-section-title">Luo avain</h2>
         <form method="post" action="{{ url_for('settings.create_api_key_route') }}" class="form-group">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if current_user.is_superadmin() and organization_id %}
+          <input type="hidden" name="organization_id" value="{{ organization_id }}">
+          {% endif %}
           <label class="form-label" for="api-key-name">Nimi
             <input type="text" id="api-key-name" name="name" class="form-input" maxlength="100" required placeholder="n8n production">
           </label>
