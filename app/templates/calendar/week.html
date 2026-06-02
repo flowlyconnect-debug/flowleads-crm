@@ -53,13 +53,15 @@
         </table>
       </div>
       {% else %}
-      {% call empty_state(
-        "📅",
-        "Aikatauluta tapaaminen",
-        "Ei tapaamisia tänään. Kalenterisi on vapaa — hyvä hetki ottaa yhteyttä kuumaan liidiin.",
-        "/pipeline",
-        "Katso kuumat liidit"
-      ) %}{% endcall %}
+      {{ empty_state(
+        "ti-calendar-plus",
+        "Ei tapaamisia",
+        "Haluatko luoda tapaamisen kuumimmalle liidille?",
+        "Luo tapaaminen",
+        "/calendar/new",
+        "Yhdistä Google Kalenteri",
+        "/settings/calendar"
+      ) }}
       {% endif %}
     </div>
   </div>
@@ -99,13 +101,15 @@
         </table>
       </div>
       {% else %}
-      {% call empty_state(
-        "🗓️",
-        "Viikko on avoin uusille tapaamisille",
-        "Kalenterissa on tilaa rakentaa momentumia. Varaa seuraava keskustelu aktiiviselle liidille.",
-        "/pipeline",
-        "Avaa pipeline"
-      ) %}{% endcall %}
+      {{ empty_state(
+        "ti-calendar-plus",
+        "Ei tapaamisia",
+        "Haluatko luoda tapaamisen kuumimmalle liidille?",
+        "Luo tapaaminen",
+        "/calendar/new",
+        "Yhdistä Google Kalenteri",
+        "/settings/calendar"
+      ) }}
       {% endif %}
     </div>
   </div>

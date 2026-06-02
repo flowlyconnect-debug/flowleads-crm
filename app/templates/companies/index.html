@@ -16,12 +16,11 @@
 
   {% if companies|length == 0 %}
     {{ empty_state(
-      "🏢",
+      "ti-building",
       "Ei yrityksiä vielä",
-      "Luo ensimmäinen yritys tai liidit linkitetään automaattisesti kun niissä on yrityksen nimi.",
-      primary_action_url=url_for("leads.list_leads", organization_id=organization_id) if current_user.is_superadmin() else url_for("leads.list_leads"),
-      primary_action_label="Siirry liideihin",
-      secondary_actions=[]
+      "Yritykset luodaan automaattisesti liidien pohjalta tai voit lisätä ne käsin.",
+      "Lisää yritys",
+      "/companies/new"
     ) }}
   {% else %}
     <div class="card">

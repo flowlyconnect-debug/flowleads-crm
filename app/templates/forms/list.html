@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Lomakkeet — FlowLeads{% endblock %}
 {% block content %}
 <div class="list-page">
@@ -55,7 +55,13 @@
           </tr>
           {% else %}
           <tr><td colspan="5">
-            {% call empty_state('Ei lomakkeita', 'Luo ensimmäinen lomake yllä olevalla painikkeella.') %}{% endcall %}
+            {{ empty_state(
+              "ti-forms",
+              "Ei verkkolomakkeita vielä",
+              "Luo lomake, jonka voit upottaa verkkosivuillesi — liidit tulevat suoraan CRM:ään.",
+              "Luo lomake",
+              "/forms/new"
+            ) }}
           </td></tr>
           {% endfor %}
         </tbody>

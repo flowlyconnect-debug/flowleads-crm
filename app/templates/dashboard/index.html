@@ -1,3 +1,4 @@
+{% from "components/empty_state.html" import empty_state %}
 {% if org_picker %}
 <div class="dashboard-page dashboard-org-picker">
   <div class="page-header">
@@ -276,10 +277,13 @@
             <span class="priority-type-badge priority-{{ task.type }}">{{ task.type }}</span>
           </div>
           {% else %}
-          <div class="priority-empty">
-            <span class="priority-empty-icon" aria-hidden="true">🎉</span>
-            <p class="priority-empty-text">Ei tehtäviä tänään — olet ajan tasalla!</p>
-          </div>
+          {{ empty_state(
+            "ti-circle-check",
+            "Ei tehtäviä tänään — olet ajan tasalla!",
+            "",
+            "Lisää tehtävä",
+            "/tasks/new"
+          ) }}
           {% endfor %}
           {% if (tasks_today_count or 0) > 5 %}
           <a href="{{ url_for('tasks.list_tasks', tab='today', **org_q) }}" class="priority-show-more">+ {{ (tasks_today_count or 0) - 5 }} lisää tehtävää</a>

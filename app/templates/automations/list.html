@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
+{% from "components/empty_state.html" import empty_state %}
 {% block title %}Automaatiot — FlowLeads{% endblock %}
 {% block content %}
 <div class="list-page">
@@ -53,7 +53,13 @@
           </tr>
           {% else %}
           <tr><td colspan="7">
-            {% call empty_state('Ei automaatioita', 'Luo ensimmäinen automaatio tai odota oletusautomaatioiden luontia.') %}{% endcall %}
+            {{ empty_state(
+              "ti-bolt",
+              "Ei automaatioita vielä",
+              "Kun liidi saa korkean score-arvon → luo tehtävä myyjälle automaattisesti.",
+              "Luo automaatio",
+              "/automations/new"
+            ) }}
           </td></tr>
           {% endfor %}
         </tbody>

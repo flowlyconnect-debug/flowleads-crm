@@ -95,39 +95,23 @@
 
   {% if not stages %}
     <div class="card pipeline-empty">
-      {% call empty_state(
-        "🚀",
-        "Lisää ensimmäinen liidi",
-        "Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n ja seuraa etenemistä vaiheittain.",
-        "/leads/new",
-        "+ Lisää liidi",
-        [
-          {"url": "/leads/import", "label": "Importtaa CSV"},
-          {"url": "/settings/api-keys", "label": "Yhdistä n8n"}
-        ]
-      ) %}
-      <div class="empty-state-quick-tips">
-        <strong>Nopeat tavat aloittaa:</strong> lisää käsin, tuo CSV:stä tai kytke automaatiot n8n:stä.
-      </div>
-      {% endcall %}
+      {{ empty_state(
+        "ti-layout-kanban",
+        "Ei liidejä tässä vaiheessa",
+        "Vedä liidejä tähän vaiheeseen tai muuta pipeline-vaiheiden järjestystä.",
+        "Hallinnoi pipelinea",
+        "/settings/pipeline"
+      ) }}
     </div>
   {% elif ns.total_leads == 0 %}
     <div class="card pipeline-empty">
-      {% call empty_state(
-        "🚀",
-        "Lisää ensimmäinen liidi",
-        "Aloita myyntiputki nopeasti: lisää liidi, importtaa CSV tai yhdistä n8n ja seuraa etenemistä vaiheittain.",
-        "/leads/new",
-        "+ Lisää liidi",
-        [
-          {"url": "/leads/import", "label": "Importtaa CSV"},
-          {"url": "/settings/api-keys", "label": "Yhdistä n8n"}
-        ]
-      ) %}
-      <div class="empty-state-quick-tips">
-        <strong>Nopeat tavat aloittaa:</strong> lisää käsin, tuo CSV:stä tai kytke automaatiot n8n:stä.
-      </div>
-      {% endcall %}
+      {{ empty_state(
+        "ti-layout-kanban",
+        "Ei liidejä tässä vaiheessa",
+        "Vedä liidejä tähän vaiheeseen tai muuta pipeline-vaiheiden järjestystä.",
+        "Hallinnoi pipelinea",
+        "/settings/pipeline"
+      ) }}
     </div>
   {% endif %}
 
@@ -153,8 +137,8 @@
         <div class="pipeline-col__list kanban-list" data-stage-id="{{ stage.id }}" role="list">
           {% if stage_count == 0 %}
             <div class="pipeline-col__placeholder">
-              <div class="pipeline-col__placeholder-title">Ei vielä liidejä tässä vaiheessa</div>
-              <div class="pipeline-col__placeholder-text">Vedä liidi tänne</div>
+              <div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div>
+              <div class="pipeline-col__placeholder-text">Vedä liidejä tähän vaiheeseen.</div>
             </div>
           {% endif %}
 
@@ -351,7 +335,7 @@
     if (listEl.querySelector('.pipeline-col__placeholder')) return;
     const placeholder = document.createElement('div');
     placeholder.className = 'pipeline-col__placeholder';
-    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei vielä liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidi tänne</div>';
+    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidejä tähän vaiheeseen.</div>';
     listEl.prepend(placeholder);
   }
 

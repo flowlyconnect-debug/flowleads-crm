@@ -112,11 +112,13 @@
       {% endif %}
     </div>
     {% else %}
-    <div class="focus-card-empty">
-      <span class="focus-card-empty-icon" aria-hidden="true">🎉</span>
-      <div class="focus-card-title focus-card-title--empty">Kaikki tehtävät hoidettu!</div>
-      <div class="focus-card-meta">Loistavaa työtä. Tänään ei ole avoimia tehtäviä.</div>
-    </div>
+    {{ empty_state(
+      "ti-circle-check",
+      "Ei tehtäviä tänään — olet ajan tasalla!",
+      "",
+      "Lisää tehtävä",
+      "/tasks/new"
+    ) }}
     {% endif %}
   </section>
 
@@ -154,29 +156,29 @@
     <div class="report-card">
       <div class="report-card__body">
         {% if tab == 'today' %}
-        {% call empty_state(
-          "🎉",
+        {{ empty_state(
+          "ti-circle-check",
           "Ei tehtäviä tänään — olet ajan tasalla!",
-          "Olet suoriutunut kaikista tehtävistä. Haluatko katsoa liidit jotka tarvitsevat huomiota?",
-          "/leads?filter=no_contact_7d",
-          "Katso huomiota tarvitsevat liidit"
-        ) %}{% endcall %}
+          "",
+          "Lisää tehtävä",
+          "/tasks/new"
+        ) }}
         {% elif tab == 'overdue' %}
-        {% call empty_state(
-          "✅",
+        {{ empty_state(
+          "ti-circle-check",
           "Ei myöhässä olevia tehtäviä",
           "Kaikki eräpäivät ovat hallinnassa. Voit siirtyä uusiin aktiviteetteihin.",
-          "/leads",
-          "Avaa liidit"
-        ) %}{% endcall %}
+          "Avaa liidit",
+          "/leads"
+        ) }}
         {% else %}
-        {% call empty_state(
-          "📌",
+        {{ empty_state(
+          "ti-circle-check",
           "Luo seuraava tehtävä",
           "Rakenna päivän fokus nopeasti pikalisäyksellä ja pidä myynti liikkeessä.",
-          "/tasks",
-          "Lisää uusi tehtävä"
-        ) %}{% endcall %}
+          "Lisää uusi tehtävä",
+          "/tasks/new"
+        ) }}
         {% endif %}
       </div>
     </div>

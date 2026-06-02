@@ -87,13 +87,13 @@
     {% else %}
     <div class="report-card">
       <div class="report-card__body">
-        {% call empty_state(
-          "📄",
-          "Luo ensimmäinen tarjouksesi",
-          "Lähetä siistejä tarjouksia suoraan CRM:stä. Näet milloin asiakas avaa tarjouksen.",
-          "/leads",
-          "Valitse liidi ja luo tarjous"
-        ) %}{% endcall %}
+        {{ empty_state(
+          "ti-file-text",
+          "Ei tarjouksia vielä",
+          "Luo ensimmäinen tarjous liidille ja seuraa avauksia suoraan CRM:stä.",
+          "Valitse liidi ja luo tarjous",
+          "/leads"
+        ) }}
       </div>
     </div>
     {% endfor %}

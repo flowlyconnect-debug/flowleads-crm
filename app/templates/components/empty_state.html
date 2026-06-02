@@ -1,14 +1,13 @@
-{% macro empty_state(icon, title, description, primary_action_url, primary_action_label, secondary_actions=[]) %}
-<div class="empty-state-card">
-  <div class="empty-state-icon">{{ icon }}</div>
-  <div class="empty-state-title">{{ title }}</div>
-  <div class="empty-state-desc">{{ description }}</div>
-  <div class="empty-state-actions">
-    <a href="{{ primary_action_url }}" class="btn btn-primary">{{ primary_action_label }}</a>
-    {% for action in secondary_actions %}
-    <a href="{{ action.url }}" class="btn btn-secondary">{{ action.label }}</a>
-    {% endfor %}
-  </div>
-  {% if caller is defined %}{{ caller() }}{% endif %}
+{% macro empty_state(icon, title, body, cta_text, cta_url, secondary_text=None, secondary_url=None) %}
+<div class="empty-state">
+  <i class="ti {{ icon }}" style="font-size:48px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+  <h3>{{ title }}</h3>
+  {% if body %}
+  <p>{{ body }}</p>
+  {% endif %}
+  <a href="{{ cta_url }}" class="btn btn-primary">{{ cta_text }}</a>
+  {% if secondary_text %}
+  <a href="{{ secondary_url }}" class="empty-state-secondary">{{ secondary_text }}</a>
+  {% endif %}
 </div>
 {% endmacro %}

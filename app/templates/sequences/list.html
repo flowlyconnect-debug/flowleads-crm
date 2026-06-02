@@ -62,13 +62,15 @@
   {% else %}
   <div class="report-card">
     <div class="report-card__body">
-      {% call empty_state(
-        "⚡",
-        "Automatisoi liidien nurturointi",
-        "Luo sähköpostisekvenssi joka hoitaa follow-upit puolestasi — automaattisesti, oikeaan aikaan.",
+      {{ empty_state(
+        "ti-mail-forward",
+        "Ei sähköpostisekvenssejä vielä",
+        "Luo automaattinen 3 viestin sähköpostiketju uusille liideille.",
+        "Luo sekvenssi",
         "/sequences/new",
-        "Luo ensimmäinen sekvenssi"
-      ) %}{% endcall %}
+        "Katso esimerkki",
+        "#sequence-example-modal"
+      ) }}
     </div>
   </div>
   {% endfor %}

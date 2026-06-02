@@ -135,17 +135,15 @@
 
   {% if show_onboarding %}
   <div class="leads-onboarding" role="region" aria-label="Aloita liidien kanssa">
-    {% call empty_state(
-      "🎯",
-      "Myyntityölistasi odottaa",
-      "Tämä on myyntityötilasi. Lisää ensimmäinen kontakti tai tuo liidejä automaattisesti integraatioista.",
-      "/leads/new",
-      "Lisää ensimmäinen liidi",
-      [
-        {"url": "/settings/api-keys", "label": "Tuo n8n-workflowsta"},
-        {"url": "/forms/new", "label": "Luo verkkolomake"}
-      ]
-    ) %}{% endcall %}
+    {{ empty_state(
+      "ti-user-plus",
+      "Ei liidejä vielä",
+      "Liidit saapuvat automaattisesti kun hakuprofiilisi on valmis.",
+      "Avaa hakuprofiili",
+      "/settings/leads",
+      "Lisää liidi manuaalisesti",
+      "/leads/new"
+    ) }}
   </div>
 
   {% elif show_no_results %}
