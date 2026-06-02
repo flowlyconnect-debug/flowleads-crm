@@ -1,11 +1,13 @@
-{% macro empty_state(icon, title, body, cta_text, cta_url, secondary_text=None, secondary_url=None) %}
+{% macro empty_state(icon, title, body, cta_text=None, cta_url=None, secondary_text=None, secondary_url=None) %}
 <div class="empty-state">
   <i class="ti {{ icon }} empty-state-hero-icon" aria-hidden="true"></i>
   <h3>{{ title }}</h3>
   {% if body %}
   <p>{{ body }}</p>
   {% endif %}
+  {% if cta_text and cta_url %}
   <a href="{{ cta_url }}" class="btn btn-primary">{{ cta_text }}</a>
+  {% endif %}
   {% if secondary_text %}
   <a href="{{ secondary_url }}" class="empty-state-secondary">{{ secondary_text }}</a>
   {% endif %}

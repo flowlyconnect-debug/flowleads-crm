@@ -15,13 +15,21 @@
   </header>
 
   {% if total_count == 0 %}
+    {% if has_endpoint('companies.new_company') %}
     {{ empty_state(
       "ti-building",
       "Ei yrityksiä vielä",
       "Yritykset luodaan automaattisesti liidien pohjalta tai voit lisätä ne käsin.",
       "+ Lisää yritys",
-      "/companies/new"
+      url_for('companies.new_company', organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.new_company')
     ) }}
+    {% else %}
+    {{ empty_state(
+      "ti-building",
+      "Ei yrityksiä vielä",
+      "Yritykset luodaan automaattisesti liidien pohjalta."
+    ) }}
+    {% endif %}
   {% else %}
     <div class="companies-toolbar">
       <form method="get" class="companies-search" role="search" aria-label="Hae yrityksiä"

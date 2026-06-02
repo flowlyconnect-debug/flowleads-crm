@@ -16,13 +16,21 @@
   </header>
 
   {% if contacts|length == 0 %}
+    {% if has_endpoint('contacts.new_contact') %}
     {{ empty_state(
       "ti-users",
       "Ei kontakteja vielä",
       "Tallenna päättäjiä ja yhteyshenkilöitä ilman että heistä tehdään liidiä.",
       "Lisää kontakti",
-      "/contacts/new"
+      url_for('contacts.new_contact', organization_id=organization_id) if current_user.is_superadmin() else url_for('contacts.new_contact')
     ) }}
+    {% else %}
+    {{ empty_state(
+      "ti-users",
+      "Ei kontakteja vielä",
+      "Tallenna päättäjiä ja yhteyshenkilöitä ilman että heistä tehdään liidiä."
+    ) }}
+    {% endif %}
   {% else %}
     <div class="card">
       <div class="card-body">

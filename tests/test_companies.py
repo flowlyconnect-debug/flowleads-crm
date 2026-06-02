@@ -341,6 +341,62 @@ def test_company_lead_count(app, client):
     assert b"2" in response.data  # open = active + won (not lost/archived)
 
 
+def test_companies_and_contacts_new_routes(app, client):
+    ctx = _setup_org_with_users(app, "co-new")
+    _login(client, ctx["admin_email"])
+
+    company_get = client.get("/companies/new")
+    assert company_get.status_code == 200
+    assert b"Lis\xc3\xa4\xc3\xa4 yritys" in company_get.data or b"Lisaa yritys" in company_get.data
+
+    company_post = client.post(
+        "/companies/new",
+        data={"name": "Uusi Oy", "type": "prospect"},
+        follow_redirects=False,
+    )
+    assert company_post.status_code == 302
+
+    with app.app_context():
+        company = Company.query.filter_by(organization_id=ctx["org_id"], name="Uusi Oy").first()
+        assert company is not None
+
+    contact_get = client.get("/contacts/new")
+    assert contact_get.status_code == 200
+
+    contact_post = client.post(
+        "/contacts/new",
+        data={
+            "first_name": "Matti",
+            "last_name": "Meikalainen",
+            "email": "matti@uusi.fi",
+            "company_id": company.id,
+        },
+        follow_redirects=False,
+    )
+    assert contact_post.status_code == 302
+
+    with app.app_context():
+        contact = Contact.query.filter_by(organization_id=ctx["org_id"], email="matti@uusi.fi").first()
+        assert contact is not None
+        assert contact.company_id == company.id
+
+
+def test_companies_superadmin_without_org_redirects(app, client):
+    with app.app_context():
+        create_user(
+            "super-co@test.com",
+            "securepassword1",
+            role="superadmin",
+            organization_id=None,
+        )
+        db.session.commit()
+
+    _login(client, "super-co@test.com")
+    response = client.get("/companies", follow_redirects=False)
+    assert response.status_code == 302
+    assert "/dashboard" in response.headers["Location"]
+
+
 def test_companies_filter(app, client):
     ctx = _setup_org_with_users(app, "co-filter")
     _create_company(app, ctx["org_id"], name="Asiakas Oy", type_="customer")

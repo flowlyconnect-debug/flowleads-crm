@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Lisää kontakti — FlowLeads{% endblock %}
+{% block content %}
+<main class="narrow">
+<div class="card">
+  <h1>Lisää kontakti</h1>
+  <form method="post" action="{{ url_for('contacts.new_contact', organization_id=organization_id) if current_user.is_superadmin() else url_for('contacts.new_contact') }}">
+    {{ form.hidden_tag() }}
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>{{ form.first_name.label }}{{ form.first_name(class_='form-control') }}</label>
+    <label>{{ form.last_name.label }}{{ form.last_name(class_='form-control') }}</label>
+    <label>{{ form.email.label }}{{ form.email(class_='form-control') }}</label>
+    <label>{{ form.phone.label }}{{ form.phone(class_='form-control') }}</label>
+    <label>{{ form.title.label }}{{ form.title(class_='form-control') }}</label>
+    <label>{{ form.company_id.label }}{{ form.company_id(class_='form-control') }}</label>
+    {% for field, errors in form.errors.items() %}
+      {% for error in errors %}<p class="errors">{{ field }}: {{ error }}</p>{% endfor %}
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Tallenna</button>
+    <a class="btn btn-secondary" href="{{ url_for('contacts.list_contacts', organization_id=organization_id) if current_user.is_superadmin() else url_for('contacts.list_contacts') }}">Peruuta</a>
+  </form>
+</div>
+</main>
+{% endblock %}

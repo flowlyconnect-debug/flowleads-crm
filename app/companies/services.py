@@ -65,6 +65,43 @@ def relative_created_fi(created_at: datetime | None) -> str:
 
 class CompanyService:
     @staticmethod
+    def create_company(
+        organization_id: int,
+        name: str,
+        *,
+        type_: str = "prospect",
+        industry: str | None = None,
+        region: str | None = None,
+        created_by: int | None = None,
+    ) -> Company:
+        clean_name = (name or "").strip()
+        if not clean_name:
+            raise CompanyServiceError("Nimi on pakollinen.", "validation")
+
+        valid_types = {t for t, _ in COMPANY_TYPE_FILTERS if t}
+        company_type = type_ if type_ in valid_types else "prospect"
+
+        existing = (
+            Company.query.filter(
+                Company.organization_id == organization_id,
+                func.lower(Company.name) == func.lower(clean_name),
+            ).first()
+        )
+        if existing:
+            raise CompanyServiceError("Yritys tällä nimellä on jo olemassa.", "duplicate")
+
+        company = Company(
+            organization_id=organization_id,
+            name=clean_name,
+            type=company_type,
+            industry=(industry or "").strip() or None,
+            region=(region or "").strip() or None,
+            created_by=created_by,
+        )
+        db.session.add(company)
+        return company
+
+    @staticmethod
     def get_company_for_org(company_id: int, organization_id: int) -> Company:
         company = (
             Company.query.filter_by(id=company_id, organization_id=organization_id)
@@ -217,10 +254,16 @@ class ContactService:
         notes: str | None = None,
         tags: list | None = None,
     ) -> Contact:
+        clean_first = (first_name or "").strip()
+        if not clean_first:
+            raise CompanyServiceError("Etunimi on pakollinen.", "validation")
+        if company_id is not None:
+            CompanyService.get_company_for_org(company_id, organization_id)
+
         contact = Contact(
             organization_id=organization_id,
             company_id=company_id,
-            first_name=first_name,
+            first_name=clean_first,
             last_name=last_name,
             email=email,
             phone=phone,

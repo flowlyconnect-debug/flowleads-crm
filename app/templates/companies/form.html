@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Lisää yritys — FlowLeads{% endblock %}
+{% block content %}
+<main class="narrow">
+<div class="card">
+  <h1>Lisää yritys</h1>
+  <form method="post" action="{{ url_for('companies.new_company', organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.new_company') }}">
+    {{ form.hidden_tag() }}
+    {% if current_user.is_superadmin() %}
+    <input type="hidden" name="organization_id" value="{{ organization_id }}">
+    {% endif %}
+    <label>{{ form.name.label }}{{ form.name(class_='form-control') }}</label>
+    <label>{{ form.type.label }}{{ form.type(class_='form-control') }}</label>
+    <label>{{ form.industry.label }}{{ form.industry(class_='form-control') }}</label>
+    <label>{{ form.region.label }}{{ form.region(class_='form-control') }}</label>
+    {% for field, errors in form.errors.items() %}
+      {% for error in errors %}<p class="errors">{{ field }}: {{ error }}</p>{% endfor %}
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Tallenna</button>
+    <a class="btn btn-secondary" href="{{ url_for('companies.list_companies', organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.list_companies') }}">Peruuta</a>
+  </form>
+</div>
+</main>
+{% endblock %}
