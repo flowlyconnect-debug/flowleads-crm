@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import text
+
 from app.extensions import db
 from app.search.models import SearchJob, SearchProfile
 from app.users.services import create_organization, create_user
@@ -141,6 +143,64 @@ def test_search_profiles_tenant_isolation(app, client):
         follow_redirects=False,
     )
     assert response.status_code == 404
+
+
+def test_search_profiles_missing_tables_shows_message_not_500(app, client):
+    ctx = _setup_org(app, "missing-tables")
+    with app.app_context():
+        db.session.execute(text("DROP TABLE IF EXISTS search_jobs"))
+        db.session.execute(text("DROP TABLE IF EXISTS search_dedupe"))
+        db.session.execute(text("DROP TABLE IF EXISTS search_profiles"))
+        db.session.commit()
+
+    _login(client, ctx["admin_email"])
+    response = client.get("/settings/search-profiles")
+    text_body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Something went wrong" not in text_body
+    assert "flask db upgrade" in text_body
+
+
+def test_search_profiles_admin_ignores_invalid_org_query_param(app, client):
+    ctx = _setup_org(app, "org-query")
+    _login(client, ctx["admin_email"])
+    response = client.get("/settings/search-profiles?organization_id=99999")
+    assert response.status_code == 200
+    assert "Hakuprofiilit" in response.get_data(as_text=True)
+
+
+def test_search_profiles_superadmin_invalid_org_redirects(app, client):
+    with app.app_context():
+        create_user(
+            "super-invalid-org@test.com",
+            "securepassword1",
+            role="superadmin",
+        )
+        db.session.commit()
+
+    _login(client, "super-invalid-org@test.com")
+    response = client.get(
+        "/settings/search-profiles?organization_id=99999",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/dashboard" in response.headers["Location"]
+
+
+def test_search_profiles_superadmin_without_org_redirects(app, client):
+    with app.app_context():
+        create_user(
+            "super-no-org@test.com",
+            "securepassword1",
+            role="superadmin",
+            organization_id=None,
+        )
+        db.session.commit()
+
+    _login(client, "super-no-org@test.com")
+    response = client.get("/settings/search-profiles", follow_redirects=False)
+    assert response.status_code == 302
+    assert "/dashboard" in response.headers["Location"]
 
 
 def test_create_test_search_job_requires_admin(app, client):

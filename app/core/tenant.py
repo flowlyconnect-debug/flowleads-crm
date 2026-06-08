@@ -39,6 +39,23 @@ def resolve_organization_id() -> int:
     return current_user.organization_id
 
 
+def resolve_organization_id_with_fallback() -> int | None:
+    """Resolve organization_id; superadmin may fall back to their own org."""
+    if current_user.role == "superadmin":
+        org_id = parse_organization_id_param()
+        if org_id is not None and not organization_exists(org_id):
+            org_id = None
+        if org_id is None and current_user.organization_id:
+            org_id = current_user.organization_id
+        if org_id is None or not organization_exists(org_id):
+            return None
+        return org_id
+
+    if current_user.organization_id is None:
+        return None
+    return current_user.organization_id
+
+
 def optional_organization_id() -> int | None:
     """Superadmin may omit organization_id (org picker flows); others use their org."""
     if current_user.role == "superadmin":

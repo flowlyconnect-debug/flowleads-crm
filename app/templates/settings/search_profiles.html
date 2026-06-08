@@ -11,6 +11,9 @@
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Hakuprofiilit</h1>
           <p class="settings-panel__subtitle">Määritä automaattiset Oikotie-haut — n8n ajaa profiilit ja lähettää liidit CRM:ään.</p>
+          {% if page_error %}
+          <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
+          {% endif %}
         </header>
 
         <div class="search-profiles-layout">
@@ -72,7 +75,7 @@
                 <legend class="form-label">Alueet</legend>
                 <p class="form-helper mb-2">Valitse maakunnat (vähintään yksi)</p>
                 <div class="search-profiles-regions__grid">
-                  {% set selected_regions = selected_profile.regions if selected_profile else [] %}
+                  {% set selected_regions = (selected_profile.regions or []) if selected_profile else [] %}
                   {% for region in finnish_regions %}
                   <label class="form-check">
                     <input type="checkbox" name="regions" value="{{ region }}"

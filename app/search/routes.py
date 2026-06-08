@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+import logging
+import traceback
 from datetime import datetime, timezone
 
 from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app.core.audit import log_audit
+from app.core.diagnostics import capture_server_error
 from app.core.permissions import require_role
-from app.core.tenant import org_query_suffix, resolve_organization_id
+from app.core.tenant import (
+    org_query_suffix,
+    resolve_organization_id,
+    resolve_organization_id_with_fallback,
+)
 from app.extensions import db
 from app.search.constants import (
     FINNISH_REGIONS,
@@ -26,6 +34,65 @@ from app.search.profile_services import (
     list_profiles,
     update_profile,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _search_profiles_template_defaults(
+    *,
+    organization_id: int | None = None,
+    page_error: str | None = None,
+) -> dict:
+    now = datetime.now(timezone.utc)
+    org_query = org_query_suffix(organization_id) if organization_id else {}
+    return {
+        "profiles": [],
+        "selected_profile": None,
+        "latest_job": None,
+        "remonttityypit": REMONTTITYYPIT,
+        "finnish_regions": FINNISH_REGIONS,
+        "schedule_labels": SEARCH_SCHEDULE_LABELS,
+        "job_status_labels": SEARCH_JOB_STATUS_LABELS,
+        "org_query": org_query,
+        "now": now,
+        "relative_last_run": "Ei vielä",
+        "page_error": page_error,
+    }
+
+
+def _render_search_profiles(
+    organization_id: int,
+    *,
+    page_error: str | None = None,
+):
+    profiles = list_profiles(organization_id)
+    selected_id = _selected_profile_id(profiles)
+    selected_profile = None
+    latest_job = None
+    if selected_id is not None:
+        selected_profile = get_profile(organization_id, selected_id)
+        if selected_profile:
+            latest_job = get_latest_job(selected_profile.id)
+
+    now = datetime.now(timezone.utc)
+    org_query = org_query_suffix(organization_id)
+    return render_template(
+        "settings/search_profiles.html",
+        profiles=profiles,
+        selected_profile=selected_profile,
+        latest_job=latest_job,
+        remonttityypit=REMONTTITYYPIT,
+        finnish_regions=FINNISH_REGIONS,
+        schedule_labels=SEARCH_SCHEDULE_LABELS,
+        job_status_labels=SEARCH_JOB_STATUS_LABELS,
+        org_query=org_query,
+        now=now,
+        relative_last_run=_relative_time_fi(
+            selected_profile.last_run_at if selected_profile else None,
+            now,
+        ),
+        page_error=page_error,
+    )
 
 
 def _relative_time_fi(value: datetime | None, now: datetime) -> str:
@@ -77,34 +144,52 @@ def register_search_profile_settings_routes(settings_bp):
     @login_required
     @require_role("admin", "superadmin")
     def search_profiles_list():
-        organization_id = resolve_organization_id()
-        profiles = list_profiles(organization_id)
-        selected_id = _selected_profile_id(profiles)
-        selected_profile = None
-        latest_job = None
-        if selected_id is not None:
-            selected_profile = get_profile(organization_id, selected_id)
-            if selected_profile:
-                latest_job = get_latest_job(selected_profile.id)
+        organization_id = resolve_organization_id_with_fallback()
+        if organization_id is None:
+            flash(
+                "Organisaatiota ei löytynyt. Valitse kelvollinen organisaatio dashboardilta.",
+                "warning",
+            )
+            return redirect(url_for("analytics.dashboard"))
 
-        now = datetime.now(timezone.utc)
-        org_query = org_query_suffix(organization_id)
-        return render_template(
-            "settings/search_profiles.html",
-            profiles=profiles,
-            selected_profile=selected_profile,
-            latest_job=latest_job,
-            remonttityypit=REMONTTITYYPIT,
-            finnish_regions=FINNISH_REGIONS,
-            schedule_labels=SEARCH_SCHEDULE_LABELS,
-            job_status_labels=SEARCH_JOB_STATUS_LABELS,
-            org_query=org_query,
-            now=now,
-            relative_last_run=_relative_time_fi(
-                selected_profile.last_run_at if selected_profile else None,
-                now,
-            ),
-        )
+        try:
+            return _render_search_profiles(organization_id)
+        except (OperationalError, ProgrammingError) as exc:
+            db.session.rollback()
+            capture_server_error(
+                exc,
+                hint="search_profiles_list database schema — run `flask db upgrade`",
+            )
+            logger.error(
+                "search_profiles_list database error org_id=%s\n%s",
+                organization_id,
+                traceback.format_exc(),
+            )
+            return render_template(
+                "settings/search_profiles.html",
+                **_search_profiles_template_defaults(
+                    organization_id=organization_id,
+                    page_error=(
+                        "Hakuprofiilit-taulu puuttuu tai on vanhentunut. "
+                        "Aja tuotannossa: flask db upgrade"
+                    ),
+                ),
+            )
+        except Exception as exc:
+            db.session.rollback()
+            capture_server_error(exc, hint="search_profiles_list unexpected error")
+            logger.error(
+                "search_profiles_list failed org_id=%s\n%s",
+                organization_id,
+                traceback.format_exc(),
+            )
+            return render_template(
+                "settings/search_profiles.html",
+                **_search_profiles_template_defaults(
+                    organization_id=organization_id,
+                    page_error="Hakuprofiilisivun lataus epäonnistui. Yritä uudelleen hetken kuluttua.",
+                ),
+            )
 
     @settings_bp.route("/search-profiles", methods=["POST"])
     @login_required

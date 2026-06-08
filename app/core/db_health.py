@@ -59,7 +59,15 @@ def get_schema_probe() -> dict:
         ]
         missing_tables = [
             name
-            for name in ("org_lead_settings", "companies", "contacts", "lead_contacts")
+            for name in (
+                "org_lead_settings",
+                "companies",
+                "contacts",
+                "lead_contacts",
+                "search_profiles",
+                "search_jobs",
+                "search_dedupe",
+            )
             if name not in tables
         ]
         ok = not missing_lead_columns and not missing_tables
