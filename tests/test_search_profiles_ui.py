@@ -143,6 +143,113 @@ def test_search_profiles_tenant_isolation(app, client):
     assert response.status_code == 404
 
 
+def test_create_test_search_job_requires_admin(app, client):
+    ctx = _setup_org(app, "testjob-auth")
+    with app.app_context():
+        profile = SearchProfile(
+            organization_id=ctx["org_id"],
+            name="Active profile",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            is_active=True,
+        )
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
+
+    _login(client, ctx["user_email"])
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    assert response.status_code == 403
+
+
+def test_create_test_search_job_success(app, client):
+    ctx = _setup_org(app, "testjob-ok")
+    with app.app_context():
+        profile = SearchProfile(
+            organization_id=ctx["org_id"],
+            name="Active profile",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            is_active=True,
+        )
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
+
+    _login(client, ctx["admin_email"])
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data == {
+        "success": True,
+        "job_id": data["job_id"],
+        "profile_id": profile_id,
+        "status": "pending",
+    }
+
+    with app.app_context():
+        job = SearchJob.query.filter_by(search_profile_id=profile_id).one()
+        assert job.id == data["job_id"]
+        assert job.status == "pending"
+
+
+def test_create_test_search_job_rejects_duplicate(app, client):
+    ctx = _setup_org(app, "testjob-dup")
+    with app.app_context():
+        profile = SearchProfile(
+            organization_id=ctx["org_id"],
+            name="Active profile",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            is_active=True,
+        )
+        db.session.add(profile)
+        db.session.flush()
+        db.session.add(
+            SearchJob(
+                search_profile_id=profile.id,
+                organization_id=ctx["org_id"],
+                status="pending",
+                scheduled_at=datetime.now(timezone.utc),
+            )
+        )
+        db.session.commit()
+        profile_id = profile.id
+
+    _login(client, ctx["admin_email"])
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    assert response.status_code == 409
+    assert response.get_json()["success"] is False
+
+
+def test_create_test_search_job_visible_in_n8n_pending_list(app, client):
+    ctx = _setup_org(app, "testjob-n8n")
+    with app.app_context():
+        profile = SearchProfile(
+            organization_id=ctx["org_id"],
+            name="Active profile",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            is_active=True,
+            crm_api_key="fl_live_test",
+        )
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
+
+    _login(client, ctx["admin_email"])
+    create_resp = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    job_id = create_resp.get_json()["job_id"]
+
+    pending = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10",
+        headers={"X-N8N-Secret": "test-n8n-secret"},
+    )
+    assert pending.status_code == 200
+    jobs = pending.get_json()["jobs"]
+    assert any(job["job_id"] == job_id for job in jobs)
+
+
 def test_search_profiles_sidepanel_shows_latest_job(app, client):
     ctx = _setup_org(app, "job")
     with app.app_context():

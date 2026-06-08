@@ -199,10 +199,63 @@
             {% else %}
             <p class="text-muted text-sm">Valitse profiili nähdäksesi ajotilanteen.</p>
             {% endif %}
+
+            {% if selected_profile and selected_profile.is_active %}
+            <div class="mt-3">
+              <button type="button"
+                      id="create-test-job-btn"
+                      class="btn btn-secondary btn-sm"
+                      data-url="{{ url_for('settings.search_profiles_create_test_job', profile_id=selected_profile.id, **org_query) }}">
+                Luo testijobi
+              </button>
+              <p id="create-test-job-result" class="text-sm mt-2" style="display:none;" role="status"></p>
+            </div>
+            {% endif %}
           </aside>
         </div>
       </div>
     </div>
   </div>
 </div>
+{% if selected_profile and selected_profile.is_active %}
+<script>
+  (function () {
+    const btn = document.getElementById("create-test-job-btn");
+    const result = document.getElementById("create-test-job-result");
+    if (!btn || !result) return;
+
+    btn.addEventListener("click", async function () {
+      const form = new FormData();
+      form.append("csrf_token", "{{ csrf_token() }}");
+      btn.disabled = true;
+      result.style.display = "none";
+      result.className = "text-sm mt-2";
+
+      try {
+        const resp = await fetch(btn.dataset.url, {
+          method: "POST",
+          body: form,
+          credentials: "same-origin",
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          result.textContent = (data && data.error) || "Testijobin luonti epäonnistui.";
+          result.style.color = "#991B1B";
+          result.style.display = "block";
+          btn.disabled = false;
+          return;
+        }
+        result.textContent = "Testijobi luotu (ID: " + data.job_id + ", status: pending).";
+        result.style.color = "#166534";
+        result.style.display = "block";
+      } catch (err) {
+        result.textContent = "Testijobin luonti epäonnistui.";
+        result.style.color = "#991B1B";
+        result.style.display = "block";
+        btn.disabled = false;
+      }
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

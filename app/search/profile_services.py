@@ -125,3 +125,39 @@ def update_profile(
 
 def delete_profile(profile: SearchProfile) -> None:
     db.session.delete(profile)
+
+
+def has_active_job(profile_id: int) -> bool:
+    return (
+        SearchJob.query.filter(
+            SearchJob.search_profile_id == profile_id,
+            SearchJob.status.in_(["pending", "running"]),
+        ).first()
+        is not None
+    )
+
+
+def create_test_search_job(organization_id: int, profile_id: int) -> SearchJob:
+    profile = get_profile(organization_id, profile_id)
+    if not profile:
+        raise SearchProfileServiceError("Hakuprofiilia ei löytynyt.", "not_found")
+    if not profile.is_active:
+        raise SearchProfileServiceError(
+            "Vain aktiivinen hakuprofiili voi saada testijobin.",
+            "inactive_profile",
+        )
+    if has_active_job(profile.id):
+        raise SearchProfileServiceError(
+            "Profiililla on jo odottava tai käynnissä oleva haku.",
+            "job_exists",
+        )
+
+    now = datetime.now(timezone.utc)
+    job = SearchJob(
+        search_profile_id=profile.id,
+        organization_id=organization_id,
+        status="pending",
+        scheduled_at=now,
+    )
+    db.session.add(job)
+    return job

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.core.audit import log_audit
@@ -19,6 +19,7 @@ from app.search.models import SEARCH_SCHEDULES
 from app.search.profile_services import (
     SearchProfileServiceError,
     create_profile,
+    create_test_search_job,
     delete_profile,
     get_latest_job,
     get_profile,
@@ -169,6 +170,39 @@ def register_search_profile_settings_routes(settings_bp):
                 **org_query,
             )
         )
+
+    @settings_bp.route(
+        "/search-profiles/<int:profile_id>/create-test-job",
+        methods=["POST"],
+    )
+    @login_required
+    @require_role("admin", "superadmin")
+    def search_profiles_create_test_job(profile_id: int):
+        organization_id = resolve_organization_id()
+        try:
+            job = create_test_search_job(organization_id, profile_id)
+            db.session.flush()
+            log_audit(
+                "search_test_job_created",
+                user_id=current_user.id,
+                organization_id=organization_id,
+                target_type="search_job",
+                target_id=job.id,
+                metadata={"profile_id": profile_id},
+            )
+            db.session.commit()
+            return jsonify(
+                {
+                    "success": True,
+                    "job_id": job.id,
+                    "profile_id": profile_id,
+                    "status": "pending",
+                }
+            )
+        except SearchProfileServiceError as exc:
+            db.session.rollback()
+            status = 404 if exc.code == "not_found" else 409 if exc.code == "job_exists" else 400
+            return jsonify({"success": False, "error": exc.message, "code": exc.code}), status
 
     @settings_bp.route("/search-profiles/<int:profile_id>/delete", methods=["POST"])
     @login_required
