@@ -211,16 +211,10 @@ def two_fa_verify():
     form = TwoFAVerifyForm()
     if form.validate_on_submit():
         token = normalize_totp_code(form.token.data)
-        backup = (
-            form.backup_code.data.strip() if form.backup_code.data else None
-        )
-        if not token and not backup:
-            flash("Enter a verification code or backup code.", "danger")
-        elif verify_totp_login(current_user, token, backup):
+        if verify_totp_login(current_user, token):
             complete_2fa_session(current_user)
             flash("Verification successful.", "success")
             return redirect(url_for("analytics.dashboard"))
-        else:
-            flash("Invalid verification code.", "danger")
+        flash("Invalid verification code.", "danger")
 
     return render_template("auth/two_fa_verify.html", form=form)

@@ -6,7 +6,6 @@
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     <label>{{ form.token.label }}{{ form.token() }}</label>
-    <label>{{ form.backup_code.label }}{{ form.backup_code() }}</label>
     {{ form.submit(class="btn") }}
   </form>
 </div>

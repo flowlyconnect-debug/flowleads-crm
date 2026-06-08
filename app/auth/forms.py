@@ -37,6 +37,5 @@ class TwoFASetupForm(FlaskForm):
 
 
 class TwoFAVerifyForm(FlaskForm):
-    token = StringField("Authentication code", validators=[Optional(), Length(min=6, max=8)])
-    backup_code = StringField("Backup code", validators=[Optional(), Length(max=32)])
+    token = StringField("Authentication code", validators=[DataRequired(), Length(min=6, max=8)])
     submit = SubmitField("Verify")

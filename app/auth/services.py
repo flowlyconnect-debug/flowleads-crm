@@ -13,11 +13,7 @@ from app.auth.totp_utils import (
 )
 from app.core.audit import log_audit
 from app.core.permissions import clear_2fa_session, set_2fa_verified
-from app.core.security import (
-    generate_backup_code,
-    hash_backup_code,
-    verify_backup_code,
-)
+from app.core.security import generate_backup_code, hash_backup_code
 from app.extensions import db
 from app.users.models import User
 from app.users.services import UserServiceError, get_user_by_email, reset_login_attempts
@@ -77,27 +73,13 @@ def _regenerate_backup_codes(user: User) -> list[str]:
     return raw_codes
 
 
-def verify_totp_login(user: User, token: str | None, backup: str | None = None) -> bool:
-    if backup:
-        return _verify_backup_code(user, backup)
+def verify_totp_login(user: User, token: str | None) -> bool:
     secret = fresh_user_totp_secret(user)
     if not secret:
         return False
     return verify_totp_token(
         secret, token, context="login", user_id=user.id
     )
-
-
-def _verify_backup_code(user: User, code: str) -> bool:
-    code_hash = hash_backup_code(code)
-    record = BackupCode.query.filter_by(
-        user_id=user.id, code_hash=code_hash, used=False
-    ).first()
-    if not record:
-        return False
-    record.used = True
-    db.session.commit()
-    return True
 
 
 def complete_2fa_session(user: User) -> None:
