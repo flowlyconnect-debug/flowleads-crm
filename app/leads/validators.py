@@ -86,8 +86,24 @@ def validate_lead_status(status: str | None) -> bool:
     return status in LEAD_STATUSES
 
 
+def _split_display_name(name: str | None) -> tuple[str | None, str | None]:
+    text = (name or "").strip()
+    if not text:
+        return None, None
+    parts = text.split(None, 1)
+    first = parts[0]
+    last = parts[1].strip() if len(parts) > 1 else None
+    return first or None, last or None
+
+
 def normalize_lead_data(data: dict) -> dict:
     result = dict(data)
+    if result.get("name") and not result.get("first_name") and not result.get("last_name"):
+        first_name, last_name = _split_display_name(result.get("name"))
+        if first_name:
+            result["first_name"] = first_name
+        if last_name:
+            result["last_name"] = last_name
     if result.get("email"):
         result["email"] = normalize_email(result["email"])
     if result.get("source"):

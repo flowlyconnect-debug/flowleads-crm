@@ -1,10 +1,14 @@
+import logging
+
 from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import current_user
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 
 from app.core.diagnostics import capture_server_error
 from app.extensions import db
+
+logger = logging.getLogger(__name__)
 
 
 def wants_json_response() -> bool:
@@ -40,8 +44,31 @@ def json_success(data=None, status: int = 200):
     )
 
 
+def _database_error_details(error: BaseException) -> str | None:
+    """Extract driver/SQL details from SQLAlchemy database errors for logs."""
+    if not isinstance(error, DBAPIError):
+        return None
+    parts: list[str] = []
+    statement = getattr(error, "statement", None)
+    if statement:
+        parts.append(f"statement={statement!r}")
+    params = getattr(error, "params", None)
+    if params:
+        parts.append(f"params={params!r}")
+    orig = getattr(error, "orig", None)
+    if orig is not None:
+        parts.append(f"dbapi={type(orig).__name__}: {orig}")
+        pgcode = getattr(orig, "pgcode", None)
+        if pgcode:
+            parts.append(f"pgcode={pgcode}")
+    return " | ".join(parts) if parts else None
+
+
 def _log_server_error(error, *, hint: str | None = None, status_code: int = 500) -> None:
     capture_server_error(error, hint=hint, status_code=status_code)
+    db_details = _database_error_details(error)
+    if db_details:
+        logger.error("DATABASE_ERROR_DETAILS %s", db_details)
 
 
 def register_error_handlers(app):

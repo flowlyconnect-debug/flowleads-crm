@@ -302,6 +302,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         title=data.get("title"),
         website=data.get("website"),
         linkedin_url=data.get("linkedin_url"),
+        notes=data.get("notes"),
         stage_id=stage.id,
         status="active",
         source=source,

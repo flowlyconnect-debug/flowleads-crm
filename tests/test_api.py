@@ -163,6 +163,44 @@ def test_post_creates_lead(client, app):
         assert "API" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
 
 
+def test_post_creates_lead_with_n8n_minimal_payload(client, app):
+    ctx = _setup_org(app, "n8n-minimal")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    response = _post_lead(
+        client,
+        full_key,
+        {
+            "name": "Matti Meikäläinen",
+            "first_name": "Matti",
+            "last_name": "",
+            "email": "matti@example.com",
+            "company": "Acme Oy",
+            "phone": "+358401234567",
+            "source": "n8n",
+            "notes": "Inbound from n8n workflow",
+        },
+    )
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["success"] is True
+    assert data["data"]["action"] == "created"
+    assert data["data"]["lead"]["email"] == "matti@example.com"
+    assert data["data"]["lead"]["source"] == "n8n"
+
+    with app.app_context():
+        lead = Lead.query.filter_by(email="matti@example.com").one()
+        assert lead.organization_id == ctx["org_id"]
+        assert lead.first_name == "Matti"
+        assert lead.company == "Acme Oy"
+        assert lead.notes == "Inbound from n8n workflow"
+        assert AuditLog.query.filter_by(
+            organization_id=ctx["org_id"],
+            action="lead_routing_applied",
+            target_type="lead",
+            target_id=lead.id,
+        ).count() == 1
+
+
 # --- Upsert ---
 
 

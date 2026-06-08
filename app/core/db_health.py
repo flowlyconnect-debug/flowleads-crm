@@ -47,6 +47,7 @@ def get_schema_probe() -> dict:
             return {
                 "ok": False,
                 "missing_lead_columns": ["industry", "region"],
+                "missing_org_lead_settings_columns": [],
                 "missing_tables": ["org_lead_settings"],
                 "error": "leads table missing",
             }
@@ -57,6 +58,16 @@ def get_schema_probe() -> dict:
             for name in ("industry", "region", "company_id")
             if name not in lead_columns
         ]
+        missing_org_lead_settings_columns: list[str] = []
+        if "org_lead_settings" in tables:
+            org_settings_columns = {
+                column["name"] for column in inspector.get_columns("org_lead_settings")
+            }
+            missing_org_lead_settings_columns = [
+                name
+                for name in ("default_industry", "default_region")
+                if name not in org_settings_columns
+            ]
         missing_tables = [
             name
             for name in (
@@ -70,10 +81,15 @@ def get_schema_probe() -> dict:
             )
             if name not in tables
         ]
-        ok = not missing_lead_columns and not missing_tables
+        ok = (
+            not missing_lead_columns
+            and not missing_tables
+            and not missing_org_lead_settings_columns
+        )
         return {
             "ok": ok,
             "missing_lead_columns": missing_lead_columns,
+            "missing_org_lead_settings_columns": missing_org_lead_settings_columns,
             "missing_tables": missing_tables,
             "error": None,
         }
@@ -81,6 +97,7 @@ def get_schema_probe() -> dict:
         return {
             "ok": False,
             "missing_lead_columns": [],
+            "missing_org_lead_settings_columns": [],
             "missing_tables": [],
             "error": str(exc),
         }
@@ -92,10 +109,12 @@ def log_migration_status(app: Flask) -> None:
         schema = get_schema_probe()
         if migration["pending"] or not schema["ok"]:
             app.logger.error(
-                "Database schema out of date: current=%s head=%s missing_columns=%s missing_tables=%s — run `flask db upgrade`",
+                "Database schema out of date: current=%s head=%s missing_columns=%s "
+                "missing_org_lead_settings_columns=%s missing_tables=%s — run `flask db upgrade`",
                 migration.get("current"),
                 migration.get("head"),
                 schema.get("missing_lead_columns"),
+                schema.get("missing_org_lead_settings_columns"),
                 schema.get("missing_tables"),
             )
         else:
