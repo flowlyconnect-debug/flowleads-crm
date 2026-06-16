@@ -1187,3 +1187,535 @@ body:has(#dashboard-command-center) {
 }
 
 /* === MISSION CONTROL vaihe 3 loppuu === */
+
+/* ============================================================
+   MISSION CONTROL — vaihe 4: Command Center Identity
+   Uudet komponentit: telemetry rail, status rail, command queue,
+   telemetry panel, syslog. Ei uusia hex-värejä.
+   ============================================================ */
+
+/* ── System Telemetry Rail ── */
+.mc-telemetry-rail {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-sidebar);
+  border: 1px solid var(--color-border-dark);
+  border-radius: 4px;
+  padding: 6px 14px;
+  margin-bottom: var(--space-4);
+  font-size: 11px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mc-telemetry-rail::-webkit-scrollbar { display: none; }
+
+.mc-tr-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.mc-tr-brand-name {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--color-highlight);
+}
+.mc-tr-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-highlight);
+  flex-shrink: 0;
+  animation: pulse-ring 2.5s ease infinite;
+}
+.mc-tr-dot--warn {
+  background: var(--color-warning);
+  animation: none;
+}
+.mc-tr-pipe {
+  width: 1px;
+  height: 12px;
+  background: var(--color-border-dark);
+  margin: 0 14px;
+  flex-shrink: 0;
+}
+.mc-tr-seg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mc-tr-seg--alert {
+  gap: 8px;
+}
+.mc-tr-key {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--sidebar-text-muted);
+}
+.mc-tr-val--on {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-success);
+}
+.mc-tr-alert-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-warning);
+}
+.mc-tr-link {
+  font-size: 11px;
+  color: var(--sidebar-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255,255,255,0.2);
+  transition: color 150ms;
+}
+.mc-tr-link:hover { color: var(--color-text-inverse); }
+.mc-tr-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-left: 14px;
+}
+.mc-tr-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-inverse);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Status Rail — unified KPI instrument band ── */
+.mc-status-rail {
+  display: flex;
+  align-items: stretch;
+  background: var(--color-sidebar);
+  border: 1px solid var(--color-border-dark);
+  border-radius: 6px;
+  margin-bottom: var(--space-5);
+  overflow: hidden;
+}
+.mc-sr-metric {
+  flex: 1;
+  padding: 16px 20px 14px;
+  min-width: 0;
+  position: relative;
+  transition: background 180ms ease-out;
+}
+.mc-sr-metric::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-highlight);
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mc-sr-metric:hover::before { opacity: 1; }
+  .mc-sr-metric:hover { background: rgba(56,189,248,0.04); }
+}
+.mc-sr-sep {
+  width: 1px;
+  background: var(--color-border-dark);
+  flex-shrink: 0;
+}
+.mc-sr-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--sidebar-text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mc-sr-period {
+  font-weight: 400;
+  color: var(--sidebar-text-label);
+}
+.mc-sr-value {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--color-text-inverse);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.mc-sr-sub {
+  font-size: 11px;
+  color: var(--sidebar-text-muted);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+  min-height: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .mc-status-rail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .mc-sr-sep { display: none; }
+  .mc-sr-metric {
+    border-bottom: 1px solid var(--color-border-dark);
+  }
+  .mc-sr-metric:nth-child(3),
+  .mc-sr-metric:nth-child(4) {
+    border-bottom: none;
+  }
+  .mc-sr-metric:nth-child(odd) {
+    border-right: 1px solid var(--color-border-dark);
+  }
+}
+@media (max-width: 480px) {
+  .mc-status-rail { grid-template-columns: 1fr; }
+  .mc-sr-metric { border-right: none !important; }
+}
+
+/* ── AI Command Queue ── */
+.mc-command-queue {
+  background: var(--color-sidebar);
+  border: 1px solid var(--color-border-dark);
+  border-left: 3px solid var(--color-highlight);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 340px;
+}
+.mc-cq-header {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--color-border-dark);
+}
+.mc-cq-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.mc-cq-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--color-highlight);
+}
+.mc-cq-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-highlight);
+  flex-shrink: 0;
+  animation: pulse-ring 2.5s ease infinite;
+}
+.mc-cq-dot--sm {
+  width: 5px;
+  height: 5px;
+}
+.mc-cq-sub {
+  font-size: 12px;
+  color: var(--sidebar-text);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Command queue — JS-rendered worklist items */
+.mc-command-queue .ai-worklist-body {
+  flex: 1;
+  padding: 0;
+}
+.mc-command-queue .ai-worklist-loading {
+  padding: 12px 20px;
+}
+.mc-command-queue .ai-worklist-item {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 11px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  margin: 0;
+}
+.mc-command-queue .ai-worklist-item:last-child { border-bottom: none; }
+@media (hover: hover) and (pointer: fine) {
+  .mc-command-queue .ai-worklist-item:hover {
+    background: rgba(255,255,255,0.03);
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+.mc-command-queue .ai-worklist-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(56,189,248,0.1);
+  color: var(--color-highlight);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(56,189,248,0.18);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.mc-command-queue .ai-worklist-content {
+  min-width: 0;
+}
+.mc-command-queue .ai-worklist-text {
+  font-size: 13px;
+  color: rgba(255,255,255,0.88);
+  line-height: 1.35;
+  font-weight: 500;
+}
+.mc-command-queue .ai-worklist-reason {
+  font-size: 11px;
+  color: var(--sidebar-text);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.mc-command-queue .btn-today {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(56,189,248,0.25);
+  background: rgba(56,189,248,0.07);
+  color: var(--color-highlight);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+  margin-top: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mc-command-queue .btn-today:hover {
+    background: rgba(56,189,248,0.15);
+    border-color: rgba(56,189,248,0.5);
+  }
+}
+.mc-command-queue .ai-worklist-empty {
+  padding: 40px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-success);
+  font-size: 13px;
+}
+.mc-command-queue .ai-worklist-empty-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(16,185,129,0.15);
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.mc-command-queue .today-empty {
+  padding: 24px 20px;
+  color: var(--sidebar-text);
+  font-size: 13px;
+}
+.mc-command-queue .ai-worklist-skeleton-line {
+  height: 54px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, #1A2440 25%, #253055 50%, #1A2440 75%);
+  background-size: 200% 100%;
+  animation: ai-worklist-skeleton 1.4s ease-in-out infinite;
+}
+
+/* ── Telemetry Panels (right column) ── */
+.mc-telemetry-panel {
+  background: var(--color-sidebar-light);
+  border: 1px solid var(--color-border-dark);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mc-tp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px 8px;
+  border-bottom: 1px solid var(--color-border-dark);
+}
+.mc-tp-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--sidebar-text-muted);
+}
+.mc-tp-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mc-tp-link {
+  font-size: 12px;
+  color: var(--sidebar-text-muted);
+  text-decoration: none;
+  transition: color 150ms ease-out;
+  line-height: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mc-tp-link:hover { color: var(--color-highlight); }
+}
+.mc-tp-live {
+  font-size: 10px;
+  color: var(--sidebar-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.mc-tp-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: var(--sidebar-text-muted);
+}
+
+/* Pipeline stages inside telemetry panel */
+.mc-telemetry-panel .mc-pulse-stages {
+  padding: 10px 14px 12px;
+  gap: 9px;
+}
+.mc-telemetry-panel .mc-pulse-stage__name { color: var(--sidebar-text); font-size: 12px; }
+.mc-telemetry-panel .mc-pulse-stage__count { color: var(--color-text-inverse); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mc-telemetry-panel .mc-pulse-stage__bar { background: rgba(255,255,255,0.07); height: 4px; }
+
+/* AI pulse inside telemetry panel */
+.mc-telemetry-panel .ai-pulse-feed { padding: 0; }
+.mc-telemetry-panel .ai-pulse-item {
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  gap: 8px;
+}
+.mc-telemetry-panel .ai-pulse-item:last-child { border-bottom: none; }
+.mc-telemetry-panel .ai-pulse-item.hot,
+.mc-telemetry-panel .ai-pulse-item.risk { background: transparent; }
+.mc-telemetry-panel .ai-pulse-icon { font-size: 12px; }
+.mc-telemetry-panel .ai-pulse-text { font-size: 12px; color: rgba(255,255,255,0.80); }
+.mc-telemetry-panel .ai-pulse-action { font-size: 11px; color: var(--color-highlight); }
+.mc-telemetry-panel .ai-pulse-time { font-size: 10px; color: var(--sidebar-text-muted); font-variant-numeric: tabular-nums; }
+.mc-telemetry-panel .ai-pulse-empty { padding: 14px; font-size: 12px; color: var(--sidebar-text-muted); }
+.mc-telemetry-panel .ai-pulse-empty-sub { font-size: 11px; color: var(--sidebar-text-label); }
+
+/* ── System Log ── */
+.mc-syslog {
+  background: var(--color-sidebar-light);
+  border: 1px solid var(--color-border-dark);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mc-syslog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px 8px;
+  border-bottom: 1px solid var(--color-border-dark);
+}
+
+/* Activity stream inside syslog — log row layout */
+.mc-syslog .activity-stream {
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-dark) transparent;
+}
+.mc-syslog .activity-stream::-webkit-scrollbar { width: 3px; }
+.mc-syslog .activity-stream::-webkit-scrollbar-track { background: transparent; }
+.mc-syslog .activity-stream::-webkit-scrollbar-thumb { background: var(--color-border-dark); border-radius: 2px; }
+
+.mc-syslog .activity-stream-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.mc-syslog .activity-stream-item:last-child { border-bottom: none; }
+
+.mc-syslog .activity-stream-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+}
+.mc-syslog .activity-stream-icon.email_sent     { background: rgba(56,189,248,0.15); }
+.mc-syslog .activity-stream-icon.stage_changed  { background: rgba(16,185,129,0.18); }
+.mc-syslog .activity-stream-icon.created,
+.mc-syslog .activity-stream-icon.lead_created   { background: rgba(139,92,246,0.2); }
+.mc-syslog .activity-stream-icon.ai_enriched    { background: rgba(56,189,248,0.15); }
+.mc-syslog .activity-stream-icon.task_completed { background: rgba(16,185,129,0.15); }
+.mc-syslog .activity-stream-icon.call           { background: rgba(245,158,11,0.18); }
+.mc-syslog .activity-stream-icon.proposal_viewed,
+.mc-syslog .activity-stream-icon.proposal_sent  { background: rgba(139,92,246,0.18); }
+
+/* Log row: [icon] [text ........... time] */
+.mc-syslog .activity-stream-content {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.mc-syslog .activity-stream-text {
+  font-size: 12px;
+  color: rgba(255,255,255,0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.mc-syslog .activity-stream-text strong {
+  color: rgba(255,255,255,0.88);
+  font-weight: 500;
+}
+.mc-syslog .activity-stream-meta {
+  font-size: 10px;
+  color: var(--sidebar-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mc-syslog .dashboard-empty {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--sidebar-text-muted);
+  min-height: auto;
+}
+
+/* ── Header / page-subtitle inside dark context ── */
+#dashboard-command-center .command-header h1 { color: var(--color-text-inverse); }
+#dashboard-command-center .command-header .page-subtitle { color: var(--sidebar-text); }
+#dashboard-command-center .dashboard-org-label { color: var(--sidebar-text); }
+#dashboard-command-center .btn-secondary {
+  background: var(--color-sidebar-hover);
+  border-color: var(--color-border-dark);
+  color: var(--sidebar-text-hover);
+}
+@media (hover: hover) and (pointer: fine) {
+  #dashboard-command-center .btn-secondary:hover { background: rgba(255,255,255,0.10); }
+}
+
+/* ── mc-grid layout already defined in vaihe 1 ── */
+#dashboard-command-center .mc-grid { margin-bottom: var(--space-4); }
+#dashboard-command-center .mc-grid__side { gap: 10px; }
+
+/* === MISSION CONTROL vaihe 4 loppuu === */
