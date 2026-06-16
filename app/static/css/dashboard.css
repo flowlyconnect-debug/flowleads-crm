@@ -2,7 +2,27 @@
 
 .dashboard-page {
   max-width: 1120px;
+  margin: 0 auto;
   padding-bottom: 8px;
+}
+
+#dashboard-command-center .dash-hero.card,
+#dashboard-command-center .dash-list.card,
+#dashboard-command-center .dash-stats.card {
+  padding: 0;
+}
+
+#dashboard-command-center .dash-hero.card {
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(15, 17, 23, 0.08));
+}
+
+#dashboard-command-center .dash-hero.card:hover {
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(15, 17, 23, 0.08));
+}
+
+#dashboard-command-center .dash-list.card:hover,
+#dashboard-command-center .dash-stats.card:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Org picker ── */
@@ -215,7 +235,7 @@
 
 .dash-hero__reason strong {
   color: var(--color-text-primary);
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -306,20 +326,42 @@
 
 .dash-hero__loading {
   flex: 1;
+  min-width: 0;
   padding: 28px 40px;
+}
+
+.dash-hero__side--loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
 }
 
 .dash-hero__skeleton-short { width: 72%; }
 
-.dash-hero--empty .dash-hero__main {
-  padding: 40px;
-  text-align: center;
+.dash-hero__skeleton-side {
+  height: 72px;
+  margin-bottom: 0;
 }
 
-.dash-hero--empty .dash-hero__action {
-  font-size: 18px;
-  max-width: none;
-  margin-top: 8px;
+.dash-hero__side-value-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.dash-hero__side-signal-dot--ok {
+  background: var(--color-success-emphasis);
+}
+
+.dash-hero__action--muted {
+  font-size: 22px;
+  max-width: 540px;
+}
+
+.dash-hero--idle .dash-hero__action {
+  font-size: 28px;
+  max-width: 540px;
 }
 
 /* ── Lead list ── */
@@ -433,9 +475,24 @@
 }
 
 .dash-list-empty {
-  padding: 32px 28px;
-  text-align: center;
+  padding: 24px 28px;
+  text-align: left;
+}
+
+.dash-list-empty__title {
   font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.dash-list-empty__sub {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 6px 0 0;
+}
+
+.dash-list-empty--error .dash-list-empty__title {
   color: var(--color-text-secondary);
 }
 
@@ -446,6 +503,7 @@
   padding: 0;
   display: flex;
   align-items: stretch;
+  border-radius: var(--radius-lg);
 }
 
 .dash-stat {

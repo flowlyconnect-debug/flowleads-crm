@@ -167,23 +167,71 @@
     var el = document.getElementById('dashboard-list-meta');
     if (!el) return;
     if (!count) {
-      el.textContent = 'Ei kiireellisiä liidejä';
+      el.textContent = 'Ei muita kiireellisiä liidejä';
       return;
     }
     var word = count === 1 ? 'liidi' : 'liidiä';
     el.textContent = count + ' ' + word + ' · reagoi seuraavaksi';
   }
 
+  function heroHeadline(row) {
+    var verb = row.verb;
+    var company = row.company !== '—' ? row.company : '';
+    var contact = row.contact || '';
+    if (company) return verb + ' ' + company;
+    if (contact) return verb + ' ' + contact;
+    return row.item.action_text || verb;
+  }
+
+  function heroReasonHtml(row) {
+    var signal = row.signal || '';
+    var value = row.value;
+    if (signal && value != null && Number(value) > 0 && signal.indexOf('€') === -1) {
+      return (
+        escapeHtml(signal) +
+        ' (<strong>' +
+        escapeHtml(formatEuro(value)) +
+        '</strong>)'
+      );
+    }
+    return escapeHtml(signal);
+  }
+
+  function heroContactLine(row) {
+    if (row.contact && row.company && row.company !== '—' && row.company !== row.contact) {
+      return escapeHtml(row.contact) + ' · ' + escapeHtml(row.company);
+    }
+    if (row.contact) return escapeHtml(row.contact);
+    if (row.company && row.company !== '—') return escapeHtml(row.company);
+    return '';
+  }
+
+  function renderHeroSideEmpty() {
+    return (
+      '<aside class="dash-hero__side dash-hero__side--summary" aria-label="Yhteenveto">' +
+      '<div class="dash-hero__side-label">Yhteenveto</div>' +
+      '<div class="dash-hero__side-value">0</div>' +
+      '<div class="dash-hero__side-value-sub">toimea odottaa</div>' +
+      '<div class="dash-hero__side-divider" aria-hidden="true"></div>' +
+      '<div class="dash-hero__side-signal">' +
+      '<span class="dash-hero__side-signal-dot dash-hero__side-signal-dot--ok" aria-hidden="true"></span>' +
+      '<span>Liidit ajan tasalla</span>' +
+      '</div>' +
+      '</aside>'
+    );
+  }
+
   function renderHeroEmpty() {
     var hero = document.getElementById('dashboardHero');
     if (!hero) return;
-    hero.className = 'dash-hero card dash-hero--empty';
+    hero.className = 'dash-hero card dash-hero--idle';
     hero.innerHTML =
       '<div class="dash-hero__main">' +
       '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
-      '<p class="dash-hero__action">Ei kiireellisiä toimia juuri nyt.</p>' +
+      '<h2 class="dash-hero__action">Ei kiireellisiä toimia juuri nyt.</h2>' +
       '<p class="dash-hero__reason">Kaikki liidit ovat ajan tasalla — hyvää työtä!</p>' +
-      '</div>';
+      '</div>' +
+      renderHeroSideEmpty();
   }
 
   function renderHero(row) {
@@ -195,16 +243,15 @@
 
     var item = row.item;
     var label = row.company !== '—' ? row.company : row.contact || 'liidi';
-    var contactLine = row.contact
-      ? escapeHtml(row.contact) + (row.company && row.company !== row.contact ? ' · ' + escapeHtml(row.company) : '')
-      : escapeHtml(row.company);
+    var contactLine = heroContactLine(row);
+    var signalText = row.signal || row.stage.label;
 
     hero.className = 'dash-hero card';
     hero.innerHTML =
       '<div class="dash-hero__main">' +
       '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
-      '<h2 class="dash-hero__action">' + escapeHtml(item.action_text || '') + '</h2>' +
-      '<p class="dash-hero__reason">' + escapeHtml(row.signal) + '</p>' +
+      '<h2 class="dash-hero__action">' + escapeHtml(heroHeadline(row)) + '</h2>' +
+      (row.signal ? '<p class="dash-hero__reason">' + heroReasonHtml(row) + '</p>' : '') +
       '<div class="dash-hero__cta-row">' +
       '<a class="btn btn-primary btn-lg" href="' + escapeHtml(item.url) + '">Avaa ' + escapeHtml(label) + ' →</a>' +
       '<button type="button" class="dash-hero__skip" data-skip-url="' + escapeHtml(item.url) + '">Ohita</button>' +
@@ -216,7 +263,7 @@
       '<div class="dash-hero__side-divider" aria-hidden="true"></div>' +
       '<div class="dash-hero__side-signal">' +
       '<span class="dash-hero__side-signal-dot" style="background:' + escapeHtml(row.stage.color) + '"></span>' +
-      '<span>' + escapeHtml(row.stage.label) + '</span>' +
+      '<span>' + escapeHtml(signalText) + '</span>' +
       '</div>' +
       (contactLine ? '<div class="dash-hero__side-contact">' + contactLine + '</div>' : '') +
       '</aside>';
@@ -235,7 +282,11 @@
     if (!body) return;
 
     if (!rows.length) {
-      body.innerHTML = '<div class="dash-list-empty">Ei muita prioriteettiliidejä tänään.</div>';
+      body.innerHTML =
+        '<div class="dash-list-empty">' +
+        '<p class="dash-list-empty__title">Ei muita kiireellisiä liidejä tänään.</p>' +
+        '<p class="dash-list-empty__sub">Prioriteettitoimet näkyvät yllä olevassa hero-kortissa.</p>' +
+        '</div>';
       return;
     }
 
@@ -295,7 +346,7 @@
 
     renderHero(enriched[0]);
     renderLeadList(enriched.slice(1));
-    updateListMeta(enriched.length);
+    updateListMeta(enriched.length > 1 ? enriched.length - 1 : 0);
 
     var tasksEl = document.getElementById('metricTasksToday');
     if (tasksEl) tasksEl.textContent = String(enriched.length);
@@ -386,17 +437,20 @@
         var hero = document.getElementById('dashboardHero');
         var body = document.getElementById('aiWorklistBody');
         if (hero) {
-          hero.className = 'dash-hero card dash-hero--empty';
+          hero.className = 'dash-hero card dash-hero--idle';
           hero.innerHTML =
-            '<div class="dash-hero__main lead-empty lead-empty--error">' +
-            '<p class="lead-empty__title">Tietoja ei voitu ladata</p>' +
-            '<p class="lead-empty__sub"><button type="button" class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
-            '</div>';
+            '<div class="dash-hero__main">' +
+            '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
+            '<p class="dash-hero__action dash-hero__action--muted">Tietoja ei voitu ladata</p>' +
+            '<p class="dash-hero__reason"><button type="button" class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
+            '</div>' +
+            renderHeroSideEmpty();
         }
         if (body) {
           body.innerHTML =
-            '<div class="lead-empty lead-empty--error">' +
-            '<p class="lead-empty__title">Lista ei latautunut</p>' +
+            '<div class="dash-list-empty dash-list-empty--error">' +
+            '<p class="dash-list-empty__title">Lista ei latautunut</p>' +
+            '<p class="dash-list-empty__sub"><button type="button" class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
             '</div>';
         }
       });
