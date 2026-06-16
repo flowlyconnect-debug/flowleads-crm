@@ -831,3 +831,54 @@
     border-radius: 8px;
   }
 }
+
+/* ============================================================
+   MISSION CONTROL — additiivinen pohjarunko (vaihe 0-1)
+   Namespace: .mc-*  | Ei vielä kytketty mihinkään markupiin.
+   Käyttää vain design-system.css:n olemassa olevia tokeneita.
+   Ei värimuutoksia, ei poistoja, ei JS-riippuvuuksia.
+   ============================================================ */
+
+/* --- Layout & grid --- */
+.mc-dashboard { display: flex; flex-direction: column; gap: var(--space-4); }
+.mc-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.mc-grid__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.mc-grid__side { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+@media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
+
+/* --- Paneelit --- */
+.mc-panel { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); }
+.mc-panel--dark { background: var(--color-sidebar); border-color: var(--color-border-dark); color: var(--color-text-inverse); }
+.mc-panel--hero { padding: var(--space-5) var(--space-6); }
+.mc-panel__header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.mc-panel__title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); letter-spacing: -0.01em; }
+.mc-panel--dark .mc-panel__title { color: var(--color-text-inverse); }
+.mc-panel__meta { margin-left: auto; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+
+/* --- Ticker / telemetria-virta --- */
+.mc-ticker { display: flex; align-items: center; gap: var(--space-4); overflow: hidden; background: var(--color-sidebar); border: 1px solid var(--color-border-dark); border-radius: var(--radius-md); padding: var(--space-2) var(--space-4); }
+.mc-ticker__track { display: flex; align-items: center; gap: var(--space-5); white-space: nowrap; }
+.mc-ticker__item { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); color: var(--sidebar-text); font-variant-numeric: tabular-nums; }
+.mc-ticker__item strong { color: var(--color-text-inverse); font-weight: var(--font-weight-semibold); }
+.mc-ticker__dot { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--color-highlight); flex: none; }
+
+/* --- KPI / instrumentti-band --- */
+.mc-kpi-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.mc-instrument { background: var(--color-sidebar); border: 1px solid var(--color-border-dark); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
+.mc-instrument__value { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--color-text-inverse); letter-spacing: -0.02em; line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; }
+.mc-instrument__label { font-size: var(--font-size-xs); color: var(--sidebar-text); margin-top: var(--space-1); }
+.mc-instrument__trend { font-size: var(--font-size-xs); margin-top: var(--space-1); font-variant-numeric: tabular-nums; }
+.mc-instrument__trend--up { color: var(--color-highlight); }
+.mc-instrument__trend--down { color: var(--color-danger); }
+@media (max-width: 700px) { .mc-kpi-band { grid-template-columns: repeat(2, 1fr); } }
+
+/* --- Vuorovaikutus: hover & transition -perusta --- */
+.mc-interactive { transition: transform var(--transition-fast), box-shadow var(--transition-base), background-color var(--transition-base); }
+.mc-elevate:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.mc-pressable:active { transform: scale(0.97); }
+.mc-signal-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--color-highlight); }
+@media (prefers-reduced-motion: reduce) {
+  .mc-interactive, .mc-elevate, .mc-pressable { transition: none; }
+  .mc-elevate:hover, .mc-pressable:active { transform: none; }
+}
+/* === MISSION CONTROL scaffold loppuu === */
