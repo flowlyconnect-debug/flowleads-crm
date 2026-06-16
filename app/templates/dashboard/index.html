@@ -30,11 +30,15 @@
 {% if form_submissions_today > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 
 {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
+{% set lead_meta_ns = namespace(rows=[]) %}
+{% for row in high_potential_leads %}
+{% set _ = lead_meta_ns.rows.append({'lead_id': row.lead_id, 'lead_name': row.lead_name, 'company': row.company, 'deal_value': row.deal_value, 'probability': row.probability}) %}
+{% endfor %}
 
 <div class="dashboard-page dashboard-action-first" id="dashboard-command-center"
      data-activity-feed='{{ activity_feed | tojson }}'
      data-org-query='{{ org_q | tojson }}'
-     data-lead-meta='{{ high_potential_leads | tojson }}'>
+     data-lead-meta='{{ lead_meta_ns.rows | tojson }}'>
 
   {% if alert_ns.count > 0 %}
   <div class="crm-notice-bar" role="alert" aria-live="polite">
