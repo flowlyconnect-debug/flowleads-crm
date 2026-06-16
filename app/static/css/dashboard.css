@@ -882,3 +882,34 @@
   .mc-elevate:hover, .mc-pressable:active { transform: none; }
 }
 /* === MISSION CONTROL scaffold loppuu === */
+
+/* ============================================================
+   MISSION CONTROL — vaihe 2: layout-liima (additiivinen)
+   Vain olemassa olevia tokeneita. Ei värimuutoksia, ei poistoja.
+   ============================================================ */
+.mc-zone-ticker { margin-bottom: var(--space-4); }
+.mc-kpi-band { margin-bottom: var(--space-5); }
+.mc-grid { margin-bottom: var(--space-5); }
+
+.mc-instrument { min-height: 92px; }
+.mc-instrument__trend { color: var(--sidebar-text); }
+
+.mc-grid__main > .card, .mc-grid__side > .card { height: auto; }
+.mc-grid__main { min-width: 0; }
+
+.ai-worklist-card .card-header.mc-panel__header,
+.mc-pulse-card .card-header.mc-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+
+/* Putken pulssi */
+.mc-pulse-stages { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-1) 0 2px; }
+.mc-pulse-stage { display: flex; flex-direction: column; gap: 5px; }
+.mc-pulse-stage__head { display: flex; align-items: center; gap: var(--space-2); }
+.mc-pulse-stage__dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex: none; }
+.mc-pulse-stage__name { flex: 1; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.mc-pulse-stage__count { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.mc-pulse-stage__bar { height: 4px; background: var(--color-border-light); border-radius: var(--radius-full); overflow: hidden; }
+.mc-pulse-stage__fill { height: 100%; border-radius: var(--radius-full); min-width: 2px; }
+
+/* Live aktiviteetti täysleveänä */
+.mc-zone-bottom .activity-stream { max-height: 340px; }
+/* === MISSION CONTROL vaihe 2 loppuu === */

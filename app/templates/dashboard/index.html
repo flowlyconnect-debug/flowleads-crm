@@ -31,33 +31,33 @@
 
 {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
 
-<div class="dashboard-page dashboard-command-center" id="dashboard-command-center"
+<div class="dashboard-page dashboard-command-center mc-dashboard" id="dashboard-command-center"
      data-activity-feed='{{ activity_feed | tojson }}'
      data-org-query='{{ org_q | tojson }}'>
 
-  {% if alert_ns.count > 0 %}
-  <div class="alert-strip" id="alertStrip">
-    <div class="alert-strip-inner">
-      <span class="alert-strip-icon" aria-hidden="true">⚡</span>
-      <span class="alert-strip-text">
-        <strong>{{ alert_ns.count }} toimintoa odottaa:</strong>
-        {% if tasks_overdue_count > 0 %}
-        <a href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}" class="alert-link">{{ tasks_overdue_count }} tehtävää myöhässä</a>
-        {% endif %}
-        {% if tasks_overdue_count > 0 and (open_proposals_count > 0 or form_submissions_today > 0) %} · {% endif %}
-        {% if open_proposals_count > 0 %}
-        <a href="{{ url_for('proposals.list_proposals', **org_q) }}" class="alert-link">{{ open_proposals_count }} avointa tarjousta</a>
-        {% endif %}
-        {% if open_proposals_count > 0 and form_submissions_today > 0 %} · {% endif %}
-        {% if form_submissions_today > 0 %}
-        <a href="{{ url_for('forms.list_forms', **org_q) }}" class="alert-link">{{ form_submissions_today }} lomakelähetystä tänään</a>
-        {% endif %}
-      </span>
-      <button type="button" class="alert-strip-close" onclick="closeAlertStrip()" aria-label="Sulje hälytys">✕</button>
+  {# Vyöhyke: telemetria-virta / ticker (sulauttaa toimintohälytykset) #}
+  <div class="mc-ticker mc-zone-ticker" role="status" aria-label="Telemetria-virta">
+    <span class="mc-ticker__dot" aria-hidden="true"></span>
+    <div class="mc-ticker__track">
+      {% if alert_ns.count > 0 %}
+      <span class="mc-ticker__item"><strong>{{ alert_ns.count }}</strong> toimintoa odottaa</span>
+      {% if tasks_overdue_count > 0 %}
+      <span class="mc-ticker__item"><a class="alert-link" href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}">{{ tasks_overdue_count }} tehtävää myöhässä</a></span>
+      {% endif %}
+      {% if open_proposals_count > 0 %}
+      <span class="mc-ticker__item"><a class="alert-link" href="{{ url_for('proposals.list_proposals', **org_q) }}">{{ open_proposals_count }} avointa tarjousta</a></span>
+      {% endif %}
+      {% if form_submissions_today > 0 %}
+      <span class="mc-ticker__item"><a class="alert-link" href="{{ url_for('forms.list_forms', **org_q) }}">{{ form_submissions_today }} lomakelähetystä tänään</a></span>
+      {% endif %}
+      {% else %}
+      <span class="mc-ticker__item">Järjestelmä aktiivinen — n8n syöttää liidejä taustalla</span>
+      {% endif %}
+      <span class="mc-ticker__item"><strong>{{ activity_feed | length }}</strong> tuoretta tapahtumaa</span>
     </div>
   </div>
-  {% endif %}
 
+  {# Vyöhyke: komento-otsikko #}
   <header class="page-header command-header">
     <div>
       <h1>Myynnin komentokeskus</h1>
@@ -81,55 +81,74 @@
     </div>
   </header>
 
-  <section class="dashboard-row-1" aria-label="Keskeiset mittarit">
-    <div class="metric-card metric-card-dark">
-      <div class="metric-card-inner">
-        <div class="metric-value" id="metricNewLeads">0</div>
-        <div class="metric-label">Uudet liidit (7 pv)</div>
-        <div class="metric-sub" id="metricNewLeadsTrend">0% vs edellinen vko</div>
-      </div>
+  {# Vyöhyke: KPI / instrumentti-band #}
+  <section class="mc-kpi-band" aria-label="Keskeiset mittarit">
+    <div class="mc-instrument mc-interactive">
+      <div class="mc-instrument__value" id="metricNewLeads">0</div>
+      <div class="mc-instrument__label">Uudet liidit · 7 pv</div>
+      <div class="mc-instrument__trend" id="metricNewLeadsTrend">0% vs edellinen vko</div>
     </div>
-    <div class="metric-card metric-card-dark">
-      <div class="metric-card-inner">
-        <div class="metric-value" id="metricHotLeads">0</div>
-        <div class="metric-label">Kuumat liidit</div>
-        <div class="metric-sub">Score ≥ 70</div>
-      </div>
+    <div class="mc-instrument mc-interactive">
+      <div class="mc-instrument__value" id="metricHotLeads">0</div>
+      <div class="mc-instrument__label">Kuumat liidit</div>
+      <div class="mc-instrument__trend">Score ≥ 70</div>
     </div>
-    <div class="metric-card metric-card-dark">
-      <div class="metric-card-inner">
-        <div class="metric-value" id="metricTasksToday">0</div>
-        <div class="metric-label">Tehtävät tänään</div>
-        <div class="metric-sub" id="metricTasksOverdue"></div>
-      </div>
+    <div class="mc-instrument mc-interactive">
+      <div class="mc-instrument__value" id="metricTasksToday">0</div>
+      <div class="mc-instrument__label">Tehtävät tänään</div>
+      <div class="mc-instrument__trend" id="metricTasksOverdue"></div>
     </div>
-    <div class="metric-card metric-card-dark">
-      <div class="metric-card-inner">
-        <div class="metric-value" id="metricPipelineValue">Ei dataa</div>
-        <div class="metric-label">Pipeline-arvo</div>
-        <div class="metric-sub">&nbsp;</div>
-      </div>
+    <div class="mc-instrument mc-interactive">
+      <div class="mc-instrument__value" id="metricPipelineValue">Ei dataa</div>
+      <div class="mc-instrument__label">Pipeline-arvo</div>
+      <div class="mc-instrument__trend">&nbsp;</div>
     </div>
   </section>
 
-  <section class="dashboard-row-2">
-    <div class="card ai-worklist-card" id="aiWorklistCard">
-      <div class="card-header">
-        <div>
-          <span class="card-title">AI:n ehdottama järjestys tänään</span>
-          <p class="ai-worklist-subtitle">Aloita näistä</p>
+  {# Vyöhyke: pääalue — AI-monitori (sankari) vasemmalle, oikea sarake #}
+  <div class="mc-grid">
+    <div class="mc-grid__main">
+      <div class="card ai-worklist-card mc-panel--hero mc-interactive mc-elevate" id="aiWorklistCard">
+        <div class="card-header mc-panel__header">
+          <div>
+            <span class="card-title">AI:n ehdottama järjestys tänään</span>
+            <p class="ai-worklist-subtitle">Aloita näistä</p>
+          </div>
+          <span class="ai-badge" aria-hidden="true">AI</span>
+        </div>
+        <div class="ai-worklist-body ai-worklist-loading" id="aiWorklistBody">
+          <div class="ai-worklist-skeleton-line"></div>
+          <div class="ai-worklist-skeleton-line"></div>
+          <div class="ai-worklist-skeleton-line"></div>
         </div>
       </div>
-      <div class="ai-worklist-body ai-worklist-loading" id="aiWorklistBody">
-        <div class="ai-worklist-skeleton-line"></div>
-        <div class="ai-worklist-skeleton-line"></div>
-        <div class="ai-worklist-skeleton-line"></div>
-      </div>
     </div>
-  </section>
 
-  <section class="dashboard-row-3">
-    <div class="card ai-pulse-card">
+    <div class="mc-grid__side">
+      {# Putken pulssi — SSR pipeline_stages #}
+      <div class="card mc-pulse-card mc-interactive">
+        <div class="card-header mc-panel__header">
+          <span class="card-title">Putken pulssi</span>
+          <a class="ai-pulse-header-time" href="{{ url_for('leads.pipeline', **org_q) }}">Avaa →</a>
+        </div>
+        <div class="mc-pulse-stages">
+          {% for s in pipeline_stages %}
+          <div class="mc-pulse-stage">
+            <div class="mc-pulse-stage__head">
+              <span class="mc-pulse-stage__dot" style="background-color: {{ s.color }}"></span>
+              <span class="mc-pulse-stage__name">{{ s.name }}</span>
+              <span class="mc-pulse-stage__count">{{ s.count }}</span>
+            </div>
+            <div class="mc-pulse-stage__bar"><div class="mc-pulse-stage__fill" style="width: {{ s.percentage }}%; background-color: {{ s.color }}"></div></div>
+          </div>
+          {% else %}
+          <div class="dashboard-empty dashboard-empty--compact">Ei putkidataa vielä.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# AI-pulssi — olemassa oleva SSR-syöte #}
+      <div class="card ai-pulse-card mc-interactive">
         <div class="card-header">
           <div class="ai-pulse-header-title">
             <div class="ai-pulse-indicator" aria-hidden="true"></div>
@@ -180,38 +199,41 @@
           {% endif %}
         </div>
       </div>
-    <div class="card activity-stream-card">
-        <div class="card-header">
-          <span class="card-title">Live aktiviteetti</span>
-          <span class="activity-live-dot" aria-hidden="true" title="Live"></span>
+    </div>
+  </div>
+
+  {# Vyöhyke: live aktiviteetti — täysleveä #}
+  <div class="card activity-stream-card mc-zone-bottom mc-interactive">
+    <div class="card-header">
+      <span class="card-title">Live aktiviteetti</span>
+      <span class="activity-live-dot" aria-hidden="true" title="Live"></span>
+    </div>
+    <div class="activity-stream" id="activityStream">
+      {% for activity in activity_feed %}
+      <div class="activity-stream-item">
+        <div class="activity-stream-icon {{ activity.type }}">
+          {% if activity.type == 'email_sent' %}✉
+          {% elif activity.type == 'stage_changed' %}↗
+          {% elif activity.type in ('created', 'lead_created') %}★
+          {% elif activity.type == 'ai_enriched' %}🤖
+          {% elif activity.type == 'task_completed' %}✓
+          {% elif activity.type == 'call' %}📞
+          {% elif activity.type == 'proposal_viewed' %}👁
+          {% elif activity.type == 'proposal_sent' %}📄
+          {% else %}•{% endif %}
         </div>
-        <div class="activity-stream" id="activityStream">
-          {% for activity in activity_feed %}
-          <div class="activity-stream-item">
-            <div class="activity-stream-icon {{ activity.type }}">
-              {% if activity.type == 'email_sent' %}✉
-              {% elif activity.type == 'stage_changed' %}↗
-              {% elif activity.type in ('created', 'lead_created') %}★
-              {% elif activity.type == 'ai_enriched' %}🤖
-              {% elif activity.type == 'task_completed' %}✓
-              {% elif activity.type == 'call' %}📞
-              {% elif activity.type == 'proposal_viewed' %}👁
-              {% elif activity.type == 'proposal_sent' %}📄
-              {% else %}•{% endif %}
-            </div>
-            <div class="activity-stream-content">
-              <div class="activity-stream-text">
-                <strong>{{ activity.lead_name }}</strong> — {{ activity.content_preview or activity.type }}
-              </div>
-              <div class="activity-stream-meta">{{ activity.time_ago }}</div>
-            </div>
+        <div class="activity-stream-content">
+          <div class="activity-stream-text">
+            <strong>{{ activity.lead_name }}</strong> — {{ activity.content_preview or activity.type }}
           </div>
-          {% else %}
-          <div class="dashboard-empty dashboard-empty--compact">Ei aktiviteettia vielä.</div>
-          {% endfor %}
+          <div class="activity-stream-meta">{{ activity.time_ago }}</div>
         </div>
       </div>
-  </section>
+      {% else %}
+      <div class="dashboard-empty dashboard-empty--compact">Ei aktiviteettia vielä.</div>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 {% endif %}
