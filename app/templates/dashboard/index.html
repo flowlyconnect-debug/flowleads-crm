@@ -4,7 +4,7 @@
   <div class="page-header">
     <div>
       <h1>Kojelauta</h1>
-      <p class="page-subtitle">Valitse organisaatio nähdäksesi komentokeskuksen.</p>
+      <p class="page-subtitle">Valitse organisaatio nähdäksesi kojelautan.</p>
     </div>
   </div>
   <div class="card dashboard-org-picker">
@@ -31,46 +31,27 @@
 
 {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
 
-<div class="dashboard-page dashboard-command-center mc-dashboard" id="dashboard-command-center"
+<div class="dashboard-page dashboard-command-center" id="dashboard-command-center"
      data-activity-feed='{{ activity_feed | tojson }}'
      data-org-query='{{ org_q | tojson }}'>
 
-  {# ── Zone 1: System Telemetry Rail ── #}
-  <div class="mc-telemetry-rail" role="status" aria-label="Järjestelmän telemetria">
-    <div class="mc-tr-brand">
-      <span class="mc-tr-dot" aria-hidden="true"></span>
-      <span class="mc-tr-brand-name">FLOWLEADS</span>
-    </div>
-    <span class="mc-tr-pipe" aria-hidden="true"></span>
-    <div class="mc-tr-seg">
-      <span class="mc-tr-key">N8N</span>
-      <span class="mc-tr-val mc-tr-val--on">AKTIV</span>
-    </div>
-    <span class="mc-tr-pipe" aria-hidden="true"></span>
-    <div class="mc-tr-seg">
-      <span class="mc-tr-key">AI</span>
-      <span class="mc-tr-val mc-tr-val--on">ANALYSOI</span>
-    </div>
-    {% if alert_ns.count > 0 %}
-    <span class="mc-tr-pipe" aria-hidden="true"></span>
-    <div class="mc-tr-seg mc-tr-seg--alert">
-      <span class="mc-tr-dot mc-tr-dot--warn" aria-hidden="true"></span>
-      <span class="mc-tr-alert-label">{{ alert_ns.count }} TOIMINTOA</span>
-      {% if tasks_overdue_count > 0 %}<a class="mc-tr-link" href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}">{{ tasks_overdue_count }} myöhässä</a>{% endif %}
-      {% if open_proposals_count > 0 %}<a class="mc-tr-link" href="{{ url_for('proposals.list_proposals', **org_q) }}">{{ open_proposals_count }} tarjousta</a>{% endif %}
-      {% if form_submissions_today > 0 %}<a class="mc-tr-link" href="{{ url_for('forms.list_forms', **org_q) }}">{{ form_submissions_today }} lomaketta</a>{% endif %}
-    </div>
-    {% endif %}
-    <div class="mc-tr-right">
-      <span class="mc-tr-key">TAPAHTUMAT</span>
-      <span class="mc-tr-count">{{ activity_feed | length }}</span>
-    </div>
+  {# ── Huomiobaari: vain jos on odottavia toimia ── #}
+  {% if alert_ns.count > 0 %}
+  <div class="crm-notice-bar" role="alert" aria-live="polite">
+    <span class="crm-notice-bar__icon" aria-hidden="true">⚠</span>
+    <span class="crm-notice-bar__msg">{{ alert_ns.count }} asia odottaa toimia</span>
+    <span class="crm-notice-bar__links">
+      {% if tasks_overdue_count > 0 %}<a class="crm-notice-link" href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}">{{ tasks_overdue_count }} myöhässä olevaa tehtävää</a>{% endif %}
+      {% if open_proposals_count > 0 %}<a class="crm-notice-link" href="{{ url_for('proposals.list_proposals', **org_q) }}">{{ open_proposals_count }} avointa tarjousta</a>{% endif %}
+      {% if form_submissions_today > 0 %}<a class="crm-notice-link" href="{{ url_for('forms.list_forms', **org_q) }}">{{ form_submissions_today }} uutta lomakelähetystä</a>{% endif %}
+    </span>
   </div>
+  {% endif %}
 
-  {# ── Zone 2: Command Header ── #}
+  {# ── Sivuotsikko ── #}
   <header class="page-header command-header">
     <div>
-      <h1>Myynnin komentokeskus</h1>
+      <h1>Kojelauta</h1>
       <p class="page-subtitle">Hei, {{ (current_user.first_name or current_user.email.split('@')[0]) }} — <time id="dashboard-current-date" datetime=""></time></p>
     </div>
     <div class="dashboard-header-extra">
@@ -91,47 +72,45 @@
     </div>
   </header>
 
-  {# ── Zone 3: Status Rail — unified KPI instrument band ── #}
-  <section class="mc-status-rail" aria-label="Keskeisten mittareiden tila">
-    <div class="mc-sr-metric">
-      <div class="mc-sr-label">UUDET LIIDIT <span class="mc-sr-period">· 7 PV</span></div>
-      <div class="mc-sr-value" id="metricNewLeads">—</div>
-      <div class="mc-sr-sub" id="metricNewLeadsTrend"></div>
+  {# ── KPI-palkki: yhtenäinen mittaristo ── #}
+  <section class="kpi-bar" aria-label="Keskeinen mittaristo">
+    <div class="kpi-bar__metric">
+      <div class="kpi-bar__label">Uudet liidit</div>
+      <div class="kpi-bar__value" id="metricNewLeads">—</div>
+      <div class="kpi-bar__sub"><span id="metricNewLeadsTrend">Viimeiset 7 pv</span></div>
     </div>
-    <div class="mc-sr-sep" aria-hidden="true"></div>
-    <div class="mc-sr-metric">
-      <div class="mc-sr-label">KUUMAT LIIDIT</div>
-      <div class="mc-sr-value" id="metricHotLeads">—</div>
-      <div class="mc-sr-sub">Score ≥ 70</div>
+    <div class="kpi-bar__sep" aria-hidden="true"></div>
+    <div class="kpi-bar__metric">
+      <div class="kpi-bar__label">Kuumat liidit</div>
+      <div class="kpi-bar__value" id="metricHotLeads">—</div>
+      <div class="kpi-bar__sub">Score ≥ 70</div>
     </div>
-    <div class="mc-sr-sep" aria-hidden="true"></div>
-    <div class="mc-sr-metric">
-      <div class="mc-sr-label">TEHTÄVÄT TÄNÄÄN</div>
-      <div class="mc-sr-value" id="metricTasksToday">—</div>
-      <div class="mc-sr-sub" id="metricTasksOverdue"></div>
+    <div class="kpi-bar__sep" aria-hidden="true"></div>
+    <div class="kpi-bar__metric">
+      <div class="kpi-bar__label">Tehtävät tänään</div>
+      <div class="kpi-bar__value" id="metricTasksToday">—</div>
+      <div class="kpi-bar__sub" id="metricTasksOverdue"></div>
     </div>
-    <div class="mc-sr-sep" aria-hidden="true"></div>
-    <div class="mc-sr-metric">
-      <div class="mc-sr-label">PIPELINE-ARVO</div>
-      <div class="mc-sr-value" id="metricPipelineValue">—</div>
-      <div class="mc-sr-sub">&nbsp;</div>
+    <div class="kpi-bar__sep" aria-hidden="true"></div>
+    <div class="kpi-bar__metric">
+      <div class="kpi-bar__label">Pipeline-arvo</div>
+      <div class="kpi-bar__value" id="metricPipelineValue">—</div>
+      <div class="kpi-bar__sub">&nbsp;</div>
     </div>
   </section>
 
-  {# ── Zone 4: Main grid — AI Command Queue + Telemetry Stack ── #}
-  <div class="mc-grid">
+  {# ── Pääalue: prioriteettiliidit + oikea sarake ── #}
+  <div class="crm-layout">
 
-    {# Left: AI Command Queue — hero element #}
-    <div class="mc-grid__main">
-      <section class="mc-command-queue" aria-label="AI-komentojono">
-        <header class="mc-cq-header">
-          <div class="mc-cq-status-row">
-            <span class="mc-cq-dot" aria-hidden="true"></span>
-            <span class="mc-cq-eyebrow">AI COMMAND QUEUE</span>
-            <span class="ai-badge" aria-hidden="true">AI</span>
+    {# Vasemmalla: tärkeimmät liidit tänään #}
+    <div class="crm-layout__main">
+      <section class="crm-lead-panel" aria-label="Tärkeimmät liidit tänään">
+        <div class="crm-lead-panel__header">
+          <div>
+            <h2 class="crm-lead-panel__title">Tärkeimmät liidit tänään</h2>
+            <p class="crm-lead-panel__sub">Aloita näistä</p>
           </div>
-          <p class="mc-cq-sub">Aloita näistä — AI:n priorisoima järjestys</p>
-        </header>
+        </div>
         <div class="ai-worklist-body ai-worklist-loading" id="aiWorklistBody">
           <div class="ai-worklist-skeleton-line"></div>
           <div class="ai-worklist-skeleton-line"></div>
@@ -142,81 +121,75 @@
       </section>
     </div>
 
-    {# Right: Telemetry stack #}
-    <div class="mc-grid__side">
+    {# Oikealla: myyntiputki + huomiot #}
+    <div class="crm-layout__side">
 
-      {# Pipeline gauge #}
-      <div class="mc-telemetry-panel">
-        <div class="mc-tp-header">
-          <span class="mc-tp-label">PUTKEN PULSSI</span>
-          <a class="mc-tp-link" href="{{ url_for('leads.pipeline', **org_q) }}" aria-label="Avaa pipeline-näkymä">↗</a>
+      {# Myyntiputken tilanne #}
+      <div class="crm-card">
+        <div class="crm-card__header">
+          <h3 class="crm-card__title">Myyntiputken tilanne</h3>
+          <a class="crm-card__link" href="{{ url_for('leads.pipeline', **org_q) }}" aria-label="Avaa myyntiputki">Avaa →</a>
         </div>
-        <div class="mc-pulse-stages">
+        <div class="crm-pipeline">
           {% for s in pipeline_stages %}
-          <div class="mc-pulse-stage">
-            <div class="mc-pulse-stage__head">
-              <span class="mc-pulse-stage__dot" style="background-color: {{ s.color }}"></span>
-              <span class="mc-pulse-stage__name">{{ s.name }}</span>
-              <span class="mc-pulse-stage__count">{{ s.count }}</span>
+          <div class="crm-pipeline__stage">
+            <div class="crm-pipeline__row">
+              <span class="crm-pipeline__dot" style="background-color: {{ s.color }}"></span>
+              <span class="crm-pipeline__name">{{ s.name }}</span>
+              <span class="crm-pipeline__count">{{ s.count }}</span>
             </div>
-            <div class="mc-pulse-stage__bar">
-              <div class="mc-pulse-stage__fill" style="width: {{ s.percentage }}%; background-color: {{ s.color }}"></div>
+            <div class="crm-pipeline__bar">
+              <div class="crm-pipeline__fill" style="width: {{ s.percentage }}%; background-color: {{ s.color }}"></div>
             </div>
           </div>
           {% else %}
-          <div class="mc-tp-empty">Ei putkidataa vielä.</div>
+          <p class="crm-empty-hint">Ei putkidataa vielä.</p>
           {% endfor %}
         </div>
       </div>
 
-      {# AI signal feed #}
-      <div class="mc-telemetry-panel">
-        <div class="mc-tp-header">
-          <div class="mc-tp-label-row">
-            <span class="mc-cq-dot mc-cq-dot--sm" aria-hidden="true"></span>
-            <span class="mc-tp-label">AI SIGNAALI</span>
-          </div>
-          <span class="mc-tp-live">Juuri nyt</span>
+      {# Huomiot #}
+      <div class="crm-card">
+        <div class="crm-card__header">
+          <h3 class="crm-card__title">Huomiot</h3>
+          <span class="crm-live-dot" aria-hidden="true" title="Reaaliaikainen"></span>
         </div>
-        <div class="ai-pulse-feed" id="aiPulseFeed">
+        <div class="crm-notices" id="aiPulseFeed">
           {% set pulse_ns = namespace(shown=0) %}
           {% for hp in high_potential_leads %}
           {% if pulse_ns.shown < 6 %}
-          <div class="ai-pulse-item hot">
-            <span class="ai-pulse-icon" aria-hidden="true">🔥</span>
-            <div class="ai-pulse-content">
-              <span class="ai-pulse-text">{{ hp.company or hp.lead_name }}</span>
-              <a href="{{ url_for('leads.detail', lead_id=hp.lead_id, **org_q) }}" class="ai-pulse-action">Avaa →</a>
+          <div class="crm-notice-item">
+            <span class="crm-notice-item__icon" aria-hidden="true">🔥</span>
+            <div class="crm-notice-item__content">
+              <span class="crm-notice-item__text">{{ hp.company or hp.lead_name }}</span>
+              <a href="{{ url_for('leads.detail', lead_id=hp.lead_id, **org_q) }}" class="crm-notice-item__link">Avaa →</a>
             </div>
-            <span class="ai-pulse-time">{% if hp.probability is not none %}{{ (hp.probability * 100)|round|int }}%{% endif %}</span>
+            <span class="crm-notice-item__meta">{% if hp.probability is not none %}{{ (hp.probability * 100)|round|int }}%{% endif %}</span>
           </div>
           {% set pulse_ns.shown = pulse_ns.shown + 1 %}
           {% endif %}
           {% endfor %}
           {% for act in activity_feed %}
           {% if pulse_ns.shown < 6 and act.type in ('ai_enriched', 'proposal_viewed', 'created') %}
-          <div class="ai-pulse-item {% if act.type == 'ai_enriched' %}hot{% elif act.type == 'proposal_viewed' %}signal{% else %}hot{% endif %}">
-            <span class="ai-pulse-icon" aria-hidden="true">{% if act.type == 'proposal_viewed' %}👁{% elif act.type == 'created' %}⚡{% else %}🤖{% endif %}</span>
-            <div class="ai-pulse-content">
-              <span class="ai-pulse-text">
-                {% if act.type == 'proposal_viewed' %}{{ act.lead_company or act.lead_name }}
-                {% elif act.type == 'created' %}{{ act.lead_company or act.lead_name }}
+          <div class="crm-notice-item">
+            <span class="crm-notice-item__icon" aria-hidden="true">{% if act.type == 'proposal_viewed' %}👁{% elif act.type == 'created' %}⚡{% else %}🤖{% endif %}</span>
+            <div class="crm-notice-item__content">
+              <span class="crm-notice-item__text">
+                {% if act.type == 'proposal_viewed' %}Tarjous avattu: {{ act.lead_company or act.lead_name }}
+                {% elif act.type == 'created' %}Uusi liidi: {{ act.lead_company or act.lead_name }}
                 {% else %}{{ act.lead_company or act.lead_name }}{% endif %}
               </span>
               {% if act.lead_id %}
-              <a href="{{ url_for('leads.detail', lead_id=act.lead_id, **org_q) }}" class="ai-pulse-action">{% if act.type == 'proposal_viewed' %}Seuraa{% else %}Tutki{% endif %} →</a>
+              <a href="{{ url_for('leads.detail', lead_id=act.lead_id, **org_q) }}" class="crm-notice-item__link">{% if act.type == 'proposal_viewed' %}Seuraa{% else %}Avaa{% endif %} →</a>
               {% endif %}
             </div>
-            <span class="ai-pulse-time">{{ act.time_ago }}</span>
+            <span class="crm-notice-item__meta">{{ act.time_ago }}</span>
           </div>
           {% set pulse_ns.shown = pulse_ns.shown + 1 %}
           {% endif %}
           {% endfor %}
           {% if pulse_ns.shown == 0 %}
-          <div class="ai-pulse-empty">
-            <p>Ei signaaleja vielä.</p>
-            <p class="ai-pulse-empty-sub">AI analysoi liidejä jatkuvasti.</p>
-          </div>
+          <p class="crm-empty-hint">Ei huomioita tällä hetkellä.</p>
           {% endif %}
         </div>
       </div>
@@ -224,14 +197,11 @@
     </div>
   </div>
 
-  {# ── Zone 5: System Log — full width ── #}
-  <section class="mc-syslog" aria-label="Järjestelmäloki">
-    <div class="mc-syslog-header">
-      <div class="mc-tp-label-row">
-        <span class="activity-live-dot" aria-hidden="true"></span>
-        <span class="mc-tp-label">SYSTEM LOG</span>
-      </div>
-      <span class="mc-tp-live">Live aktiviteetti</span>
+  {# ── Viimeisin aktiviteetti ── #}
+  <section class="crm-card crm-activity" aria-label="Viimeisin aktiviteetti">
+    <div class="crm-card__header">
+      <h3 class="crm-card__title">Viimeisin aktiviteetti</h3>
+      <span class="activity-live-dot" aria-hidden="true" title="Live"></span>
     </div>
     <div class="activity-stream" id="activityStream">
       {% for activity in activity_feed %}

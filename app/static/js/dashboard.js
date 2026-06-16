@@ -516,14 +516,11 @@
     if (!body) return;
     if (!items || !items.length) {
       body.innerHTML =
-        '<div class="cq-system-msg cq-system-msg--clear">' +
-        '<div class="cq-sm-header"><span class="cq-sm-icon cq-sm-icon--ok">✓</span><span class="cq-sm-label">QUEUE CLEAR</span></div>' +
-        '<p class="cq-sm-text">Ei kiireellisiä toimia tänään — hyvää työtä!</p>' +
-        '<div class="cq-sm-diag">' +
-        '<div class="cq-sm-row"><span class="cq-sm-key">AI MONITORING</span><span class="cq-sm-val cq-sm-val--ok">ACTIVE</span></div>' +
-        '<div class="cq-sm-row"><span class="cq-sm-key">LEAD SCORING</span><span class="cq-sm-val cq-sm-val--ok">RUNNING</span></div>' +
-        '<div class="cq-sm-row"><span class="cq-sm-key">N8N PIPELINE</span><span class="cq-sm-val cq-sm-val--ok">CONNECTED</span></div>' +
-        '</div></div>';
+        '<div class="lead-empty">' +
+        '<div class="lead-empty__icon">✓</div>' +
+        '<p class="lead-empty__title">Ei kiireellisiä toimia tänään</p>' +
+        '<p class="lead-empty__sub">Kaikki liidit ovat ajan tasalla. Hyvää työtä!</p>' +
+        '</div>';
       return;
     }
     body.innerHTML = items
@@ -592,14 +589,9 @@
       .catch(function () {
         var body = document.getElementById('aiWorklistBody');
         if (body) body.innerHTML =
-          '<div class="cq-system-msg cq-system-msg--error">' +
-          '<div class="cq-sm-header"><span class="cq-sm-icon cq-sm-icon--warn">!</span><span class="cq-sm-label">QUEUE UNAVAILABLE</span></div>' +
-          '<p class="cq-sm-text">AI-palveluun ei saatu yhteyttä</p>' +
-          '<div class="cq-sm-diag">' +
-          '<div class="cq-sm-row"><span class="cq-sm-key">AI API</span><span class="cq-sm-val cq-sm-val--warn">OFFLINE</span></div>' +
-          '<div class="cq-sm-row"><span class="cq-sm-key">N8N</span><span class="cq-sm-val cq-sm-val--warn">TARKISTA</span></div>' +
-          '</div>' +
-          '<button class="cq-retry-btn" onclick="location.reload()">↺ Päivitä sivu</button>' +
+          '<div class="lead-empty lead-empty--error">' +
+          '<p class="lead-empty__title">Tietoja ei voitu ladata</p>' +
+          '<p class="lead-empty__sub"><button class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
           '</div>';
       });
   }

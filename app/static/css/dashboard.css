@@ -1908,3 +1908,506 @@ body:has(#dashboard-command-center) {
 }
 
 /* === MISSION CONTROL vaihe 4 loppuu === */
+
+/* ============================================================
+   CRM REFRESH — kumoaa tumman Mission Control -identiteetin,
+   rakentaa modernin premium CRM -työtilan.
+   Ei uusia hex-värejä. Vain olemassa olevia tokeneita.
+   ============================================================ */
+
+/* ── Reset: poista full-bleed tumma tausta ── */
+#dashboard-command-center {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  min-height: 0;
+}
+body:has(#dashboard-command-center) {
+  overflow-x: visible;
+}
+
+/* ── Huomiobaari (vain kun on odottavia toimia) ── */
+.crm-notice-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--color-warning-soft);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.crm-notice-bar__icon { font-size: 14px; flex-shrink: 0; }
+.crm-notice-bar__msg { font-weight: 600; color: var(--color-warning-emphasis); flex-shrink: 0; }
+.crm-notice-bar__links { display: flex; flex-wrap: wrap; gap: 12px; }
+.crm-notice-link {
+  color: var(--color-warning-emphasis);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 13px;
+}
+.crm-notice-link:hover { color: var(--color-text-primary); }
+
+/* ── Page header CRM-kontekstissa (vaalea tausta) ── */
+#dashboard-command-center .command-header h1 { color: var(--color-text-primary); }
+#dashboard-command-center .command-header .page-subtitle { color: var(--color-text-secondary); }
+#dashboard-command-center .dashboard-org-label { color: var(--color-text-secondary); }
+#dashboard-command-center .btn-secondary {
+  background: var(--color-card);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* ── KPI-palkki: tumma yhtenäinen mittaristo ── */
+.kpi-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--color-sidebar);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.kpi-bar__metric {
+  flex: 1;
+  padding: 18px 20px 16px;
+  min-width: 0;
+  position: relative;
+  transition: background 180ms ease-out;
+}
+.kpi-bar__metric::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--color-accent);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .kpi-bar__metric:hover::after { opacity: 1; }
+  .kpi-bar__metric:hover { background: rgba(255,255,255,0.04); }
+}
+.kpi-bar__sep {
+  width: 1px;
+  background: var(--color-border-dark);
+  flex-shrink: 0;
+}
+.kpi-bar__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sidebar-text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.01em;
+}
+.kpi-bar__value {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--color-text-inverse);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-bar__sub {
+  font-size: 11px;
+  color: var(--sidebar-text-muted);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+  min-height: 15px;
+}
+#dashboard-command-center #metricTasksOverdue:not(:empty) {
+  color: var(--color-danger);
+}
+
+@media (max-width: 768px) {
+  .kpi-bar { display: grid; grid-template-columns: 1fr 1fr; }
+  .kpi-bar__sep { display: none; }
+  .kpi-bar__metric { border-bottom: 1px solid var(--color-border-dark); }
+  .kpi-bar__metric:nth-child(3),
+  .kpi-bar__metric:nth-child(4) { border-bottom: none; }
+  .kpi-bar__metric:nth-child(odd) { border-right: 1px solid var(--color-border-dark); }
+}
+@media (max-width: 480px) {
+  .kpi-bar { grid-template-columns: 1fr; }
+  .kpi-bar__metric { border-right: none !important; }
+}
+
+/* ── Layout: pääalue + oikea sarake ── */
+.crm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+.crm-layout__main { min-width: 0; }
+.crm-layout__side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (max-width: 900px) { .crm-layout { grid-template-columns: 1fr; } }
+
+/* ── CRM-kortit (oikea sarake + aktiviteetti) ── */
+.crm-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.crm-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.crm-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+.crm-card__link {
+  font-size: 12px;
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 150ms;
+}
+.crm-card__link:hover { color: var(--color-accent-hover); }
+.crm-live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: pulse-ring 2.5s ease infinite;
+  display: inline-block;
+}
+
+/* ── Tärkeimmät liidit -paneeli (hero, vasen) ── */
+.crm-lead-panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+.crm-lead-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.crm-lead-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 2px;
+}
+.crm-lead-panel__sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* JS-renderöidyt worklist-rivit CRM-kontekstissa */
+#dashboard-command-center .crm-lead-panel .ai-worklist-body {
+  flex: 1;
+  padding: 0;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-loading {
+  padding: 12px 20px;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-item {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background 150ms ease-out;
+  margin: 0;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-item:last-child { border-bottom: none; }
+@media (hover: hover) and (pointer: fine) {
+  #dashboard-command-center .crm-lead-panel .ai-worklist-item:hover { background: var(--color-bg); }
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-rank {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border: none;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-content { min-width: 0; }
+#dashboard-command-center .crm-lead-panel .ai-worklist-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.35;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-reason {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+#dashboard-command-center .crm-lead-panel .btn-today {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+  margin-top: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  #dashboard-command-center .crm-lead-panel .btn-today:hover {
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent-border);
+  }
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-skeleton-line {
+  height: 54px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, var(--color-border-light) 25%, var(--color-bg) 50%, var(--color-border-light) 75%);
+  background-size: 200% 100%;
+  animation: ai-worklist-skeleton 1.4s ease-in-out infinite;
+}
+/* Eri leveydet lataustilassa */
+#dashboard-command-center .crm-lead-panel .ai-worklist-skeleton-line:nth-child(2) { width: 92%; }
+#dashboard-command-center .crm-lead-panel .ai-worklist-skeleton-line:nth-child(3) { width: 97%; }
+#dashboard-command-center .crm-lead-panel .ai-worklist-skeleton-line:nth-child(4) { width: 88%; }
+#dashboard-command-center .crm-lead-panel .ai-worklist-skeleton-line:nth-child(5) { width: 94%; }
+
+/* JS-renderöity tyhjätila */
+#dashboard-command-center .crm-lead-panel .lead-empty {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+#dashboard-command-center .crm-lead-panel .lead-empty__icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--color-success-soft);
+  color: var(--color-success-emphasis);
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+#dashboard-command-center .crm-lead-panel .lead-empty__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+#dashboard-command-center .crm-lead-panel .lead-empty__sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+#dashboard-command-center .crm-lead-panel .lead-empty--error .lead-empty__title {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+#dashboard-command-center .crm-lead-panel .lead-retry {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+/* Vanha ai-worklist-empty jos API palauttaa sen */
+#dashboard-command-center .crm-lead-panel .ai-worklist-empty {
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+#dashboard-command-center .crm-lead-panel .ai-worklist-empty-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--color-success-soft);
+  color: var(--color-success-emphasis);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#dashboard-command-center .crm-lead-panel .today-empty {
+  padding: 32px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ── Myyntiputken tilanne ── */
+.crm-pipeline { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.crm-pipeline__stage { display: flex; flex-direction: column; gap: 5px; }
+.crm-pipeline__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.crm-pipeline__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.crm-pipeline__name { flex: 1; font-size: 12px; color: var(--color-text-secondary); }
+.crm-pipeline__count { font-size: 12px; font-weight: 600; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.crm-pipeline__bar { height: 4px; background: var(--color-border-light); border-radius: 99px; overflow: hidden; }
+.crm-pipeline__fill { height: 100%; border-radius: 99px; min-width: 2px; transition: width 600ms cubic-bezier(0.23,1,0.32,1); }
+
+/* ── Huomiot ── */
+.crm-notices { padding: 0; }
+.crm-notice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background 150ms ease-out;
+}
+.crm-notice-item:last-child { border-bottom: none; }
+@media (hover: hover) and (pointer: fine) {
+  .crm-notice-item:hover { background: var(--color-bg); }
+}
+.crm-notice-item__icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; line-height: 1; }
+.crm-notice-item__content { flex: 1; min-width: 0; }
+.crm-notice-item__text { font-size: 13px; color: var(--color-text-primary); display: block; line-height: 1.4; }
+.crm-notice-item__link {
+  font-size: 12px; color: var(--color-accent); font-weight: 500; text-decoration: none;
+  transition: color 150ms;
+}
+.crm-notice-item__link:hover { color: var(--color-accent-hover); text-decoration: underline; }
+.crm-notice-item__meta { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── Viimeisin aktiviteetti ── */
+.crm-activity .activity-stream {
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.crm-activity .activity-stream::-webkit-scrollbar { width: 4px; }
+.crm-activity .activity-stream::-webkit-scrollbar-track { background: transparent; }
+.crm-activity .activity-stream::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+/* Resetoi vaihe 3/4 tummat overridet aktiviteettilistalle */
+#dashboard-command-center .crm-activity .activity-stream-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  background: transparent;
+  transition: background 150ms ease-out;
+}
+#dashboard-command-center .crm-activity .activity-stream-item:last-child { border-bottom: none; }
+@media (hover: hover) and (pointer: fine) {
+  #dashboard-command-center .crm-activity .activity-stream-item:hover { background: var(--color-bg); }
+}
+#dashboard-command-center .crm-activity .activity-stream-content {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+#dashboard-command-center .crm-activity .activity-stream-text {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#dashboard-command-center .crm-activity .activity-stream-text strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+#dashboard-command-center .crm-activity .activity-stream-meta {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Aktiviteetti-ikonit vaaleassa kontekstissa */
+#dashboard-command-center .crm-activity .activity-stream-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-neutral-soft);
+}
+#dashboard-command-center .crm-activity .activity-stream-icon.email_sent     { background: var(--color-info-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.stage_changed  { background: var(--color-success-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.created,
+#dashboard-command-center .crm-activity .activity-stream-icon.lead_created   { background: var(--color-accent-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.ai_enriched    { background: var(--color-info-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.task_completed { background: var(--color-success-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.call           { background: var(--color-warning-soft); }
+#dashboard-command-center .crm-activity .activity-stream-icon.proposal_viewed,
+#dashboard-command-center .crm-activity .activity-stream-icon.proposal_sent  { background: var(--color-accent-soft); }
+
+/* Tyhjätila aktiviteetissa */
+#dashboard-command-center .crm-activity .dashboard-empty {
+  color: var(--color-text-secondary);
+  min-height: auto;
+  padding: 16px;
+}
+
+/* ── Apuluokka: pienet tyhjätilavihjeet korteissa ── */
+.crm-empty-hint {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Focus-tilat vaaleassa kontekstissa ── */
+#dashboard-command-center a:focus-visible,
+#dashboard-command-center button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .crm-live-dot,
+  .activity-live-dot { animation: none; }
+  .crm-pipeline__fill { transition: none; }
+  .kpi-bar__metric::after { transition: none; }
+}
+
+/* === CRM REFRESH loppuu === */
