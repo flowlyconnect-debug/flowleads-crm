@@ -80,20 +80,11 @@
 }
 
 .sidebar-logo__mark {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 26px;
+  width: auto;
   flex-shrink: 0;
-}
-
-.sidebar-logo__mark svg {
-  width: 16px;
-  height: 16px;
-  color: var(--color-text-inverse);
+  display: block;
+  object-fit: contain;
 }
 
 .sidebar-logo__text {
