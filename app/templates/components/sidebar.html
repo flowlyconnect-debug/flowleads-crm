@@ -103,43 +103,7 @@
             <span class="sidebar-item__label">Kalenteri</span>
           </a>
         </li>
-        <li>
-          <a href="{{ nav_url('leads.list_leads') }}"
-             class="sidebar-item{% if ep and ep.startswith('email.') %} active{% endif %}"
-             {% if ep and ep.startswith('email.') %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-mail" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Sähköposti</span>
-          </a>
-        </li>
-        <li>
-          <a href="{{ nav_url('sequences.list_sequences') }}"
-             class="sidebar-item{% if ep and ep.startswith('sequences.') %} active{% endif %}">
-            <i class="sidebar-icon ti ti-mail-forward" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Sekvenssit</span>
-          </a>
-        </li>
 
-        <li><span class="nav-group-label">Kasvu</span></li>
-        <li>
-          <a href="{{ nav_url('forms.list_forms') }}"
-             class="sidebar-item{% if ep and ep.startswith('forms.') %} active{% endif %}">
-            <i class="sidebar-icon ti ti-forms" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Lomakkeet</span>
-          </a>
-        </li>
-        <li>
-          <a href="{{ nav_url('automations.list_automations') }}"
-             class="sidebar-item{% if ep and ep.startswith('automations.') %} active{% endif %}">
-            <i class="sidebar-icon ti ti-bolt" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Automaatiot</span>
-          </a>
-        </li>
-        <li>
-          <span class="sidebar-item nav-item-disabled" aria-disabled="true">
-            <i class="sidebar-icon ti ti-file-text" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Tarjoukset</span>
-          </span>
-        </li>
         <li><span class="nav-group-label">Hallinta</span></li>
         <li>
           <a href="{{ nav_url('analytics.reports') }}"
@@ -150,51 +114,12 @@
           </a>
         </li>
         <li>
-          <span class="sidebar-item nav-item-disabled" aria-disabled="true">
-            <i class="sidebar-icon ti ti-chart-line" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Ennuste</span>
-          </span>
-        </li>
-        <li>
           <a href="{{ nav_url(settings_home_ep) }}"
              class="sidebar-item{% if settings_active %} active{% endif %}"
              {% if settings_active %}aria-current="page"{% endif %}>
             <i class="sidebar-icon ti ti-settings" aria-hidden="true"></i>
             <span class="sidebar-item__label">Asetukset</span>
           </a>
-        </li>
-        <li>
-          <a href="{{ nav_url('settings.search_profiles_list') }}"
-             class="sidebar-item{% if ep == 'settings.search_profiles_list' %} active{% endif %}">
-            <i class="sidebar-icon ti ti-settings-automation" aria-hidden="true"></i>
-            <span class="sidebar-item__label">Hakuprofiili</span>
-          </a>
-        </li>
-      </ul>
-
-      <hr class="sidebar-divider" aria-hidden="true">
-
-      <p class="sidebar-section">Segmentit</p>
-      <ul>
-        <li>
-          <span class="sidebar-item sidebar-item--segment sidebar-item--muted" aria-disabled="true">
-            <span class="sidebar-segment-dot sidebar-segment-dot--accent" aria-hidden="true"></span>
-            <span class="sidebar-item__label">Korkea potentiaali</span>
-          </span>
-        </li>
-        <li>
-          <span class="sidebar-item sidebar-item--segment sidebar-item--muted" aria-disabled="true">
-            <span class="sidebar-segment-dot sidebar-segment-dot--info" aria-hidden="true"></span>
-            <span class="sidebar-item__label">B2B SaaS</span>
-          </span>
-        </li>
-        <li>
-          <button type="button" class="sidebar-item sidebar-item--muted" disabled>
-            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            <span class="sidebar-item__label">Uusi segmentti</span>
-          </button>
         </li>
       </ul>
 
