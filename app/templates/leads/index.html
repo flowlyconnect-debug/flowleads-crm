@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set hide_workflow_bar = true %}
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Tärkeimmät mahdollisuudet — FlowLeads{% endblock %}
 {% block content %}
@@ -353,11 +354,11 @@
             </div>
           </div>
           <div class="leads-opp-row__aside">
-            <div class="leads-opp-row__value">
+            <div class="leads-opp-row__value{% if not lead.deal_value %} leads-opp-row__value--missing{% endif %}">
               {% if lead.deal_value %}
               {{ currency_symbol }}{{ '{:,.0f}'.format(lead.deal_value|float).replace(',', ' ') }}
               {% else %}
-              —
+              Ei arvoa
               {% endif %}
             </div>
             <span class="leads-opp-row__next">{{ next_action }} →</span>

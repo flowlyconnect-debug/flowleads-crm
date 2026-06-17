@@ -2308,6 +2308,7 @@ details.ai-insights summary {
   padding: 4px 0;
   overflow: hidden;
   margin-top: 0;
+  min-height: 0;
 }
 
 .leads-opp-list-bar {
@@ -2507,6 +2508,13 @@ details.ai-insights summary {
   color: var(--color-text-primary);
 }
 
+.leads-opp-row__value--missing {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  letter-spacing: 0;
+}
+
 .leads-opp-row__next {
   display: inline-flex;
   align-items: center;
@@ -2528,6 +2536,7 @@ details.ai-insights summary {
   font-size: 13px;
   color: var(--color-text-muted);
   flex-wrap: wrap;
+  min-height: 20px;
 }
 
 .leads-opp-footer strong {
