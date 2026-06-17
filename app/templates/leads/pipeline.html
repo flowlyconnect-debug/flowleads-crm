@@ -19,6 +19,23 @@
   'note': 'Muistiinpano', 'meeting': 'Tapaaminen', 'meeting_scheduled': 'Tapaaminen',
   'stage_change': 'Vaihe muuttunut', 'stage_changed': 'Vaihe muuttunut',
 } %}
+{% set stage_display_labels = {
+  'new lead': 'Uusi liidi', 'uusi liidi': 'Uusi liidi', 'uusi': 'Uusi liidi',
+  'contacted': 'Kontaktoitu', 'kontaktoitu': 'Kontaktoitu',
+  'interested': 'Kiinnostunut', 'kiinnostunut': 'Kiinnostunut',
+  'kvalifioitu': 'Kvalifioitu', 'qualified': 'Kvalifioitu',
+  'proposal sent': 'Tarjous lähetetty', 'tarjous lähetetty': 'Tarjous lähetetty',
+  'proposal': 'Tarjous lähetetty', 'tarjous': 'Tarjous lähetetty',
+  'won': 'Voitettu', 'voitettu': 'Voitettu', 'closed won': 'Voitettu',
+  'lost': 'Hävitty', 'hävitty': 'Hävitty', 'closed lost': 'Hävitty',
+} %}
+{% set signal_display_overrides = {
+  'created via api': 'Luotu automaatiolla',
+  'created via n8n': 'Luotu automaatiolla',
+  'created via import': 'Tuotu järjestelmään',
+  'created via webform': 'Luotu lomakkeesta',
+  'new lead': 'Uusi liidi',
+} %}
 {% set ns = namespace(total_leads=0, total_value=0, slipping=0, near_close=0) %}
 {% for stage in stages %}
   {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
@@ -170,11 +187,13 @@
 
   {% if stages %}
   <div class="pipeline-wrapper" id="pipeline-wrapper">
-    <div class="pipeline-board kanban" id="kanban">
+    <div class="pipeline-board kanban" id="kanban" style="--pipeline-cols: {{ stages|length }}">
       {% for stage in stages %}
       {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
       {% set stage_count = stage_leads|length %}
       {% set stage_total = stage_deal_totals.get(stage.id) %}
+      {% set stage_key = stage.name|lower|trim %}
+      {% set stage_display = stage_display_labels.get(stage_key, stage.name) %}
       {% set col_ns = namespace(slipping=0, near_close=0, stuck=0) %}
       {% for item in stage_leads %}
         {% set lead = item.get('lead') if item is mapping else item %}
@@ -207,11 +226,11 @@
         {% set col_note_mod = '' %}
       {% endif %}
 
-      <section class="pipeline-col kanban-col{% if stage_count == 0 %} pipeline-col--empty{% endif %}" data-stage-id="{{ stage.id }}" aria-label="{{ stage.name }}">
+      <section class="pipeline-col kanban-col{% if stage_count == 0 %} pipeline-col--empty{% endif %}" data-stage-id="{{ stage.id }}" data-stage-name="{{ stage.name }}" aria-label="{{ stage_display }}">
         <header class="pipeline-col__header">
           <div class="pipeline-col__title-row">
             <span class="pipeline-col__dot" style="background: {{ stage.color or '#94A3B8' }};" aria-hidden="true"></span>
-            <h2 class="pipeline-col__title">{{ stage.name }}</h2>
+            <h2 class="pipeline-col__title">{{ stage_display }}</h2>
             <span class="pipeline-col__count">{{ stage_count }}</span>
           </div>
           <div class="pipeline-col__value" data-col-value>
@@ -244,7 +263,9 @@
           {% set is_slipping = (last_days is not none and last_days >= 7) or (last_days is none and created_days is not none and created_days >= 7) %}
           {% set is_near = (prob is not none and prob >= 0.6) or (ai_rec and ai_rec.get('text') in ['Seuraa välittömästi', 'Lähetä tarjous']) %}
           {% set is_stuck = stage_days >= 14 %}
-          {% set stage_lower = stage.name|lower %}
+          {% set is_proposal_sent_stage = stage_key in ['proposal sent', 'tarjous lähetetty', 'proposal'] %}
+          {% set is_proposal_stage = is_proposal_sent_stage or 'tarjous' in stage_key or 'proposal' in stage_key %}
+          {% set is_won_stage = stage_key in ['won', 'voitettu', 'closed won'] %}
           {% set status = namespace(label='', mod='') %}
           {% set card_mod = '' %}
           {% if is_slipping %}
@@ -257,26 +278,35 @@
           {% elif ai_rec and ai_rec.get('text') == 'Muistuta tarjouksesta' %}
             {% set status.label = 'Tarjous odottaa' %}
             {% set status.mod = 'proposal' %}
-          {% elif 'tarjous' in stage_lower %}
+          {% elif is_proposal_sent_stage %}
+            {% set status.label = 'Tarjous lähetetty' %}
+            {% set status.mod = 'stage' %}
+          {% elif is_proposal_stage %}
             {% set status.label = 'Tarjousvaihe' %}
             {% set status.mod = 'stage' %}
           {% elif created_days is not none and created_days <= 7 and (last_days is none or last_days > created_days) %}
             {% set status.label = 'Uusi' %}
             {% set status.mod = 'new' %}
           {% endif %}
-          {% if 'voitettu' in stage_lower or 'won' in stage_lower %}
+          {% if is_won_stage %}
             {% set card_mod = 'won' %}
           {% endif %}
           {% if lead.score_reason %}
-            {% set signal_text = lead.score_reason|truncate(48, True, '…') %}
+            {% set signal_text = lead.score_reason|truncate(40, True, '…') %}
           {% elif last_activity and last_activity.content %}
-            {% set signal_text = last_activity.content|truncate(48, True, '…') %}
+            {% set signal_text = last_activity.content|truncate(40, True, '…') %}
           {% elif last_activity %}
             {% set signal_text = act_labels.get(last_activity.type, 'Aktiviteetti') %}
           {% elif created_days is not none and created_days <= 3 %}
             {% set signal_text = 'Uusi liidi' %}
           {% else %}
             {% set signal_text = 'Ei viimeisintä signaalia' %}
+          {% endif %}
+          {% set signal_key = signal_text|lower|trim %}
+          {% if signal_key in signal_display_overrides %}
+            {% set signal_text = signal_display_overrides[signal_key] %}
+          {% elif signal_key.startswith('created via') %}
+            {% set signal_text = 'Luotu automaatiolla' %}
           {% endif %}
           {% if last_days is not none %}
             {% if last_days == 0 %}
@@ -310,7 +340,7 @@
             {% set next_action = 'Uudelleenaktivoi' %}
           {% elif lead.score is not none and lead.score >= 80 %}
             {% set next_action = 'Soita' %}
-          {% elif 'tarjous' in stage_lower %}
+          {% elif is_proposal_stage %}
             {% set next_action = 'Seuraa' %}
           {% elif created_days is not none and created_days <= 7 %}
             {% set next_action = 'Ensikontakti' %}
@@ -637,8 +667,11 @@
   function onCardMoved(card, targetColumn) {
     if (!card) return;
     card.dataset.stuck = '0';
-    const stageTitle = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim();
-    if (stageTitle) card.dataset.stageName = stageTitle;
+    const technicalStageName =
+      targetColumn?.dataset?.stageName ||
+      targetColumn?.getAttribute('data-stage-name') ||
+      '';
+    if (technicalStageName) card.dataset.stageName = technicalStageName;
   }
 
   function countColumnFlags(listEl) {
@@ -822,7 +855,10 @@
           const prevIndex = evt.oldIndex;
           const cardEl = card?.classList?.contains('lead-card') ? card : (resolveLeadCardElement(card) || card);
           const targetColumn = evt.to?.closest('.pipeline-col');
-          const newStageName = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim() || '';
+          const newStageName =
+            targetColumn?.dataset?.stageName ||
+            targetColumn?.getAttribute('data-stage-name') ||
+            '';
           const flagSnapshot = evt.item.__flFlagSnapshot || null;
           delete evt.item.__flFlagSnapshot;
 
