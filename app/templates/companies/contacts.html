@@ -33,51 +33,62 @@
   {% else %}
     {% set next_action = 'Täydennä tiedot' %}
   {% endif %}
-  <article class="crm-contact-row contacts-row" role="listitem"
+  <article class="contacts-focus-row contacts-row{% if is_dm %} contacts-focus-row--priority{% endif %}{% if is_quiet %} contacts-focus-row--quiet{% endif %}"
+           role="listitem"
            data-search="{{ search_blob }}"
            {% if company_url %}data-href="{{ company_url }}" tabindex="0"{% endif %}>
+    <div class="contacts-focus-row__accent" aria-hidden="true"></div>
     <span class="crm-contact-row__avatar" aria-hidden="true">{{ contact_initials(c) }}</span>
-    <div class="crm-registry-row__main">
-      <div class="crm-registry-row__headline">
-        <span class="crm-registry-row__name">{{ full_name }}</span>
-        {% if c.title %}
-        <span class="crm-contact-row__role">· {{ c.title }}</span>
-        {% endif %}
+
+    <div class="contacts-focus-row__body">
+      <div class="contacts-focus-row__head">
+        <h2 class="contacts-focus-row__name">{{ full_name }}</h2>
         {% if is_dm %}
         <span class="crm-registry-row__badge crm-registry-row__badge--decision">Päättäjä</span>
         {% elif is_quiet %}
         <span class="crm-registry-row__badge crm-registry-row__badge--slipping">Hiljainen</span>
         {% endif %}
       </div>
-      <div class="crm-registry-row__meta">
-        {% if company %}
-          {% if company_url %}
-          <a href="{{ company_url }}" class="crm-contact-row__company-link" onclick="event.stopPropagation()">{{ company.name }}</a>
-          {% else %}
-          {{ company.name }}
-          {% endif %}
-        {% else %}
-          Ei yritystä
-        {% endif %}
-        {% if c.email or c.phone %}
-        <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
-        <span class="crm-contact-row__contact-info">
-          {% if c.email %}{{ c.email }}{% endif %}
-          {% if c.email and c.phone %} · {% endif %}
-          {% if c.phone %}{{ c.phone }}{% endif %}
-        </span>
-        {% endif %}
-      </div>
+
+      <dl class="contacts-focus-row__facts">
+        <div class="contacts-focus-row__fact">
+          <dt>Yritys</dt>
+          <dd>
+            {% if company %}
+              {% if company_url %}
+              <a href="{{ company_url }}" class="crm-contact-row__company-link" onclick="event.stopPropagation()">{{ company.name }}</a>
+              {% else %}
+              {{ company.name }}
+              {% endif %}
+            {% else %}
+              Ei yritystä
+            {% endif %}
+          </dd>
+        </div>
+        <div class="contacts-focus-row__fact">
+          <dt>Rooli</dt>
+          <dd>{{ c.title or "—" }}</dd>
+        </div>
+        <div class="contacts-focus-row__fact">
+          <dt>Yhteystiedot</dt>
+          <dd class="crm-contact-row__contact-info">
+            {% if c.email %}{{ c.email }}{% endif %}
+            {% if c.email and c.phone %} · {% endif %}
+            {% if c.phone %}{{ c.phone }}{% else %}{% if not c.email %}—{% endif %}{% endif %}
+          </dd>
+        </div>
+        <div class="contacts-focus-row__fact contacts-focus-row__fact--activity">
+          <dt>Viimeisin kontakti</dt>
+          <dd class="{% if is_quiet %}crm-registry-row__meta-time--warn{% else %}crm-registry-row__meta-time--muted{% endif %}">
+            {% if c.updated_at %}{{ c.updated_at.strftime('%d.%m.%Y') }}{% else %}Ei kontaktia{% endif %}
+          </dd>
+        </div>
+      </dl>
     </div>
-    <div class="crm-registry-row__aside">
-      <div class="crm-registry-row__meta{% if is_quiet %} crm-registry-row__meta-time--warn{% else %} crm-registry-row__meta-time--muted{% endif %}" style="margin-top:0;font-size:12.5px;">
-        {% if c.updated_at %}
-        Viimeisin aktiviteetti {{ c.updated_at.strftime('%d.%m.%Y') }}
-        {% else %}
-        Ei aktiviteettia
-        {% endif %}
-      </div>
-      <span class="crm-registry-row__next"><span class="sr-only">Seuraava toimi: </span>{{ next_action }} →</span>
+
+    <div class="contacts-focus-row__cta">
+      <span class="contacts-focus-row__cta-label">Seuraava toimi</span>
+      <span class="contacts-focus-row__next">{{ next_action }} →</span>
     </div>
   </article>
 {% endmacro %}
@@ -128,7 +139,7 @@
   <div id="contacts-groups">
     <section class="crm-contacts-group" data-contact-group="priority">
       <div class="crm-contacts-group__head">
-        <h2 class="crm-contacts-group__title crm-contacts-group__title--priority">Päättäjät</h2>
+        <h2 class="crm-contacts-group__title crm-contacts-group__title--priority">Päättäjät — aloita tästä</h2>
         <span class="crm-contacts-group__count"></span>
       </div>
       <div class="card crm-registry-card">
