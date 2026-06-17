@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, flash, redirect, render_template, request,
 from flask_login import current_user, login_required
 
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
-from app.admin.services import get_accessible_organizations, get_dashboard_stats
+from app.admin.services import get_accessible_organizations, get_dashboard_stats, list_customers_summary
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
@@ -97,6 +97,15 @@ def dashboard():
         stats=stats,
         organizations=organizations,
     )
+
+
+@admin_bp.route("/customers")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def customers_list():
+    customers = list_customers_summary()
+    return render_template("admin/customers.html", customers=customers)
 
 
 @admin_bp.route("/organizations", methods=["POST"])

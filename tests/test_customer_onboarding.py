@@ -180,3 +180,60 @@ def test_superadmin_onboarding_form_and_result(client, app):
 
     second_view = client.get("/admin/customers/result")
     assert second_view.status_code == 302
+
+
+def test_superadmin_customers_list(app, client):
+    with app.app_context():
+        actor = create_user("sa-customers@test.com", "securepassword1", role="superadmin")
+        actor.totp_enabled = True
+        db.session.commit()
+        create_customer(
+            actor=actor,
+            organization_name="Listaus Test Oy",
+            admin_email="listaus@test.fi",
+            admin_password="securepassword1",
+            admin_name=None,
+            search_profile_name="Lukkoremontti Uusimaa",
+            regions=["Uusimaa"],
+            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            is_active=True,
+        )
+        db.session.commit()
+
+    client.post(
+        "/auth/login",
+        data={"email": "sa-customers@test.com", "password": "securepassword1"},
+    )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+
+    response = client.get("/admin/customers")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "Listaus Test Oy" in page
+    assert "Lukkoremontti Uusimaa" in page
+    assert "Asiakaslista" in page
+    assert "Avaa" in page
+    assert "Muokkaa" in page
+
+
+def test_admin_cannot_access_customers_list(app, client):
+    with app.app_context():
+        from app.users.services import create_organization
+
+        org = create_organization("Admin Org", "admin-org")
+        db.session.flush()
+        create_user(
+            "admin-customers@test.com",
+            "securepassword1",
+            role="admin",
+            organization_id=org.id,
+        )
+        db.session.commit()
+
+    client.post(
+        "/auth/login",
+        data={"email": "admin-customers@test.com", "password": "securepassword1"},
+    )
+    response = client.get("/admin/customers")
+    assert response.status_code == 403

@@ -77,7 +77,7 @@ def test_search_profiles_list_and_create(app, client):
 
     response = client.get("/settings/search-profiles")
     assert response.status_code == 200
-    assert "Hakuprofiilit" in response.get_data(as_text=True)
+    assert "Hakuprofiili" in response.get_data(as_text=True)
 
     create_resp = client.post(
         "/settings/search-profiles",
@@ -167,7 +167,7 @@ def test_search_profiles_admin_ignores_invalid_org_query_param(app, client):
     _login(client, ctx["admin_email"])
     response = client.get("/settings/search-profiles?organization_id=99999")
     assert response.status_code == 200
-    assert "Hakuprofiilit" in response.get_data(as_text=True)
+    assert "Hakuprofiili" in response.get_data(as_text=True)
 
 
 def test_search_profiles_superadmin_invalid_org_redirects(app, client):

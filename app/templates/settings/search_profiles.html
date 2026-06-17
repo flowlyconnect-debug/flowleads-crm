@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
 {% from "_macros.html" import empty_state %}
-{% block title %}Hakuprofiilit{% endblock %}
+{% block title %}Hakuprofiili{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
@@ -9,7 +9,7 @@
     <div class="settings-content">
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Hakuprofiilit</h1>
+          <h1 class="settings-panel__title">Hakuprofiili</h1>
           <p class="settings-panel__subtitle">Määritä automaattiset Oikotie-haut — n8n ajaa profiilit ja lähettää liidit CRM:ään.</p>
           {% if page_error %}
           <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
@@ -17,7 +17,7 @@
         </header>
 
         <div class="search-profiles-layout">
-          <aside class="search-profiles-list" aria-label="Hakuprofiilit">
+          <aside class="search-profiles-list" aria-label="Hakuprofiili">
             <div class="search-profiles-list__header">
               <span class="text-sm font-medium">Profiilit</span>
               <a href="{{ url_for('settings.search_profiles_list', id='new', **org_query) }}"

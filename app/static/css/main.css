@@ -4460,6 +4460,23 @@ body.modal-open {
   border: none;
 }
 
+.settings-nav__group-label {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-nav__group-label:not(:first-of-type) {
+  margin-top: var(--space-2);
+}
+
+.settings-nav__item--nested {
+  padding-left: calc(var(--space-3) + 8px);
+}
+
 .settings-content {
   min-width: 0;
 }

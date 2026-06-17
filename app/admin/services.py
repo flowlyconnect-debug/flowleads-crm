@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 from flask_login import current_user
 
 from app.leads.models import Activity, Lead
+from app.search.profile_services import list_profiles
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, ensure_same_organization
 
@@ -61,3 +64,34 @@ def get_ai_usage_stats() -> dict:
         "total_tokens": total_tokens,
         "failed_count": failed_count,
     }
+
+
+def _format_last_search(dt: datetime | None) -> str:
+    if dt is None:
+        return "—"
+    now = datetime.now(timezone.utc)
+    if dt.date() == now.date():
+        return "Tänään"
+    yesterday = (now - timedelta(days=1)).date()
+    if dt.date() == yesterday:
+        return "Eilen"
+    return dt.strftime("%d.%m.%Y")
+
+
+def list_customers_summary() -> list[dict]:
+    customers = []
+    for org in get_accessible_organizations():
+        profiles = list_profiles(org.id)
+        profile = profiles[0] if profiles else None
+        customers.append(
+            {
+                "org": org,
+                "profile_name": profile.name if profile else None,
+                "lead_count": Lead.query.filter_by(organization_id=org.id).count(),
+                "last_search_label": _format_last_search(
+                    profile.last_run_at if profile else None
+                ),
+                "is_active": org.is_active,
+            }
+        )
+    return customers

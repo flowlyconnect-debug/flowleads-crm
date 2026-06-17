@@ -18,29 +18,43 @@
 {% set use_org = current_user.is_superadmin() and org_id_param %}
 <nav class="settings-nav" aria-label="Asetukset">
   <span class="settings-nav__label">Asetukset</span>
-  <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Profiili</span>
-  <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Organisaatio</span>
-  {% if current_user.role in ('admin', 'superadmin') %}
-  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item{% if active in ('api_keys', 'integrations') %} is-active{% endif %}">API-avaimet</a>
-  <a href="{% if use_org %}{{ url_for('settings.email_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.email_settings') }}{% endif %}" class="settings-nav__item{% if active == 'email' %} is-active{% endif %}">Sähköposti</a>
-  {% endif %}
-  <a href="{% if use_org %}{{ url_for('settings.email_templates_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.email_templates_list') }}{% endif %}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
-  {% if current_user.role in ('admin', 'superadmin') %}
-  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
-  <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="settings-nav__item{% if active == 'webhooks' %} is-active{% endif %}">Webhooks</a>
-  <a href="{% if use_org %}{{ url_for('settings.lead_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.lead_settings') }}{% endif %}" class="settings-nav__item{% if active == 'lead_settings' %} is-active{% endif %}">Liidiasetukset</a>
-  <a href="{% if use_org %}{{ url_for('settings.search_profiles_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.search_profiles_list') }}{% endif %}" class="settings-nav__item{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiilit</a>
-  <a href="{% if use_org %}{{ url_for('settings.privacy_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.privacy_settings') }}{% endif %}" class="settings-nav__item{% if active == 'privacy' %} is-active{% endif %}">Tietosuoja</a>
-  <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Laskutus</span>
-  <a href="{% if use_org %}{{ url_for('settings.proposals_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.proposals_settings') }}{% endif %}" class="settings-nav__item{% if active == 'proposals' %} is-active{% endif %}">Tarjoukset</a>
-  {% endif %}
-  <a href="{% if use_org %}{{ url_for('settings.calendar_settings', organization_id=org_id_param) }}{% else %}{{ url_for('settings.calendar_settings') }}{% endif %}" class="settings-nav__item{% if active == 'calendar' %} is-active{% endif %}">Kalenteri</a>
+
   {% if current_user.is_superadmin() %}
-  <hr class="settings-nav__divider" aria-hidden="true">
-  <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item{% if active == 'backups' %} is-active{% endif %}">Backups</a>
-  <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item{% if active == 'admin_reports' %} is-active{% endif %}">System reports</a>
-  <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
-  <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
+
+  <span class="settings-nav__group-label">Asiakkaat</span>
+  <a href="{{ url_for('admin.customers_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customers' %} is-active{% endif %}">Asiakaslista</a>
+  <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
+
+  <span class="settings-nav__group-label">Hakujärjestelmä</span>
+  <a href="{% if use_org %}{{ url_for('settings.search_profiles_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.search_profiles_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiili</a>
+  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'api_keys' %} is-active{% endif %}">API-avaimet</a>
+
+  <span class="settings-nav__group-label">Integraatiot</span>
+  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
+  <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'webhooks' %} is-active{% endif %}">Webhooks</a>
+
+  <span class="settings-nav__group-label">Järjestelmä</span>
+  <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Backups</a>
+  <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin_reports' %} is-active{% endif %}">System Reports</a>
+  <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
+
+  {% elif current_user.role == 'admin' %}
+
+  <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Organisaatio</span>
+  <a href="{{ url_for('settings.search_profiles_list') }}" class="settings-nav__item{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiili</a>
+  <a href="{{ url_for('settings.api_keys') }}" class="settings-nav__item{% if active == 'api_keys' %} is-active{% endif %}">API-avain</a>
+
+  <span class="settings-nav__group-label">Sähköposti</span>
+  <a href="{{ url_for('settings.email_settings') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email' %} is-active{% endif %}">Sähköpostiasetukset</a>
+  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
+
+  <a href="{{ url_for('settings.api_keys') }}" class="settings-nav__item{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
+  <a href="{{ url_for('settings.privacy_settings') }}" class="settings-nav__item{% if active == 'privacy' %} is-active{% endif %}">Tietosuoja</a>
+
+  {% else %}
+
+  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
+
   {% endif %}
 </nav>
 {% endmacro %}

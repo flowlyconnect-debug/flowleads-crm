@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Asiakkaat — Asetukset{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('customers') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Asiakkaat</h1>
+          <p class="settings-panel__subtitle">Kaikki organisaatiot ja niiden hakuprofiilit.</p>
+        </header>
+
+        <p style="margin-bottom: 1rem;">
+          <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo asiakas</a>
+        </p>
+
+        {% if customers %}
+        <table>
+          <thead>
+            <tr>
+              <th>Asiakas</th>
+              <th>Hakuprofiili</th>
+              <th>Liidejä</th>
+              <th>Viimeisin haku</th>
+              <th>Status</th>
+              <th>Toiminnot</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in customers %}
+            <tr>
+              <td>{{ row.org.name }}</td>
+              <td>{{ row.profile_name or '—' }}</td>
+              <td>{{ row.lead_count }}</td>
+              <td>{{ row.last_search_label }}</td>
+              <td>{% if row.is_active %}Aktiivinen{% else %}Ei aktiivinen{% endif %}</td>
+              <td>
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=row.org.id) }}">Avaa</a>
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id) }}">Muokkaa</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>Ei asiakkaita vielä. <a href="{{ url_for('admin.create_customer_route') }}">Luo ensimmäinen asiakas</a>.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
