@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set hide_workflow_bar = true %}
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Myyntiputki — FlowLeads{% endblock %}
 {% block head %}
@@ -13,41 +14,52 @@
 {% set filters = filters|default({}) %}
 {% set currency_symbol = currency_symbol|default('€') %}
 {% set is_superadmin = current_user.is_authenticated and current_user.is_superadmin() %}
-{% set ns = namespace(total_leads=0, total_value=0) %}
+{% set act_labels = {
+  'email': 'Sähköposti', 'email_sent': 'Sähköposti', 'call': 'Soitettu',
+  'note': 'Muistiinpano', 'meeting': 'Tapaaminen', 'meeting_scheduled': 'Tapaaminen',
+  'stage_change': 'Vaihe muuttunut', 'stage_changed': 'Vaihe muuttunut',
+} %}
+{% set ns = namespace(total_leads=0, total_value=0, slipping=0, near_close=0) %}
 {% for stage in stages %}
   {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
   {% set ns.total_leads = ns.total_leads + (stage_leads|length) %}
   {% if stage_deal_totals.get(stage.id) %}
     {% set ns.total_value = ns.total_value + stage_deal_totals.get(stage.id) %}
   {% endif %}
+  {% for item in stage_leads %}
+    {% set lead = item.get('lead') if item is mapping else item %}
+    {% if lead %}
+      {% set last_days = item.get('days_since_last_activity') if item is mapping else none %}
+      {% set created_days = (now.date() - lead.created_at.date()).days if lead.created_at else none %}
+      {% set is_slipping = (last_days is not none and last_days >= 7) or (last_days is none and created_days is not none and created_days >= 7) %}
+      {% set prob = lead.close_probability|float if lead.close_probability is not none else none %}
+      {% set ai_rec = item.get('ai_recommendation') if item is mapping else none %}
+      {% set is_near = (prob is not none and prob >= 0.6) or (ai_rec and ai_rec.get('text') in ['Seuraa välittömästi', 'Lähetä tarjous']) %}
+      {% if is_slipping %}{% set ns.slipping = ns.slipping + 1 %}{% endif %}
+      {% if is_near %}{% set ns.near_close = ns.near_close + 1 %}{% endif %}
+    {% endif %}
+  {% endfor %}
 {% endfor %}
 
 <section class="pipeline" aria-label="Myyntiputki">
   <header class="pipeline-page-header">
     <div class="pipeline-page-header__main">
       <h1 class="pipeline-page-header__title">Myyntiputki</h1>
-      <p class="pipeline-page-header__subtitle">
-        <span id="pipeline-total-leads">
-          <strong>{{ ns.total_leads if ns.total_leads is not none else 0 }}</strong> liidiä
-        </span>
-        <span class="pipeline-page-header__sep" aria-hidden="true">·</span>
-        <span id="pipeline-total-value">
-          <strong>{{ currency_symbol }}{{ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ') if ns.total_value else '0' }}</strong> yhteensä
-        </span>
-      </p>
+      <p class="pipeline-page-header__subtitle">Näe missä raha liikkuu ja mihin pitää tarttua.</p>
     </div>
 
     <div class="pipeline-page-actions">
       <label class="pipeline-search" for="pipeline-search">
         <span class="sr-only">Hae liidejä</span>
-        <svg class="pipeline-search__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+        <svg class="pipeline-search__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
         </svg>
         <input id="pipeline-search" class="pipeline-search__input" type="search" placeholder="Hae nimi, yritys…" autocomplete="off" />
       </label>
 
       <div class="pipeline-filters">
-        <button type="button" class="btn btn-ghost btn-sm pipeline-filters__toggle" id="pipeline-filters-toggle" aria-expanded="false" aria-controls="pipeline-filters-panel">
+        <button type="button" class="btn btn-secondary btn-sm pipeline-filters__toggle" id="pipeline-filters-toggle" aria-expanded="false" aria-controls="pipeline-filters-panel">
+          <svg class="pipeline-filters__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
           Suodattimet
         </button>
 
@@ -73,7 +85,7 @@
                 <select name="source">
                   <option value="">Kaikki</option>
                   <option value="manual" {% if filters.get('source') == 'manual' %}selected{% endif %}>Manuaalinen</option>
-                  <option value="n8n" {% if filters.get('source') == 'n8n' %}selected{% endif %}>n8n</option>
+                  <option value="n8n" {% if filters.get('source') == 'n8n' %}selected{% endif %}>Automaatio</option>
                   <option value="import" {% if filters.get('source') == 'import' %}selected{% endif %}>Tuonti</option>
                 </select>
               </label>
@@ -86,19 +98,60 @@
         </div>
       </div>
 
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', organization_id=organization_id) if is_superadmin else url_for('leads.list_leads') }}">Lista</a>
-      <a class="btn btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">Lisää liidi</a>
     </div>
 
     <div class="pipeline-toast" id="pipeline-toast" aria-live="polite" aria-atomic="true"></div>
   </header>
+
+  {% if stages and ns.total_leads > 0 %}
+  <div class="pipeline-summary" id="pipeline-summary" aria-label="Putken yhteenveto">
+    <div class="pipeline-summary__stats">
+      <span class="pipeline-summary__item">
+        Putkessa <strong id="pipeline-total-value">{{ currency_symbol }}{{ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ') if ns.total_value else '0' }}</strong>
+      </span>
+      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
+      <span class="pipeline-summary__item">
+        <strong id="pipeline-total-leads">{{ ns.total_leads if ns.total_leads is not none else 0 }}</strong> liidiä
+      </span>
+      {% if ns.slipping > 0 %}
+      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
+      <span class="pipeline-summary__flag pipeline-summary__flag--warn" id="pipeline-slipping-wrap">
+        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+        <span id="pipeline-slipping-count">{{ ns.slipping }}</span>
+        <span id="pipeline-slipping-label">{{ 'liidi' if ns.slipping == 1 else 'liidiä' }} liukumassa pois</span>
+      </span>
+      {% else %}
+      <span class="pipeline-summary__flag pipeline-summary__flag--warn" id="pipeline-slipping-wrap" hidden>
+        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+        <span id="pipeline-slipping-count">0</span>
+        <span id="pipeline-slipping-label">liidiä liukumassa pois</span>
+      </span>
+      {% endif %}
+      {% if ns.near_close > 0 %}
+      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
+      <span class="pipeline-summary__flag pipeline-summary__flag--success" id="pipeline-near-wrap">
+        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+        <span id="pipeline-near-count">{{ ns.near_close }}</span>
+        <span id="pipeline-near-label">lähellä sulkeutumista</span>
+      </span>
+      {% else %}
+      <span class="pipeline-summary__flag pipeline-summary__flag--success" id="pipeline-near-wrap" hidden>
+        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+        <span id="pipeline-near-count">0</span>
+        <span id="pipeline-near-label">lähellä sulkeutumista</span>
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
   {% if not stages %}
     <div class="card pipeline-empty">
       {{ empty_state(
         "ti-layout-kanban",
         "Ei liidejä tässä vaiheessa",
-        "Vedä liidejä tähän vaiheeseen tai muuta pipeline-vaiheiden järjestystä.",
+        "Vedä liidi tähän kun se etenee tai muuta pipeline-vaiheiden järjestystä.",
         "Hallinnoi pipelinea",
         "/settings/pipeline"
       ) }}
@@ -108,9 +161,9 @@
       {{ empty_state(
         "ti-layout-kanban",
         "Ei liidejä tässä vaiheessa",
-        "Vedä liidejä tähän vaiheeseen tai muuta pipeline-vaiheiden järjestystä.",
-        "Hallinnoi pipelinea",
-        "/settings/pipeline"
+        "Vedä liidi tähän kun se etenee tai lisää uusi liidi putkeen.",
+        "Lisää liidi",
+        url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead')
       ) }}
     </div>
   {% endif %}
@@ -122,23 +175,56 @@
       {% set stage_leads = leads_by_stage.get(stage.id, []) if leads_by_stage is mapping else [] %}
       {% set stage_count = stage_leads|length %}
       {% set stage_total = stage_deal_totals.get(stage.id) %}
+      {% set col_ns = namespace(slipping=0, near_close=0, stuck=0) %}
+      {% for item in stage_leads %}
+        {% set lead = item.get('lead') if item is mapping else item %}
+        {% if lead %}
+          {% set last_days = item.get('days_since_last_activity') if item is mapping else none %}
+          {% set created_days = (now.date() - lead.created_at.date()).days if lead.created_at else none %}
+          {% if (last_days is not none and last_days >= 7) or (last_days is none and created_days is not none and created_days >= 7) %}
+            {% set col_ns.slipping = col_ns.slipping + 1 %}
+          {% endif %}
+          {% set prob = lead.close_probability|float if lead.close_probability is not none else none %}
+          {% set ai_rec = item.get('ai_recommendation') if item is mapping else none %}
+          {% if (prob is not none and prob >= 0.6) or (ai_rec and ai_rec.get('text') in ['Seuraa välittömästi', 'Lähetä tarjous']) %}
+            {% set col_ns.near_close = col_ns.near_close + 1 %}
+          {% endif %}
+          {% set stage_days = item.get('stage_days', 0) if item is mapping else 0 %}
+          {% if stage_days >= 14 %}{% set col_ns.stuck = col_ns.stuck + 1 %}{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if col_ns.slipping > 0 %}
+        {% set col_note = (col_ns.slipping|string) ~ (' liidi liukumassa pois' if col_ns.slipping == 1 else ' liidiä liukumassa pois') %}
+        {% set col_note_mod = 'warn' %}
+      {% elif col_ns.near_close > 0 %}
+        {% set col_note = (col_ns.near_close|string) ~ ' lähellä sulkeutumista' %}
+        {% set col_note_mod = 'success' %}
+      {% elif col_ns.stuck > 0 %}
+        {% set col_note = (col_ns.stuck|string) ~ (' liidi jumissa' if col_ns.stuck == 1 else ' liidiä jumissa') %}
+        {% set col_note_mod = 'muted' %}
+      {% else %}
+        {% set col_note = none %}
+        {% set col_note_mod = '' %}
+      {% endif %}
 
       <section class="pipeline-col kanban-col{% if stage_count == 0 %} pipeline-col--empty{% endif %}" data-stage-id="{{ stage.id }}" aria-label="{{ stage.name }}">
         <header class="pipeline-col__header">
-          <div class="pipeline-col__title-bar">
+          <div class="pipeline-col__title-row">
+            <span class="pipeline-col__dot" style="background: {{ stage.color or '#94A3B8' }};" aria-hidden="true"></span>
             <h2 class="pipeline-col__title">{{ stage.name }}</h2>
             <span class="pipeline-col__count">{{ stage_count }}</span>
           </div>
           <div class="pipeline-col__value" data-col-value>
             {{ currency_symbol }}{{ '{:,.0f}'.format(stage_total|float).replace(',', ' ') if stage_total else '0' }}
           </div>
+          <div class="pipeline-col__note pipeline-col__note--{{ col_note_mod }}" data-col-note{% if not col_note %} hidden{% endif %}>{{ col_note or '' }}</div>
         </header>
 
         <div class="pipeline-col__list kanban-list" data-stage-id="{{ stage.id }}" role="list">
           {% if stage_count == 0 %}
             <div class="pipeline-col__placeholder">
               <div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div>
-              <div class="pipeline-col__placeholder-text">Vedä liidejä tähän vaiheeseen.</div>
+              <div class="pipeline-col__placeholder-text">Vedä liidi tähän kun se etenee</div>
             </div>
           {% endif %}
 
@@ -151,84 +237,117 @@
           {% set stage_days = item.get('stage_days', 0) if item is mapping else 0 %}
           {% set ai_rec = item.get('ai_recommendation') if item is mapping else none %}
           {% set next_task = item.get('next_task') if item is mapping else none %}
-          {% set last_activity_days = item.get('days_since_last_activity') if item is mapping else none %}
-          {% if lead.score is not none and lead.score >= 80 %}
-            {% set accent_color = '#EF4444' %}
-          {% elif lead.score is not none and lead.score >= 60 %}
-            {% set accent_color = '#F59E0B' %}
-          {% elif lead.score is not none and lead.score >= 40 %}
-            {% set accent_color = '#1D6BF3' %}
-          {% else %}
-            {% set accent_color = '#E5E7EB' %}
+          {% set last_activity = item.get('last_activity') if item is mapping else none %}
+          {% set last_days = item.get('days_since_last_activity') if item is mapping else none %}
+          {% set created_days = (now.date() - lead.created_at.date()).days if lead.created_at else none %}
+          {% set prob = lead.close_probability|float if lead.close_probability is not none else none %}
+          {% set is_slipping = (last_days is not none and last_days >= 7) or (last_days is none and created_days is not none and created_days >= 7) %}
+          {% set is_near = (prob is not none and prob >= 0.6) or (ai_rec and ai_rec.get('text') in ['Seuraa välittömästi', 'Lähetä tarjous']) %}
+          {% set is_stuck = stage_days >= 14 %}
+          {% set stage_lower = stage.name|lower %}
+          {% set status = namespace(label='', mod='') %}
+          {% set card_mod = '' %}
+          {% if is_slipping %}
+            {% set status.label = 'Liukumassa pois' %}
+            {% set status.mod = 'slipping' %}
+            {% set card_mod = 'risk' %}
+          {% elif lead.score is not none and lead.score >= 70 %}
+            {% set status.label = 'Kuuma' %}
+            {% set status.mod = 'hot' %}
+          {% elif ai_rec and ai_rec.get('text') == 'Muistuta tarjouksesta' %}
+            {% set status.label = 'Tarjous odottaa' %}
+            {% set status.mod = 'proposal' %}
+          {% elif 'tarjous' in stage_lower %}
+            {% set status.label = 'Tarjousvaihe' %}
+            {% set status.mod = 'stage' %}
+          {% elif created_days is not none and created_days <= 7 and (last_days is none or last_days > created_days) %}
+            {% set status.label = 'Uusi' %}
+            {% set status.mod = 'new' %}
           {% endif %}
+          {% if 'voitettu' in stage_lower or 'won' in stage_lower %}
+            {% set card_mod = 'won' %}
+          {% endif %}
+          {% if lead.score_reason %}
+            {% set signal_text = lead.score_reason|truncate(48, True, '…') %}
+          {% elif last_activity and last_activity.content %}
+            {% set signal_text = last_activity.content|truncate(48, True, '…') %}
+          {% elif last_activity %}
+            {% set signal_text = act_labels.get(last_activity.type, 'Aktiviteetti') %}
+          {% elif created_days is not none and created_days <= 3 %}
+            {% set signal_text = 'Uusi liidi' %}
+          {% else %}
+            {% set signal_text = 'Ei viimeisintä signaalia' %}
+          {% endif %}
+          {% if last_days is not none %}
+            {% if last_days == 0 %}
+              {% set contact_text = 'Tänään' %}
+              {% set contact_mod = 'ok' %}
+            {% elif last_days == 1 %}
+              {% set contact_text = '1 pv sitten' %}
+              {% set contact_mod = 'muted' %}
+            {% elif last_days < 7 %}
+              {% set contact_text = last_days ~ ' pv sitten' %}
+              {% set contact_mod = 'muted' %}
+            {% elif last_days < 14 %}
+              {% set contact_text = last_days ~ ' pv hiljaa' %}
+              {% set contact_mod = 'warn' %}
+            {% else %}
+              {% set contact_text = last_days ~ ' pv hiljaa' %}
+              {% set contact_mod = 'danger' %}
+            {% endif %}
+          {% elif created_days is not none and created_days >= 7 %}
+            {% set contact_text = created_days ~ ' pv hiljaa' %}
+            {% set contact_mod = 'danger' %}
+          {% else %}
+            {% set contact_text = 'Ei kontaktia' %}
+            {% set contact_mod = 'muted' %}
+          {% endif %}
+          {% if ai_rec and ai_rec.get('text') %}
+            {% set next_action = ai_rec.get('text') %}
+          {% elif next_task and next_task.title %}
+            {% set next_action = next_task.title|truncate(28, True, '…') %}
+          {% elif is_slipping %}
+            {% set next_action = 'Uudelleenaktivoi' %}
+          {% elif lead.score is not none and lead.score >= 80 %}
+            {% set next_action = 'Soita' %}
+          {% elif 'tarjous' in stage_lower %}
+            {% set next_action = 'Seuraa' %}
+          {% elif created_days is not none and created_days <= 7 %}
+            {% set next_action = 'Ensikontakti' %}
+          {% else %}
+            {% set next_action = 'Avaa' %}
+          {% endif %}
+          {% set detail_url = url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) %}
 
           <article
-            class="lead-card sortable-lead"
+            class="lead-card sortable-lead{% if card_mod %} lead-card--{{ card_mod }}{% endif %}"
             data-lead-id="{{ lead.id }}"
             data-id="{{ lead.id }}"
             data-deal-value="{{ deal_amount }}"
             data-stage-name="{{ stage.name }}"
             data-probability="{{ lead.close_probability|default(0) }}"
+            data-last-days="{{ last_days if last_days is not none else '' }}"
+            data-created-days="{{ created_days if created_days is not none else '' }}"
+            data-near-signal="{{ 1 if (ai_rec and ai_rec.get('text') in ['Seuraa välittömästi', 'Lähetä tarjous']) else 0 }}"
+            data-stuck="{{ 1 if is_stuck else 0 }}"
             tabindex="0"
             role="listitem"
             aria-label="{{ company_label }}"
-            style="--lead-accent: {{ accent_color }};"
           >
-            <div class="lead-card__accent" aria-hidden="true"></div>
-            <div class="lead-card__body">
-              <a class="lead-card__company" href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) }}">{{ company_label }}</a>
-              <div class="lead-card__contact">{{ contact_label }}</div>
-              <div class="lead-card__meta-row">
-                {% if lead.score is not none %}
-                  {% if lead.score >= 80 %}
-                    <span class="lead-pill lead-pill--red">🔥 {{ lead.score }}</span>
-                  {% elif lead.score >= 60 %}
-                    <span class="lead-pill lead-pill--amber">{{ lead.score }}</span>
-                  {% elif lead.score < 40 %}
-                    <span class="lead-pill lead-pill--gray">{{ lead.score }}</span>
-                  {% endif %}
-                {% endif %}
-                {% if stage_days > 14 %}
-                  <span class="lead-pill lead-pill--red">{{ stage_days }} pv — siirrä eteenpäin</span>
-                {% elif stage_days >= 8 %}
-                  <span class="lead-pill lead-pill--amber">{{ stage_days }} pv vaiheessa</span>
-                {% elif stage_days >= 3 %}
-                  <span class="lead-pill lead-pill--gray">{{ stage_days }} pv vaiheessa</span>
-                {% endif %}
-              </div>
-              {% if ai_rec and ai_rec.get('text') %}
-              <div class="lead-recommendation lead-recommendation--{{ ai_rec.get('type', 'opportunity') }}">
-                {% if ai_rec.get('type') == 'risk' %}
-                  <i class="ti ti-alert-triangle" aria-hidden="true"></i>
-                {% elif ai_rec.get('type') == 'followup' %}
-                  <i class="ti ti-clock" aria-hidden="true"></i>
-                {% else %}
-                  <i class="ti ti-star" aria-hidden="true"></i>
-                {% endif %}
-                {{ ai_rec.get('text')|truncate(32, True, '...') }}
-              </div>
-              {% endif %}
-              {% if next_task %}
-              {% set task_days = (next_task.due_date.date() - now.date()).days if next_task.due_date else none %}
-              <div class="lead-next-task {% if task_days is not none and task_days < 0 %}lead-next-task--overdue{% elif task_days == 0 %}lead-next-task--today{% else %}lead-next-task--future{% endif %}">
-                {{ next_task.title|truncate(32, True, '...') }}
-                {% if task_days is not none and task_days < 0 %}(myöhässä)
-                {% elif task_days == 0 %}(tänään)
-                {% elif task_days == 1 %}(huomenna)
-                {% elif task_days is not none %}({{ task_days }} pv päästä)
-                {% else %}(ei eräpäivää){% endif %}
-              </div>
-              {% endif %}
-              {% if last_activity_days is not none and last_activity_days > 0 %}
-              <div class="lead-last-contact {% if last_activity_days >= 14 %}lead-last-contact--red{% elif last_activity_days >= 7 %}lead-last-contact--amber{% else %}lead-last-contact--gray{% endif %}">
-                {% if last_activity_days >= 14 %}
-                  Ei kontaktia {{ last_activity_days }} pv
-                {% else %}
-                  Kontakti {{ last_activity_days }} pv sitten
-                {% endif %}
-              </div>
-              {% endif %}
+            <div class="lead-card__top">
+              <a class="lead-card__company" href="{{ detail_url }}">{{ company_label }}</a>
+              <span class="lead-card__value">{{ currency_symbol }}{{ '{:,.0f}'.format(deal_amount).replace(',', ' ') if deal_amount else '0' }}</span>
             </div>
+            <div class="lead-card__contact">{{ contact_label }}</div>
+            {% if status.label %}
+            <span class="lead-card__chip lead-card__chip--{{ status.mod }}">{{ status.label }}</span>
+            {% endif %}
+            <p class="lead-card__signal">
+              {{ signal_text }}
+              <span class="lead-card__signal-sep" aria-hidden="true">·</span>
+              <span class="lead-card__contact-time lead-card__contact-time--{{ contact_mod }}">{{ contact_text }}</span>
+            </p>
+            <a class="lead-card__next" href="{{ detail_url }}">Seuraava toimi: {{ next_action }} →</a>
           </article>
           {% endif %}
           {% endfor %}
@@ -329,17 +448,6 @@
     return null;
   }
 
-  function logSortableItemDebug(evt, phase) {
-    console.log(`Sortable item debug (${phase})`, {
-      item: evt.item,
-      itemClasses: evt.item?.className,
-      itemDataset: evt.item ? { ...evt.item.dataset } : null,
-      itemHtml: evt.item?.outerHTML,
-      resolvedLeadId: readLeadIdFromCard(evt.item),
-      resolvedCard: resolveLeadCardElement(evt.item),
-    });
-  }
-
   function buildStageUrl(leadId) {
     const id = parseLeadId(leadId);
     if (id === null) return null;
@@ -349,6 +457,7 @@
     }
     return stageUrlTemplate.replace(/\/leads\/0\/stage/, `/leads/${id}/stage`);
   }
+
   const isClosedLostStage = (stageName) => {
     const normalized = String(stageName || '').trim().toLowerCase();
     return (
@@ -357,6 +466,7 @@
       normalized === 'hävitty'
     );
   };
+
   let currentDragLeadId = null;
   let lostStageId = null;
   let originalColumn = null;
@@ -408,38 +518,6 @@
     modal.hidden = false;
     modal.style.display = 'flex';
     return true;
-  }
-
-  function resolveLostConfirmLeadId() {
-    const modal = document.getElementById('lost-reason-modal');
-    const fromModal = parseLeadId(modal?.dataset?.pendingLeadId);
-    if (fromModal) return fromModal;
-
-    const fromDraggedCard = readLeadIdFromCard(draggedCard);
-    if (fromDraggedCard) return fromDraggedCard;
-
-    const activeCard =
-      document.querySelector('.lead-card.is-dragging') ||
-      document.querySelector('.lead-card.dragging') ||
-      document.querySelector('.pipeline .lead-card.is-updating[aria-busy="true"]');
-    const fromActiveCard = readLeadIdFromCard(activeCard);
-    if (fromActiveCard) return fromActiveCard;
-
-    const pendingHost = document.querySelector('[data-pending-lead-id]');
-    const fromPendingAttr = parseLeadId(
-      pendingHost?.dataset?.pendingLeadId || pendingHost?.getAttribute?.('data-pending-lead-id')
-    );
-    if (fromPendingAttr) return fromPendingAttr;
-
-    return null;
-  }
-
-  function resolveLostConfirmStageId() {
-    const modal = document.getElementById('lost-reason-modal');
-    return (
-      parseLeadId(modal?.dataset?.pendingStageId) ||
-      parseLeadId(lostStageId)
-    );
   }
 
   function hideLostReasonModal() {
@@ -519,11 +597,107 @@
     return total;
   }
 
+  function parseOptionalInt(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number.parseInt(String(value), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function cardIsSlipping(card) {
+    const lastDays = parseOptionalInt(card?.dataset?.lastDays);
+    const createdDays = parseOptionalInt(card?.dataset?.createdDays);
+    if (lastDays !== null && lastDays >= 7) return true;
+    return lastDays === null && createdDays !== null && createdDays >= 7;
+  }
+
+  function cardIsNearClose(card) {
+    const prob = Number.parseFloat(card?.dataset?.probability);
+    if (Number.isFinite(prob) && prob >= 0.6) return true;
+    return card?.dataset?.nearSignal === '1';
+  }
+
+  function cardIsStuck(card) {
+    return card?.dataset?.stuck === '1';
+  }
+
+  function snapshotCardFlags(card) {
+    if (!card) return null;
+    return {
+      stuck: card.dataset.stuck || '0',
+      stageName: card.dataset.stageName || '',
+    };
+  }
+
+  function restoreCardFlags(card, snapshot) {
+    if (!card || !snapshot) return;
+    card.dataset.stuck = snapshot.stuck;
+    if (snapshot.stageName) card.dataset.stageName = snapshot.stageName;
+  }
+
+  function onCardMoved(card, targetColumn) {
+    if (!card) return;
+    card.dataset.stuck = '0';
+    const stageTitle = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim();
+    if (stageTitle) card.dataset.stageName = stageTitle;
+  }
+
+  function countColumnFlags(listEl) {
+    const flags = { slipping: 0, nearClose: 0, stuck: 0 };
+    listEl.querySelectorAll('.lead-card:not(.is-hidden)').forEach((card) => {
+      if (cardIsSlipping(card)) flags.slipping += 1;
+      if (cardIsNearClose(card)) flags.nearClose += 1;
+      if (cardIsStuck(card)) flags.stuck += 1;
+    });
+    return flags;
+  }
+
+  function formatColumnNote(flags) {
+    if (flags.slipping > 0) {
+      return {
+        text: flags.slipping === 1 ? '1 liidi liukumassa pois' : `${flags.slipping} liidiä liukumassa pois`,
+        mod: 'warn',
+      };
+    }
+    if (flags.nearClose > 0) {
+      return {
+        text: `${flags.nearClose} lähellä sulkeutumista`,
+        mod: 'success',
+      };
+    }
+    if (flags.stuck > 0) {
+      return {
+        text: flags.stuck === 1 ? '1 liidi jumissa' : `${flags.stuck} liidiä jumissa`,
+        mod: 'muted',
+      };
+    }
+    return null;
+  }
+
+  function updateColumnNote(col, listEl) {
+    const noteEl = col?.querySelector('[data-col-note]');
+    if (!noteEl) return;
+    const count = countCards(listEl);
+    if (count === 0) {
+      noteEl.hidden = true;
+      noteEl.textContent = '';
+      return;
+    }
+    const note = formatColumnNote(countColumnFlags(listEl));
+    if (!note) {
+      noteEl.hidden = true;
+      noteEl.textContent = '';
+      return;
+    }
+    noteEl.hidden = false;
+    noteEl.textContent = note.text;
+    noteEl.className = `pipeline-col__note pipeline-col__note--${note.mod}`;
+  }
+
   function ensurePlaceholder(listEl) {
     if (listEl.querySelector('.pipeline-col__placeholder')) return;
     const placeholder = document.createElement('div');
     placeholder.className = 'pipeline-col__placeholder';
-    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidejä tähän vaiheeseen.</div>';
+    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidi tähän kun se etenee</div>';
     listEl.prepend(placeholder);
   }
 
@@ -550,23 +724,46 @@
     if (valueEl) valueEl.textContent = formatEuro(total);
     col.classList.toggle('pipeline-col--empty', count === 0);
     syncPlaceholder(listEl);
+    updateColumnNote(col, listEl);
   }
 
   function updatePageStats(root) {
     let totalLeads = 0;
     let totalValue = 0;
+    let slipping = 0;
+    let nearClose = 0;
 
     root.querySelectorAll('.kanban-list').forEach((list) => {
       list.querySelectorAll('.lead-card:not(.is-hidden)').forEach((card) => {
         totalLeads += 1;
         totalValue += parseDealValue(card);
+        if (cardIsSlipping(card)) slipping += 1;
+        if (cardIsNearClose(card)) nearClose += 1;
       });
     });
 
-    const leadsEl = root.querySelector('#pipeline-total-leads strong');
-    const valueEl = root.querySelector('#pipeline-total-value strong');
+    const leadsEl = root.querySelector('#pipeline-total-leads');
+    const valueEl = root.querySelector('#pipeline-total-value');
     if (leadsEl) leadsEl.textContent = String(totalLeads);
     if (valueEl) valueEl.textContent = formatEuro(totalValue);
+
+    const slippingWrap = root.querySelector('#pipeline-slipping-wrap');
+    const slippingCount = root.querySelector('#pipeline-slipping-count');
+    const slippingLabel = root.querySelector('#pipeline-slipping-label');
+    if (slippingWrap && slippingCount) {
+      slippingWrap.hidden = slipping === 0;
+      slippingCount.textContent = String(slipping);
+      if (slippingLabel) {
+        slippingLabel.textContent = slipping === 1 ? 'liidi liukumassa pois' : 'liidiä liukumassa pois';
+      }
+    }
+
+    const nearWrap = root.querySelector('#pipeline-near-wrap');
+    const nearCount = root.querySelector('#pipeline-near-count');
+    if (nearWrap && nearCount) {
+      nearWrap.hidden = nearClose === 0;
+      nearCount.textContent = String(nearClose);
+    }
   }
 
   function refreshAllStats(root) {
@@ -599,19 +796,14 @@
         filter: '.pipeline-col__placeholder',
         onStart: (evt) => {
           document.body.classList.add('pipeline-is-dragging');
+          const card = resolveLeadCardElement(evt.item);
+          if (card) evt.item.__flFlagSnapshot = snapshotCardFlags(card);
         },
         onEnd: async (evt) => {
           document.body.classList.remove('pipeline-is-dragging');
           root.querySelectorAll('.kanban-list.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
 
           const card = evt.item;
-          console.log('SORTABLE EVT ITEM', {
-            itemTag: card?.tagName,
-            itemClass: card?.className,
-            itemDataset: card?.dataset,
-            itemHtml: card?.outerHTML,
-          });
-
           const leadId = Number.parseInt(
             card?.dataset?.leadId ||
             card?.getAttribute('data-lead-id') ||
@@ -631,14 +823,15 @@
           const cardEl = card?.classList?.contains('lead-card') ? card : (resolveLeadCardElement(card) || card);
           const targetColumn = evt.to?.closest('.pipeline-col');
           const newStageName = targetColumn?.querySelector('.pipeline-col__title')?.textContent?.trim() || '';
+          const flagSnapshot = evt.item.__flFlagSnapshot || null;
+          delete evt.item.__flFlagSnapshot;
 
           function revertDrag() {
             if (prevList && card) {
               prevList.insertBefore(card, prevList.children[prevIndex] || null);
             }
-            updateColumnStats(evt.from);
-            updateColumnStats(evt.to);
-            updatePageStats(root);
+            restoreCardFlags(cardEl, flagSnapshot);
+            refreshAllStats(root);
             if (cardEl) {
               cardEl.classList.remove('is-updating');
               cardEl.removeAttribute('aria-busy');
@@ -648,32 +841,20 @@
           }
 
           if (!leadIdValid || !stageIdValid) {
-            console.error('Drag rejected: missing leadId or stageId', {
-              leadId,
-              leadIdValid,
-              stageIdRaw,
-              stageIdValid,
-              card,
-            });
             revertDrag();
             toast('Virhe: liidin ID puuttuu', 'error');
             return;
           }
 
-          updateColumnStats(evt.from);
-          updateColumnStats(evt.to);
-          updatePageStats(root);
+          onCardMoved(cardEl, targetColumn);
+          refreshAllStats(root);
 
           cardEl.classList.add('is-updating');
           cardEl.setAttribute('aria-busy', 'true');
 
           try {
             if (isClosedLostStage(newStageName)) {
-              console.log('LOST STAGE DETECTED', {
-                stageId: stageIdValid,
-                stageName: newStageName,
-                columnDataset: targetColumn?.dataset,
-              });
+              if (cardEl && flagSnapshot) cardEl.__flLostFlagSnapshot = flagSnapshot;
               const opened = showLostReasonModal({
                 leadId: leadIdValid,
                 stageId: stageIdValid,
@@ -717,9 +898,8 @@
             }
           } catch (err) {
             prevList?.insertBefore(card, prevList.children[prevIndex] || null);
-            updateColumnStats(evt.from);
-            updateColumnStats(evt.to);
-            updatePageStats(root);
+            restoreCardFlags(cardEl, flagSnapshot);
+            refreshAllStats(root);
             cardEl.classList.add('is-error');
             if ((err?.message || '').toLowerCase() !== 'siirto peruutettu') {
               toast(err?.message || 'Liidin siirto epäonnistui.', 'error');
@@ -755,17 +935,27 @@
     const errorEl = document.getElementById('lost-reason-error');
     if (!confirmBtn || !reasonSelect || !noteField || !errorEl) return;
 
+    function resolveLostConfirmLeadId() {
+      const modal = document.getElementById('lost-reason-modal');
+      const fromModal = parseLeadId(modal?.dataset?.pendingLeadId);
+      if (fromModal) return fromModal;
+      const fromDraggedCard = readLeadIdFromCard(draggedCard);
+      if (fromDraggedCard) return fromDraggedCard;
+      const activeCard =
+        document.querySelector('.lead-card.is-dragging') ||
+        document.querySelector('.lead-card.dragging') ||
+        document.querySelector('.pipeline .lead-card.is-updating[aria-busy="true"]');
+      const fromActiveCard = readLeadIdFromCard(activeCard);
+      if (fromActiveCard) return fromActiveCard;
+      return currentDragLeadId || null;
+    }
+
     const modal = document.getElementById('lost-reason-modal');
-    const resolvedLeadId = currentDragLeadId || parseLeadId(modal?.dataset?.pendingLeadId);
+    const resolvedLeadId = resolveLostConfirmLeadId();
     const resolvedStageId = lostStageId || parseLeadId(modal?.dataset?.pendingStageId);
     const url = buildStageUrl(resolvedLeadId);
 
     if (!resolvedLeadId || !resolvedStageId || !url) {
-      console.error('Missing drag state on confirm');
-      console.error('currentDragLeadId =', currentDragLeadId);
-      console.error('lostStageId =', lostStageId);
-      console.error('modalLeadId =', modal?.dataset?.pendingLeadId);
-      console.error('modalStageId =', modal?.dataset?.pendingStageId);
       toast('Virhe: liidin ID puuttuu', 'error');
       return;
     }
@@ -806,7 +996,6 @@
       }
 
       if (response.status === 404) {
-        console.error('Stage update 404:', url, data);
         toast('Virhe: Liidia tai polkua ei löytynyt', 'error');
         return;
       }
@@ -825,7 +1014,6 @@
         toast(`Virhe: ${errMsg}`, 'error');
       }
     } catch (e) {
-      console.error('Stage update failed:', url, e);
       toast('Verkkovirhe — yritä uudelleen', 'error');
     } finally {
       confirmBtn.disabled = false;
@@ -836,15 +1024,12 @@
     const root = document.querySelector('.pipeline');
     if (originalColumn && draggedCard) {
       originalColumn.insertBefore(draggedCard, originalColumn.children[originalIndex] || null);
-      updateColumnStats(originalColumn);
-    }
-    if (draggedCard) {
-      const currentList = draggedCard.closest('.kanban-list');
-      updateColumnStats(currentList);
+      restoreCardFlags(draggedCard, draggedCard.__flLostFlagSnapshot || null);
+      delete draggedCard.__flLostFlagSnapshot;
       draggedCard.classList.remove('is-updating');
       draggedCard.removeAttribute('aria-busy');
     }
-    if (root) updatePageStats(root);
+    if (root) refreshAllStats(root);
     hideLostReasonModal();
     resetLostDragState();
   }
@@ -861,7 +1046,7 @@
     if (errorEl) errorEl.textContent = '';
   }
 
-  function initLostReasonActions(root) {
+  function initLostReasonActions() {
     const confirmBtn = document.getElementById('lost-confirm');
     const cancelBtn = document.getElementById('lost-cancel');
     const reasonSelect = document.getElementById('lost-reason-select');
@@ -940,7 +1125,7 @@
     if (!root) return;
     initFilters(root);
     initSearch(root);
-    initLostReasonActions(root);
+    initLostReasonActions();
     destroySortables(root);
     initSortable(root);
     refreshAllStats(root);
