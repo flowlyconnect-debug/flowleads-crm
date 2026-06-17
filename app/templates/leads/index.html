@@ -1,44 +1,75 @@
 {% extends "base.html" %}
-{% from "_macros.html" import score_badge, probability_badge %}
 {% from "components/empty_state.html" import empty_state %}
-{% block title %}Leads — FlowLeads{% endblock %}
+{% block title %}Tärkeimmät mahdollisuudet — FlowLeads{% endblock %}
 {% block content %}
 {% set has_active_filters = filters.search or filters.source or filters.stage_id or filters.assigned_to or filters.status or filters.score_min or filters.score_max or filters.no_contact_7 or filters.gdpr_consent or filters.marketing_opt_in or filters.unsubscribed or filters.is_anonymized %}
 {% set show_onboarding = pagination.total == 0 and not has_active_filters %}
 {% set show_no_results = pagination.total == 0 and has_active_filters %}
 {% set active_sort = filters.sort or 'created_at' %}
 {% set active_dir = filters.dir or 'desc' %}
-<section class="leads-page{% if show_onboarding %} leads-page--empty{% endif %}">
-  <header class="page-header leads-header">
-    <div class="page-header__main">
-      <div class="breadcrumbs">
-        <span>Liidit</span>
-      </div>
-      <h1>Liidit</h1>
-      <p class="page-subtitle">
-        {{ pagination.total }} liidiä
-        {% if today_new_count is defined %}
-          · {{ today_new_count }} uutta tänään
-        {% endif %}
-      </p>
+{% set source_labels = {'manual': 'Manuaalinen', 'n8n': 'Automaatio', 'import': 'Tuonti', 'webform': 'Lomake'} %}
+{% set base_filters = {
+  'search': filters.search or none,
+  'stage_id': filters.stage_id,
+  'source': filters.source or none,
+  'assigned_to': filters.assigned_to,
+  'status': filters.status,
+  'score_min': filters.score_min,
+  'score_max': filters.score_max,
+  'sort': filters.sort,
+  'dir': filters.dir,
+  'no_contact_7': 1 if filters.no_contact_7 else none,
+  'gdpr_consent': 1 if filters.gdpr_consent else none,
+  'marketing_opt_in': 1 if filters.marketing_opt_in else none,
+  'unsubscribed': 1 if filters.unsubscribed else none,
+  'is_anonymized': 1 if filters.is_anonymized else none,
+} %}
+{% set quick_tab = 'all' %}
+{% if filters.no_contact_7 %}
+  {% set quick_tab = 'slipping' %}
+{% elif filters.score_min and filters.score_min|int >= 70 %}
+  {% set quick_tab = 'hot' %}
+{% elif active_sort == 'created_at' and active_dir == 'desc' and not filters.no_contact_7 and not filters.score_min and not filters.score_max %}
+  {% set quick_tab = 'new' %}
+{% endif %}
+{% set tab_all_filters = dict(base_filters, no_contact_7=none, score_min=none, score_max=none, sort='score', dir='desc') %}
+{% set tab_hot_filters = dict(base_filters, no_contact_7=none, score_min=70, score_max=none, sort='score', dir='desc') %}
+{% set tab_slipping_filters = dict(base_filters, no_contact_7=1, score_min=none, score_max=none, sort='last_activity', dir='asc') %}
+{% set tab_new_filters = dict(base_filters, no_contact_7=none, score_min=none, score_max=none, sort='created_at', dir='desc') %}
+{% set totals_ns = namespace(value=0) %}
+{% for lead in leads %}
+  {% if lead.deal_value %}
+    {% set totals_ns.value = totals_ns.value + lead.deal_value|float %}
+  {% endif %}
+{% endfor %}
+
+<section class="leads-page leads-page--action-first{% if show_onboarding %} leads-page--empty{% endif %}">
+  <header class="leads-opp-header">
+    <div class="leads-opp-header__main">
+      <h1 class="leads-opp-header__title">Tärkeimmät mahdollisuudet</h1>
+      <p class="leads-opp-header__sub">Aloita niistä, joissa on eniten arvoa tai kiirettä.</p>
     </div>
-    <div class="page-header__actions leads-toolbar" role="toolbar" aria-label="Liidilistan työkalupalkki">
-      <form method="get" class="leads-search" role="search" aria-label="Hae liidejä">
+    <div class="leads-opp-header__actions" role="toolbar" aria-label="Liidilistan työkalupalkki">
+      <form method="get" class="leads-opp-search" role="search" aria-label="Hae liidejä">
         {% if current_user.is_superadmin() %}
         <input type="hidden" name="organization_id" value="{{ organization_id }}">
         {% endif %}
-        {% if filters.no_contact_7 %}
-        <input type="hidden" name="no_contact_7" value="1">
-        {% endif %}
-        <span class="leads-search__icon" aria-hidden="true">🔍</span>
-        {{ filter_form.search(class_="leads-search__input", placeholder="Hae nimellä, yrityksellä tai sähköpostilla") }}
+        {% if filters.no_contact_7 %}<input type="hidden" name="no_contact_7" value="1">{% endif %}
+        {% if filters.score_min %}<input type="hidden" name="score_min" value="{{ filters.score_min }}">{% endif %}
+        {% if filters.score_max %}<input type="hidden" name="score_max" value="{{ filters.score_max }}">{% endif %}
+        {% if filters.sort %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+        {% if filters.dir %}<input type="hidden" name="dir" value="{{ filters.dir }}">{% endif %}
+        <span class="leads-opp-search__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+        {{ filter_form.search(class_="leads-opp-search__input", placeholder="Hae nimi, yritys…") }}
       </form>
       <div class="leads-filters">
-        <button type="button" class="btn btn-secondary btn-sm leads-filters__toggle" aria-haspopup="true" aria-expanded="false">
+        <button type="button" class="btn btn-secondary btn-sm leads-filters__toggle" aria-haspopup="dialog" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
           Suodattimet
-          <span aria-hidden="true">▾</span>
         </button>
-        <div class="leads-filters__panel" role="dialog" aria-label="Suodata liidejä">
+        <div class="leads-filters__panel" role="dialog" aria-label="Suodata liidejä" hidden>
           <form method="get" class="leads-filters__form">
             {% if current_user.is_superadmin() %}
             <input type="hidden" name="organization_id" value="{{ organization_id }}">
@@ -50,7 +81,11 @@
               </div>
               <div class="form-group">
                 {{ filter_form.source.label(class_="form-label") }}
-                {{ filter_form.source(class_="form-input") }}
+                <select name="source" id="{{ filter_form.source.id }}" class="form-input">
+                  {% for value, label in filter_form.source.choices %}
+                  <option value="{{ value }}"{% if filter_form.source.data == value %} selected{% endif %}>{{ source_labels.get(value, label) }}</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="form-group">
                 {{ filter_form.assigned_to.label(class_="form-label") }}
@@ -98,67 +133,86 @@
               <input type="hidden" name="no_contact_7" value="1">
               {% endif %}
               {{ filter_form.submit(class_="btn btn-primary btn-sm") }}
+              <a class="btn btn-ghost btn-sm leads-filters__export" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">Vie CSV</a>
             </div>
           </form>
         </div>
       </div>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">
-        Myyntiputki
-      </a>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">
-        Vie CSV
-      </a>
-      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
-        + Liidi
+      <a class="btn btn-ghost btn-sm leads-opp-export" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">Vie CSV</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
+        Lisää liidi
       </a>
     </div>
   </header>
 
-  <div class="leads-source-tabs{% if pagination.total == 0 %} leads-source-tabs--empty{% endif %}" role="tablist" aria-label="Lähdesuodattimet"{% if pagination.total == 0 %} aria-disabled="true"{% endif %}>
-    {% set active_source = filter_form.source.data or '' %}
-    {% for value, label in filter_form.source.choices %}
-    {% set tab_filters = {
-      'search': filters.search or none,
-      'stage_id': filters.stage_id,
-      'source': value or none,
-      'assigned_to': filters.assigned_to,
-      'status': filters.status,
-      'score_min': filters.score_min,
-      'score_max': filters.score_max,
-      'sort': filters.sort,
-      'dir': filters.dir,
-      'no_contact_7': 1 if filters.no_contact_7 else none,
-    } %}
-    {% if pagination.total == 0 %}
-    <span class="leads-source-tab{% if value == active_source %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}" aria-disabled="true">
-      {{ label }}
-    </span>
-    {% else %}
-    <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_filters) }}"
-       class="leads-source-tab{% if value == active_source %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if value == active_source else 'false' }}">
-      {{ label }}
-    </a>
-    {% endif %}
-    {% endfor %}
-  </div>
+  <div class="leads-opp-tabs-bar{% if pagination.total == 0 %} leads-opp-tabs-bar--empty{% endif %}">
+    <nav class="leads-opp-tabs" role="tablist" aria-label="Pikasuodattimet">
+      {% if pagination.total == 0 %}
+      <span class="leads-opp-tab{% if quick_tab == 'all' %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if quick_tab == 'all' else 'false' }}" aria-disabled="true">Kaikki</span>
+      <span class="leads-opp-tab" role="tab" aria-disabled="true">Kuumat</span>
+      <span class="leads-opp-tab" role="tab" aria-disabled="true">Liukumassa pois</span>
+      <span class="leads-opp-tab" role="tab" aria-disabled="true">Uudet</span>
+      {% else %}
+      <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_all_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_all_filters) }}"
+         class="leads-opp-tab{% if quick_tab == 'all' %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if quick_tab == 'all' else 'false' }}">Kaikki</a>
+      <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_hot_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_hot_filters) }}"
+         class="leads-opp-tab{% if quick_tab == 'hot' %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if quick_tab == 'hot' else 'false' }}">Kuumat</a>
+      <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_slipping_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_slipping_filters) }}"
+         class="leads-opp-tab{% if quick_tab == 'slipping' %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if quick_tab == 'slipping' else 'false' }}">Liukumassa pois</a>
+      <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **tab_new_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **tab_new_filters) }}"
+         class="leads-opp-tab{% if quick_tab == 'new' %} is-active{% endif %}" role="tab" aria-selected="{{ 'true' if quick_tab == 'new' else 'false' }}">Uudet</a>
+      {% endif %}
+    </nav>
 
-  <div class="leads-source-tabs" role="toolbar" aria-label="Pikasuodattimet">
-    {% set no_contact_filters = {
-      'search': filters.search or none,
-      'stage_id': filters.stage_id,
-      'source': filters.source or none,
-      'assigned_to': filters.assigned_to,
-      'status': filters.status,
-      'score_min': filters.score_min,
-      'score_max': filters.score_max,
-      'sort': filters.sort,
-      'dir': filters.dir,
-      'no_contact_7': 1 if not filters.no_contact_7 else none,
-    } %}
-    <a href="{{ url_for('leads.list_leads', organization_id=organization_id, **no_contact_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **no_contact_filters) }}"
-       class="leads-source-tab{% if filters.no_contact_7 %} is-active{% endif %}">
-      Ei kontaktia 7+ pv
-    </a>
+    {% if has_active_filters and not show_onboarding %}
+    <div class="leads-opp-chips" aria-label="Aktiiviset suodattimet">
+      {% if filters.search %}
+      {% set chip_filters = dict(base_filters, search=none) %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        Haku: {{ filters.search|truncate(24, True, '…') }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.stage_id %}
+      {% set chip_filters = dict(base_filters, stage_id=none) %}
+      {% set stage_label = filter_form.stage_id.choices|selectattr('0', 'equalto', filters.stage_id)|map(attribute='1')|first|default('Vaihe') %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        {{ stage_label }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.source %}
+      {% set chip_filters = dict(base_filters, source=none) %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        {{ source_labels.get(filters.source, filters.source) }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.assigned_to %}
+      {% set chip_filters = dict(base_filters, assigned_to=none) %}
+      {% set assignee_label = filter_form.assigned_to.choices|selectattr('0', 'equalto', filters.assigned_to)|map(attribute='1')|first|default('Vastuuhenkilö') %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        {{ assignee_label|truncate(20, True, '…') }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.score_min %}
+      {% set chip_filters = dict(base_filters, score_min=none) %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        Pisteet ≥ {{ filters.score_min }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.score_max %}
+      {% set chip_filters = dict(base_filters, score_max=none) %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        Pisteet ≤ {{ filters.score_max }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      {% if filters.no_contact_7 and quick_tab != 'slipping' %}
+      {% set chip_filters = dict(base_filters, no_contact_7=none) %}
+      <a class="leads-opp-chip" href="{{ url_for('leads.list_leads', organization_id=organization_id, **chip_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **chip_filters) }}">
+        Ei kontaktia 7+ pv <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endif %}
+      <a class="leads-opp-chips__clear" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Tyhjennä</a>
+    </div>
+    {% endif %}
   </div>
 
   {% if show_onboarding %}
@@ -184,180 +238,177 @@
   </div>
 
   {% else %}
-  <div class="card card--flat">
+  <div class="card leads-opp-card">
     <form method="post" action="{{ url_for('leads.bulk_action', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.bulk_action') }}" class="leads-bulk-form">
       {{ bulk_form.hidden_tag() }}
-      <div class="leads-bulk-toolbar">
-        <div class="leads-bulk-toolbar__left">
-          {{ bulk_form.action(class_="form-input form-input--compact") }}
-          {% if can_assign_others %}
-          {{ bulk_form.assigned_to(class_="form-input form-input--compact") }}
-          {% endif %}
-          {{ bulk_form.stage_id(class_="form-input form-input--compact") }}
-          {{ bulk_form.submit(class_="btn btn-secondary btn-sm") }}
-        </div>
-        <div class="leads-bulk-toolbar__right text-sm text-muted">
-          Valittuna <span id="leads-selected-count">0</span>
+      <div class="leads-opp-list-bar">
+        <label class="leads-bulk-select-all">
+          <input type="checkbox" id="select-all-leads" aria-label="Valitse kaikki liidit tältä sivulta">
+          <span class="leads-bulk-select-all__label">Valitse sivu</span>
+        </label>
+        <div class="leads-bulk-toolbar" id="leads-bulk-toolbar" hidden>
+          <div class="leads-bulk-toolbar__left">
+            {{ bulk_form.action(class_="form-input form-input--compact") }}
+            {% if can_assign_others %}
+            {{ bulk_form.assigned_to(class_="form-input form-input--compact") }}
+            {% endif %}
+            {{ bulk_form.stage_id(class_="form-input form-input--compact") }}
+            {{ bulk_form.submit(class_="btn btn-secondary btn-sm") }}
+          </div>
+          <div class="leads-bulk-toolbar__right text-sm text-muted">
+            Valittuna <span id="leads-selected-count">0</span>
+          </div>
         </div>
       </div>
 
-      <div class="table-wrap leads-table-wrap" role="region" aria-label="Liidilistaus">
-        <table class="leads-table">
-          <thead>
-            <tr>
-              <th scope="col" class="leads-col-select">
-                <input type="checkbox" id="select-all-leads" aria-label="Valitse kaikki liidit">
-              </th>
-              <th scope="col" class="leads-col-contact">
-                <button type="button" class="leads-th-sortable">
-                  Kontakti
-                </button>
-              </th>
-              <th scope="col">Yritys</th>
-              <th scope="col">Vaihe</th>
-              <th scope="col">Score</th>
-              <th scope="col">
-                {% set last_activity_toggle = 'asc' if active_sort == 'last_activity' and active_dir == 'desc' else 'desc' %}
-                {% set last_activity_sort_filters = {
-                  'search': filters.search or none,
-                  'stage_id': filters.stage_id,
-                  'source': filters.source or none,
-                  'assigned_to': filters.assigned_to,
-                  'status': filters.status,
-                  'score_min': filters.score_min,
-                  'score_max': filters.score_max,
-                  'sort': 'last_activity',
-                  'order': last_activity_toggle,
-                  'no_contact_7': 1 if filters.no_contact_7 else none,
-                } %}
-                <a class="leads-th-sortable" href="{{ url_for('leads.list_leads', organization_id=organization_id, **last_activity_sort_filters) if current_user.is_superadmin() else url_for('leads.list_leads', **last_activity_sort_filters) }}">
-                  VIIMEISIN AKTIVITEETTI
-                  {% if active_sort == 'last_activity' %}
-                    {{ '↑' if active_dir == 'asc' else '↓' }}
-                  {% else %}
-                    ↕
-                  {% endif %}
-                </a>
-              </th>
-              <th scope="col">Lähde</th>
-              <th scope="col">Lisätty</th>
-              <th scope="col" class="leads-col-actions">
-                <span class="sr-only">Toiminnot</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for lead in leads %}
-            <tr class="leads-row" data-lead-id="{{ lead.id }}" onclick="openLeadDrawer({{ lead.id }})">
-              <td class="leads-cell-select">
-                <input type="checkbox" name="lead_ids" value="{{ lead.id }}" class="lead-check" aria-label="Valitse {{ lead.display_name }}">
-              </td>
-              <td class="leads-cell-contact">
-                <div class="lead-contact-cell">
-                  <div class="lead-contact-avatar" aria-hidden="true">
-                    {% set initials = (lead.display_name or lead.email or '?').split() %}
-                    {% if initials|length > 1 %}
-                      {{ initials[0][0] }}{{ initials[1][0] }}
-                    {% else %}
-                      {{ (initials[0][0:2])|upper }}
-                    {% endif %}
-                  </div>
-                  <div class="lead-contact-main">
-                    <a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}"
-                       class="lead-contact-name truncate">
-                      {{ lead.display_name }}
-                    </a>
-                    {% if lead.email %}
-                    <div class="lead-contact-email truncate">{{ lead.email }}</div>
-                    {% endif %}
-                  </div>
-                </div>
-              </td>
-              <td class="leads-cell-company">
-                <span class="truncate text-secondary">{{ lead.company or '—' }}</span>
-              </td>
-              <td class="leads-cell-stage">
-                <span class="badge badge-neutral badge--dot leads-stage-badge">
-                  {{ lead.stage.name if lead.stage else '—' }}
-                </span>
-              </td>
-              <td class="leads-cell-score">
-                {{ score_badge(lead.score) }}
-              </td>
-              <td class="leads-cell-last-activity">
-                {% set last_at = lead.last_activity_at %}
-                {% if last_at %}
-                  {% set days_since = (now - last_at).days %}
-                  {% set label = last_activity_label(lead.last_activity_type) %}
-                  {% if days_since == 0 %}
-                    <span class="text-secondary text-sm">{{ label }} tänään</span>
-                  {% elif days_since < 7 %}
-                    <span class="text-muted text-sm">{{ label }} {{ days_since }} pv sitten</span>
-                  {% elif days_since < 14 %}
-                    <span class="text-sm leads-last-activity-amber">{{ label }} {{ days_since }} pv sitten</span>
-                  {% else %}
-                    <span class="text-danger text-sm">Ei kontaktia {{ days_since }} pv</span>
-                  {% endif %}
-                {% else %}
-                  <span class="text-muted text-sm">Ei kontaktia</span>
-                {% endif %}
-              </td>
-              <td class="leads-cell-source">
-                {% if lead.source %}
-                <span class="badge leads-source-badge">{{ lead.source }}</span>
-                {% else %}
-                <span class="text-muted">—</span>
-                {% endif %}
-              </td>
-              <td class="leads-cell-created">
-                <span class="text-sm text-muted">
-                  {{ lead.created_at.strftime('%Y-%m-%d') if lead.created_at else '' }}
-                </span>
-              </td>
-              <td class="leads-cell-actions">
-                <div class="leads-row-actions row-actions" role="group" aria-label="Toiminnot">
-                  <a href="{{ url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=lead.id) }}"
-                     class="leads-row-action row-action-btn primary">
-                    Avaa
-                  </a>
-                  <a href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}"
-                     class="leads-row-action row-action-btn">
-                    Muokkaa
-                  </a>
-                  <button type="button" class="leads-row-action leads-row-action--icon row-action-btn" aria-label="Lisää toimintoja">
-                    ⋯
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="leads-opp-list" role="list" aria-label="Priorisoidut mahdollisuudet">
+        {% for lead in leads %}
+        {% set last_at = lead.last_activity_at %}
+        {% set days_since = (now.date() - last_at.date()).days if last_at else none %}
+        {% set created_days = (now.date() - lead.created_at.date()).days if lead.created_at else none %}
+        {% set urgency = namespace(label='', mod='') %}
+        {% if created_days is not none and created_days <= 7 and (days_since is none or days_since > created_days) %}
+          {% set urgency.label = 'Uusi' %}
+          {% set urgency.mod = 'new' %}
+        {% elif days_since is none and created_days is not none and created_days >= 7 %}
+          {% set urgency.label = 'Liukumassa pois' %}
+          {% set urgency.mod = 'slipping' %}
+        {% elif days_since is not none and days_since >= 7 %}
+          {% set urgency.label = 'Liukumassa pois' %}
+          {% set urgency.mod = 'slipping' %}
+        {% elif lead.score is not none and lead.score >= 70 %}
+          {% set urgency.label = 'Kuuma' %}
+          {% set urgency.mod = 'hot' %}
+        {% endif %}
+        {% if lead.score_reason %}
+          {% set signal_text = lead.score_reason|truncate(90, True, '…') %}
+        {% elif last_at and days_since is not none and days_since > 0 %}
+          {% set signal_text = last_activity_label(lead.last_activity_type) %}
+        {% elif last_at %}
+          {% set signal_text = 'Viimeisin signaali vastaanotettu' %}
+        {% elif created_days is not none and created_days <= 3 %}
+          {% set signal_text = 'Uusi liidi' %}
+        {% else %}
+          {% set signal_text = 'Ei viimeisintä signaalia' %}
+        {% endif %}
+        {% if last_at %}
+          {% set activity_label = last_activity_label(lead.last_activity_type) %}
+          {% if days_since == 0 %}
+            {% set contact_text = activity_label ~ ' tänään' %}
+            {% set contact_mod = 'ok' %}
+          {% elif days_since < 7 %}
+            {% set contact_text = activity_label ~ ' ' ~ days_since ~ ' pv sitten' %}
+            {% set contact_mod = 'muted' %}
+          {% elif days_since < 14 %}
+            {% set contact_text = activity_label ~ ' ' ~ days_since ~ ' pv sitten' %}
+            {% set contact_mod = 'warn' %}
+          {% else %}
+            {% set contact_text = 'Ei kontaktia ' ~ days_since ~ ' pv' %}
+            {% set contact_mod = 'danger' %}
+          {% endif %}
+        {% else %}
+          {% set contact_text = 'Ei kontaktia' %}
+          {% set contact_mod = 'muted' %}
+        {% endif %}
+        {% if created_days is not none and created_days <= 7 and (days_since is none or days_since >= 7) %}
+          {% set next_action = 'Ensikontakti' %}
+        {% elif days_since is not none and days_since >= 14 %}
+          {% set next_action = 'Uudelleenaktivoi' %}
+        {% elif lead.score is not none and lead.score > 80 %}
+          {% set next_action = 'Soita' %}
+        {% elif lead.stage and 'tarjous' in lead.stage.name|lower %}
+          {% set next_action = 'Seuraa' %}
+        {% elif days_since is not none and days_since >= 7 %}
+          {% set next_action = 'Ota yhteyttä' %}
+        {% else %}
+          {% set next_action = 'Avaa' %}
+        {% endif %}
+        {% set company_name = lead.company or '—' %}
+        {% set stage_color = lead.stage.color if lead.stage else '#94A3B8' %}
+        {% set stage_name = lead.stage.name if lead.stage else '—' %}
+
+        <article class="leads-opp-row" role="listitem" data-lead-id="{{ lead.id }}" tabindex="0" aria-label="{{ company_name }}, {{ lead.display_name }}">
+          {% if lead.email %}<span class="sr-only">{{ lead.email }}</span>{% endif %}
+          <label class="leads-opp-row__select" onclick="event.stopPropagation()">
+            <input type="checkbox" name="lead_ids" value="{{ lead.id }}" class="lead-check" aria-label="Valitse {{ lead.display_name }}">
+          </label>
+          <div class="leads-opp-row__main">
+            <div class="leads-opp-row__headline">
+              <span class="leads-opp-row__company">{{ company_name }}</span>
+              <span class="leads-opp-row__contact">{{ lead.display_name }}</span>
+              {% if urgency.label %}
+              <span class="leads-opp-row__urgency leads-opp-row__urgency--{{ urgency.mod }}">{{ urgency.label }}</span>
+              {% endif %}
+              <span class="leads-opp-row__stage">
+                <span class="leads-opp-row__stage-dot" style="background: {{ stage_color }}"></span>
+                {{ stage_name }}
+              </span>
+            </div>
+            <div class="leads-opp-row__meta">
+              <span class="leads-opp-row__signal">{{ signal_text }}</span>
+              <span class="leads-opp-row__meta-sep" aria-hidden="true">·</span>
+              <span class="leads-opp-row__contact-time leads-opp-row__contact-time--{{ contact_mod }}">{{ contact_text }}</span>
+              <span class="leads-opp-row__meta-sep" aria-hidden="true">·</span>
+              <span class="leads-opp-row__source">{{ source_labels.get(lead.source, lead.source or '—') }}</span>
+            </div>
+          </div>
+          <div class="leads-opp-row__aside">
+            <div class="leads-opp-row__value">
+              {% if lead.deal_value %}
+              {{ currency_symbol }}{{ '{:,.0f}'.format(lead.deal_value|float).replace(',', ' ') }}
+              {% else %}
+              —
+              {% endif %}
+            </div>
+            <span class="leads-opp-row__next">{{ next_action }} →</span>
+          </div>
+        </article>
+        {% endfor %}
       </div>
 
       <input type="hidden" name="lead_ids" id="bulk-lead-ids" value="">
     </form>
-
-    {% if pagination.pages > 1 %}
-    <footer class="leads-pagination text-sm text-muted">
-      <span>Sivu {{ pagination.page }} / {{ pagination.pages }}</span>
-      <div class="ml-auto flex gap-2">
-        {% if pagination.has_prev %}
-        <a href="{{ url_for('leads.list_leads', page=pagination.prev_num, organization_id=organization_id, order=filters.dir, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.prev_num, order=filters.dir, **filters) }}"
-           class="btn btn-secondary btn-sm">
-          Edellinen
-        </a>
-        {% endif %}
-        {% if pagination.has_next %}
-        <a href="{{ url_for('leads.list_leads', page=pagination.next_num, organization_id=organization_id, order=filters.dir, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.next_num, order=filters.dir, **filters) }}"
-           class="btn btn-secondary btn-sm">
-          Seuraava
-        </a>
-        {% endif %}
-      </div>
-    </footer>
-    {% endif %}
   </div>
+
+  <footer class="leads-opp-footer">
+    <span class="leads-opp-footer__count">
+      {{ pagination.total }} mahdollisuutta
+      {% if totals_ns.value > 0 %}
+      · tällä sivulla yhteensä <strong>{{ currency_symbol }}{{ '{:,.0f}'.format(totals_ns.value).replace(',', ' ') }}</strong>
+      {% endif %}
+    </span>
+    <span class="leads-opp-footer__sort">
+      Lajiteltu:
+      <strong>
+        {% if active_sort == 'score' %}pisteytys
+        {% elif active_sort == 'last_activity' %}viimeisin kontakti
+        {% elif active_sort == 'created_at' %}uusimmat
+        {% elif active_sort == 'company' %}yritys
+        {% else %}prioriteetti{% endif %}
+        {% if active_dir == 'asc' %}↑{% else %}↓{% endif %}
+      </strong>
+    </span>
+  </footer>
+
+  {% if pagination.pages > 1 %}
+  <nav class="leads-pagination text-sm text-muted" aria-label="Sivutus">
+    <span>Sivu {{ pagination.page }} / {{ pagination.pages }}</span>
+    <div class="ml-auto flex gap-2">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('leads.list_leads', page=pagination.prev_num, organization_id=organization_id, order=filters.dir, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.prev_num, order=filters.dir, **filters) }}"
+         class="btn btn-secondary btn-sm">
+        Edellinen
+      </a>
+      {% endif %}
+      {% if pagination.has_next %}
+      <a href="{{ url_for('leads.list_leads', page=pagination.next_num, organization_id=organization_id, order=filters.dir, **filters) if current_user.is_superadmin() else url_for('leads.list_leads', page=pagination.next_num, order=filters.dir, **filters) }}"
+         class="btn btn-secondary btn-sm">
+        Seuraava
+      </a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
   {% endif %}
 </section>
 
@@ -365,13 +416,20 @@
 (function() {
   const root = document;
   const selectAll = root.getElementById('select-all-leads');
+  const bulkToolbar = root.getElementById('leads-bulk-toolbar');
   const bulkIdsInput = root.getElementById('bulk-lead-ids');
   const bulkForm = root.querySelector('.leads-bulk-form');
   const selectedCount = root.getElementById('leads-selected-count');
 
   function updateSelectedCount() {
-    const checks = root.querySelectorAll('.lead-check:checked');
-    if (selectedCount) selectedCount.textContent = checks.length.toString();
+    const checks = root.querySelectorAll('.lead-check');
+    const checked = root.querySelectorAll('.lead-check:checked');
+    if (selectedCount) selectedCount.textContent = checked.length.toString();
+    if (bulkToolbar) bulkToolbar.hidden = checked.length === 0;
+    if (selectAll) {
+      selectAll.checked = checks.length > 0 && checked.length === checks.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < checks.length;
+    }
   }
 
   selectAll && selectAll.addEventListener('change', function(e) {
@@ -407,14 +465,21 @@
   if (filterToggle && filterPanel) {
     function closePanel() {
       filterPanel.classList.remove('is-open');
+      filterPanel.hidden = true;
       filterToggle.setAttribute('aria-expanded', 'false');
     }
+    function openPanel() {
+      filterPanel.classList.add('is-open');
+      filterPanel.hidden = false;
+      filterToggle.setAttribute('aria-expanded', 'true');
+      const firstInput = filterPanel.querySelector('input, select');
+      if (firstInput) firstInput.focus();
+    }
     filterToggle.addEventListener('click', function() {
-      const isOpen = filterPanel.classList.toggle('is-open');
-      filterToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (isOpen) {
-        const firstInput = filterPanel.querySelector('input, select');
-        if (firstInput) firstInput.focus();
+      if (filterPanel.classList.contains('is-open')) {
+        closePanel();
+      } else {
+        openPanel();
       }
     });
     document.addEventListener('click', function(e) {
@@ -430,16 +495,25 @@
     });
   }
 
-  root.querySelectorAll('.leads-row[data-lead-id]').forEach(function(row) {
-    row.addEventListener('click', function(e) {
-      if (e.target.closest('a, button, input, select, textarea, label')) return;
+  root.querySelectorAll('.leads-opp-row[data-lead-id]').forEach(function(row) {
+    function openRow() {
       const leadId = row.getAttribute('data-lead-id');
       if (leadId && typeof window.openLeadDrawer === 'function') {
         window.openLeadDrawer(leadId);
+      }
+    }
+    row.addEventListener('click', function(e) {
+      if (e.target.closest('a, button, input, select, textarea, label')) return;
+      openRow();
+    });
+    row.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target.closest('input')) return;
+        e.preventDefault();
+        openRow();
       }
     });
   });
 })();
 </script>
 {% endblock %}
-
