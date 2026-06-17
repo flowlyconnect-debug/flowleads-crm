@@ -1,16 +1,97 @@
 {% extends "base.html" %}
+{% set hide_workflow_bar = true %}
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Yritykset — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/companies.css') }}">
+{% endblock %}
+{% block body_class %} page-companies{% endblock %}
 
 {% block content %}
-<section class="companies-page">
-  <header class="page-header">
-    <div class="page-header__main">
-      <div class="breadcrumbs">
-        <span>Yritykset</span>
-      </div>
-      <h1>Yritykset</h1>
-      <p class="page-subtitle">{{ total_count }} yritystä</p>
+{% macro days_from_relative_label(label) -%}
+  {%- if label and ' pv sitten' in label -%}
+    {{- label.split()[0]|int -}}
+  {%- elif label and ('min sitten' in label or 'h sitten' in label or label == 'Juuri nyt') -%}
+    0
+  {%- elif label and label != '—' -%}
+    999
+  {%- else -%}
+    {{- none -}}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro company_status(row) -%}
+  {% set c = row.company %}
+  {% set created_label = relative_created_fi(c.created_at) %}
+  {% set updated_label = relative_created_fi(c.updated_at) %}
+  {% set created_days = days_from_relative_label(created_label)|int if created_label and ' pv sitten' in created_label else (0 if created_label and ('min sitten' in created_label or 'h sitten' in created_label or created_label == 'Juuri nyt') else (999 if created_label and created_label != '—' else none)) %}
+  {% set updated_days = days_from_relative_label(updated_label)|int if updated_label and ' pv sitten' in updated_label else (0 if updated_label and ('min sitten' in updated_label or 'h sitten' in updated_label or updated_label == 'Juuri nyt') else (999 if updated_label and updated_label != '—' else none)) %}
+  {% if row.open_lead_count > 0 and updated_days is not none and updated_days >= 14 %}
+    {{- 'slipping' -}}
+  {% elif row.open_lead_count > 0 %}
+    {{- 'active' -}}
+  {% elif created_days is not none and created_days <= 7 and (c.type or 'prospect') == 'prospect' %}
+    {{- 'new' -}}
+  {% elif updated_days is not none and updated_days >= 21 %}
+    {{- 'slipping' -}}
+  {% else %}
+    {{- '' -}}
+  {% endif %}
+{%- endmacro %}
+
+{% macro company_next_action(row, status) -%}
+  {% if row.open_lead_count > 0 %}
+    Seuraa liidejä
+  {% elif status == 'new' %}
+    Ensikontakti
+  {% elif status == 'slipping' %}
+    Uudelleenaktivoi
+  {% elif row.contact_count == 0 %}
+    Lisää kontakti
+  {% else %}
+    Avaa yritys
+  {% endif %}
+{%- endmacro %}
+
+{% macro activity_time_mod(days) -%}
+  {%- if days is none -%}muted
+  {%- elif days == 0 -%}ok
+  {%- elif days < 7 -%}muted
+  {%- elif days < 14 -%}warn
+  {%- else -%}danger
+  {%- endif -%}
+{%- endmacro %}
+
+<section class="companies-page companies-page--action-first">
+  <header class="crm-registry-header">
+    <div class="crm-registry-header__main">
+      <h1 class="crm-registry-header__title">Yritykset</h1>
+      <p class="crm-registry-header__sub">Keskity yrityksiin, joissa on avointa arvoa tai aktiivisia mahdollisuuksia.</p>
+    </div>
+    <div class="crm-registry-header__actions" role="toolbar" aria-label="Yrityslistan työkalupalkki">
+      {% if total_count > 0 %}
+      <form method="get" class="crm-registry-search" role="search" aria-label="Hae yrityksiä"
+            {% if use_client_filter %}data-client-search="1"{% endif %}>
+        {% if current_user.is_superadmin() %}
+        <input type="hidden" name="organization_id" value="{{ organization_id }}">
+        {% endif %}
+        {% if not use_client_filter and active_type %}
+        <input type="hidden" name="type" value="{{ active_type }}">
+        {% endif %}
+        <span class="crm-registry-search__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+        <input type="search" name="q" class="crm-registry-search__input" placeholder="Hae yritys…"
+               value="{{ search_query }}"
+               {% if use_client_filter %}id="companies-search-input"{% endif %}>
+      </form>
+      {% endif %}
+      {% if has_endpoint('companies.new_company') %}
+      <a class="btn btn-ghost btn-sm"
+         href="{{ url_for('companies.new_company', organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.new_company') }}">
+        Lisää yritys
+      </a>
+      {% endif %}
     </div>
   </header>
 
@@ -31,133 +112,152 @@
     ) }}
     {% endif %}
   {% else %}
-    <div class="companies-toolbar">
-      <form method="get" class="companies-search" role="search" aria-label="Hae yrityksiä"
-            {% if use_client_filter %}data-client-search="1"{% endif %}>
-        {% if current_user.is_superadmin() %}
-        <input type="hidden" name="organization_id" value="{{ organization_id }}">
-        {% endif %}
-        {% if not use_client_filter and active_type %}
-        <input type="hidden" name="type" value="{{ active_type }}">
-        {% endif %}
-        <input type="search" name="q" class="companies-search__input" placeholder="Hae yrityksen nimellä"
-               value="{{ search_query }}"
-               {% if use_client_filter %}id="companies-search-input"{% endif %}>
-      </form>
-
-      <nav class="companies-filter-chips" aria-label="Yritystyypin suodatin"
+    <div class="crm-registry-tabs-bar">
+      <nav class="crm-registry-tabs" aria-label="Yritystyypin suodatin"
            {% if use_client_filter %}data-client-type-filter="1"{% endif %}>
         {% for value, label in type_filters %}
         {% if use_client_filter %}
         <button type="button"
-                class="companies-filter-chip{% if value == active_type %} is-active{% endif %}"
+                class="crm-registry-tab{% if value == active_type %} is-active{% endif %}"
                 data-type="{{ value }}">{{ label }}</button>
         {% else %}
         <a href="{{ url_for('companies.list_companies', organization_id=organization_id, type=value or none, q=search_query or none) if current_user.is_superadmin() else url_for('companies.list_companies', type=value or none, q=search_query or none) }}"
-           class="companies-filter-chip{% if value == active_type %} is-active{% endif %}">{{ label }}</a>
+           class="crm-registry-tab{% if value == active_type %} is-active{% endif %}">{{ label }}</a>
         {% endif %}
         {% endfor %}
       </nav>
     </div>
 
-    <div class="card">
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table companies-table" id="companies-table">
-            <thead>
-              <tr>
-                <th>Yritys</th>
-                <th>Toimiala</th>
-                <th>Kaupunki</th>
-                <th>Kontaktit</th>
-                <th>Liidit</th>
-                <th>Omistaja</th>
-                <th>Luotu</th>
-                <th class="company-type-cell">Tyyppi</th>
-                <th aria-hidden="true"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in rows %}
-              {% set c = row.company %}
-              <tr class="companies-row"
-                  data-type="{{ c.type or 'prospect' }}"
-                  data-name="{{ c.name|lower }}">
-                <td>
-                  <a href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}">
-                    {{ c.name }}
-                  </a>
-                </td>
-                <td>{{ c.industry or "—" }}</td>
-                <td>{{ c.city or "—" }}</td>
-                <td>
-                  {% if row.contact_count == 1 %}1 kontakti
-                  {% elif row.contact_count %}{{ row.contact_count }} kontaktia
-                  {% else %}—{% endif %}
-                </td>
-                <td>
-                  {% if row.open_lead_count == 1 %}1 liidi
-                  {% elif row.open_lead_count %}{{ row.open_lead_count }} liidiä
-                  {% else %}—{% endif %}
-                </td>
-                <td>{{ row.owner_label or "—" }}</td>
-                <td>{{ relative_created_fi(c.created_at) }}</td>
-                <td class="company-type-cell">
-                  {% set ctype = c.type or 'prospect' %}
-                  <span class="company-type-badge company-type-badge--{{ ctype }}">
-                    {% if ctype == 'customer' %}Asiakas
-                    {% elif ctype == 'partner' %}Kumppani
-                    {% elif ctype == 'supplier' %}Toimittaja
-                    {% else %}Prospekti{% endif %}
-                  </span>
-                </td>
-                <td>
-                  <div class="row-actions companies-row-actions" role="group" aria-label="Toiminnot">
-                    <a class="row-action-btn"
-                       href="{{ url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) }}"
-                       title="Muokkaa"
-                       aria-label="Muokkaa">
-                      <i class="ti ti-pencil" aria-hidden="true"></i>
-                    </a>
-                    <form method="post"
-                          action="{{ url_for('companies.delete_company', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.delete_company', company_id=c.id) }}"
-                          class="form-row-inline"
-                          onsubmit="return confirm('Poistetaanko yritys {{ c.name|e }}?');">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="row-action-btn action-destructive" title="Poista" aria-label="Poista">
-                        <i class="ti ti-trash" aria-hidden="true"></i>
-                      </button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+  {% set sorted_rows = rows|sort(attribute='open_lead_count', reverse=true) %}
+    <div class="card crm-registry-card">
+      <div class="crm-registry-list" id="companies-list" role="list" aria-label="Priorisoidut yritykset">
+        {% for row in sorted_rows %}
+        {% set c = row.company %}
+        {% set ctype = c.type or 'prospect' %}
+        {% set status = company_status(row) %}
+        {% set updated_label = relative_created_fi(c.updated_at) %}
+        {% set updated_days = updated_label.split()[0]|int if updated_label and ' pv sitten' in updated_label else (0 if updated_label and ('min sitten' in updated_label or 'h sitten' in updated_label or updated_label == 'Juuri nyt') else (999 if updated_label and updated_label != '—' else none)) %}
+        {% set detail_url = url_for('companies.detail', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.detail', company_id=c.id) %}
+        <article class="crm-registry-row crm-registry-row--link companies-row"
+                 role="listitem"
+                 data-type="{{ ctype }}"
+                 data-name="{{ c.name|lower }}"
+                 data-href="{{ detail_url }}"
+                 tabindex="0">
+          <div class="crm-registry-row__main">
+            <div class="crm-registry-row__headline">
+              <span class="crm-registry-row__name">{{ c.name }}</span>
+              <span class="crm-registry-row__badge crm-registry-row__badge--type crm-registry-row__badge--{{ ctype }}">
+                {% if ctype == 'customer' %}Asiakas
+                {% elif ctype == 'partner' %}Kumppani
+                {% elif ctype == 'supplier' %}Toimittaja
+                {% else %}Prospekti{% endif %}
+              </span>
+              {% if status == 'active' %}
+              <span class="crm-registry-row__badge crm-registry-row__badge--active">Aktiivinen</span>
+              {% elif status == 'new' %}
+              <span class="crm-registry-row__badge crm-registry-row__badge--new">Uusi mahdollisuus</span>
+              {% elif status == 'slipping' %}
+              <span class="crm-registry-row__badge crm-registry-row__badge--slipping">Liukumassa pois</span>
+              {% endif %}
+            </div>
+            <div class="crm-registry-row__meta">
+              {% if c.industry %}{{ c.industry }}{% else %}—{% endif %}
+              <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
+              {% if c.city %}{{ c.city }}{% elif c.region %}{{ c.region }}{% else %}—{% endif %}
+              <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
+              {% if row.contact_count == 1 %}1 kontakti
+              {% elif row.contact_count %}{{ row.contact_count }} kontaktia
+              {% else %}Ei kontakteja{% endif %}
+              <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
+              {% if row.open_lead_count == 1 %}1 liidi
+              {% elif row.open_lead_count %}{{ row.open_lead_count }} liidiä
+              {% else %}Ei avoimia liidejä{% endif %}
+              <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
+              <span class="crm-registry-row__meta-time--{{ activity_time_mod(updated_days) }}">
+                Viimeisin aktiviteetti {{ relative_created_fi(c.updated_at) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="crm-registry-row__actions" role="group" aria-label="Toiminnot" onclick="event.stopPropagation()">
+            <a class="row-action-btn"
+               href="{{ detail_url }}"
+               title="Muokkaa"
+               aria-label="Muokkaa">
+              <i class="ti ti-pencil" aria-hidden="true"></i>
+            </a>
+            <form method="post"
+                  action="{{ url_for('companies.delete_company', company_id=c.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('companies.delete_company', company_id=c.id) }}"
+                  class="form-row-inline"
+                  onsubmit="return confirm('Poistetaanko yritys {{ c.name|e }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="row-action-btn action-destructive" title="Poista" aria-label="Poista">
+                <i class="ti ti-trash" aria-hidden="true"></i>
+              </button>
+            </form>
+          </div>
+
+          <div class="crm-registry-row__aside">
+            {% if row.open_lead_count > 0 %}
+            <div class="crm-registry-row__value crm-registry-row__value--missing" title="Avoin arvo">Arvo puuttuu</div>
+            {% endif %}
+            <span class="crm-registry-row__next"><span class="sr-only">Seuraava toimi: </span>{{ company_next_action(row, status) }} →</span>
+          </div>
+        </article>
+        {% endfor %}
       </div>
     </div>
+
+    <footer class="crm-registry-footer">
+      <span>{{ total_count }} yritystä</span>
+      {% set active_company_count = rows|selectattr('open_lead_count', 'gt', 0)|list|length %}
+      {% if active_company_count > 0 %}
+      <span><strong>{{ active_company_count }}</strong> yrityksellä aktiivisia mahdollisuuksia</span>
+      {% endif %}
+    </footer>
   {% endif %}
 </section>
 
-{% if use_client_filter and total_count > 0 %}
+{% if total_count > 0 %}
 <script>
 (function () {
-  const table = document.getElementById('companies-table');
-  if (!table) return;
-  const rows = Array.from(table.querySelectorAll('tbody tr.companies-row'));
+  const list = document.getElementById('companies-list');
+  if (!list) return;
+  const rows = Array.from(list.querySelectorAll('.companies-row'));
   const searchInput = document.getElementById('companies-search-input');
-  const chips = document.querySelectorAll('[data-client-type-filter] .companies-filter-chip');
+  const chips = document.querySelectorAll('[data-client-type-filter] .crm-registry-tab');
   let activeType = {{ active_type|tojson }};
 
+  rows.forEach((row) => {
+    const href = row.dataset.href;
+    if (!href) return;
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('.crm-registry-row__actions')) return;
+      window.location.href = href;
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (!event.target.closest('.crm-registry-row__actions')) {
+          window.location.href = href;
+        }
+      }
+    });
+  });
+
+  {% if use_client_filter %}
   function applyFilters() {
     const q = (searchInput && searchInput.value || '').trim().toLowerCase();
+    let visible = 0;
     rows.forEach((row) => {
       const name = row.dataset.name || '';
       const type = row.dataset.type || '';
       const typeOk = !activeType || type === activeType;
       const searchOk = !q || name.includes(q);
-      row.style.display = typeOk && searchOk ? '' : 'none';
+      const show = typeOk && searchOk;
+      row.style.display = show ? '' : 'none';
+      if (show) visible += 1;
     });
   }
 
@@ -174,6 +274,7 @@
   });
 
   applyFilters();
+  {% endif %}
 })();
 </script>
 {% endif %}

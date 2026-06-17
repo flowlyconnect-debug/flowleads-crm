@@ -1,17 +1,109 @@
 {% extends "base.html" %}
+{% set hide_workflow_bar = true %}
 {% from "components/empty_state.html" import empty_state %}
 
 {% block title %}Kontaktit — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/companies.css') }}">
+{% endblock %}
+{% block body_class %} page-contacts{% endblock %}
 
 {% block content %}
-<section class="contacts-page">
-  <header class="page-header">
-    <div class="page-header__main">
-      <div class="breadcrumbs">
-        <span>Kontaktit</span>
+{% set sorted_by_update = contacts|sort(attribute='updated_at') %}
+{% set quiet_cutoff = (contacts|length * 0.3)|int %}
+{% set quiet_threshold = sorted_by_update[quiet_cutoff].updated_at if contacts and quiet_cutoff < contacts|length else none %}
+
+{% macro contact_initials(contact) -%}
+  {{ ((contact.first_name[0] if contact.first_name else '') ~ (contact.last_name[0] if contact.last_name else ''))|upper }}
+{%- endmacro %}
+
+{% macro render_contact_row(c, is_dm, is_quiet) %}
+  {% set company = companies_by_id.get(c.company_id) if c.company_id else none %}
+  {% set full_name = c.first_name ~ (' ' ~ c.last_name if c.last_name else '') %}
+  {% set search_blob = (full_name ~ ' ' ~ (c.title or '') ~ ' ' ~ (company.name if company else '') ~ ' ' ~ (c.email or '') ~ ' ' ~ (c.phone or ''))|lower %}
+  {% set company_url = url_for('companies.detail', company_id=company.id, organization_id=organization_id) if company and current_user.is_superadmin() else (url_for('companies.detail', company_id=company.id) if company else '') %}
+  {% if is_dm %}
+    {% set next_action = 'Soita' %}
+  {% elif is_quiet %}
+    {% set next_action = 'Ota yhteyttä' %}
+  {% elif c.email %}
+    {% set next_action = 'Lähetä viesti' %}
+  {% elif company %}
+    {% set next_action = 'Avaa yritys' %}
+  {% else %}
+    {% set next_action = 'Täydennä tiedot' %}
+  {% endif %}
+  <article class="crm-contact-row contacts-row" role="listitem"
+           data-search="{{ search_blob }}"
+           {% if company_url %}data-href="{{ company_url }}" tabindex="0"{% endif %}>
+    <span class="crm-contact-row__avatar" aria-hidden="true">{{ contact_initials(c) }}</span>
+    <div class="crm-registry-row__main">
+      <div class="crm-registry-row__headline">
+        <span class="crm-registry-row__name">{{ full_name }}</span>
+        {% if c.title %}
+        <span class="crm-contact-row__role">· {{ c.title }}</span>
+        {% endif %}
+        {% if is_dm %}
+        <span class="crm-registry-row__badge crm-registry-row__badge--decision">Päättäjä</span>
+        {% elif is_quiet %}
+        <span class="crm-registry-row__badge crm-registry-row__badge--slipping">Hiljainen</span>
+        {% endif %}
       </div>
-      <h1>Kontaktit</h1>
-      <p class="page-subtitle">{{ contacts|length }} kontaktia</p>
+      <div class="crm-registry-row__meta">
+        {% if company %}
+          {% if company_url %}
+          <a href="{{ company_url }}" class="crm-contact-row__company-link" onclick="event.stopPropagation()">{{ company.name }}</a>
+          {% else %}
+          {{ company.name }}
+          {% endif %}
+        {% else %}
+          Ei yritystä
+        {% endif %}
+        {% if c.email or c.phone %}
+        <span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>
+        <span class="crm-contact-row__contact-info">
+          {% if c.email %}{{ c.email }}{% endif %}
+          {% if c.email and c.phone %} · {% endif %}
+          {% if c.phone %}{{ c.phone }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="crm-registry-row__aside">
+      <div class="crm-registry-row__meta{% if is_quiet %} crm-registry-row__meta-time--warn{% else %} crm-registry-row__meta-time--muted{% endif %}" style="margin-top:0;font-size:12.5px;">
+        {% if c.updated_at %}
+        Viimeisin aktiviteetti {{ c.updated_at.strftime('%d.%m.%Y') }}
+        {% else %}
+        Ei aktiviteettia
+        {% endif %}
+      </div>
+      <span class="crm-registry-row__next"><span class="sr-only">Seuraava toimi: </span>{{ next_action }} →</span>
+    </div>
+  </article>
+{% endmacro %}
+
+<section class="contacts-page contacts-page--action-first">
+  <header class="crm-registry-header">
+    <div class="crm-registry-header__main">
+      <h1 class="crm-registry-header__title">Kontaktit</h1>
+      <p class="crm-registry-header__sub">Aloita ihmisistä, joihin kannattaa olla yhteydessä seuraavaksi.</p>
+    </div>
+    <div class="crm-registry-header__actions" role="toolbar" aria-label="Kontaktilistan työkalupalkki">
+      {% if contacts|length > 0 %}
+      <label class="crm-registry-search" for="contacts-search-input">
+        <span class="crm-registry-search__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+        <input type="search" id="contacts-search-input" class="crm-registry-search__input"
+               placeholder="Hae kontakti…" autocomplete="off" aria-label="Hae kontakteja">
+      </label>
+      {% endif %}
+      {% if has_endpoint('contacts.new_contact') %}
+      <a class="btn btn-ghost btn-sm"
+         href="{{ url_for('contacts.new_contact', organization_id=organization_id) if current_user.is_superadmin() else url_for('contacts.new_contact') }}">
+        Lisää kontakti
+      </a>
+      {% endif %}
     </div>
   </header>
 
@@ -32,41 +124,128 @@
     ) }}
     {% endif %}
   {% else %}
-    <div class="card">
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Nimi</th>
-                <th>Titteli</th>
-                <th>Yritys</th>
-                <th>Sähköposti</th>
-                <th>Puhelin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for c in contacts %}
-                <tr>
-                  <td>{{ c.first_name }} {{ c.last_name or "" }}</td>
-                  <td>{{ c.title or "—" }}</td>
-                  <td>
-                    {% if c.company_id and companies_by_id.get(c.company_id) %}
-                      {{ companies_by_id.get(c.company_id).name }}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </td>
-                  <td>{{ c.email or "—" }}</td>
-                  <td>{{ c.phone or "—" }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+
+  <div id="contacts-groups">
+    <section class="crm-contacts-group" data-contact-group="priority">
+      <div class="crm-contacts-group__head">
+        <h2 class="crm-contacts-group__title crm-contacts-group__title--priority">Päättäjät</h2>
+        <span class="crm-contacts-group__count"></span>
+      </div>
+      <div class="card crm-registry-card">
+        <div class="crm-registry-list" role="list" aria-label="Päättäjät">
+          {% for c in contacts %}
+          {% set t = (c.title or '')|lower %}
+          {% set is_dm = 'toimitusjohtaja' in t or 'ceo' in t or 'johtaja' in t or 'director' in t or 'päättäjä' in t or 'hallitu' in t or 'cfo' in t or 'cto' in t or 'chief' in t %}
+          {% if is_dm %}
+          {{ render_contact_row(c, is_dm, false) }}
+          {% endif %}
+          {% endfor %}
         </div>
       </div>
-    </div>
+    </section>
+
+    <section class="crm-contacts-group" data-contact-group="quiet">
+      <div class="crm-contacts-group__head">
+        <h2 class="crm-contacts-group__title crm-contacts-group__title--slipping">Hiljainen</h2>
+        <span class="crm-contacts-group__count"></span>
+      </div>
+      <div class="card crm-registry-card">
+        <div class="crm-registry-list" role="list" aria-label="Hiljainen">
+          {% for c in contacts %}
+          {% set t = (c.title or '')|lower %}
+          {% set is_dm = 'toimitusjohtaja' in t or 'ceo' in t or 'johtaja' in t or 'director' in t or 'päättäjä' in t or 'hallitu' in t or 'cfo' in t or 'cto' in t or 'chief' in t %}
+          {% set is_quiet = not is_dm and quiet_threshold and c.updated_at and c.updated_at <= quiet_threshold %}
+          {% if is_quiet %}
+          {{ render_contact_row(c, is_dm, is_quiet) }}
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="crm-contacts-group" data-contact-group="default">
+      <div class="crm-contacts-group__head">
+        <h2 class="crm-contacts-group__title crm-contacts-group__title--default">Muut yhteyshenkilöt</h2>
+        <span class="crm-contacts-group__count"></span>
+      </div>
+      <div class="card crm-registry-card">
+        <div class="crm-registry-list" role="list" aria-label="Muut yhteyshenkilöt">
+          {% for c in contacts %}
+          {% set t = (c.title or '')|lower %}
+          {% set is_dm = 'toimitusjohtaja' in t or 'ceo' in t or 'johtaja' in t or 'director' in t or 'päättäjä' in t or 'hallitu' in t or 'cfo' in t or 'cto' in t or 'chief' in t %}
+          {% set is_quiet = not is_dm and quiet_threshold and c.updated_at and c.updated_at <= quiet_threshold %}
+          {% if not is_dm and not is_quiet %}
+          {{ render_contact_row(c, is_dm, false) }}
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="crm-registry-footer">
+    <span>{{ contacts|length }} kontaktia</span>
+    <span id="contacts-priority-footer" hidden><strong>0</strong> päättäjää listalla</span>
+  </footer>
   {% endif %}
 </section>
-{% endblock %}
 
+{% if contacts|length > 0 %}
+<script>
+(function () {
+  const searchInput = document.getElementById('contacts-search-input');
+  const rows = Array.from(document.querySelectorAll('.contacts-row'));
+  const groups = Array.from(document.querySelectorAll('[data-contact-group]'));
+
+  rows.forEach((row) => {
+    const href = row.dataset.href;
+    if (!href) return;
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('a')) return;
+      window.location.href = href;
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = href;
+      }
+    });
+  });
+
+  function updateGroupCounts() {
+    let priorityVisible = 0;
+    groups.forEach((group) => {
+      const countEl = group.querySelector('.crm-contacts-group__count');
+      const visible = Array.from(group.querySelectorAll('.contacts-row')).filter((r) => r.style.display !== 'none').length;
+      if (group.dataset.contactGroup === 'priority') priorityVisible = visible;
+      if (countEl) countEl.textContent = String(visible);
+      group.style.display = visible > 0 ? '' : 'none';
+    });
+    const footer = document.getElementById('contacts-priority-footer');
+    if (footer) {
+      if (priorityVisible > 0) {
+        footer.hidden = false;
+        footer.innerHTML = '<strong>' + priorityVisible + '</strong> päättäjää listalla';
+      } else {
+        footer.hidden = true;
+      }
+    }
+  }
+
+  updateGroupCounts();
+
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    rows.forEach((row) => {
+      const blob = row.dataset.search || '';
+      row.style.display = !q || blob.includes(q) ? '' : 'none';
+    });
+    updateGroupCounts();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
