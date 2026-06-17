@@ -115,17 +115,6 @@
     {% set active_company_count = rows|selectattr('open_lead_count', 'gt', 0)|list|length %}
     {% set sorted_rows = rows|sort(attribute='open_lead_count', reverse=true) %}
 
-    {% if active_company_count > 0 %}
-    <div class="companies-focus-banner" role="status">
-      <span class="companies-focus-banner__count">{{ active_company_count }}</span>
-      <span class="companies-focus-banner__text">
-        {% if active_company_count == 1 %}yritys vaatii huomiota nyt
-        {% else %}yritystä vaatii huomiota nyt{% endif %}
-        — aloita aktiivisista mahdollisuuksista
-      </span>
-    </div>
-    {% endif %}
-
     <div class="crm-registry-tabs-bar">
       <nav class="crm-registry-tabs" aria-label="Yritystyypin suodatin"
            {% if use_client_filter %}data-client-type-filter="1"{% endif %}>
@@ -178,49 +167,51 @@
                 <span class="crm-registry-row__badge crm-registry-row__badge--slipping">Liukumassa pois</span>
                 {% endif %}
               </div>
-              {% if is_priority %}
-              <span class="companies-focus-row__opp">
-                {% if row.open_lead_count == 1 %}1 aktiivinen liidi
-                {% else %}{{ row.open_lead_count }} aktiivista mahdollisuutta{% endif %}
-              </span>
-              <span class="sr-only">{% if row.open_lead_count == 1 %}1 liidi{% else %}{{ row.open_lead_count }} liidiä{% endif %}</span>
-              {% endif %}
             </div>
 
-            <dl class="companies-focus-row__facts">
-              <div class="companies-focus-row__fact">
-                <dt>Toimiala</dt>
-                <dd{% if not c.industry %} class="crm-focus-fact__value--empty"{% endif %}>{{ c.industry or "—" }}</dd>
-              </div>
-              <div class="companies-focus-row__fact">
-                <dt>Kaupunki</dt>
-                <dd{% if not c.city and not c.region %} class="crm-focus-fact__value--empty"{% endif %}>{% if c.city %}{{ c.city }}{% elif c.region %}{{ c.region }}{% else %}—{% endif %}</dd>
-              </div>
-              <div class="companies-focus-row__fact">
-                <dt>Kontaktit</dt>
-                <dd{% if not row.contact_count %} class="crm-focus-fact__value--empty"{% endif %}>
-                  {% if row.contact_count == 1 %}1 kontakti
-                  {% elif row.contact_count %}{{ row.contact_count }} kontaktia
-                  {% else %}Ei kontakteja{% endif %}
-                </dd>
-              </div>
-              <div class="companies-focus-row__fact companies-focus-row__fact--activity">
-                <dt>Viimeisin aktiviteetti</dt>
-                <dd class="crm-registry-row__meta-time--{{ activity_time_mod(updated_days) }}">{{ relative_created_fi(c.updated_at) }}</dd>
-              </div>
-            </dl>
-
-            {% if is_priority %}
-            <p class="companies-focus-row__value-hint">Avoin arvo puuttuu</p>
-            {% endif %}
+            {% set ns = namespace(sep=false) %}
+            <p class="crm-registry-row__meta">
+              {% if c.industry %}
+              <span>{{ c.industry }}</span>
+              {% set ns.sep = true %}
+              {% endif %}
+              {% if c.city or c.region %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span>{% if c.city %}{{ c.city }}{% else %}{{ c.region }}{% endif %}</span>
+              {% set ns.sep = true %}
+              {% endif %}
+              {% if row.contact_count == 1 %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span>1 kontakti</span>
+              {% set ns.sep = true %}
+              {% elif row.contact_count > 1 %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span>{{ row.contact_count }} kontaktia</span>
+              {% set ns.sep = true %}
+              {% endif %}
+              {% if row.open_lead_count == 1 %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span>1 aktiivinen liidi</span>
+              {% set ns.sep = true %}
+              {% elif row.open_lead_count > 1 %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span>{{ row.open_lead_count }} aktiivista liidiä</span>
+              {% set ns.sep = true %}
+              {% else %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span class="crm-registry-row__meta-quiet">Ei avoimia liidejä</span>
+              {% set ns.sep = true %}
+              {% endif %}
+              {% if c.updated_at %}
+              {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+              <span class="crm-registry-row__meta-time--{{ activity_time_mod(updated_days) }}">Viimeisin aktiviteetti {{ c.updated_at.strftime('%d.%m.%Y') }}</span>
+              {% endif %}
+            </p>
           </div>
 
-          <div class="companies-focus-row__cta">
-            <span class="companies-focus-row__cta-label">Seuraava toimi</span>
+          <div class="companies-focus-row__trail">
             <span class="companies-focus-row__next">{{ company_next_action(row, status) }} →</span>
-          </div>
-
-          <div class="crm-registry-row__actions" role="group" aria-label="Toiminnot" onclick="event.stopPropagation()">
+            <div class="crm-registry-row__actions" role="group" aria-label="Toiminnot" onclick="event.stopPropagation()">
             <a class="row-action-btn"
                href="{{ detail_url }}"
                title="Muokkaa"
@@ -236,6 +227,7 @@
                 <i class="ti ti-trash" aria-hidden="true"></i>
               </button>
             </form>
+            </div>
           </div>
         </article>
         {% endfor %}

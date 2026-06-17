@@ -8,7 +8,7 @@
   flex-direction: column;
   gap: 0;
   width: 100%;
-  max-width: none;
+  max-width: 1120px;
 }
 
 /* --------------------------------------------------------------------------
@@ -86,45 +86,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   Focus banner (companies)
-   -------------------------------------------------------------------------- */
-
-.companies-focus-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 14px;
-  margin-bottom: 12px;
-  border-radius: var(--radius-sm, 8px);
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-accent);
-}
-
-.companies-focus-banner__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 9999px;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
-  color: var(--color-accent-emphasis);
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.companies-focus-banner__text {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  line-height: 1.35;
-}
-
-/* --------------------------------------------------------------------------
    Tabs / type filters
    -------------------------------------------------------------------------- */
 
@@ -188,11 +149,10 @@
    -------------------------------------------------------------------------- */
 
 .companies-focus-row {
-  display: grid;
-  grid-template-columns: 4px 1fr auto auto;
-  align-items: stretch;
+  display: flex;
+  align-items: center;
   gap: 0 18px;
-  padding: 13px 18px 13px 0;
+  padding: 14px 20px 14px 0;
   border-top: 1px solid var(--color-border-light);
   transition: background 120ms ease;
   cursor: pointer;
@@ -204,6 +164,8 @@
 
 .companies-focus-row__accent {
   width: 4px;
+  align-self: stretch;
+  flex-shrink: 0;
   border-radius: 0 4px 4px 0;
   background: transparent;
 }
@@ -217,6 +179,7 @@
 }
 
 .companies-focus-row__body {
+  flex: 1;
   min-width: 0;
 }
 
@@ -225,7 +188,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 8px;
-  margin-bottom: 7px;
 }
 
 .companies-focus-row__name {
@@ -243,92 +205,37 @@
   flex-wrap: wrap;
 }
 
-.companies-focus-row__opp {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-accent-emphasis);
-  background: color-mix(in srgb, var(--color-accent-soft) 65%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 14%, transparent);
-  white-space: nowrap;
-}
-
-.companies-focus-row__facts,
-.contacts-focus-row__facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2px 16px;
-  margin: 0;
-}
-
-.companies-focus-row__fact,
-.contacts-focus-row__fact {
-  min-width: 0;
-}
-
-.companies-focus-row__fact dt,
-.contacts-focus-row__fact dt {
-  margin: 0;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  opacity: 0.8;
-  line-height: 1.2;
-}
-
-.companies-focus-row__fact dd,
-.contacts-focus-row__fact dd {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.25;
+.crm-registry-row__meta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.crm-focus-fact__value--empty {
-  color: color-mix(in srgb, var(--color-text-muted) 55%, transparent);
-  font-weight: 400;
-  font-size: 12px;
-  letter-spacing: 0.01em;
-}
-
-.companies-focus-row__value-hint {
-  margin: 5px 0 0;
-  font-size: 10.5px;
-  color: color-mix(in srgb, var(--color-text-muted) 80%, transparent);
-  font-weight: 400;
-}
-
-.companies-focus-row__cta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
-  flex-shrink: 0;
-  min-width: 140px;
-  padding-left: 8px;
-  border-left: 1px solid var(--color-border-light);
-}
-
-.companies-focus-row__cta-label {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.crm-registry-row__meta-sep {
+  margin: 0 5px;
   color: var(--color-text-muted);
-  opacity: 0.85;
+  opacity: 0.65;
 }
 
-.companies-focus-row__next {
+.crm-registry-row__meta-quiet {
+  color: color-mix(in srgb, var(--color-text-muted) 75%, transparent);
+  font-weight: 400;
+}
+
+.companies-focus-row__trail,
+.contacts-focus-row__trail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.companies-focus-row__next,
+.contacts-focus-row__next {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -344,7 +251,6 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  align-self: center;
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -514,11 +420,10 @@
 }
 
 .contacts-focus-row {
-  display: grid;
-  grid-template-columns: 4px auto 1fr auto;
-  align-items: stretch;
-  gap: 0 12px;
-  padding: 12px 18px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 0 14px;
+  padding: 13px 20px 13px 0;
   border-top: 1px solid var(--color-border-light);
   transition: background 120ms ease;
 }
@@ -529,6 +434,8 @@
 
 .contacts-focus-row__accent {
   width: 4px;
+  align-self: stretch;
+  flex-shrink: 0;
   border-radius: 0 4px 4px 0;
   background: transparent;
 }
@@ -557,8 +464,8 @@
 }
 
 .contacts-focus-row__body {
+  flex: 1;
   min-width: 0;
-  align-self: center;
 }
 
 .contacts-focus-row__head {
@@ -566,7 +473,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 6px;
 }
 
 .contacts-focus-row__name {
@@ -577,41 +483,8 @@
   color: var(--color-text-primary);
 }
 
-.contacts-focus-row__cta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
-  flex-shrink: 0;
-  min-width: 132px;
-  padding-left: 8px;
-  border-left: 1px solid var(--color-border-light);
-  align-self: center;
-}
-
-.contacts-focus-row__cta-label {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  opacity: 0.85;
-}
-
-.contacts-focus-row__next {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--color-accent);
-  white-space: nowrap;
-  transition: gap 120ms ease;
-}
-
 .crm-contact-row__company-link {
-  color: var(--color-text-secondary);
+  color: inherit;
   text-decoration: none;
 }
 
@@ -634,54 +507,26 @@
 }
 
 @media (max-width: 960px) {
-  .companies-focus-row {
-    grid-template-columns: 4px 1fr;
-    grid-template-rows: auto auto auto;
+  .companies-focus-row,
+  .contacts-focus-row {
+    flex-wrap: wrap;
     gap: 10px 0;
     padding: 12px 16px 12px 0;
   }
 
-  .companies-focus-row__cta {
-    grid-column: 2;
-    border-left: none;
-    border-top: 1px solid var(--color-border-light);
-    padding: 8px 0 0;
-    align-items: flex-start;
-    min-width: 0;
+  .companies-focus-row__trail,
+  .contacts-focus-row__trail {
+    width: 100%;
+    padding-left: 22px;
+    justify-content: space-between;
   }
 
   .companies-focus-row .crm-registry-row__actions {
-    grid-column: 2;
     opacity: 1;
-    justify-content: flex-end;
-  }
-
-  .companies-focus-row__facts,
-  .contacts-focus-row__facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .contacts-focus-row {
-    grid-template-columns: 4px auto 1fr;
-    grid-template-rows: auto auto;
-  }
-
-  .contacts-focus-row__cta {
-    grid-column: 2 / -1;
-    border-left: none;
-    border-top: 1px solid var(--color-border-light);
-    padding-top: 8px;
-    align-items: flex-start;
-    min-width: 0;
   }
 }
 
 @media (max-width: 560px) {
-  .companies-focus-row__facts,
-  .contacts-focus-row__facts {
-    grid-template-columns: 1fr;
-  }
-
   .crm-registry-header {
     flex-direction: column;
     align-items: stretch;

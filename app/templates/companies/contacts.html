@@ -50,44 +50,40 @@
         {% endif %}
       </div>
 
-      <dl class="contacts-focus-row__facts">
-        <div class="contacts-focus-row__fact">
-          <dt>Yritys</dt>
-          <dd{% if not company %} class="crm-focus-fact__value--empty"{% endif %}>
-            {% if company %}
-              {% if company_url %}
-              <a href="{{ company_url }}" class="crm-contact-row__company-link" onclick="event.stopPropagation()">{{ company.name }}</a>
-              {% else %}
-              {{ company.name }}
-              {% endif %}
-            {% else %}
-              Ei yritystä
-            {% endif %}
-          </dd>
-        </div>
-        <div class="contacts-focus-row__fact">
-          <dt>Rooli</dt>
-          <dd{% if not c.title %} class="crm-focus-fact__value--empty"{% endif %}>{{ c.title or "—" }}</dd>
-        </div>
-        <div class="contacts-focus-row__fact">
-          <dt>Yhteystiedot</dt>
-          <dd class="crm-contact-row__contact-info{% if not c.email and not c.phone %} crm-focus-fact__value--empty{% endif %}">
-            {% if c.email %}{{ c.email }}{% endif %}
-            {% if c.email and c.phone %} · {% endif %}
-            {% if c.phone %}{{ c.phone }}{% else %}{% if not c.email %}—{% endif %}{% endif %}
-          </dd>
-        </div>
-        <div class="contacts-focus-row__fact contacts-focus-row__fact--activity">
-          <dt>Viimeisin kontakti</dt>
-          <dd class="{% if not c.updated_at %}crm-focus-fact__value--empty{% elif is_quiet %}crm-registry-row__meta-time--warn{% else %}crm-registry-row__meta-time--muted{% endif %}">
-            {% if c.updated_at %}{{ c.updated_at.strftime('%d.%m.%Y') }}{% else %}Ei kontaktia{% endif %}
-          </dd>
-        </div>
-      </dl>
+      {% set ns = namespace(sep=false) %}
+      <p class="crm-registry-row__meta">
+        {% if company %}
+        <span>
+          {% if company_url %}
+          <a href="{{ company_url }}" class="crm-contact-row__company-link" onclick="event.stopPropagation()">{{ company.name }}</a>
+          {% else %}
+          {{ company.name }}
+          {% endif %}
+        </span>
+        {% set ns.sep = true %}
+        {% endif %}
+        {% if c.title %}
+        {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+        <span>{{ c.title }}</span>
+        {% set ns.sep = true %}
+        {% endif %}
+        {% if c.email or c.phone %}
+        {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+        <span class="crm-contact-row__contact-info">
+          {% if c.email %}{{ c.email }}{% endif %}
+          {% if c.email and c.phone %} · {% endif %}
+          {% if c.phone %}{{ c.phone }}{% endif %}
+        </span>
+        {% set ns.sep = true %}
+        {% endif %}
+        {% if c.updated_at %}
+        {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
+        <span class="{% if is_quiet %}crm-registry-row__meta-time--warn{% else %}crm-registry-row__meta-time--muted{% endif %}">Viimeisin kontakti {{ c.updated_at.strftime('%d.%m.%Y') }}</span>
+        {% endif %}
+      </p>
     </div>
 
-    <div class="contacts-focus-row__cta">
-      <span class="contacts-focus-row__cta-label">Seuraava toimi</span>
+    <div class="contacts-focus-row__trail">
       <span class="contacts-focus-row__next">{{ next_action }} →</span>
     </div>
   </article>
