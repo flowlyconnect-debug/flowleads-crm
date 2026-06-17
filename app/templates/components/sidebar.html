@@ -26,8 +26,10 @@
 
 <aside class="sidebar" id="app-sidebar" aria-label="Päänavigaatio">
   <div class="sidebar-logo">
-    <a href="{{ nav_url('analytics.dashboard') }}" class="flex items-center gap-2" aria-label="FlowLeads etusivu">
-      <img src="{{ url_for('static', filename='img/flowleads-mark.png') }}" alt="" class="sidebar-logo__mark" width="26" height="26">
+    <a href="{{ nav_url('analytics.dashboard') }}" class="sidebar-logo__link" aria-label="FlowLeads etusivu">
+      <span class="sidebar-logo__tile" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/flowleads-mark.png') }}" alt="" class="sidebar-logo__mark" width="28" height="28">
+      </span>
       <span class="sidebar-logo__text">FlowLeads</span>
     </a>
   </div>
