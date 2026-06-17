@@ -129,6 +129,22 @@ def test_n8n_jobs_include_onboarded_customer(app, client):
     assert match[0]["source"] == "oikotie"
 
 
+def test_superadmin_customers_new_get_renders_form(client, app):
+    """GET /admin/customers/new must render the onboarding template (not 500)."""
+    _login_superadmin(client, app)
+
+    response = client.get("/admin/customers/new")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "Something went wrong" not in page
+    assert "Luo uusi asiakas" in page
+    assert 'name="organization_name"' in page
+    assert 'name="remonttityyppi"' in page
+    assert 'name="regions"' in page
+    assert "Putkiremontti" in page
+    assert "Uusimaa" in page
+
+
 def test_superadmin_onboarding_form_and_result(client, app):
     _login_superadmin(client, app)
 
