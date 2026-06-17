@@ -40,6 +40,7 @@
   <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item{% if active == 'backups' %} is-active{% endif %}">Backups</a>
   <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item{% if active == 'admin_reports' %} is-active{% endif %}">System reports</a>
   <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
+  <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
   {% endif %}
 </nav>
 {% endmacro %}

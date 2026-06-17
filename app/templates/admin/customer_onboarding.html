@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Luo uusi asiakas — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('customer_onboarding') }}
+    <div class="settings-content">
+      <div class="card settings-panel--wide">
+        <h1>Luo uusi asiakas</h1>
+        <p class="text-muted">Luo organisaatio, admin-käyttäjä, API-avain ja hakuprofiili yhdellä toiminnolla. n8n voi aloittaa liidien haun heti.</p>
+
+        <form method="post" action="{{ url_for('admin.create_customer_route') }}" class="form-group" style="margin-top:1.5rem;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <h2>Organisaatio</h2>
+          <label class="form-label">Asiakkaan nimi
+            <input type="text" name="organization_name" class="form-input" maxlength="255" required
+                   placeholder="Esimerkki Oy"
+                   value="{{ form_data.get('organization_name', '') }}">
+          </label>
+
+          <h2 style="margin-top:1.5rem;">Admin-käyttäjä</h2>
+          <label class="form-label">Adminin nimi
+            <input type="text" name="admin_name" class="form-input" maxlength="255"
+                   placeholder="Matti Meikäläinen"
+                   value="{{ form_data.get('admin_name', '') }}">
+            <span class="form-helper">Vain viitteeksi — ei tallenneta käyttäjäprofiiliin.</span>
+          </label>
+          <label class="form-label">Adminin sähköposti
+            <input type="email" name="admin_email" class="form-input" maxlength="255" required
+                   placeholder="matti@esimerkki.fi"
+                   value="{{ form_data.get('admin_email', '') }}">
+          </label>
+          <label class="form-label">Väliaikainen salasana
+            <input type="text" name="temporary_password" class="form-input" minlength="12" autocomplete="new-password"
+                   placeholder="Jätä tyhjäksi → luodaan automaattisesti">
+            <span class="form-helper">Kutsulinkkiä ei ole käytössä. Jätä tyhjäksi, niin järjestelmä luo turvallisen salasanan.</span>
+          </label>
+
+          <h2 style="margin-top:1.5rem;">Hakuprofiili (n8n)</h2>
+          <label class="form-label">Hakuprofiilin nimi
+            <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
+                   placeholder="esim. Lukkoremontti Uusimaa"
+                   value="{{ form_data.get('search_profile_name', '') }}">
+          </label>
+
+          <label class="form-label">Remonttityyppi
+            <select name="remonttityyppi" class="form-select" required>
+              <option value="">Valitse…</option>
+              {% for option in remonttityypit %}
+              <option value="{{ option }}"
+                {% if form_data.get('remonttityyppi') == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <fieldset class="search-profiles-regions" style="margin-top:1rem;">
+            <legend class="form-label">Alueet</legend>
+            <p class="form-helper mb-2">Valitse maakunnat (vähintään yksi)</p>
+            <div class="search-profiles-regions__grid">
+              {% set selected_regions = form_data.get('regions', []) %}
+              {% for region in finnish_regions %}
+              <label class="form-check">
+                <input type="checkbox" name="regions" value="{{ region }}"
+                  {% if region in selected_regions %}checked{% endif %}>
+                {{ region }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <label class="form-label" style="margin-top:1rem;">Lähde
+            <input type="text" name="source" class="form-input" maxlength="50"
+                   value="{{ form_data.get('source', 'oikotie') }}">
+          </label>
+
+          <label class="form-check" style="margin-top:1rem;">
+            <input type="checkbox" name="is_active" value="y"
+              {% if form_data.get('is_active', True) %}checked{% endif %}>
+            Aktiivinen (organisaatio, admin ja hakuprofiili)
+          </label>
+
+          <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
+            <button type="submit" class="btn btn-primary">Luo asiakas</button>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Peruuta</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

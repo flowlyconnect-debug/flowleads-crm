@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.extensions import db
 from app.search.models import SearchJob, SearchProfile
+from app.search.profile_services import update_profile
 from app.users.services import create_organization, create_user
 
 
@@ -344,3 +345,142 @@ def test_search_profiles_sidepanel_shows_latest_job(app, client):
     assert response.status_code == 200
     assert "7 (viimeisin ajo)" in text
     assert "Valmis" in text
+
+
+def _profile_with_key(app, key="fl_live_original_key_12345"):
+    with app.app_context():
+        org = create_organization("Key Org", "key-org")
+        db.session.flush()
+        profile = SearchProfile(
+            organization_id=org.id,
+            name="Key profile",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            crm_api_key=key,
+        )
+        db.session.add(profile)
+        db.session.commit()
+        return profile.id, key
+
+
+def test_update_profile_preserves_key_when_missing(app):
+    profile_id, original_key = _profile_with_key(app)
+    with app.app_context():
+        profile = db.session.get(SearchProfile, profile_id)
+        update_profile(
+            profile,
+            name="Updated",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            schedule_description="daily",
+            crm_api_key=None,
+            is_active=True,
+        )
+        db.session.commit()
+        assert profile.crm_api_key == original_key
+
+
+def test_update_profile_preserves_key_when_empty(app):
+    profile_id, original_key = _profile_with_key(app)
+    with app.app_context():
+        profile = db.session.get(SearchProfile, profile_id)
+        update_profile(
+            profile,
+            name="Updated",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            schedule_description="daily",
+            crm_api_key="",
+            is_active=True,
+        )
+        db.session.commit()
+        assert profile.crm_api_key == original_key
+
+
+def test_update_profile_preserves_key_when_whitespace(app):
+    profile_id, original_key = _profile_with_key(app)
+    with app.app_context():
+        profile = db.session.get(SearchProfile, profile_id)
+        update_profile(
+            profile,
+            name="Updated",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            schedule_description="daily",
+            crm_api_key="   ",
+            is_active=True,
+        )
+        db.session.commit()
+        assert profile.crm_api_key == original_key
+
+
+def test_update_profile_updates_key_when_new_value(app):
+    profile_id, _original_key = _profile_with_key(app)
+    new_key = "fl_live_replacement_key_99"
+    with app.app_context():
+        profile = db.session.get(SearchProfile, profile_id)
+        update_profile(
+            profile,
+            name="Updated",
+            remonttityyppi="Putkiremontti",
+            regions=["Uusimaa"],
+            schedule_description="daily",
+            crm_api_key=new_key,
+            is_active=True,
+        )
+        db.session.commit()
+        assert profile.crm_api_key == new_key
+
+
+def test_search_profiles_edit_page_does_not_render_full_api_key(app, client):
+    ctx = _setup_org(app, "mask-ui")
+    secret_key = "fl_live_secret_full_key_value"
+    _login(client, ctx["admin_email"])
+    client.post(
+        "/settings/search-profiles",
+        data=_profile_form(crm_api_key=secret_key),
+    )
+
+    with app.app_context():
+        profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
+        profile_id = profile.id
+
+    response = client.get(f"/settings/search-profiles?id={profile_id}")
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert secret_key not in page
+    assert "...****" in page
+
+
+def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client):
+    ctx = _setup_org(app, "n8n-full-key")
+    secret_key = "fl_live_n8n_full_key_value"
+    _login(client, ctx["admin_email"])
+    client.post(
+        "/settings/search-profiles",
+        data=_profile_form(crm_api_key=secret_key),
+    )
+
+    with app.app_context():
+        profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
+        profile_id = profile.id
+
+    client.post(
+        f"/settings/search-profiles/{profile_id}",
+        data=_profile_form(
+            name="Still works",
+            crm_api_key="",
+        ),
+        follow_redirects=True,
+    )
+    client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+
+    response = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10",
+        headers={"X-N8N-Secret": "test-n8n-secret"},
+    )
+    assert response.status_code == 200
+    jobs = response.get_json()["jobs"]
+    match = [job for job in jobs if job.get("profile_id") == profile_id]
+    assert len(match) == 1
+    assert match[0]["crm_api_key"] == secret_key

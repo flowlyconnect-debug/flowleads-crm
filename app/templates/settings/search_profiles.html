@@ -87,14 +87,25 @@
               </fieldset>
 
               <label class="form-label">CRM API-avain
+                {% if selected_profile and selected_profile.crm_api_key %}
+                <span class="form-input form-input--readonly" aria-hidden="true">{{ mask_crm_api_key(selected_profile.crm_api_key) }}</span>
+                {% elif selected_profile %}
+                <p class="form-helper" style="color:#991B1B;" role="alert">
+                  API-avain puuttuu — n8n ei voi lähettää liidejä tähän profiiliin.
+                </p>
+                {% endif %}
                 <input type="text" name="crm_api_key" class="form-input" maxlength="200" autocomplete="off"
-                       placeholder="fl_live_…"
-                       value="{{ selected_profile.crm_api_key if selected_profile and selected_profile.crm_api_key else '' }}">
+                       placeholder="{% if selected_profile %}Syötä uusi avain vaihtaaksesi{% else %}fl_live_…{% endif %}"
+                       value="">
               </label>
               <p class="form-helper">
+                {% if selected_profile %}
+                Jätä tyhjäksi säilyttääksesi nykyisen avaimen.
+                Uuden avaimen löydät
+                {% else %}
                 Kopioi avain
-                <a href="{{ url_for('settings.lead_settings') }}">Liidiasetukset-sivulta</a>
-                tai <a href="{{ url_for('settings.api_keys', **org_query) }}">API-avaimet</a>-sivulta.
+                {% endif %}
+                <a href="{{ url_for('settings.api_keys', **org_query) }}">API-avaimet</a>-sivulta.
               </p>
 
               <label class="form-label">Aikataulu

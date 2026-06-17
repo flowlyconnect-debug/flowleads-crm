@@ -12,6 +12,9 @@
   <p>Users: {{ stats.user_count }}</p>
 
   {% if current_user.is_superadmin() %}
+  <h2 style="margin-top:1.5rem;">Asiakkaat</h2>
+  <p><a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo uusi asiakas</a></p>
+
   <h2 style="margin-top:1.5rem;">Organisaatiot</h2>
   {% if organizations %}
   <ul>

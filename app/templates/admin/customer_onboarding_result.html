@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Asiakas luotu — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('customer_onboarding') }}
+    <div class="settings-content">
+      <div class="card settings-panel--wide">
+        <h1>Asiakas valmis</h1>
+        <p class="text-muted">Tallenna alla olevat tiedot nyt — API-avainta ei näytetä uudelleen.</p>
+
+        <div class="flash success" style="margin-top:1rem;">
+          <strong>Status:</strong>
+          {% if result.is_active and result.initial_job_created %}
+          Valmis n8n-ajoon — ensimmäinen hakujobi on jonossa.
+          {% elif result.is_active %}
+          Valmis n8n-ajoon — päivittäinen haku käynnistyy aikataulun mukaan.
+          {% else %}
+          Luotu passiivisena — aktivoi hakuprofiili ennen n8n-ajoa.
+          {% endif %}
+        </div>
+
+        <dl class="onboarding-result" style="margin-top:1.5rem;">
+          <dt>Asiakas</dt>
+          <dd>{{ result.organization_name }} <code>{{ result.organization_slug }}</code></dd>
+
+          {% if result.admin_name %}
+          <dt>Admin</dt>
+          <dd>{{ result.admin_name }}</dd>
+          {% endif %}
+
+          <dt>Admin-sähköposti</dt>
+          <dd><code>{{ result.admin_email }}</code></dd>
+
+          {% if result.temporary_password %}
+          <dt>Väliaikainen salasana</dt>
+          <dd><code id="onboarding-password" style="word-break:break-all;">{{ result.temporary_password }}</code></dd>
+          {% endif %}
+
+          <dt>Hakuprofiili</dt>
+          <dd>{{ result.search_profile_name }}</dd>
+
+          <dt>API-avain (näytetään kerran)</dt>
+          <dd><code id="onboarding-api-key" style="word-break:break-all;">{{ result.api_key_full }}</code></dd>
+        </dl>
+
+        <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" id="copy-onboarding-secrets">Kopioi salaisuudet</button>
+          <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo toinen asiakas</a>
+          <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Hallintapaneeli</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const btn = document.getElementById("copy-onboarding-secrets");
+    if (!btn) return;
+    btn.addEventListener("click", async function () {
+      const lines = [
+        "Asiakas: {{ result.organization_name }}",
+        "Admin: {{ result.admin_email }}",
+        {% if result.temporary_password %}
+        "Salasana: {{ result.temporary_password }}",
+        {% endif %}
+        "Hakuprofiili: {{ result.search_profile_name }}",
+        "API-avain: {{ result.api_key_full }}",
+      ];
+      try {
+        await navigator.clipboard.writeText(lines.join("\n"));
+        btn.textContent = "Kopioitu!";
+      } catch (err) {
+        btn.textContent = "Kopiointi epäonnistui";
+      }
+    });
+  })();
+</script>
+{% endblock %}

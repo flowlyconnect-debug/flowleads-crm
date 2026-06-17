@@ -46,6 +46,7 @@ def _validate_profile_fields(
     regions: list[str],
     schedule_description: str,
     crm_api_key: str | None,
+    source: str,
 ) -> None:
     if not name or len(name) > 100:
         raise SearchProfileServiceError("Nimi on pakollinen (max 100 merkkiä).")
@@ -60,6 +61,28 @@ def _validate_profile_fields(
         raise SearchProfileServiceError("Valitse kelvollinen aikataulu.")
     if crm_api_key is not None and len(crm_api_key) > 200:
         raise SearchProfileServiceError("CRM API-avain on liian pitkä.")
+    if not source or len(source) > 50:
+        raise SearchProfileServiceError("Valitse kelvollinen lähde.")
+
+
+def mask_crm_api_key_display(key: str | None) -> str | None:
+    if not key or not str(key).strip():
+        return None
+    value = str(key).strip()
+    prefix_len = min(12, max(4, len(value) - 4))
+    return f"{value[:prefix_len]}...****"
+
+
+def _resolve_crm_api_key_for_update(
+    profile: SearchProfile,
+    crm_api_key: str | None,
+) -> str | None:
+    if crm_api_key is None:
+        return profile.crm_api_key
+    stripped = str(crm_api_key).strip()
+    if not stripped:
+        return profile.crm_api_key
+    return stripped
 
 
 def create_profile(
@@ -71,21 +94,25 @@ def create_profile(
     schedule_description: str,
     crm_api_key: str | None,
     is_active: bool,
+    source: str = "oikotie",
 ) -> SearchProfile:
     name = (name or "").strip()
     crm_api_key = (crm_api_key or "").strip() or None
+    source = (source or "oikotie").strip() or "oikotie"
     _validate_profile_fields(
         name=name,
         remonttityyppi=remonttityyppi,
         regions=regions,
         schedule_description=schedule_description,
         crm_api_key=crm_api_key,
+        source=source,
     )
     profile = SearchProfile(
         organization_id=organization_id,
         name=name,
         remonttityyppi=remonttityyppi,
         regions=list(regions),
+        source=source,
         schedule_description=schedule_description,
         crm_api_key=crm_api_key,
         is_active=is_active,
@@ -105,19 +132,21 @@ def update_profile(
     is_active: bool,
 ) -> SearchProfile:
     name = (name or "").strip()
-    crm_api_key = (crm_api_key or "").strip() or None
+    source = profile.source or "oikotie"
+    resolved_crm_api_key = _resolve_crm_api_key_for_update(profile, crm_api_key)
     _validate_profile_fields(
         name=name,
         remonttityyppi=remonttityyppi,
         regions=regions,
         schedule_description=schedule_description,
-        crm_api_key=crm_api_key,
+        crm_api_key=resolved_crm_api_key,
+        source=source,
     )
     profile.name = name
     profile.remonttityyppi = remonttityyppi
     profile.regions = list(regions)
     profile.schedule_description = schedule_description
-    profile.crm_api_key = crm_api_key
+    profile.crm_api_key = resolved_crm_api_key
     profile.is_active = is_active
     profile.updated_at = datetime.now(timezone.utc)
     return profile

@@ -32,6 +32,7 @@ from app.search.profile_services import (
     get_latest_job,
     get_profile,
     list_profiles,
+    mask_crm_api_key_display,
     update_profile,
 )
 
@@ -57,6 +58,7 @@ def _search_profiles_template_defaults(
         "now": now,
         "relative_last_run": "Ei vielä",
         "page_error": page_error,
+        "mask_crm_api_key": mask_crm_api_key_display,
     }
 
 
@@ -92,6 +94,7 @@ def _render_search_profiles(
             now,
         ),
         page_error=page_error,
+        mask_crm_api_key=mask_crm_api_key_display,
     )
 
 
