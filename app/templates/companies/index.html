@@ -190,15 +190,15 @@
             <dl class="companies-focus-row__facts">
               <div class="companies-focus-row__fact">
                 <dt>Toimiala</dt>
-                <dd>{{ c.industry or "—" }}</dd>
+                <dd{% if not c.industry %} class="crm-focus-fact__value--empty"{% endif %}>{{ c.industry or "—" }}</dd>
               </div>
               <div class="companies-focus-row__fact">
                 <dt>Kaupunki</dt>
-                <dd>{% if c.city %}{{ c.city }}{% elif c.region %}{{ c.region }}{% else %}—{% endif %}</dd>
+                <dd{% if not c.city and not c.region %} class="crm-focus-fact__value--empty"{% endif %}>{% if c.city %}{{ c.city }}{% elif c.region %}{{ c.region }}{% else %}—{% endif %}</dd>
               </div>
               <div class="companies-focus-row__fact">
                 <dt>Kontaktit</dt>
-                <dd>
+                <dd{% if not row.contact_count %} class="crm-focus-fact__value--empty"{% endif %}>
                   {% if row.contact_count == 1 %}1 kontakti
                   {% elif row.contact_count %}{{ row.contact_count }} kontaktia
                   {% else %}Ei kontakteja{% endif %}
