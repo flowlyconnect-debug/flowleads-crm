@@ -454,8 +454,8 @@ def test_companies_filter(app, client):
 
         list_resp = client.get("/companies")
         list_body = list_resp.get_data(as_text=True)
-        assert "1 liidi" in list_body
-        assert "2 liidi" not in list_body
+        assert "1 aktiivinen liidi" in list_body
+        assert "2 aktiivista liidiä" not in list_body
 
         search_resp = client.get("/companies?q=Prospekti")
         search_body = search_resp.get_data(as_text=True)

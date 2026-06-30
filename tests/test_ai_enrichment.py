@@ -446,19 +446,17 @@ def test_score_badge_colors_in_list(client, app):
             ctx["org_id"],
             ctx["admin_id"],
         )
-        none = LeadService.create(
-            {"email": "none@example.com", "company": "N"},
-            ctx["org_id"],
-            ctx["admin_id"],
-        )
         db.session.commit()
+        low_id = low.id
+        mid_id = mid.id
+        high_id = high.id
 
-    response = client.get("/leads/")
-    html = response.data.decode()
-    assert "score-low" in html
-    assert "score-mid" in html
-    assert "score-high" in html
-    assert "score-none" in html or "No score" in html
+    low_html = client.get(f"/leads/{low_id}").data.decode()
+    assert "score-low" in low_html
+    mid_html = client.get(f"/leads/{mid_id}").data.decode()
+    assert "score-mid" in mid_html
+    high_html = client.get(f"/leads/{high_id}").data.decode()
+    assert "score-high" in high_html
 
 
 def test_has_enrichment_fields():

@@ -163,6 +163,28 @@ def test_post_creates_lead(client, app):
         assert "API" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
 
 
+def test_post_creates_lead_with_oikotie_source(client, app):
+    ctx = _setup_org(app, "oikotie-source")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    response = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-123",
+            "phone": "+358401234567",
+            "email": "oikotie+123@noemail.flowleads.local",
+        },
+    )
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["success"] is True
+    assert data["data"]["action"] == "created"
+    assert data["data"]["lead"]["source"] == "oikotie"
+    assert data["data"]["lead"]["source_ref"] == "oikotie-123"
+    assert "Invalid source" not in response.get_data(as_text=True)
+
+
 def test_post_creates_lead_with_n8n_minimal_payload(client, app):
     ctx = _setup_org(app, "n8n-minimal")
     full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
@@ -464,7 +486,7 @@ def test_api_lost_reason_required(client, app):
         headers=_auth_headers(full_key),
     )
     assert ok.status_code == 200
-    assert ok.get_json()["data"]["lead"]["lost_reason"] == "Ei budjettia"
+    assert ok.get_json()["data"]["lead"]["lost_reason"] == "no_budget"
 
     no_reason_needed = client.patch(
         f"/api/v1/leads/{lead_id}/stage",

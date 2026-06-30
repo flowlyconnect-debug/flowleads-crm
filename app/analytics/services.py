@@ -281,7 +281,7 @@ class AnalyticsService:
         source_totals.setdefault("other", 0)
         sources_chart = [
             {"source": k, "count": source_totals[k]}
-            for k in ("n8n", "manual", "import", "other")
+            for k in ("n8n", "manual", "import", "webform", "oikotie", "other")
             if source_totals[k] > 0 or k in LEAD_SOURCES
         ]
         if not any(s["count"] for s in sources_chart):
@@ -828,7 +828,7 @@ class AnalyticsService:
                     bucket["no_score"] += 1
 
         sources = []
-        for src in ("n8n", "manual", "import", "other"):
+        for src in ("n8n", "manual", "import", "webform", "oikotie", "other"):
             data = by_source.get(src)
             if not data or data["total"] == 0:
                 continue

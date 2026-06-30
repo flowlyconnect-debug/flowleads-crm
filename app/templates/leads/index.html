@@ -7,7 +7,7 @@
 {% set show_no_results = pagination.total == 0 and has_active_filters %}
 {% set active_sort = filters.sort or 'created_at' %}
 {% set active_dir = filters.dir or 'desc' %}
-{% set source_labels = {'manual': 'Manuaalinen', 'n8n': 'Automaatio', 'import': 'Tuonti', 'webform': 'Lomake'} %}
+{% set source_labels = {'manual': 'Manuaalinen', 'n8n': 'Automaatio', 'import': 'Tuonti', 'webform': 'Lomake', 'oikotie': 'Oikotie'} %}
 {% set base_filters = {
   'search': filters.search or none,
   'stage_id': filters.stage_id,

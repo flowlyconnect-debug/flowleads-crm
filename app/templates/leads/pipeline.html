@@ -103,6 +103,8 @@
                   <option value="manual" {% if filters.get('source') == 'manual' %}selected{% endif %}>Manuaalinen</option>
                   <option value="n8n" {% if filters.get('source') == 'n8n' %}selected{% endif %}>Automaatio</option>
                   <option value="import" {% if filters.get('source') == 'import' %}selected{% endif %}>Tuonti</option>
+                  <option value="webform" {% if filters.get('source') == 'webform' %}selected{% endif %}>Lomake</option>
+                  <option value="oikotie" {% if filters.get('source') == 'oikotie' %}selected{% endif %}>Oikotie</option>
                 </select>
               </label>
             </div>

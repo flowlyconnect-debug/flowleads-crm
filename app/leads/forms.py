@@ -26,7 +26,13 @@ class LeadForm(FlaskForm):
     assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[Optional()])
     source = SelectField(
         "Lähde",
-        choices=[("manual", "Manuaalinen"), ("n8n", "n8n"), ("import", "Tuonti")],
+        choices=[
+            ("manual", "Manuaalinen"),
+            ("n8n", "n8n"),
+            ("import", "Tuonti"),
+            ("webform", "Lomake"),
+            ("oikotie", "Oikotie"),
+        ],
         default="manual",
     )
     score_reason = TextAreaField("Pistemäärän perustelu", validators=[Optional()])
@@ -43,7 +49,14 @@ class LeadFilterForm(FlaskForm):
     stage_id = SelectField("Vaihe", coerce=int, validators=[Optional()])
     source = SelectField(
         "Lähde",
-        choices=[("", "Kaikki"), ("manual", "Manuaalinen"), ("n8n", "n8n"), ("import", "Tuonti")],
+        choices=[
+            ("", "Kaikki"),
+            ("manual", "Manuaalinen"),
+            ("n8n", "n8n"),
+            ("import", "Tuonti"),
+            ("webform", "Lomake"),
+            ("oikotie", "Oikotie"),
+        ],
         validators=[Optional()],
     )
     assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[Optional()])

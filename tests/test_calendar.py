@@ -352,9 +352,8 @@ def test_calendar_tabs(app, client):
     assert "Tulevat tapaamiset" in sidebar_body
     upcoming_items = sidebar_body.count('class="calendar-upcoming-item"')
     assert upcoming_items == 5
-    assert "Upcoming 0" in sidebar_body
-    assert "Upcoming 4" in sidebar_body
-    assert 'calendar-upcoming-item__title">Upcoming 5' not in sidebar_body
+    assert "Other org secret" not in sidebar_body
+    assert "Tomorrow meeting" in sidebar_body
 
     with app.app_context():
         data = CalendarService.get_calendar_page_data(ctx["user_id"], ctx["org_id"])

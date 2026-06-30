@@ -22,7 +22,7 @@ from app.extensions import db
 from app.companies.models import lead_contacts
 
 LEAD_STATUSES = ("active", "won", "lost", "archived")
-LEAD_SOURCES = ("n8n", "manual", "import", "webform")
+LEAD_SOURCES = ("n8n", "manual", "import", "webform", "oikotie")
 GDPR_CONSENT_SOURCES = ("api", "form", "manual")
 GDPR_LEGAL_BASES = ("consent", "legitimate_interest", "contract")
 AI_ENRICHMENT_STATUSES = ("pending", "processing", "completed", "failed", "disabled")
