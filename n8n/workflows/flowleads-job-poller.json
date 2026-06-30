@@ -1,0 +1,299 @@
+{
+  "name": "FlowLeads – Job Poller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000001",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {},
+      "id": "a1000001-0000-4000-8000-000000000002",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "crm_base_url",
+              "name": "crm_base_url",
+              "value": "={{ $env.CRM_BASE_URL || 'https://flowleads-crm.onrender.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "n8n_secret",
+              "name": "n8n_secret",
+              "value": "={{ $env.N8N_MASTER_SECRET }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000003",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [260, 100]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.crm_base_url }}/api/v1/n8n/jobs?status=pending&limit=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000004",
+      "name": "GET pending jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.first().json.jobs || [];\nif (!jobs.length) {\n  return [];\n}\nreturn jobs.map((job) => ({ json: job }));"
+      },
+      "id": "a1000001-0000-4000-8000-000000000005",
+      "name": "Split jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 100]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000006",
+      "name": "For each job",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1040, 100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.crm_base_url }}/api/v1/n8n/jobs/{{ $json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $('Config').first().json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"running\",\n  \"leads_found\": 0,\n  \"leads_sent\": 0,\n  \"error\": \"\"\n}",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000007",
+      "name": "PATCH job running",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "job_id": "={{ $('For each job').item.json.job_id }}",
+            "organization_id": "={{ $('For each job').item.json.organization_id }}",
+            "profile_id": "={{ $('For each job').item.json.profile_id }}",
+            "remonttityyppi": "={{ $('For each job').item.json.remonttityyppi }}",
+            "regions": "={{ $('For each job').item.json.regions }}",
+            "source": "={{ $('For each job').item.json.source }}",
+            "crm_api_key": "={{ $('For each job').item.json.crm_api_key }}",
+            "crm_endpoint": "={{ $('For each job').item.json.crm_endpoint }}",
+            "max_pages": 5
+          }
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000008",
+      "name": "CALL – Job Dispatcher",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1560, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-worker-error",
+              "leftValue": "={{ $json.worker_error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000009",
+      "name": "Worker error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1820, 100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.crm_base_url }}/api/v1/n8n/jobs/{{ $('For each job').item.json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $('Config').first().json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"failed\",\n  \"leads_found\": {{ $json.leads_found || 0 }},\n  \"leads_sent\": {{ $json.leads_sent || 0 }},\n  \"error\": {{ JSON.stringify($json.worker_error || 'Dispatcher failed') }}\n}",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-00000000000a",
+      "name": "PATCH job failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2080, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.crm_base_url }}/api/v1/n8n/jobs/{{ $('For each job').item.json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $('Config').first().json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"completed\",\n  \"leads_found\": {{ $json.leads_found || 0 }},\n  \"leads_sent\": {{ $json.leads_sent || 0 }},\n  \"error\": \"\"\n}",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-00000000000b",
+      "name": "PATCH job completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2080, 200]
+    },
+    {
+      "parameters": {},
+      "id": "a1000001-0000-4000-8000-00000000000c",
+      "name": "Next job",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2340, 100]
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
+      "main": [[{ "node": "GET pending jobs", "type": "main", "index": 0 }]]
+    },
+    "GET pending jobs": {
+      "main": [[{ "node": "Split jobs", "type": "main", "index": 0 }]]
+    },
+    "Split jobs": {
+      "main": [[{ "node": "For each job", "type": "main", "index": 0 }]]
+    },
+    "For each job": {
+      "main": [
+        [{ "node": "PATCH job running", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "PATCH job running": {
+      "main": [[{ "node": "CALL – Job Dispatcher", "type": "main", "index": 0 }]]
+    },
+    "CALL – Job Dispatcher": {
+      "main": [[{ "node": "Worker error?", "type": "main", "index": 0 }]]
+    },
+    "Worker error?": {
+      "main": [
+        [{ "node": "PATCH job failed", "type": "main", "index": 0 }],
+        [{ "node": "PATCH job completed", "type": "main", "index": 0 }]
+      ]
+    },
+    "PATCH job failed": {
+      "main": [[{ "node": "Next job", "type": "main", "index": 0 }]]
+    },
+    "PATCH job completed": {
+      "main": [[{ "node": "Next job", "type": "main", "index": 0 }]]
+    },
+    "Next job": {
+      "main": [[{ "node": "For each job", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "flowleads"
+    }
+  ]
+}

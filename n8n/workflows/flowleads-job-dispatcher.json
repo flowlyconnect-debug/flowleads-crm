@@ -1,0 +1,159 @@
+{
+  "name": "FlowLeads – Job Dispatcher",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b2000001-0000-4000-8000-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $input.first().json;\nconst regions = Array.isArray(job.regions) ? job.regions : [];\nconst max_pages = Number(job.max_pages ?? 5);\n\nif (!regions.length) {\n  return [{\n    json: {\n      ...job,\n      current_region: '',\n      max_pages,\n      worker_error: 'No regions configured on search profile',\n    },\n  }];\n}\n\nreturn regions.map((current_region) => ({\n  json: {\n    ...job,\n    current_region,\n    max_pages,\n  },\n}));"
+      },
+      "id": "b2000001-0000-4000-8000-000000000002",
+      "name": "Expand regions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b2000001-0000-4000-8000-000000000003",
+      "name": "For each region",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $json;\nconst params = new URLSearchParams();\nparams.set('limit', '24');\nparams.set('offset', '0');\nparams.set('sortBy', 'published_desc');\nif (job.remonttityyppi) {\n  params.set('freeText', job.remonttityyppi);\n}\nif (job.current_region) {\n  params.append('locations[]', job.current_region);\n}\n\nreturn [{\n  json: {\n    ...job,\n    oikotie_url: `https://asunnot.oikotie.fi/api/5.0/cards?${params.toString()}`,\n  },\n}];"
+      },
+      "id": "b2000001-0000-4000-8000-000000000004",
+      "name": "Build Oikotie page 1 URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.oikotie_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b2000001-0000-4000-8000-000000000005",
+      "name": "GET Oikotie page 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const regionJob = $('For each region').item.json;\nconst probe = $input.first().json;\n\nfunction extractTotalCount(payload) {\n  if (!payload || typeof payload !== 'object') return 0;\n  for (const key of ['total', 'totalCount', 'count']) {\n    if (Number.isInteger(payload[key]) && payload[key] >= 0) return payload[key];\n  }\n  for (const nestedKey of ['data', 'meta']) {\n    const nested = payload[nestedKey];\n    if (!nested || typeof nested !== 'object') continue;\n    for (const key of ['total', 'totalCount', 'count']) {\n      if (Number.isInteger(nested[key]) && nested[key] >= 0) return nested[key];\n    }\n  }\n  return 0;\n}\n\nfunction buildPageItems(total, maxPages = 5, pageSize = 24) {\n  const cap = Math.max(1, maxPages);\n  const limit = Math.max(1, pageSize);\n  if (!total || total <= 0) return [{ page: 1, offset: 0, limit }];\n  const totalPages = Math.min(cap, Math.max(1, Math.ceil(total / limit)));\n  const items = [];\n  for (let page = 1; page <= totalPages; page += 1) {\n    items.push({ page, offset: (page - 1) * limit, limit });\n  }\n  return items;\n}\n\nconst total = extractTotalCount(probe);\nconst pages = buildPageItems(total, regionJob.max_pages ?? 5, 24);\n\nreturn pages.map((pageItem) => ({\n  json: {\n    ...regionJob,\n    current_region: regionJob.current_region,\n    page: pageItem.page,\n    offset: pageItem.offset,\n    limit: pageItem.limit,\n  },\n}));"
+      },
+      "id": "b2000001-0000-4000-8000-000000000006",
+      "name": "Build page items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "job_id": "={{ $json.job_id }}",
+            "organization_id": "={{ $json.organization_id }}",
+            "profile_id": "={{ $json.profile_id }}",
+            "remonttityyppi": "={{ $json.remonttityyppi }}",
+            "regions": "={{ $json.regions }}",
+            "source": "={{ $json.source }}",
+            "crm_api_key": "={{ $json.crm_api_key }}",
+            "crm_endpoint": "={{ $json.crm_endpoint }}",
+            "current_region": "={{ $json.current_region }}",
+            "page": "={{ $json.page }}",
+            "offset": "={{ $json.offset }}",
+            "limit": "={{ $json.limit }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "b2000001-0000-4000-8000-000000000009",
+      "name": "CALL – Lead Worker Universal",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1560, 0]
+    },
+    {
+      "parameters": {},
+      "id": "b2000001-0000-4000-8000-00000000000c",
+      "name": "Next region",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1820, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $('CALL – Lead Worker Universal').all();\nconst totals = {\n  leads_found: 0,\n  leads_sent: 0,\n  duplicates: 0,\n  failed_pages: 0,\n  worker_error: '',\n};\n\nfor (const item of items) {\n  const row = item.json || {};\n  if (row.worker_error) totals.worker_error = row.worker_error;\n  totals.leads_found += Number(row.leads_found || 0);\n  totals.leads_sent += Number(row.leads_sent || 0);\n  totals.duplicates += Number(row.duplicates || 0);\n  if (row.failed || row.page_failed) totals.failed_pages += 1;\n}\n\nreturn [{ json: totals }];"
+      },
+      "id": "b2000001-0000-4000-8000-00000000000b",
+      "name": "Aggregate totals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2080, 200]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Expand regions", "type": "main", "index": 0 }]]
+    },
+    "Expand regions": {
+      "main": [[{ "node": "For each region", "type": "main", "index": 0 }]]
+    },
+    "For each region": {
+      "main": [
+        [{ "node": "Build Oikotie page 1 URL", "type": "main", "index": 0 }],
+        [{ "node": "Aggregate totals", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Oikotie page 1 URL": {
+      "main": [[{ "node": "GET Oikotie page 1", "type": "main", "index": 0 }]]
+    },
+    "GET Oikotie page 1": {
+      "main": [[{ "node": "Build page items", "type": "main", "index": 0 }]]
+    },
+    "Build page items": {
+      "main": [[{ "node": "CALL – Lead Worker Universal", "type": "main", "index": 0 }]]
+    },
+    "CALL – Lead Worker Universal": {
+      "main": [[{ "node": "Next region", "type": "main", "index": 0 }]]
+    },
+    "Next region": {
+      "main": [[{ "node": "For each region", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "flowleads"
+    }
+  ]
+}

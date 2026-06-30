@@ -1,0 +1,258 @@
+{
+  "name": "FlowLeads – Lead Worker Universal",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c3000001-0000-4000-8000-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $input.first().json;\nconst offset = Number(job.offset ?? 0);\nconst limit = Number(job.limit ?? 24);\nconst params = new URLSearchParams();\nparams.set('limit', String(limit));\nparams.set('offset', String(offset));\nparams.set('sortBy', 'published_desc');\nif (job.remonttityyppi) params.set('freeText', job.remonttityyppi);\nif (job.current_region) params.append('locations[]', job.current_region);\n\nreturn [{\n  json: {\n    ...job,\n    oikotie_url: `https://asunnot.oikotie.fi/api/5.0/cards?${params.toString()}`,\n  },\n}];"
+      },
+      "id": "c3000001-0000-4000-8000-000000000002",
+      "name": "Build Oikotie URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.oikotie_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c3000001-0000-4000-8000-000000000003",
+      "name": "GET Oikotie listings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('Execute Workflow Trigger').first().json;\nconst payload = $input.first().json;\nconst cards = payload.cards || payload.items || payload.data?.cards || payload.data?.items || [];\nconst source = job.source || 'oikotie';\n\nconst leads = cards.map((card) => {\n  const cardId = card.id || card.cardId || card.card_id;\n  const source_ref = `${source}-${cardId}`;\n  const company = card.companyName || card.company || card.housingCompanyName || '';\n  const title = card.title || card.header || card.subject || '';\n  const notesParts = [\n    title,\n    card.description || card.text || '',\n    job.remonttityyppi ? `Remonttityyppi: ${job.remonttityyppi}` : '',\n    job.current_region ? `Alue: ${job.current_region}` : '',\n  ].filter(Boolean);\n\n  return {\n    source_ref,\n    email: `oikotie+${cardId}@noemail.flowleads.local`,\n    company,\n    notes: notesParts.join('\\n').trim(),\n    source: 'n8n',\n    tags: [source, job.remonttityyppi].filter(Boolean),\n    custom_fields: {\n      oikotie_card_id: cardId,\n      remonttityyppi: job.remonttityyppi,\n      region: job.current_region,\n      search_job_id: job.job_id,\n      search_profile_id: job.profile_id,\n    },\n  };\n}).filter((lead) => lead.source_ref && lead.source_ref !== `${source}-undefined`);\n\nreturn [{\n  json: {\n    ...job,\n    leads,\n    leads_found: leads.length,\n    source_ids: leads.map((l) => l.source_ref),\n  },\n}];"
+      },
+      "id": "c3000001-0000-4000-8000-000000000004",
+      "name": "Parse listings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://flowleads-crm.onrender.com' }}/api/v1/n8n/dedupe/check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $env.N8N_MASTER_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"organization_id\": {{ $json.organization_id }},\n  \"source_ids\": {{ JSON.stringify($json.source_ids || []) }}\n}",
+        "options": {}
+      },
+      "id": "c3000001-0000-4000-8000-000000000005",
+      "name": "Dedupe check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('Parse listings').first().json;\nconst dedupe = $input.first().json;\nconst newIds = new Set(dedupe.new_ids || []);\nconst newLeads = (job.leads || []).filter((lead) => newIds.has(lead.source_ref));\nconst duplicates = (job.leads || []).length - newLeads.length;\n\nif (!newLeads.length) {\n  return [{\n    json: {\n      ...job,\n      lead: null,\n      duplicates,\n      leads_found: job.leads_found,\n      has_new_lead: false,\n    },\n  }];\n}\n\nreturn newLeads.map((lead) => ({\n  json: {\n    ...job,\n    lead,\n    duplicates,\n    leads_found: job.leads_found,\n    has_new_lead: true,\n  },\n}));"
+      },
+      "id": "c3000001-0000-4000-8000-000000000006",
+      "name": "Filter new leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-lead",
+              "leftValue": "={{ $json.has_new_lead }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3000001-0000-4000-8000-000000000007",
+      "name": "Has new lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1560, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.crm_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.lead) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c3000001-0000-4000-8000-000000000008",
+      "name": "POST lead to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1820, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const posted = $('POST lead to CRM').all();\nconst base = $('Filter new leads').first().json;\nlet leads_sent = 0;\nlet failed = 0;\nconst sentIds = [];\n\nfor (const row of posted) {\n  const response = row.json || {};\n  const lead = row.json?.lead || $('Filter new leads').item?.json?.lead;\n  if (response.success === true || response.data) {\n    leads_sent += 1;\n    if (lead?.source_ref) sentIds.push(lead.source_ref);\n  } else {\n    failed += 1;\n  }\n}\n\nreturn [{\n  json: {\n    organization_id: base.organization_id,\n    source_ids_to_mark: [...new Set(sentIds)],\n    leads_sent,\n    failed,\n    duplicates: base.duplicates || 0,\n    leads_found: base.leads_found || 0,\n    page: base.page,\n    current_region: base.current_region,\n  },\n}];"
+      },
+      "id": "c3000001-0000-4000-8000-000000000009",
+      "name": "Summarize sends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2080, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Parse listings').first().json;\nconst dedupe = $('Dedupe check').first().json;\nconst duplicates = (base.leads || []).length - (dedupe.new_ids || []).length;\n\nreturn [{\n  json: {\n    organization_id: base.organization_id,\n    source_ids_to_mark: [],\n    leads_sent: 0,\n    failed: 0,\n    duplicates,\n    leads_found: base.leads_found,\n    page: base.page,\n    current_region: base.current_region,\n  },\n}];"
+      },
+      "id": "c3000001-0000-4000-8000-00000000000a",
+      "name": "No new leads summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1820, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CRM_BASE_URL || 'https://flowleads-crm.onrender.com' }}/api/v1/n8n/dedupe/mark",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $env.N8N_MASTER_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"organization_id\": {{ $json.organization_id }},\n  \"source_ids\": {{ JSON.stringify($json.source_ids_to_mark || []) }}\n}",
+        "options": {}
+      },
+      "id": "c3000001-0000-4000-8000-00000000000b",
+      "name": "Dedupe mark",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2340, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $('Summarize sends').first()?.json || $('No new leads summary').first()?.json || {};\n\nreturn [{\n  json: {\n    leads_found: summary.leads_found || 0,\n    leads_sent: summary.leads_sent || 0,\n    duplicates: summary.duplicates || 0,\n    failed: summary.failed || 0,\n    page_failed: (summary.failed || 0) > 0,\n    page: summary.page,\n    current_region: summary.current_region,\n    worker_error: summary.failed > 0 ? 'One or more leads failed to post' : '',\n  },\n}];"
+      },
+      "id": "c3000001-0000-4000-8000-00000000000c",
+      "name": "Return page result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2600, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Build Oikotie URL", "type": "main", "index": 0 }]]
+    },
+    "Build Oikotie URL": {
+      "main": [[{ "node": "GET Oikotie listings", "type": "main", "index": 0 }]]
+    },
+    "GET Oikotie listings": {
+      "main": [[{ "node": "Parse listings", "type": "main", "index": 0 }]]
+    },
+    "Parse listings": {
+      "main": [[{ "node": "Dedupe check", "type": "main", "index": 0 }]]
+    },
+    "Dedupe check": {
+      "main": [[{ "node": "Filter new leads", "type": "main", "index": 0 }]]
+    },
+    "Filter new leads": {
+      "main": [[{ "node": "Has new lead?", "type": "main", "index": 0 }]]
+    },
+    "Has new lead?": {
+      "main": [
+        [{ "node": "POST lead to CRM", "type": "main", "index": 0 }],
+        [{ "node": "No new leads summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST lead to CRM": {
+      "main": [[{ "node": "Summarize sends", "type": "main", "index": 0 }]]
+    },
+    "Summarize sends": {
+      "main": [[{ "node": "Dedupe mark", "type": "main", "index": 0 }]]
+    },
+    "No new leads summary": {
+      "main": [[{ "node": "Dedupe mark", "type": "main", "index": 0 }]]
+    },
+    "Dedupe mark": {
+      "main": [[{ "node": "Return page result", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "flowleads"
+    }
+  ]
+}

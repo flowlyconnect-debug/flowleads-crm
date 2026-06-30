@@ -226,34 +226,11 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
 
     def run_create_daily_search_jobs():
         with app.app_context():
-            from datetime import datetime, timezone
-
             from app.extensions import db
-            from app.search.models import SearchJob, SearchProfile
+            from app.search.job_scheduler import create_daily_search_jobs
 
             try:
-                today = datetime.now(timezone.utc).date()
-                active_profiles = SearchProfile.query.filter_by(
-                    is_active=True, schedule_description="daily"
-                ).all()
-                created = 0
-                for profile in active_profiles:
-                    existing = SearchJob.query.filter(
-                        SearchJob.search_profile_id == profile.id,
-                        SearchJob.scheduled_at >= today,
-                        SearchJob.status.in_(["pending", "running"]),
-                    ).first()
-                    if not existing:
-                        db.session.add(
-                            SearchJob(
-                                search_profile_id=profile.id,
-                                organization_id=profile.organization_id,
-                                status="pending",
-                                scheduled_at=datetime.now(timezone.utc),
-                            )
-                        )
-                        created += 1
-                db.session.commit()
+                created = create_daily_search_jobs()
                 if created:
                     logger.info("Created %s daily search job(s)", created)
             except Exception:
