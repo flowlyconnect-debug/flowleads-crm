@@ -72,7 +72,12 @@ def validate_api_tags(tags) -> tuple[bool, str | None]:
     return True, None
 
 
-def validate_api_lead_payload(payload: dict, *, require_email: bool = False) -> dict:
+def validate_api_lead_payload(
+    payload: dict,
+    *,
+    require_email: bool = False,
+    require_identifier: bool = False,
+) -> dict:
     if not isinstance(payload, dict):
         raise ApiServiceError("Request body must be a JSON object.", "validation_error")
 
@@ -96,7 +101,7 @@ def validate_api_lead_payload(payload: dict, *, require_email: bool = False) -> 
         )
     data["source"] = source
 
-    ok, msg = validate_lead_fields(data, require_identifier=require_email)
+    ok, msg = validate_lead_fields(data, require_identifier=require_identifier)
     if not ok:
         raise ApiServiceError(msg or "Validation failed.", "validation_error")
 
@@ -232,7 +237,11 @@ def _apply_custom_fields_from_payload(
 
 def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
     raw_payload = payload if isinstance(payload, dict) else {}
-    data = validate_api_lead_payload(payload, require_email=True)
+    data = validate_api_lead_payload(
+        payload,
+        require_email=False,
+        require_identifier=True,
+    )
     email = data.get("email")
     source = data.get("source", "n8n")
     source_ref = data.get("source_ref")

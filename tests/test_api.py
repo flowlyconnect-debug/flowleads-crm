@@ -163,6 +163,106 @@ def test_post_creates_lead(client, app):
         assert "API" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
 
 
+def test_post_creates_oikotie_lead_without_email(client, app):
+    ctx = _setup_org(app, "oikotie-no-email")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    response = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-123",
+            "phone": "+358401234567",
+        },
+    )
+    assert response.status_code == 201
+    body = response.get_data(as_text=True)
+    assert "Invalid source" not in body
+    assert "Email is required" not in body
+    data = response.get_json()
+    assert data["data"]["action"] == "created"
+    assert data["data"]["lead"]["source"] == "oikotie"
+    assert data["data"]["lead"]["source_ref"] == "oikotie-123"
+    assert data["data"]["lead"]["phone"] == "+358401234567"
+
+    with app.app_context():
+        lead = Lead.query.filter_by(
+            organization_id=ctx["org_id"],
+            source="oikotie",
+            source_ref="oikotie-123",
+        ).one()
+        assert lead.phone == "+358401234567"
+        assert lead.email is None
+
+
+def test_same_source_ref_updates_oikotie_lead_without_email(client, app):
+    ctx = _setup_org(app, "oikotie-upsert-no-email")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    first = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-123",
+            "phone": "+358401234567",
+        },
+    )
+    assert first.status_code == 201
+    assert first.get_json()["data"]["action"] == "created"
+
+    second = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-123",
+            "phone": "+358409999999",
+            "name": "Päivitetty Oikotie Liidi",
+        },
+    )
+    assert second.status_code == 200
+    data = second.get_json()
+    assert data["data"]["action"] == "updated"
+    assert data["data"]["lead"]["phone"] == "+358409999999"
+    assert data["data"]["lead"]["first_name"] == "Päivitetty"
+
+    with app.app_context():
+        assert (
+            Lead.query.filter_by(
+                organization_id=ctx["org_id"],
+                source="oikotie",
+                source_ref="oikotie-123",
+            ).count()
+            == 1
+        )
+        lead = Lead.query.filter_by(
+            organization_id=ctx["org_id"],
+            source="oikotie",
+            source_ref="oikotie-123",
+        ).one()
+        assert lead.phone == "+358409999999"
+        assert lead.first_name == "Päivitetty"
+
+
+def test_post_rejects_payload_without_identifier(client, app):
+    ctx = _setup_org(app, "no-identifier")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    response = _post_lead(
+        client,
+        full_key,
+        {"source": "oikotie"},
+    )
+    assert response.status_code == 400
+    with app.app_context():
+        assert (
+            Lead.query.filter_by(
+                organization_id=ctx["org_id"],
+                source="oikotie",
+            ).count()
+            == 0
+        )
+
+
 def test_post_creates_lead_with_oikotie_source(client, app):
     ctx = _setup_org(app, "oikotie-source")
     full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
@@ -347,6 +447,36 @@ def test_bulk_partial_errors(client, app):
     data = response.get_json()["data"]
     assert data["created"] == 1
     assert len(data["errors"]) == 1
+
+
+def test_bulk_accepts_oikotie_lead_without_email(client, app):
+    ctx = _setup_org(app, "bulk-oikotie-no-email")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    payload = [
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-bulk-123",
+            "phone": "+358401111111",
+        }
+    ]
+    response = client.post(
+        "/api/v1/leads/bulk",
+        data=json.dumps(payload),
+        headers=_auth_headers(full_key),
+    )
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["created"] == 1
+    assert data["errors"] == []
+
+    with app.app_context():
+        lead = Lead.query.filter_by(
+            organization_id=ctx["org_id"],
+            source="oikotie",
+            source_ref="oikotie-bulk-123",
+        ).one()
+        assert lead.phone == "+358401111111"
+        assert lead.email is None
 
 
 def test_bulk_duplicate_emails_in_payload(client, app):
