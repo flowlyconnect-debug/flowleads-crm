@@ -1,7 +1,7 @@
 import secrets
 import time
 
-from flask import Blueprint, jsonify, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, jsonify, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
@@ -286,6 +286,22 @@ def run_predictions_batch():
         if current_user.is_superadmin()
         else url_for("analytics.forecast")
     )
+
+
+@admin_bp.route("/dev/create-test-jobs", methods=["POST"])
+@login_required
+@require_role("admin", "superadmin")
+@require_2fa
+def create_test_jobs_route():
+    from flask import current_app
+
+    if not current_app.config.get("ENABLE_TEST_JOBS"):
+        abort(403)
+
+    from app.search.job_scheduler import create_missing_test_jobs
+
+    result = create_missing_test_jobs()
+    return jsonify(result)
 
 
 @admin_bp.route("/api-keys/<int:key_id>", methods=["POST", "DELETE"])

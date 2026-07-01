@@ -95,6 +95,8 @@ class Config:
     N8N_MASTER_SECRET = os.environ.get("N8N_MASTER_SECRET")
     APP_BASE_URL = os.environ.get("APP_BASE_URL")
 
+    ENABLE_TEST_JOBS = os.environ.get("ENABLE_TEST_JOBS", "false").lower() == "true"
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

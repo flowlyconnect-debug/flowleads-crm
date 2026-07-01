@@ -69,3 +69,31 @@ def create_weekly_search_jobs(*, now: datetime | None = None) -> int:
     if created:
         db.session.commit()
     return created
+
+
+def create_missing_test_jobs(*, now: datetime | None = None) -> dict[str, int]:
+    """Create pending jobs for active profiles without a pending/running job (dev use)."""
+    when = now or datetime.now(timezone.utc)
+    active_profiles = SearchProfile.query.filter_by(is_active=True).all()
+    created = 0
+    skipped = 0
+    for profile in active_profiles:
+        existing = SearchJob.query.filter(
+            SearchJob.search_profile_id == profile.id,
+            SearchJob.status.in_(["pending", "running"]),
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+        db.session.add(
+            SearchJob(
+                search_profile_id=profile.id,
+                organization_id=profile.organization_id,
+                status="pending",
+                scheduled_at=when,
+            )
+        )
+        created += 1
+    if created:
+        db.session.commit()
+    return {"created": created, "skipped": skipped}
