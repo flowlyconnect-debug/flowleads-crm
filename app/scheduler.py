@@ -237,6 +237,19 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Daily search job creation failed")
 
+    def run_create_weekly_search_jobs():
+        with app.app_context():
+            from app.extensions import db
+            from app.search.job_scheduler import create_weekly_search_jobs
+
+            try:
+                created = create_weekly_search_jobs()
+                if created:
+                    logger.info("Created %s weekly search job(s)", created)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Weekly search job creation failed")
+
     scheduler.add_job(
         run_daily_backup,
         CronTrigger(hour=2, minute=0, timezone="UTC"),
@@ -343,6 +356,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_create_daily_search_jobs,
         CronTrigger(hour=6, minute=0, timezone="UTC"),
         id="create_search_jobs",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_create_weekly_search_jobs,
+        CronTrigger(day_of_week="mon", hour=6, minute=0, timezone="UTC"),
+        id="create_weekly_search_jobs",
         replace_existing=True,
     )
 
