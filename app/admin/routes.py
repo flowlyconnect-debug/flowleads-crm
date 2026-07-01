@@ -304,6 +304,22 @@ def create_test_jobs_route():
     return jsonify(result)
 
 
+@admin_bp.route("/dev/reset-running-test-jobs", methods=["POST"])
+@login_required
+@require_role("admin", "superadmin")
+@require_2fa
+def reset_running_test_jobs_route():
+    from flask import current_app
+
+    if not current_app.config.get("ENABLE_TEST_JOBS"):
+        abort(403)
+
+    from app.search.job_scheduler import reset_running_test_jobs
+
+    result = reset_running_test_jobs()
+    return jsonify(result)
+
+
 @admin_bp.route("/api-keys/<int:key_id>", methods=["POST", "DELETE"])
 @login_required
 @require_role("superadmin")

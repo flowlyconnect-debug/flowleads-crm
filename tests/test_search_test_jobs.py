@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from app.core.permissions import TWO_FA_SESSION_KEY
 from app.extensions import db
-from app.search.job_scheduler import create_missing_test_jobs
+from app.search.job_scheduler import create_missing_test_jobs, reset_running_test_jobs
 from app.search.models import SearchJob, SearchProfile
 from app.users.services import create_organization, create_user
 
@@ -129,3 +129,81 @@ def test_create_test_jobs_endpoint_creates_jobs_when_enabled(app, client):
     with app.app_context():
         job = SearchJob.query.filter_by(search_profile_id=ctx["profile_id"]).one()
         assert job.status == "pending"
+
+
+def _add_job(app, *, profile_id, org_id, status, scheduled_at=None):
+    when = scheduled_at or datetime.now(timezone.utc)
+    with app.app_context():
+        job = SearchJob(
+            search_profile_id=profile_id,
+            organization_id=org_id,
+            status=status,
+            scheduled_at=when,
+        )
+        db.session.add(job)
+        db.session.commit()
+        return job.id
+
+
+def test_reset_running_test_jobs_marks_running_as_failed(app):
+    ctx = _create_active_profile(app, slug_suffix="reset-running")
+    job_id = _add_job(
+        app,
+        profile_id=ctx["profile_id"],
+        org_id=ctx["org_id"],
+        status="running",
+    )
+
+    with app.app_context():
+        result = reset_running_test_jobs()
+
+        assert result == {"reset": 1}
+        job = db.session.get(SearchJob, job_id)
+        assert job.status == "failed"
+        assert job.error_message == "Reset from running during n8n dev testing"
+
+
+def test_reset_running_test_jobs_leaves_pending_untouched(app):
+    ctx = _create_active_profile(app, slug_suffix="reset-pending")
+    job_id = _add_job(
+        app,
+        profile_id=ctx["profile_id"],
+        org_id=ctx["org_id"],
+        status="pending",
+    )
+
+    with app.app_context():
+        result = reset_running_test_jobs()
+
+        assert result == {"reset": 0}
+        job = db.session.get(SearchJob, job_id)
+        assert job.status == "pending"
+        assert job.error_message is None
+
+
+def test_reset_running_test_jobs_leaves_completed_untouched(app):
+    ctx = _create_active_profile(app, slug_suffix="reset-completed")
+    job_id = _add_job(
+        app,
+        profile_id=ctx["profile_id"],
+        org_id=ctx["org_id"],
+        status="completed",
+    )
+
+    with app.app_context():
+        result = reset_running_test_jobs()
+
+        assert result == {"reset": 0}
+        job = db.session.get(SearchJob, job_id)
+        assert job.status == "completed"
+        assert job.error_message is None
+
+
+def test_reset_running_test_jobs_endpoint_disabled_without_env(app, client):
+    _create_active_profile(app, slug_suffix="reset-endpoint-off")
+    _login_superadmin(client, app, email="sa-reset-off@test.com")
+
+    app.config["ENABLE_TEST_JOBS"] = False
+    response = client.post("/admin/dev/reset-running-test-jobs")
+
+    assert response.status_code == 403
