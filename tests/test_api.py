@@ -285,6 +285,106 @@ def test_post_creates_lead_with_oikotie_source(client, app):
     assert "Invalid source" not in response.get_data(as_text=True)
 
 
+OIKOTIE_FULL_METADATA = {
+    "isannoitsija_yritys": "Esimerkki Isännöinti Oy",
+    "isannoitsija_puh": "+358401112233",
+    "isannoitsija_email": "isannoitsija@example.com",
+    "isannoitsija_ytunnus": "1234567-8",
+    "taloyhtio": "As Oy Testitalo",
+    "remonttityyppi": "putkiremontti",
+    "tulevat_remontit": "Putkiremontti suunnitteilla 2026",
+    "oikotie_url": "https://asunnot.oikotie.fi/example",
+    "kaupunki": "Seinäjoki",
+    "osoite": "Testikatu 1",
+    "hinta": "189000",
+}
+
+
+def test_post_oikotie_metadata_stored_in_ai_contact_info(client, app):
+    ctx = _setup_org(app, "oikotie-metadata")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    response = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-meta-123",
+            "phone": "+358401234567",
+            "metadata": OIKOTIE_FULL_METADATA,
+        },
+    )
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["data"]["action"] == "created"
+    assert data["data"]["lead"]["email"] is None
+    for key, value in OIKOTIE_FULL_METADATA.items():
+        assert data["data"]["lead"]["metadata"][key] == value
+
+    with app.app_context():
+        lead = Lead.query.filter_by(
+            organization_id=ctx["org_id"],
+            source="oikotie",
+            source_ref="oikotie-meta-123",
+        ).one()
+        assert lead.email is None
+        for key, value in OIKOTIE_FULL_METADATA.items():
+            assert lead.ai_contact_info[key] == value
+
+
+def test_oikotie_metadata_merge_on_update(client, app):
+    ctx = _setup_org(app, "oikotie-metadata-merge")
+    full_key, _ = _create_api_key_for_org(app, ctx["org_id"])
+    first = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-meta-update-123",
+            "phone": "+358401234567",
+            "metadata": {
+                "taloyhtio": "As Oy Vanha",
+                "kaupunki": "Seinäjoki",
+            },
+        },
+    )
+    assert first.status_code == 201
+
+    second = _post_lead(
+        client,
+        full_key,
+        {
+            "source": "oikotie",
+            "source_ref": "oikotie-meta-update-123",
+            "phone": "+358409999999",
+            "metadata": {
+                "taloyhtio": "As Oy Uusi",
+                "remonttityyppi": "julkisivuremontti",
+            },
+        },
+    )
+    assert second.status_code == 200
+    assert second.get_json()["data"]["action"] == "updated"
+
+    with app.app_context():
+        assert (
+            Lead.query.filter_by(
+                organization_id=ctx["org_id"],
+                source="oikotie",
+                source_ref="oikotie-meta-update-123",
+            ).count()
+            == 1
+        )
+        lead = Lead.query.filter_by(
+            organization_id=ctx["org_id"],
+            source="oikotie",
+            source_ref="oikotie-meta-update-123",
+        ).one()
+        assert lead.phone == "+358409999999"
+        assert lead.ai_contact_info["taloyhtio"] == "As Oy Uusi"
+        assert lead.ai_contact_info["remonttityyppi"] == "julkisivuremontti"
+        assert lead.ai_contact_info["kaupunki"] == "Seinäjoki"
+
+
 def test_post_creates_lead_with_n8n_minimal_payload(client, app):
     ctx = _setup_org(app, "n8n-minimal")
     full_key, _ = _create_api_key_for_org(app, ctx["org_id"])

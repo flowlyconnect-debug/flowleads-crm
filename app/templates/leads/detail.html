@@ -259,6 +259,31 @@
         </div>
       </section>
 
+      {% if property_info_rows %}
+      <section class="card mt-4">
+        <header class="card-header">
+          <h2 class="card-title">Kohteen tiedot</h2>
+        </header>
+        <div class="card-body">
+          <dl class="contact-info-grid">
+            {% for row in property_info_rows %}
+            <div class="contact-info-item">
+              <span class="contact-info-icon" aria-hidden="true">🏠</span>
+              <div class="contact-info-value">
+                <strong>{{ row.label }}:</strong>
+                {% if row.is_url %}
+                <a href="{{ row.value }}" target="_blank" rel="noopener noreferrer">{{ row.link_text }}</a>
+                {% else %}
+                {{ row.value }}
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </dl>
+        </div>
+      </section>
+      {% endif %}
+
       <section class="card mt-4">
         <header class="card-header">
           <h2 class="card-title">Työtila</h2>

@@ -390,12 +390,15 @@ def detail(lead_id):
     latest_prediction = PredictionService.get_latest_prediction(lead.id, organization_id)
     org_currency = get_default_currency(organization_id)
     from app.leads.playbook import get_playbook_data
+    from app.leads.property_info import get_property_info_rows
 
     playbook = get_playbook_data(lead, organization_id, current_user)
+    property_info_rows = get_property_info_rows(lead.ai_contact_info)
     return render_template(
         "leads/detail.html",
         lead=lead,
         playbook=playbook,
+        property_info_rows=property_info_rows,
         activities=activities,
         stages=stages,
         users=users,

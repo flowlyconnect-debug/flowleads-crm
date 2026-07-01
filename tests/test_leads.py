@@ -228,6 +228,43 @@ def test_user_cannot_see_other_org_lead_detail(app, client):
     assert response.status_code == 404
 
 
+def test_lead_detail_shows_property_info_from_ai_contact_info(app, client):
+    ctx = _setup_org_with_users(app, "property-info-detail")
+    with app.app_context():
+        lead = LeadService.create(
+            {
+                "phone": "+358401234567",
+                "source": "oikotie",
+                "source_ref": "detail-property-info",
+                "ai_contact_info": {
+                    "taloyhtio": "As Oy Testitalo",
+                    "isannoitsija_yritys": "Esimerkki Isännöinti Oy",
+                    "isannoitsija_puh": "+358401112233",
+                    "remonttityyppi": "putkiremontti",
+                    "oikotie_url": "https://asunnot.oikotie.fi/example",
+                },
+            },
+            ctx["org_id"],
+            ctx["admin_id"],
+            actor_role="admin",
+        )
+        db.session.commit()
+        lead_id = lead.id
+
+    _login(client, ctx["admin_email"])
+    response = client.get(f"/leads/{lead_id}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Kohteen tiedot" in html
+    assert "As Oy Testitalo" in html
+    assert "Esimerkki Isännöinti Oy" in html
+    assert "+358401112233" in html
+    assert "putkiremontti" in html
+    assert "Avaa Oikotiessä" in html
+    assert 'rel="noopener noreferrer"' in html
+    assert "Isännöitsijän sähköposti" not in html
+
+
 def test_list_only_own_organization(app, client):
     ctx = _setup_org_with_users(app, "iso-list")
     _create_lead(app, ctx["org_id"], ctx["stage_id"], email="mine@a.com")

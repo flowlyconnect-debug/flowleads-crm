@@ -78,6 +78,8 @@ def serialize_lead(lead: Lead, *, custom_fields: dict | None = None) -> dict:
     }
     if custom_fields is not None:
         payload["custom_fields"] = custom_fields
+    if lead.ai_contact_info:
+        payload["metadata"] = dict(lead.ai_contact_info)
     return payload
 
 
