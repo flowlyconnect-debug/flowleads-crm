@@ -4743,7 +4743,7 @@ body.modal-open {
 .proposal-timeline-step.active .proposal-timeline-dot {
   background: #1d6bf3;
   border-color: #1d6bf3;
-  box-shadow: 0 0 0 3px rgba(29, 107, 243, 0.2);
+  box-shadow: 0 0 0 3px rgba(105, 72, 220, 0.2);
 }
 
 .proposal-timeline-label {
@@ -5087,15 +5087,15 @@ tbody tr:hover .row-actions { opacity: 1; }
 }
 
 .row-action-btn:hover {
-  background: #1D6BF3;
+  background: #6948DC;
   color: white;
-  border-color: #1D6BF3;
+  border-color: #6948DC;
 }
 
 .row-action-btn.primary {
-  background: #1D6BF3;
+  background: #6948DC;
   color: white;
-  border-color: #1D6BF3;
+  border-color: #6948DC;
 }
 
 /* The number IS the message — make it huge */
@@ -5388,8 +5388,8 @@ tr:hover .action-destructive,
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #E8F0FE;
-  color: #1D6BF3;
+  background: #F1EDFC;
+  color: #6948DC;
 }
 
 .calendar-location {
@@ -5419,8 +5419,8 @@ tr:hover .action-destructive,
 }
 
 .calendar-week-col.is-today {
-  border-color: #1D6BF3;
-  background: #F0F6FF;
+  border-color: #6948DC;
+  background: #F1EDFC;
 }
 
 .calendar-week-col__header {
@@ -5436,7 +5436,7 @@ tr:hover .action-destructive,
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1D6BF3;
+  background: #6948DC;
 }
 
 .calendar-week-col__events {
@@ -5446,7 +5446,7 @@ tr:hover .action-destructive,
 }
 
 .calendar-event-block {
-  background: #1D6BF3;
+  background: #6948DC;
   color: #fff;
   border-radius: 6px;
   padding: 6px 8px;
@@ -5545,8 +5545,8 @@ tr:hover .action-destructive,
 }
 
 .companies-filter-chip.is-active {
-  background: #1D6BF3;
-  border-color: #1D6BF3;
+  background: #6948DC;
+  border-color: #6948DC;
   color: #fff;
 }
 
@@ -5578,7 +5578,7 @@ tr:hover .action-destructive,
 
 .companies-row-actions .row-action-btn:hover {
   background: #F4F6FB;
-  color: #1D6BF3;
+  color: #6948DC;
   border: none;
 }
 
