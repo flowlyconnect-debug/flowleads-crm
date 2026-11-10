@@ -13,6 +13,8 @@ REMONTTITYYPIT: tuple[str, ...] = (
     "Muu remontti",
 )
 
+ALL_FINLAND_REGION = "Koko Suomi"
+
 FINNISH_REGIONS: tuple[str, ...] = (
     "Uusimaa",
     "Varsinais-Suomi",

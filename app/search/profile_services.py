@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc
 
 from app.extensions import db
-from app.search.constants import FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.constants import ALL_FINLAND_REGION, FINNISH_REGIONS, REMONTTITYYPIT
 from app.search.models import SEARCH_SCHEDULES, SearchJob, SearchProfile
 
 
@@ -54,9 +54,15 @@ def _validate_profile_fields(
         raise SearchProfileServiceError("Valitse kelvollinen remonttityyppi.")
     if not regions:
         raise SearchProfileServiceError("Valitse vähintään yksi alue.")
-    invalid_regions = [region for region in regions if region not in FINNISH_REGIONS]
-    if invalid_regions:
-        raise SearchProfileServiceError("Valitse maakunnat listasta.")
+    if ALL_FINLAND_REGION in regions:
+        if len(regions) > 1:
+            raise SearchProfileServiceError(
+                "Koko Suomi valitaan omana valintana, ei yhdessä muiden alueiden kanssa."
+            )
+    else:
+        invalid_regions = [region for region in regions if region not in FINNISH_REGIONS]
+        if invalid_regions:
+            raise SearchProfileServiceError("Valitse maakunnat listasta.")
     if schedule_description not in SEARCH_SCHEDULES:
         raise SearchProfileServiceError("Valitse kelvollinen aikataulu.")
     if crm_api_key is not None and len(crm_api_key) > 200:

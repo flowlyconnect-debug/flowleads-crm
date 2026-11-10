@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Kutsu lähetetty — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('customer_invite') }}
+    <div class="settings-content">
+      <div class="card settings-panel--wide">
+        <h1>Kutsu lähetetty</h1>
+        <p class="text-muted">Linkki näytetään tässä vain kerran — tallenna se tarvittaessa.</p>
+
+        <dl class="onboarding-result" style="margin-top:1.5rem;">
+          <dt>Asiakas</dt>
+          <dd>{{ result.organization_name }}</dd>
+
+          <dt>Kutsuttu sähköposti</dt>
+          <dd><code>{{ result.admin_email }}</code></dd>
+
+          <dt>Kutsulinkki (kertakäyttöinen, 7 vrk)</dt>
+          <dd><code id="invite-link" style="word-break:break-all;">{{ result.invite_url }}</code></dd>
+
+          <dt>Vanhenee</dt>
+          <dd>{{ result.expires_at_label }}</dd>
+        </dl>
+
+        <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" id="copy-invite-link">Kopioi linkki</button>
+          <a href="{{ url_for('admin.create_invite_route') }}" class="btn btn-primary">Kutsu toinen asiakas</a>
+          <a href="{{ url_for('admin.customers_list') }}" class="btn btn-secondary">Asiakaslista</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const btn = document.getElementById("copy-invite-link");
+    if (!btn) return;
+    btn.addEventListener("click", async function () {
+      try {
+        await navigator.clipboard.writeText("{{ result.invite_url }}");
+        btn.textContent = "Kopioitu!";
+      } catch (err) {
+        btn.textContent = "Kopiointi epäonnistui";
+      }
+    });
+  })();
+</script>
+{% endblock %}

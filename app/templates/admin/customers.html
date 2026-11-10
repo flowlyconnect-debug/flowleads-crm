@@ -12,8 +12,9 @@
           <p class="settings-panel__subtitle">Kaikki organisaatiot ja niiden hakuprofiilit.</p>
         </header>
 
-        <p style="margin-bottom: 1rem;">
+        <p style="margin-bottom: 1rem;display:flex;gap:0.75rem;">
           <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo asiakas</a>
+          <a href="{{ url_for('admin.create_invite_route') }}" class="btn btn-secondary">Kutsu asiakas</a>
         </p>
 
         {% if customers %}
@@ -35,10 +36,20 @@
               <td>{{ row.profile_name or '—' }}</td>
               <td>{{ row.lead_count }}</td>
               <td>{{ row.last_search_label }}</td>
-              <td>{% if row.is_active %}Aktiivinen{% else %}Ei aktiivinen{% endif %}</td>
+              <td>
+                {% if row.profile_id and not row.profile_is_active %}
+                Käyttöönotto valmis — lähde ei aktiivinen
+                {% elif row.is_active %}Aktiivinen{% else %}Ei aktiivinen{% endif %}
+              </td>
               <td>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=row.org.id) }}">Avaa</a>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id) }}">Muokkaa</a>
+                {% if row.profile_id and not row.profile_is_active %}
+                <form method="post" action="{{ url_for('admin.activate_source_route', profile_id=row.profile_id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-primary btn-sm">Aktivoi lähde</button>
+                </form>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

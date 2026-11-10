@@ -128,6 +128,7 @@ def _init_extensions(app):
 
 
 def _register_blueprints(app):
+    from app.admin.invite_routes import invite_bp
     from app.admin.routes import admin_bp
     from app.analytics import analytics_bp
     from app.api import api_bp, web_api_bp
@@ -150,6 +151,7 @@ def _register_blueprints(app):
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(invite_bp)
     app.register_blueprint(backups_bp, url_prefix="/admin")
     app.register_blueprint(leads_bp)
     app.register_blueprint(companies_bp)

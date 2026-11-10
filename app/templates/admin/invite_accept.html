@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Käyttöönotto — FlowLeads{% endblock %}
+{% block content %}
+<div class="card">
+  {% if invite is none %}
+  <h1>Kutsu ei kelpaa</h1>
+  <p>Tämä kutsulinkki on vanhentunut, käytetty tai mitätöity. Pyydä uusi kutsu ylläpitäjältä.</p>
+  <a href="{{ url_for('auth.login') }}" class="btn">Kirjautumiseen</a>
+  {% else %}
+  <h1>Tervetuloa, {{ invite.organization.name }}</h1>
+  <p class="text-muted">Aseta salasana ja valitse hakualueet aloittaaksesi.</p>
+
+  <form method="post" novalidate style="margin-top:1rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <h2>Salasana</h2>
+    <label class="form-label">Uusi salasana
+      <input type="password" name="password" class="form-input" minlength="12" required autocomplete="new-password">
+    </label>
+    <label class="form-label">Vahvista salasana
+      <input type="password" name="password_confirm" class="form-input" minlength="12" required autocomplete="new-password">
+    </label>
+
+    <h2 style="margin-top:1.5rem;">Hakualueet</h2>
+    <label class="form-check">
+      <input type="radio" name="region_mode" value="all_finland" id="region-mode-all">
+      Koko Suomi
+    </label>
+    <label class="form-check">
+      <input type="radio" name="region_mode" value="specific" id="region-mode-specific" checked>
+      Valitse maakunnat erikseen
+    </label>
+
+    <fieldset id="regions-fieldset" style="margin-top:0.75rem;">
+      <div class="search-profiles-regions__grid">
+        {% for region in finnish_regions %}
+        <label class="form-check">
+          <input type="checkbox" name="regions" value="{{ region }}">
+          {{ region }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <p class="form-helper" style="margin-top:0.5rem;">
+      Lähde: <strong>{{ invite.source }}</strong> — kattaa valitsemasi alueet / koko Suomen.
+      {% if invite.source == 'oikotie' %}Etuovi ei ole vielä käytössä tässä versiossa.{% endif %}
+    </p>
+
+    {% if allowed_features %}
+    <h2 style="margin-top:1.5rem;">Toiminnot</h2>
+    <p class="form-helper mb-2">Valitse mitkä haluat ottaa käyttöön — voit muuttaa näitä myöhemmin.</p>
+    {% for key, label in allowed_features %}
+    <label class="form-check">
+      <input type="checkbox" name="enabled_features" value="{{ key }}">
+      {{ label }}
+    </label>
+    {% endfor %}
+    {% endif %}
+
+    <button type="submit" class="btn btn-primary" style="margin-top:1.5rem;">Viimeistele käyttöönotto</button>
+  </form>
+  {% endif %}
+</div>
+<script>
+  (function () {
+    const allRadio = document.getElementById("region-mode-all");
+    const specificRadio = document.getElementById("region-mode-specific");
+    const fieldset = document.getElementById("regions-fieldset");
+    if (!allRadio || !specificRadio || !fieldset) return;
+    function sync() {
+      fieldset.style.display = allRadio.checked ? "none" : "";
+    }
+    allRadio.addEventListener("change", sync);
+    specificRadio.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

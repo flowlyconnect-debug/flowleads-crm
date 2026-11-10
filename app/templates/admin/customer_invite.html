@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Kutsu asiakas — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('customer_invite') }}
+    <div class="settings-content">
+      <div class="card settings-panel--wide">
+        <h1>Kutsu asiakas</h1>
+        <p class="text-muted">
+          Luo organisaatio ja lähetä asiakkaalle kertakäyttöinen, 7 vuorokautta voimassa oleva
+          kutsulinkki. Asiakas asettaa itse salasanansa ja valitsee hakualueensa linkin takaa.
+        </p>
+
+        <form method="post" action="{{ url_for('admin.create_invite_route') }}" class="form-group" style="margin-top:1.5rem;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <h2>Organisaatio</h2>
+          <label class="form-label">Asiakkaan nimi
+            <input type="text" name="organization_name" class="form-input" maxlength="255" required
+                   placeholder="Esimerkki Oy"
+                   value="{{ form_data.get('organization_name', '') }}">
+          </label>
+
+          <label class="form-label" style="margin-top:1rem;">Adminin sähköposti
+            <input type="email" name="admin_email" class="form-input" maxlength="255" required
+                   placeholder="matti@esimerkki.fi"
+                   value="{{ form_data.get('admin_email', '') }}">
+            <span class="form-helper">Kutsulinkki lähetetään tähän osoitteeseen.</span>
+          </label>
+
+          <h2 style="margin-top:1.5rem;">Hakuprofiili (n8n)</h2>
+          <label class="form-label">Hakuprofiilin nimi
+            <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
+                   placeholder="esim. Lukkoremontti Uusimaa"
+                   value="{{ form_data.get('search_profile_name', '') }}">
+          </label>
+
+          <label class="form-label">Remonttityyppi
+            <select name="remonttityyppi" class="form-select" required>
+              <option value="">Valitse…</option>
+              {% for option in remonttityypit %}
+              <option value="{{ option }}"
+                {% if form_data.get('remonttityyppi') == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="form-label" style="margin-top:1rem;">Lähde
+            <input type="text" name="source" class="form-input" maxlength="50"
+                   value="{{ form_data.get('source', 'oikotie') }}">
+            <span class="form-helper">Tällä hetkellä tuettu lähde on "oikotie". Alueet ja "Koko Suomi" -valinta tehdään kutsulinkin takaa.</span>
+          </label>
+
+          <fieldset style="margin-top:1rem;">
+            <legend class="form-label">Sallitut toiminnot</legend>
+            <p class="form-helper mb-2">Asiakas voi ottaa käyttöön näistä haluamansa onboarding-vaiheessa.</p>
+            {% set selected_features = form_data.get('allowed_features', []) %}
+            {% for key, label in feature_catalog.items() %}
+            <label class="form-check">
+              <input type="checkbox" name="allowed_features" value="{{ key }}"
+                {% if key in selected_features %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </fieldset>
+
+          <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
+            <button type="submit" class="btn btn-primary">Lähetä kutsu</button>
+            <a href="{{ url_for('admin.customers_list') }}" class="btn btn-secondary">Peruuta</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

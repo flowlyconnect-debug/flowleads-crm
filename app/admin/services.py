@@ -87,6 +87,8 @@ def list_customers_summary() -> list[dict]:
             {
                 "org": org,
                 "profile_name": profile.name if profile else None,
+                "profile_id": profile.id if profile else None,
+                "profile_is_active": profile.is_active if profile else None,
                 "lead_count": Lead.query.filter_by(organization_id=org.id).count(),
                 "last_search_label": _format_last_search(
                     profile.last_run_at if profile else None
