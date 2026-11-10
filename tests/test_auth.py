@@ -192,3 +192,37 @@ def test_audit_login_success_and_failed_and_logout(client, app):
     client.get("/auth/logout", follow_redirects=True)
     with app.app_context():
         assert AuditLog.query.filter_by(action="logout").count() == 1
+
+
+def test_login_page_shows_form_and_public_product_intro(client):
+    response = client.get("/auth/login")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    # Sign-in form and password reset stay available
+    assert 'name="email"' in html
+    assert 'name="password"' in html
+    assert 'value="Kirjaudu sisään"' in html
+    assert 'href="/auth/reset-password"' in html
+
+    # Public product intro and Flowly links
+    assert "FlowLeads" in html and "CRM" in html
+    assert "Tiedä, keneen kannattaa olla seuraavaksi yhteydessä." in html
+    assert "Miten FlowLeads auttaa myynnissä" in html
+    assert "Pyydä esittely" in html
+    assert "Tarvitsetko apua kirjautumisessa?" in html
+    assert 'href="https://flowlysolutions.net"' in html
+    assert "Flowly Solutions" in html
+
+
+def test_login_page_shows_error_for_invalid_credentials(client, app):
+    _create_org_user(app, email="wrongpw@acme.com", slug="wrongpw")
+    response = client.post(
+        "/auth/login",
+        data={"email": "wrongpw@acme.com", "password": "not-the-password"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Invalid email or password." in html
+    assert 'name="password"' in html
