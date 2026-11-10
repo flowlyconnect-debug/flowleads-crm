@@ -1,12 +1,15 @@
 databases:
   - name: flowleads-db
-    plan: free
+    plan: basic_256mb
+    region: frankfurt
 
 services:
   # Serves the web UI/API. Also runs `flask db upgrade` on every deploy.
   - type: web
     name: flowleads-crm
     runtime: python
+    plan: starter
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: flask db upgrade && gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
     envVars:
@@ -68,6 +71,8 @@ services:
   - type: worker
     name: flowleads-scheduler
     runtime: python
+    plan: starter
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: flask run-scheduler
     envVars:
