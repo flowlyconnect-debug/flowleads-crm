@@ -74,6 +74,9 @@ class User(UserMixin, db.Model):
     def is_superadmin(self) -> bool:
         return self.role == "superadmin"
 
+    def requires_mandatory_2fa(self) -> bool:
+        return self.role in ("superadmin", "admin")
+
     def can_login_ui(self) -> bool:
         return self.is_active and self.role in UI_LOGIN_ROLES
 

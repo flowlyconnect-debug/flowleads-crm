@@ -13,8 +13,11 @@
         </header>
 
         <div class="card p-4">
-          <form method="post" action="{{ url_for('settings.lead_settings') }}">
+          <form method="post" action="{{ url_for('settings.lead_settings', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.lead_settings') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if current_user.is_superadmin() %}
+            <input type="hidden" name="organization_id" value="{{ organization_id }}">
+            {% endif %}
 
             <div class="form-group">
               <label class="form-label">Minne uusi liidi menee?</label>

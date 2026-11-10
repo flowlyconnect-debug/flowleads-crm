@@ -117,6 +117,19 @@ class Config:
 
     ENABLE_TEST_JOBS = os.environ.get("ENABLE_TEST_JOBS", "false").lower() == "true"
 
+    # Error tracking (optional — a no-op until SENTRY_DSN is actually set).
+    SENTRY_DSN = os.environ.get("SENTRY_DSN")
+    SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
+
+    # Render sits one reverse-proxy hop in front of the app; trust exactly
+    # one X-Forwarded-* hop so request.remote_addr (used for login rate
+    # limiting) reflects the real client, not Render's proxy.
+    PROXY_FIX_X_FOR = int(os.environ.get("PROXY_FIX_X_FOR", "1"))
+
+    # Per-organization outbound email cap (sales email + sequences +
+    # automations); 0 disables the limit.
+    EMAIL_DAILY_LIMIT_PER_ORG = int(os.environ.get("EMAIL_DAILY_LIMIT_PER_ORG", "500"))
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

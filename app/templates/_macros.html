@@ -30,6 +30,9 @@
   <a href="{% if use_org %}{{ url_for('settings.search_profiles_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.search_profiles_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiili</a>
   <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'api_keys' %} is-active{% endif %}">API-avaimet</a>
 
+  <span class="settings-nav__group-label">Tiimi</span>
+  <a href="{% if use_org %}{{ url_for('settings.team_members', organization_id=org_id_param) }}{% else %}{{ url_for('settings.team_members') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'team' %} is-active{% endif %}">Käyttäjät</a>
+
   <span class="settings-nav__group-label">Integraatiot</span>
   <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
   <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'webhooks' %} is-active{% endif %}">Webhooks</a>

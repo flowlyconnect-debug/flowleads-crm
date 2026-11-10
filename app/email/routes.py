@@ -19,6 +19,7 @@ from app.email.services import (
     TemplateService,
     email_sending_enabled,
     get_email_log_for_org,
+    handle_inbound_reply,
     handle_mailgun_webhook,
     list_email_logs_for_lead,
     paginate_email_logs,
@@ -251,5 +252,24 @@ def mailgun_webhook():
             payload["message-id"] = request.form.get("message-id")
 
     handle_mailgun_webhook(payload)
+    db.session.commit()
+    return "", 200
+
+
+@webhooks_bp.route("/mailgun/inbound", methods=["POST"])
+def mailgun_inbound_webhook():
+    """Mailgun Route target for inbound replies to sales email/sequences."""
+    if not current_app.config.get("MAILGUN_WEBHOOK_SIGNING_KEY"):
+        abort(503)
+
+    timestamp = request.form.get("timestamp")
+    token = request.form.get("token")
+    signature = request.form.get("signature")
+    if not timestamp or not token or not signature:
+        abort(403)
+    if not verify_mailgun_webhook_signature(timestamp, token, signature):
+        abort(403)
+
+    handle_inbound_reply(request.form.to_dict())
     db.session.commit()
     return "", 200

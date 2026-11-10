@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% from "_macros.html" import empty_state %}
+{% block title %}Tiimi — Asetukset{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('team') }}
+    <div class="settings-content">
+      <div class="settings-panel">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Tiimi</h1>
+          <p class="settings-panel__subtitle">Kutsu kollegoita organisaatioosi ja hallinnoi heidän käyttöoikeuksiaan.</p>
+        </header>
+
+        <h2 class="form-section-title">Kutsu käyttäjä</h2>
+        <form method="post" action="{{ url_for('settings.invite_team_member') }}" class="form-group">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if current_user.is_superadmin() and organization_id %}
+          <input type="hidden" name="organization_id" value="{{ organization_id }}">
+          {% endif %}
+          <label class="form-label" for="team-invite-email">Sähköposti
+            <input type="email" id="team-invite-email" name="email" class="form-input" required placeholder="etunimi@yritys.fi">
+          </label>
+          <label class="form-label" for="team-invite-role">Rooli
+            <select id="team-invite-role" name="role" class="form-select">
+              {% for role in invite_roles %}
+              <option value="{{ role }}">{{ 'Ylläpitäjä' if role == 'admin' else 'Käyttäjä' }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Lähetä kutsu</button>
+          </div>
+        </form>
+
+        <h2 class="form-section-title">Organisaation käyttäjät</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sähköposti</th>
+                <th>Rooli</th>
+                <th>Tila</th>
+                <th>Luotu</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for member in members %}
+              <tr>
+                <td>{{ member.email }}</td>
+                <td>{{ 'Ylläpitäjä' if member.role == 'admin' else ('Superadmin' if member.role == 'superadmin' else 'Käyttäjä') }}</td>
+                <td>{{ 'Aktiivinen' if member.is_active else 'Ei käytössä' }}</td>
+                <td>{{ member.created_at }}</td>
+                <td>
+                  {% if member.id != current_user.id %}
+                  <div class="form-row-inline">
+                    <form method="post" action="{{ url_for('settings.resend_team_invite', user_id=member.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">Lähetä kutsu uudelleen</button>
+                    </form>
+                    {% if member.is_active %}
+                    <form method="post" action="{{ url_for('settings.deactivate_team_member', user_id=member.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">Poista käytöstä</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{{ url_for('settings.reactivate_team_member', user_id=member.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">Aktivoi</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5">
+                {% call empty_state('Ei käyttäjiä', 'Kutsu ensimmäinen kollega yllä olevalla lomakkeella.') %}{% endcall %}
+              </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

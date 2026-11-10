@@ -31,6 +31,7 @@ ACTIVITY_TYPES = (
     "email_sent",
     "email_opened",
     "email_clicked",
+    "email_reply_received",
     "call",
     "stage_changed",
     "ai_enriched",

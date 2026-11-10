@@ -12,9 +12,11 @@ from app.analytics.prediction import (
     PredictionServiceError,
     run_weekly_batch_predictions,
 )
+from app.core.permissions import TWO_FA_SESSION_KEY
 from app.extensions import db
 from app.leads.models import Activity, Lead
 from app.leads.services import LeadService, get_default_stage
+from app.users.models import User
 from app.users.services import create_organization, create_user
 
 
@@ -56,6 +58,17 @@ def _login(client, email):
         follow_redirects=False,
     )
     assert r.status_code == 302
+
+
+def _bypass_2fa(client, app, email):
+    # No nested app_context here: db.session is scoped per app-context
+    # object, and the request-handling context (reused from the pytest
+    # fixture) must see this same mutation, not a separate session's copy.
+    user = User.query.filter_by(email=email).one()
+    user.totp_enabled = True
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
 
 
 def _create_lead(app, org_id, stage_id, **kwargs):
@@ -372,6 +385,7 @@ def test_dashboard_forecast_card_renders(mock_openai, client, app):
     mock_openai.return_value = {"probability": 0.5, "key_positive_signals": [], "key_risk_signals": []}
     app.config["OPENAI_API_KEY"] = "test-key"
     _login(client, ctx["admin_email"])
+    _bypass_2fa(client, app, ctx["admin_email"])
 
     with app.app_context():
         leads = Lead.query.filter_by(organization_id=ctx["org_id"]).all()
@@ -406,6 +420,7 @@ def test_pipeline_probability_badge_renders(mock_openai, client, app):
 def test_reports_forecast_renders(client, app):
     ctx = _setup_org(app, "forecast-page")
     _login(client, ctx["admin_email"])
+    _bypass_2fa(client, app, ctx["admin_email"])
     response = client.get(f"/reports/forecast?organization_id={ctx['org_id']}")
     assert response.status_code == 200
     assert b"Myyntiennuste" in response.data

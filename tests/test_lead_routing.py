@@ -366,3 +366,25 @@ def test_apply_routing_sets_industry_region(app):
         LeadRoutingService.apply_to_lead(lead_with_values, settings)
         assert lead_with_values.industry == "Rakentaminen"
         assert lead_with_values.region == "Pirkanmaa"
+
+
+def test_superadmin_can_switch_organization_on_lead_settings(client, app):
+    with app.app_context():
+        org, _stages, _admin, _user = _setup_org("leads-org-switch")
+        org_id = org.id
+        create_user("sa-leads-switch@test.com", "securepassword1", role="superadmin")
+        db.session.commit()
+
+    client.post("/auth/login", data={"email": "sa-leads-switch@test.com", "password": "securepassword1"})
+    response = client.get(f"/settings/leads?organization_id={org_id}")
+    assert response.status_code == 200
+
+
+def test_lead_settings_404_for_nonexistent_organization(client, app):
+    with app.app_context():
+        create_user("sa-leads-404@test.com", "securepassword1", role="superadmin")
+        db.session.commit()
+
+    client.post("/auth/login", data={"email": "sa-leads-404@test.com", "password": "securepassword1"})
+    response = client.get("/settings/leads?organization_id=999999")
+    assert response.status_code == 404

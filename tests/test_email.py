@@ -166,6 +166,82 @@ def test_lead_without_email_cannot_send(app):
         assert exc.value.code == "no_email"
 
 
+@patch("app.email.services._mailgun_send")
+def test_daily_send_limit_blocks_further_sends_for_organization(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
+    ctx = _setup_org(app, "rate-limited-org")
+    lead_id = _create_lead_with_email(app, ctx["org_id"], ctx["stage_id"], ctx["admin_id"])
+
+    with app.app_context():
+        app.config["EMAIL_DAILY_LIMIT_PER_ORG"] = 2
+        for _ in range(2):
+            result = EmailService.send_to_lead(
+                lead_id,
+                ctx["admin_id"],
+                "Hello",
+                "<p>Hi</p>",
+                None,
+                organization_id=ctx["org_id"],
+            )
+            db.session.commit()
+            assert result["success"] is True
+
+        with pytest.raises(EmailServiceError) as exc:
+            EmailService.send_to_lead(
+                lead_id,
+                ctx["admin_id"],
+                "Hello",
+                "<p>Hi</p>",
+                None,
+                organization_id=ctx["org_id"],
+            )
+        assert exc.value.code == "rate_limited"
+
+
+@patch("app.email.services._mailgun_send")
+def test_daily_send_limit_does_not_affect_other_organizations(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
+    ctx = _setup_org(app, "rate-limited-org-2")
+    lead_id = _create_lead_with_email(app, ctx["org_id"], ctx["stage_id"], ctx["admin_id"])
+    other_lead_id = _create_lead_with_email(
+        app, ctx["other_org_id"], ctx["stage_id"], ctx["admin_id"], email="other-lead@test.com"
+    )
+
+    with app.app_context():
+        app.config["EMAIL_DAILY_LIMIT_PER_ORG"] = 1
+        EmailService.send_to_lead(
+            lead_id, ctx["admin_id"], "Hello", "<p>Hi</p>", None, organization_id=ctx["org_id"]
+        )
+        db.session.commit()
+
+        result = EmailService.send_to_lead(
+            other_lead_id,
+            ctx["admin_id"],
+            "Hello",
+            "<p>Hi</p>",
+            None,
+            organization_id=ctx["other_org_id"],
+        )
+        db.session.commit()
+        assert result["success"] is True
+
+
+@patch("app.email.services._mailgun_send")
+def test_daily_send_limit_disabled_when_zero(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
+    ctx = _setup_org(app, "rate-limit-disabled-org")
+    lead_id = _create_lead_with_email(app, ctx["org_id"], ctx["stage_id"], ctx["admin_id"])
+
+    with app.app_context():
+        app.config["EMAIL_DAILY_LIMIT_PER_ORG"] = 0
+        for _ in range(3):
+            result = EmailService.send_to_lead(
+                lead_id, ctx["admin_id"], "Hello", "<p>Hi</p>", None, organization_id=ctx["org_id"]
+            )
+            db.session.commit()
+            assert result["success"] is True
+
+
 # --- Templates ---
 
 
@@ -576,3 +652,13 @@ def test_send_to_lead_falls_back_to_shared_domain_when_unverified(mock_send, app
             lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
         )
         assert mock_send.call_args.kwargs["domain"] is None
+
+
+def test_email_settings_404_for_nonexistent_organization(client, app):
+    with app.app_context():
+        create_user("sa-email-404@test.com", "securepassword1", role="superadmin")
+        db.session.commit()
+
+    client.post("/auth/login", data={"email": "sa-email-404@test.com", "password": "securepassword1"})
+    response = client.get("/settings/email?organization_id=999999")
+    assert response.status_code == 404

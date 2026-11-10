@@ -13,6 +13,8 @@ def create_app(config_object=None):
     app.config.from_object(config)
     apply_testing_defaults(app)
     configure_stdout_logging(app)
+    _init_sentry(app)
+    _apply_proxy_fix(app)
 
     if app.config.get("REDIS_URL"):
         app.config["CACHE_TYPE"] = "RedisCache"
@@ -39,6 +41,35 @@ def create_app(config_object=None):
     _log_db_health(app)
 
     return app
+
+
+def _apply_proxy_fix(app):
+    """Trust Render's single reverse-proxy hop for X-Forwarded-* headers.
+
+    Without this, request.remote_addr is Render's proxy IP for every
+    request, which breaks per-client login rate limiting.
+    """
+    if app.config.get("TESTING"):
+        return
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    hops = app.config.get("PROXY_FIX_X_FOR", 1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+
+
+def _init_sentry(app):
+    """No-op unless SENTRY_DSN is configured — keeps Sentry optional."""
+    dsn = app.config.get("SENTRY_DSN")
+    if not dsn:
+        return
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+
+    sentry_sdk.init(
+        dsn=dsn,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=app.config.get("SENTRY_TRACES_SAMPLE_RATE", 0.0),
+    )
 
 
 def _configure_redis_fallback(app):

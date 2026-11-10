@@ -22,7 +22,7 @@ from app.email.templates import (
 )
 from app.extensions import db
 from app.leads.models import Activity, Lead
-from app.leads.services import get_lead_for_org
+from app.leads.services import LeadService, get_lead_for_org
 from app.users.models import Organization, User
 
 MAX_SUBJECT_LEN = 255
@@ -40,6 +40,28 @@ class EmailServiceError(Exception):
 
 def email_sending_enabled() -> bool:
     return bool(current_app.config.get("EMAIL_SENDING_ENABLED"))
+
+
+def _check_daily_send_limit(organization_id: int) -> None:
+    """Guard against a misbehaving automation/sequence flooding one
+    organization's recipients (and Mailgun reputation) with mail."""
+    limit = current_app.config.get("EMAIL_DAILY_LIMIT_PER_ORG") or 0
+    if limit <= 0:
+        return
+    from datetime import timedelta
+
+    day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = EmailLog.query.filter(
+        EmailLog.organization_id == organization_id,
+        EmailLog.status == "sent",
+        EmailLog.sent_at >= day_start,
+        EmailLog.sent_at < day_start + timedelta(days=1),
+    ).count()
+    if sent_today >= limit:
+        raise EmailServiceError(
+            "Daily email sending limit reached for this organization.",
+            "rate_limited",
+        )
 
 
 def sanitize_html_body(html_body: str | None) -> str:
@@ -208,6 +230,8 @@ class EmailService:
         if not lead.email:
             raise EmailServiceError("Lead has no email address.", "no_email")
 
+        _check_daily_send_limit(organization_id)
+
         if actor and actor.organization_id is not None:
             if actor.organization_id != lead.organization_id and not actor.is_superadmin():
                 raise EmailServiceError("Access denied.", "forbidden")
@@ -368,6 +392,78 @@ class EmailService:
             f"Pyysit salasanan palautusta. Aseta uusi salasana: {reset_url} "
             f"(linkki vanhenee {max_age_minutes} minuutin kuluttua)"
         )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
+    def send_teammate_invite_email(
+        *, to_email: str, set_password_url: str, organization_name: str
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        subject = f"Sinut on lisätty FlowLeads-tiimiin ({organization_name})"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>Tervetuloa tiimiin, {html.escape(organization_name)}</h2>"
+            "<p>Sinut on lisätty organisaation FlowLeads-CRM-tilille. Aseta salasanasi "
+            "alla olevasta linkistä päästäksesi sisään:</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(set_password_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Aseta salasana</a></p>"
+            "<p style='color:#6B7280;font-size:13px;'>Linkki on kertakäyttöinen ja vanhenee pian.</p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = (
+            "Sinut on lisätty organisaation FlowLeads-tilille. Aseta salasanasi: "
+            f"{set_password_url}"
+        )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
+    def send_onboarding_complete_email(
+        *, to_email: str, organization_name: str, login_url: str
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        subject = "FlowLeads-tilisi on käyttövalmis"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>Tervetuloa, {html.escape(organization_name)}</h2>"
+            "<p>Käyttöönotto on valmis. Voit kirjautua sisään sähköpostiosoitteellasi ja "
+            "valitsemallasi salasanalla:</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(login_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Kirjaudu sisään</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = f"Tilisi on käyttövalmis. Kirjaudu sisään: {login_url}"
         from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
         from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
         ok, message_id, error = _mailgun_send(
@@ -839,6 +935,63 @@ def handle_mailgun_webhook(event_data: dict) -> bool:
         target_type="email_log",
         target_id=log.id,
         metadata={"event": event, "message_id": message_id},
+    )
+    return True
+
+
+def _message_id_variants(value: str | None) -> list[str]:
+    """Both forms ("<id>" and bare "id") since EmailLog.mailgun_message_id
+    is stored exactly as Mailgun's send API returned it (usually bracketed),
+    while header values we need to match against are not guaranteed to be."""
+    if not value:
+        return []
+    trimmed = value.strip()
+    if not trimmed:
+        return []
+    bare = trimmed.strip("<>").strip()
+    if not bare:
+        return []
+    return [bare, f"<{bare}>"]
+
+
+def handle_inbound_reply(form_data: dict) -> bool:
+    """Match an inbound Mailgun reply back to the lead it answers.
+
+    Deliberately matches only via the In-Reply-To/References header against
+    EmailLog.mailgun_message_id — the message we actually sent — rather than
+    by sender address, which could resolve to the wrong lead/organization if
+    the same person's address appears in more than one tenant's data.
+    """
+    references = form_data.get("References") or ""
+    candidate_ids: list[str] = []
+    for raw_id in [form_data.get("In-Reply-To"), *references.split()]:
+        candidate_ids.extend(_message_id_variants(raw_id))
+    if not candidate_ids:
+        return False
+
+    log = EmailLog.query.filter(EmailLog.mailgun_message_id.in_(candidate_ids)).first()
+    if not log:
+        return False
+
+    from app.sequences.services import SequenceService
+
+    SequenceService.handle_reply(log.lead_id)
+
+    body_preview_text = body_preview(form_data.get("stripped-text") or form_data.get("body-plain") or "")
+    LeadService.log_activity(
+        log.lead_id,
+        None,
+        "email_reply_received",
+        content=body_preview_text,
+        metadata={"email_log_id": log.id, "sender": form_data.get("sender")},
+    )
+
+    log_audit(
+        "email_reply_received",
+        organization_id=log.organization_id,
+        target_type="email_log",
+        target_id=log.id,
+        metadata={"lead_id": log.lead_id},
     )
     return True
 
