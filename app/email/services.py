@@ -405,6 +405,78 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    def send_teammate_invite_email(
+        *, to_email: str, set_password_url: str, organization_name: str
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        subject = f"Sinut on lisätty FlowLeads-tiimiin ({organization_name})"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>Tervetuloa tiimiin, {html.escape(organization_name)}</h2>"
+            "<p>Sinut on lisätty organisaation FlowLeads-CRM-tilille. Aseta salasanasi "
+            "alla olevasta linkistä päästäksesi sisään:</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(set_password_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Aseta salasana</a></p>"
+            "<p style='color:#6B7280;font-size:13px;'>Linkki on kertakäyttöinen ja vanhenee pian.</p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = (
+            "Sinut on lisätty organisaation FlowLeads-tilille. Aseta salasanasi: "
+            f"{set_password_url}"
+        )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
+    def send_onboarding_complete_email(
+        *, to_email: str, organization_name: str, login_url: str
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        subject = "FlowLeads-tilisi on käyttövalmis"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>Tervetuloa, {html.escape(organization_name)}</h2>"
+            "<p>Käyttöönotto on valmis. Voit kirjautua sisään sähköpostiosoitteellasi ja "
+            "valitsemallasi salasanalla:</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(login_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Kirjaudu sisään</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = f"Tilisi on käyttövalmis. Kirjaudu sisään: {login_url}"
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
     def send_customer_invite_email(
         *, to_email: str, invite_url: str, organization_name: str, ttl_days: int
     ) -> dict:

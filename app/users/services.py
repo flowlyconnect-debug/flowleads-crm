@@ -114,6 +114,25 @@ def delete_user(user: User, *, actor: User) -> None:
     db.session.delete(user)
 
 
+def set_user_active(user: User, is_active: bool, *, actor: User) -> User:
+    if actor.id == user.id:
+        raise UserServiceError("You cannot deactivate your own account.", "self_deactivate")
+    ensure_same_organization(actor, user)
+    if actor.role != "superadmin" and user.role in ("superadmin", "admin"):
+        raise UserServiceError("Insufficient permissions.", "forbidden")
+
+    user.is_active = is_active
+    log_audit(
+        "user_activated" if is_active else "user_deactivated",
+        user_id=actor.id,
+        organization_id=user.organization_id,
+        target_type="user",
+        target_id=user.id,
+        metadata={"email": user.email},
+    )
+    return user
+
+
 def change_user_role(user: User, new_role: str, *, actor: User) -> User:
     if new_role not in ROLES:
         raise UserServiceError("Invalid role.", "invalid_role")

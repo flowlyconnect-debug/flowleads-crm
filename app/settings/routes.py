@@ -185,3 +185,7 @@ register_stream_settings_routes(settings_bp)
 from app.search.routes import register_search_profile_settings_routes  # noqa: E402
 
 register_search_profile_settings_routes(settings_bp)
+
+from app.users.team_routes import register_team_settings_routes  # noqa: E402
+
+register_team_settings_routes(settings_bp)

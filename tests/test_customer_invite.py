@@ -86,7 +86,9 @@ def test_get_valid_invite_rejects_expired_revoked_or_accepted(app):
         assert get_valid_invite(result.token) is None
 
 
-def test_accept_invite_creates_admin_and_inactive_profile(app):
+@patch("app.email.services._mailgun_send")
+def test_accept_invite_creates_admin_and_inactive_profile(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
     with app.app_context():
         actor = create_user("actor-invite3@test.com", "securepassword1", role="superadmin")
         db.session.commit()
@@ -124,8 +126,13 @@ def test_accept_invite_creates_admin_and_inactive_profile(app):
         assert refreshed_invite.accepted_at is not None
         assert get_valid_invite(result.token) is None  # single-use
 
+        mock_send.assert_called_once()
+        assert mock_send.call_args.kwargs["to_email"] == "admin@hyvaksy.fi"
 
-def test_accept_invite_stores_all_finland_as_its_own_value(app):
+
+@patch("app.email.services._mailgun_send")
+def test_accept_invite_stores_all_finland_as_its_own_value(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
     with app.app_context():
         actor = create_user("actor-invite4@test.com", "securepassword1", role="superadmin")
         db.session.commit()
@@ -150,7 +157,9 @@ def test_accept_invite_stores_all_finland_as_its_own_value(app):
         assert profile.regions == ["Koko Suomi"]
 
 
-def test_activate_source_turns_profile_on_and_creates_job(app):
+@patch("app.email.services._mailgun_send")
+def test_activate_source_turns_profile_on_and_creates_job(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
     with app.app_context():
         actor = create_user("actor-invite5@test.com", "securepassword1", role="superadmin")
         db.session.commit()
