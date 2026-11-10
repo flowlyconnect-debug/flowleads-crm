@@ -21,7 +21,7 @@
 
   {% if current_user.is_superadmin() %}
 
-  <span class="settings-nav__group-label">Asiakkaat</span>
+  <span class="settings-nav__group-label" title="FlowLeadsia käyttävät organisaatiot — eri asia kuin CRM:n Yritykset">Asiakasorganisaatiot</span>
   <a href="{{ url_for('admin.customers_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customers' %} is-active{% endif %}">Asiakaslista</a>
   <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
   <a href="{{ url_for('admin.create_invite_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_invite' %} is-active{% endif %}">Kutsu asiakas</a>

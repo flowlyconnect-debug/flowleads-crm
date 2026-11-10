@@ -3,24 +3,32 @@
 :root {
   /* === FLOWLY BRAND COLORS === */
 
-  /* Sidebar — ink navy, matches the F-logo's dark mark */
-  --color-sidebar:        #111827;
-  --color-sidebar-light:  #1A2235;
-  --color-sidebar-hover:  #212B42;
-  --color-border-dark:    #26324A;
+  /* Sidebar — light shell; the dark ink surface is reserved for the
+     primary work panel (see --color-ink) */
+  --color-sidebar:        #FFFFFF;
+  --color-sidebar-light:  #F5F7FC;
+  --color-sidebar-hover:  #F1F4FA;
+  --color-border-dark:    #2A3B57;
+
+  /* Ink — the one dark surface, used where the user's main work is */
+  --color-ink:            #15243B;
+  --color-ink-raised:     #1D3050;
+  --color-ink-border:     #2F4263;
+  --color-ink-text:       #FFFFFF;
+  --color-ink-text-muted: #A9B6CC;
 
   /* Primary accent — violet, FlowLeads' own identity */
-  --color-accent:         #623DD6;
-  --color-accent-hover:   #4F2EB3;
-  --color-accent-soft:    #F1ECFF;
-  --color-accent-border:  #DDD0FA;
+  --color-accent:         #5C43CD;
+  --color-accent-hover:   #4A34B0;
+  --color-accent-soft:    #EFEBFC;
+  --color-accent-border:  #D9D0F7;
 
   /* Highlight — logo blue, used sparingly for small brand details */
   --color-highlight:      #2F6FED;
   --color-highlight-dark: #1D54C4;
 
   /* Backgrounds */
-  --color-bg:             #F6F8FC;
+  --color-bg:             #F5F7FC;
   --color-bg-secondary:   #ECEFF6;
   --color-card:           #FFFFFF;
   --color-card-hover:     #FAFBFF;
@@ -34,7 +42,7 @@
   --color-text-secondary: #526079;
   --color-text-muted:     #8A94A6;
   --color-text-inverse:   #FFFFFF;
-  --color-text-accent:    #623DD6;
+  --color-text-accent:    #5C43CD;
   --color-text-highlight: #2F6FED;
 
   /* Status */
@@ -47,12 +55,12 @@
   --color-danger:         #EF4444;
   --color-danger-soft:    #FEE2E2;
   --color-danger-emphasis: #991B1B;
-  --color-info:           #3B82F6;
+  --color-info:           #2F6FED;
   --color-info-soft:      #DBEAFE;
   --color-info-emphasis:  #1E40AF;
   --color-neutral-soft:   #F3F4F6;
   --color-neutral-emphasis: #374151;
-  --color-accent-emphasis: #4F2EB3;
+  --color-accent-emphasis: #4A34B0;
 
   /* Pipeline stages */
   --stage-new:            #8B5CF6;
@@ -69,16 +77,16 @@
   --stage-lost-soft:      #F3F4F6;
 
   /* Sidebar UI (derived, no extra hex in components) */
-  --sidebar-text:         rgba(255, 255, 255, 0.65);
-  --sidebar-text-hover:   rgba(255, 255, 255, 0.90);
-  --sidebar-text-muted:   rgba(255, 255, 255, 0.35);
-  --sidebar-text-label:   rgba(255, 255, 255, 0.30);
-  --sidebar-text-search:  rgba(255, 255, 255, 0.45);
-  --sidebar-border:       rgba(255, 255, 255, 0.06);
-  --sidebar-surface:      rgba(255, 255, 255, 0.07);
-  --sidebar-surface-hover:rgba(255, 255, 255, 0.11);
-  --sidebar-item-hover:   rgba(255, 255, 255, 0.08);
-  --sidebar-grid-line:    rgba(255, 255, 255, 0.02);
+  --sidebar-text:         #46536B;
+  --sidebar-text-hover:   #172033;
+  --sidebar-text-muted:   #6B778C;
+  --sidebar-text-label:   #8A94A6;
+  --sidebar-text-search:  #6B778C;
+  --sidebar-border:       #E2E7F0;
+  --sidebar-surface:      #F5F7FC;
+  --sidebar-surface-hover:#ECEFF6;
+  --sidebar-item-hover:   #F1F4FA;
+  --sidebar-grid-line:    transparent;
 
   /* Webhook providers */
   --webhook-slack-bg:     #4a154b;
@@ -132,7 +140,7 @@
   --shadow-sm:  0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-accent: 0 4px 14px rgba(98, 61, 214, 0.28);
+  --shadow-accent: 0 4px 14px rgba(92, 67, 205, 0.28);
 
   /* Transitions */
   --transition-fast: 120ms ease;
@@ -140,7 +148,7 @@
   --transition-slow: 350ms ease;
 
   /* Layout */
-  --sidebar-width: 240px;
+  --sidebar-width: 216px;
   --sidebar-width-collapsed: 64px;
   --topbar-height: 0px;
 

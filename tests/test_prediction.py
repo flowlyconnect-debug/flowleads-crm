@@ -397,7 +397,7 @@ def test_dashboard_forecast_card_renders(mock_openai, client, app):
     assert response.status_code == 200
     assert b"dashboard-command-center" in response.data
     assert b"aiWorklistBody" in response.data
-    assert "Tässä päivän tärkeimmät liidit" in response.data.decode("utf-8")
+    assert "Päivän työjono" in response.data.decode("utf-8")
 
 
 @patch("app.analytics.prediction.call_openai_prediction")
