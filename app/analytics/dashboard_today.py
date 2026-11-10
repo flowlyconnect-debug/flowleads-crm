@@ -86,6 +86,23 @@ def _days_since_contact(lead: Lead, organization_id: int, now: datetime) -> int 
     return days_since(last, now=now)
 
 
+def _lead_display_fields(lead: Lead | None) -> dict:
+    """Presentation fields so the dashboard can show a worklist item with the
+    same name → source/stage → next action order as the other lead views."""
+    if lead is None:
+        return {}
+    stage = lead.stage
+    return {
+        "lead_id": lead.id,
+        "name": lead.display_name,
+        "company": lead.company or "",
+        "source": lead.source or "",
+        "stage": stage.name if stage else "",
+        "stage_color": stage.color if stage else None,
+        "deal_value": float(lead.deal_value) if lead.deal_value is not None else None,
+    }
+
+
 def _score_badge_label(score: int | None) -> tuple[str, str]:
     if score is not None and score >= 80:
         return "Kuuma", "hot"
@@ -241,6 +258,7 @@ class DashboardTodayService:
         return {
             "new_leads_7d": int(new_leads_7d),
             "new_leads_delta_pct": int(delta_pct),
+            "new_leads_prev_7d": int(previous_new_leads_7d),
             "hot_leads": int(hot_leads),
             "tasks_today": int(tasks_today),
             "overdue_tasks": int(overdue_tasks),
@@ -422,6 +440,7 @@ class DashboardTodayService:
                         "action_text": f"Lähetä follow-up {lead_name}{company}",
                         "reason": f"Follow-up tehtävä myöhässä {days_overdue} pv",
                         "url": f"/leads/{lead.id}" if lead else "/tasks",
+                        **_lead_display_fields(lead),
                     },
                 )
             )
@@ -476,6 +495,7 @@ class DashboardTodayService:
                             "action_text": f"Soita {lead.display_name}{company}",
                             "reason": f"Ei kontaktia {contact_days} pv, score {lead.score}",
                             "url": f"/leads/{lead.id}",
+                            **_lead_display_fields(lead),
                         },
                     )
                 )
@@ -493,6 +513,7 @@ class DashboardTodayService:
                             "action_text": f"Käy läpi {lead.display_name}{company}",
                             "reason": f"Ei kontaktia {contact_days} pv, score {lead.score}",
                             "url": f"/leads/{lead.id}",
+                            **_lead_display_fields(lead),
                         },
                     )
                 )
@@ -511,6 +532,7 @@ class DashboardTodayService:
                         "action_text": f"Soita {lead.display_name}{company}",
                         "reason": "Uusi liidi, ei kontaktia",
                         "url": f"/leads/{lead.id}",
+                        **_lead_display_fields(lead),
                     },
                 )
             )

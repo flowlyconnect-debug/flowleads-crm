@@ -619,6 +619,7 @@ def dashboard_metrics():
             {
                 "new_leads_7d": 0,
                 "new_leads_delta_pct": 0,
+                "new_leads_prev_7d": 0,
                 "hot_leads": 0,
                 "tasks_today": 0,
                 "overdue_tasks": 0,
@@ -780,9 +781,40 @@ def dashboard():
     forecast = PredictionService.calculate_forecast(organization_id, period_days=30)
     high_potential = PredictionService.get_high_potential_leads(organization_id, limit=5)
     org_currency = get_default_currency(organization_id)
+
+    # Newest leads through the same query the Leads list uses, so the
+    # dashboard can name an arrived lead instead of only counting it.
+    # "New" keeps the existing definition: active, still in the first stage.
+    from app.leads.services import LeadService, get_default_stage
+
+    recent_leads = LeadService.search(
+        organization_id,
+        {
+            "sort": "created_at",
+            "dir": "desc",
+            "status": "active",
+            "stage_id": get_default_stage(organization_id).id,
+        },
+        page=1,
+        per_page=8,
+    ).items
+    new_cutoff = now - timedelta(days=7)
+    new_leads = []
+    for lead in recent_leads:
+        created = lead.created_at
+        if created is not None and created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created is None or created < new_cutoff:
+            continue
+        if getattr(lead, "last_activity_at", None) is not None:
+            continue
+        new_leads.append(lead)
+
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
+        now=now,
+        new_leads=new_leads,
         organizations=organizations,
         organization_id=organization_id,
         org=org,

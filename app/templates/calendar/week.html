@@ -6,7 +6,6 @@
   <header class="page-header">
     <div class="page-header__main">
       <h1>Kalenteri</h1>
-      <p class="page-subtitle">Tapaamiset päivän ja viikon näkymässä</p>
     </div>
     <div class="page-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.calendar_settings') }}">Kalenteriasetukset</a>
@@ -15,6 +14,14 @@
 
   <div class="calendar-layout">
     <div class="calendar-main">
+      <div class="calendar-toolbar" role="toolbar" aria-label="Kalenterin työkalurivi">
+      <span class="calendar-toolbar__range">
+        {%- if active_view == 'week' and week_days -%}
+          {{ week_days[0].label }} – {{ week_days[-1].label }}
+        {%- else -%}
+          Tänään
+        {%- endif -%}
+      </span>
       <nav class="calendar-view-tabs" role="tablist" aria-label="Kalenterinäkymä">
         <a href="{{ url_for('calendar.my_calendar', view='day', organization_id=organization_id) if current_user.is_superadmin() else url_for('calendar.my_calendar', view='day') }}"
            class="calendar-view-tab{% if active_view == 'day' %} is-active{% endif %}"
@@ -25,6 +32,8 @@
            role="tab"
            aria-selected="{{ 'true' if active_view == 'week' else 'false' }}">Viikko</a>
       </nav>
+      <a href="/calendar/new" class="btn btn-primary btn-sm calendar-toolbar__create">+ Luo tapaaminen</a>
+      </div>
 
       {% if active_view == 'day' %}
       <section class="card calendar-day-panel" role="tabpanel" aria-label="Päivän tapaamiset">
@@ -59,8 +68,7 @@
             <span class="calendar-empty-inline__icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
             </span>
-            <p>Ei tapaamisia tänään. Haluatko luoda tapaamisen kuumimmalle liidille?</p>
-            <a href="/calendar/new" class="btn btn-primary btn-sm">Luo tapaaminen</a>
+            <p>Ei tapaamisia tänään.</p>
           </div>
           {% endif %}
         </div>
@@ -92,8 +100,7 @@
             <span class="calendar-empty-inline__icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
             </span>
-            <p>Ei tapaamisia tällä viikolla</p>
-            <a href="/calendar/new" class="btn btn-primary btn-sm">Luo tapaaminen</a>
+            <p>Ei tapaamisia tällä viikolla.</p>
           </div>
           {% endif %}
         </div>

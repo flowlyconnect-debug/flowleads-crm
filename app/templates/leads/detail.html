@@ -5,19 +5,18 @@
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
 <section class="lead-profile-layout">
-  <header class="page-header">
+  {% set target_name = lead.company or lead.display_name %}
+  {% set contact_person = lead.display_name if lead.company and lead.display_name != lead.company else '' %}
+  {% set open_tasks = lead_tasks|rejectattr('status', 'in', ['completed', 'cancelled'])|list if lead_tasks is defined else [] %}
+  {% set next_task = (open_tasks|selectattr('due_date')|sort(attribute='due_date')|first) or (open_tasks|first) %}
+  {% set is_closed_lead = lead.status in ('won', 'lost') %}
+  <header class="page-header lead-detail-header">
     <div class="page-header__main">
       <div class="breadcrumbs">
         <a href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Liidit</a>
         <span class="breadcrumbs__sep">/</span>
-        <span>{{ lead.display_name }}</span>
+        <span>{{ target_name }}</span>
       </div>
-      <h1>{{ lead.display_name }}</h1>
-      <p class="page-subtitle">
-        {% if lead.company %}{{ lead.company }} · {% endif %}
-        {% if lead.title %}{{ lead.title }} · {% endif %}
-        {% if lead.stage %}{{ lead.stage.name }}{% endif %}
-      </p>
     </div>
     <div class="page-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.pipeline', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.pipeline') }}">
@@ -36,75 +35,54 @@
     </div>
   </header>
 
+  {# Same reading order as the list and the pipeline: name → source + stage → next action #}
+  <article class="lead-focus">
+    <div class="lead-focus__main">
+      <h1 class="lead-focus__name">{{ target_name }}</h1>
+      {% if contact_person or lead.title %}
+      <p class="lead-focus__person">
+        {% if contact_person %}{{ contact_person }}{% endif %}{% if contact_person and lead.title %} · {% endif %}{% if lead.title %}{{ lead.title }}{% endif %}
+      </p>
+      {% endif %}
+      <div class="lead-focus__facts">
+        <span class="lead-source">{{ source_label(lead.source) }}</span>
+        {% if lead.stage %}
+        <span class="lead-stage"><span class="lead-stage__dot" style="background: {{ lead.stage.color or '#94A3B8' }}"></span>{{ stage_label(lead.stage.name) }}</span>
+        {% endif %}
+        {# A missing estimate is not the same thing as zero. #}
+        {% if lead.deal_value is not none %}
+        <span class="lead-focus__value">{{ currency_symbol }}{{ '{:,.0f}'.format(lead.deal_value|float).replace(',', ' ') }}</span>
+        {% else %}
+        <span class="lead-focus__value lead-focus__value--missing">Arvoa ei ole arvioitu</span>
+        {% endif %}
+        {% if lead.created_at %}<span>Saapui {{ lead.created_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+        {% if lead.assignee %}<span class="truncate">Vastuu: {{ lead.assignee.email.split('@')[0] }}</span>{% endif %}
+      </div>
+      <div class="lead-focus__badges lead-header-badges">
+        {% if lead.score is not none %}{{ score_badge(lead.score) }}{% endif %}
+        {% if lead.close_probability is not none %}{{ probability_badge(lead.close_probability) }}{% endif %}
+        <span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>
+      </div>
+    </div>
+    <div class="lead-focus__next">
+      {% if next_task %}
+      <span class="lead-focus__next-label">Kirjattu seuraava toimi</span>
+      <span class="lead-focus__next-text">{{ next_task.title }}</span>
+      {% if next_task.due_date %}<span class="lead-focus__next-meta">Eräpäivä {{ next_task.due_date.strftime('%d.%m.%Y') }}</span>{% endif %}
+      {% elif is_closed_lead %}
+      <span class="lead-focus__next-label">Tila</span>
+      <span class="lead-focus__next-text">{{ 'Kauppa voitettu' if lead.status == 'won' else 'Kauppa hävitty' }}</span>
+      {% else %}
+      <span class="lead-focus__next-label">Ehdotettu seuraava toimi</span>
+      <span class="lead-focus__next-text">{{ 'Ota ensikontakti' if not lead.last_contacted_at else 'Sovi seuraava askel' }}</span>
+      <span class="lead-focus__next-meta">Ei kirjattua tehtävää</span>
+      {% endif %}
+      <a class="btn btn-primary btn-sm lead-focus__cta" href="#lead-primary-actions">Jatka tästä <span aria-hidden="true">↓</span></a>
+    </div>
+  </article>
+
   <div class="lead-profile-grid">
     <div class="lead-main-column">
-      <article class="card lead-header-card">
-        <div class="lead-header-main">
-          <div class="lead-header-avatar" aria-hidden="true">
-            {% set initials = (lead.display_name or lead.email or '?').split() %}
-            {% if initials|length > 1 %}
-              {{ initials[0][0] }}{{ initials[1][0] }}
-            {% else %}
-              {{ (initials[0][0:2])|upper }}
-            {% endif %}
-          </div>
-          <div class="lead-header-text">
-            <h2 class="lead-header-name">
-              {{ lead.display_name }}
-            </h2>
-            <p class="lead-header-title">
-              {% if lead.title %}{{ lead.title }}{% endif %}
-              {% if lead.title and lead.company %} · {% endif %}
-              {% if lead.company %}{{ lead.company }}{% endif %}
-            </p>
-            <div class="lead-header-badges">
-              {% if lead.stage %}
-              <span class="badge badge-neutral badge--dot">
-                {{ lead.stage.name }}
-              </span>
-              {% endif %}
-              {% if lead.score is not none %}
-              {{ score_badge(lead.score) }}
-              {% endif %}
-              {% if lead.close_probability is not none %}
-              {{ probability_badge(lead.close_probability) }}
-              {% endif %}
-              <span class="badge badge-accent">
-                {{ ai_status_badge(lead) }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="lead-header-meta">
-          <dl class="lead-header-meta-list">
-            {% if lead.deal_value %}
-            <div class="lead-header-meta-item">
-              <dt>Arvo</dt>
-              <dd>{{ currency_symbol }}{{ '%.0f'|format(lead.deal_value) }}</dd>
-            </div>
-            {% endif %}
-            {% if lead.expected_value is not none %}
-            <div class="lead-header-meta-item">
-              <dt>Odotettu arvo</dt>
-              <dd>{{ currency_symbol }}{{ '%.0f'|format(lead.expected_value) }}</dd>
-            </div>
-            {% endif %}
-            {% if lead.created_at %}
-            <div class="lead-header-meta-item">
-              <dt>Luotu</dt>
-              <dd>{{ lead.created_at.strftime('%Y-%m-%d') }}</dd>
-            </div>
-            {% endif %}
-            {% if lead.assignee %}
-            <div class="lead-header-meta-item">
-              <dt>Vastuuhenkilö</dt>
-              <dd class="truncate">{{ lead.assignee.email }}</dd>
-            </div>
-            {% endif %}
-          </dl>
-        </div>
-      </article>
-
       <article class="card playbook-card" id="ai-playbook-card">
         <header class="playbook-card__header">
           <div class="playbook-card__title-row">
@@ -242,7 +220,7 @@
           </div>
           {% endif %}
 
-          <div class="lead-primary-actions mt-4">
+          <div class="lead-primary-actions mt-4" id="lead-primary-actions">
             {% if lead.email %}
             <a class="btn btn-primary btn-sm" href="{{ url_for('email.compose', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.compose', lead_id=lead.id) }}">
               Lähetä sähköposti
