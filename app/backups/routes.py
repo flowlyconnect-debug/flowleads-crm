@@ -1,11 +1,14 @@
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
+import shutil
+
+from flask import Blueprint, after_this_request, current_app, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
 from app.backups.forms import RestoreBackupForm
 from app.backups.services import (
     BackupServiceError,
+    backup_exists,
     create_backup,
-    get_backup_path,
+    download_backup_to_temp,
     list_backups,
     restore_backup,
 )
@@ -42,11 +45,21 @@ def backups_create():
 @require_2fa
 def backups_download(filename: str):
     try:
-        path = get_backup_path(filename)
-        return send_file(path, as_attachment=True, download_name=path.name)
+        path = download_backup_to_temp(filename)
     except BackupServiceError as exc:
         flash(exc.message, "danger")
         return redirect(url_for("backups.backups_list"))
+
+    s3_backed = (current_app.config.get("BACKUP_STORAGE_BACKEND") or "local").lower() == "s3"
+    if s3_backed:
+        download_dir = path.parent
+
+        @after_this_request
+        def _cleanup_s3_download(response):
+            shutil.rmtree(download_dir, ignore_errors=True)
+            return response
+
+    return send_file(path, as_attachment=True, download_name=path.name)
 
 
 @backups_bp.route("/backups/<filename>/restore", methods=["GET", "POST"])
@@ -55,10 +68,8 @@ def backups_download(filename: str):
 @require_2fa
 def backups_restore(filename: str):
     form = RestoreBackupForm()
-    try:
-        get_backup_path(filename)
-    except BackupServiceError as exc:
-        flash(exc.message, "danger")
+    if not backup_exists(filename):
+        flash("Backup file not found.", "danger")
         return redirect(url_for("backups.backups_list"))
 
     if form.validate_on_submit():
@@ -71,6 +82,7 @@ def backups_restore(filename: str):
                     confirmed_by_user_id=current_user.id,
                     totp_code=form.totp_code.data or "",
                     password=form.password.data or "",
+                    target_database_url=(form.target_database_url.data or "").strip() or None,
                 )
                 flash("Backup restored successfully.", "success")
                 return redirect(url_for("backups.backups_list"))

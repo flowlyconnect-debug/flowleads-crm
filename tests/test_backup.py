@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pyotp
 import pytest
@@ -223,6 +223,174 @@ def test_restore_route_post(mock_restore, client, app, backup_dir):
     )
     assert response.status_code == 200
     mock_restore.assert_called_once()
+
+
+# --- S3-backed storage (isolated: boto3 client is faked, no network calls) ---
+
+
+class FakeS3Client:
+    """Minimal in-memory stand-in for a boto3 S3 client."""
+
+    def __init__(self):
+        self.objects: dict[str, dict] = {}
+
+    def upload_file(self, path, bucket, key):
+        with open(path, "rb") as f:
+            data = f.read()
+        self.objects[key] = {"body": data, "last_modified": datetime.now(timezone.utc)}
+
+    def download_file(self, bucket, key, dest):
+        entry = self.objects.get(key)
+        if entry is None:
+            raise RuntimeError("NoSuchKey")
+        with open(dest, "wb") as f:
+            f.write(entry["body"])
+
+    def head_object(self, Bucket, Key):
+        if Key not in self.objects:
+            raise RuntimeError("NoSuchKey")
+        return {}
+
+    def get_paginator(self, _name):
+        objects = self.objects
+
+        class _Paginator:
+            def paginate(self, Bucket, Prefix=""):
+                contents = [
+                    {
+                        "Key": key,
+                        "Size": len(entry["body"]),
+                        "LastModified": entry["last_modified"],
+                    }
+                    for key, entry in objects.items()
+                    if key.startswith(Prefix)
+                ]
+                yield {"Contents": contents}
+
+        return _Paginator()
+
+    def delete_objects(self, Bucket, Delete):
+        for obj in Delete["Objects"]:
+            self.objects.pop(obj["Key"], None)
+
+
+@pytest.fixture
+def s3_backup(app):
+    app.config["BACKUP_STORAGE_BACKEND"] = "s3"
+    app.config["BACKUP_S3_BUCKET"] = "flowleads-backups-test"
+    app.config["BACKUP_S3_PREFIX"] = "backups"
+    app.config["BACKUP_S3_ACCESS_KEY_ID"] = "write-key"
+    app.config["BACKUP_S3_SECRET_ACCESS_KEY"] = "write-secret"
+    app.config["BACKUP_S3_READONLY_ACCESS_KEY_ID"] = "read-key"
+    app.config["BACKUP_S3_READONLY_SECRET_ACCESS_KEY"] = "read-secret"
+
+    fake_client = FakeS3Client()
+    with patch("app.backups.services._s3_client", return_value=fake_client) as mock_factory:
+        yield fake_client, mock_factory
+
+    app.config["BACKUP_STORAGE_BACKEND"] = "local"
+
+
+def test_s3_create_backup_uploads_and_does_not_leave_local_copy(app, s3_backup, tmp_path):
+    fake_client, _ = s3_backup
+    app.config["BACKUP_DIR"] = str(tmp_path / "backups")
+    with app.app_context():
+        filename = create_backup(triggered_by_user_id=None)
+        assert BACKUP_FILENAME_RE.match(filename)
+        assert f"backups/{filename}" in fake_client.objects
+        # the local staging copy must not be left behind once it's in S3
+        assert not (tmp_path / "backups" / filename).exists()
+
+
+def test_s3_list_backups_reads_from_bucket(app, s3_backup):
+    fake_client, _ = s3_backup
+    with app.app_context():
+        filename = create_backup()
+        items = list_backups()
+        assert any(i["filename"] == filename for i in items)
+
+
+def test_s3_download_round_trips_content(app, s3_backup):
+    fake_client, _ = s3_backup
+    with app.app_context():
+        from app.backups.services import download_backup_to_temp
+
+        filename = create_backup()
+        local_path = download_backup_to_temp(filename)
+        assert local_path.is_file()
+        assert local_path.read_bytes() == fake_client.objects[f"backups/{filename}"]["body"]
+
+
+def test_s3_retention_cleanup_deletes_only_old_objects(app, s3_backup):
+    fake_client, _ = s3_backup
+    with app.app_context():
+        app.config["BACKUP_RETENTION_DAYS"] = 30
+        old_name = "backup_2020_01_01_120000.tar.gz"
+        fake_client.objects["backups/" + old_name] = {
+            "body": b"old",
+            "last_modified": datetime.now(timezone.utc) - timedelta(days=400),
+        }
+        new_filename = create_backup()
+
+        items = {i["filename"] for i in list_backups()}
+        assert old_name not in items
+        assert new_filename in items
+
+
+def test_s3_backup_not_found_raises(app, s3_backup):
+    with app.app_context():
+        from app.backups.services import download_backup_to_temp
+
+        with pytest.raises(BackupServiceError):
+            download_backup_to_temp("backup_2099_01_01_120000.tar.gz")
+
+
+def test_s3_restore_uses_separate_readonly_credentials_for_listing(app, s3_backup):
+    """The web admin UI must list/download with the restricted read-only key,
+    never the scheduler's write key (least privilege)."""
+    _, mock_factory = s3_backup
+    with app.app_context():
+        create_backup()
+        mock_factory.reset_mock()
+        list_backups()
+        assert mock_factory.call_args.kwargs == {"readonly": True}
+
+
+@patch("app.backups.services._run_pg_dump")
+def test_s3_restore_drill_targets_separate_database(mock_dump, app, s3_backup):
+    """Passing target_database_url must restore into that database, not the
+    app's own, and must not trigger the production restore notification."""
+
+    def fake_dump(dest):
+        import gzip
+
+        with gzip.open(dest, "wb") as gz:
+            gz.write(b"-- dump\n")
+
+    mock_dump.side_effect = fake_dump
+    user_id, secret = _superadmin_with_2fa(app)
+    with app.app_context():
+        filename = create_backup()
+        totp = pyotp.TOTP(secret)
+
+        with patch("app.backups.services._restore_pg_dump") as mock_restore_dump, patch(
+            "app.backups.services._is_postgres_uri", return_value=True
+        ), patch("app.backups.services._notify_superadmins") as mock_notify:
+            restore_backup(
+                filename,
+                confirmed_by_user_id=user_id,
+                totp_code=totp.now(),
+                password="securepassword1",
+                target_database_url="postgresql://drill:drill@localhost:5432/flowleads_restore_test",
+            )
+            mock_restore_dump.assert_called_once()
+            called_url = mock_restore_dump.call_args.args[1]
+            assert called_url == "postgresql://drill:drill@localhost:5432/flowleads_restore_test"
+            # A drill into a separate database is not "production restored" news.
+            mock_notify.assert_not_called()
+
+        audit = AuditLog.query.filter_by(action="backup_restored").order_by(AuditLog.id.desc()).first()
+        assert audit.metadata_json["drill_into_separate_database"] is True
 
 
 def test_download_backup_route(client, app, backup_dir):

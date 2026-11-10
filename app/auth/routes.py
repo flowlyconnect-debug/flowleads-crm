@@ -13,7 +13,10 @@ from app.auth.forms import (
 from app.auth.services import (
     authenticate_user,
     complete_2fa_session,
+    consume_password_reset_token,
     enable_totp,
+    get_valid_password_reset_token,
+    issue_password_reset_token,
     logout_user_session,
     setup_totp,
     verify_totp_login,
@@ -21,16 +24,13 @@ from app.auth.services import (
 from app.auth.totp_utils import normalize_totp_code
 from app.core.audit import log_audit
 from app.core.permissions import is_2fa_verified, require_2fa
-from app.core.security import (
-    generate_password_reset_token,
-    verify_password_reset_token,
-)
 from app.email.services import EmailService
 from app.extensions import db, limiter
 from app.users.services import (
     UserServiceError,
     change_password,
     get_user_by_email,
+    get_user_by_id,
 )
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -115,7 +115,8 @@ def reset_password_request():
     if form.validate_on_submit():
         user = get_user_by_email(form.email.data)
         if user and user.can_login_ui():
-            token = generate_password_reset_token(user.email)
+            token = issue_password_reset_token(user)
+            db.session.commit()
             reset_url = url_for("auth.reset_password", token=token, _external=True)
             EmailService.send_password_reset_email(to_email=user.email, reset_url=reset_url)
             flash(
@@ -137,13 +138,13 @@ def reset_password_request():
 
 @auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
-    email = verify_password_reset_token(token)
+    token_record = get_valid_password_reset_token(token)
     form = ResetPasswordForm()
-    if email is None:
+    if token_record is None:
         flash("The reset link is invalid or has expired.", "danger")
         return redirect(url_for("auth.reset_password_request"))
 
-    user = get_user_by_email(email)
+    user = get_user_by_id(token_record.user_id)
     if user is None or not user.can_login_ui():
         flash("The reset link is invalid or has expired.", "danger")
         return redirect(url_for("auth.reset_password_request"))
@@ -154,6 +155,7 @@ def reset_password(token):
         else:
             try:
                 change_password(user, form.password.data)
+                consume_password_reset_token(token_record)
                 db.session.commit()
                 flash("Your password has been updated.", "success")
                 return redirect(url_for("auth.login"))

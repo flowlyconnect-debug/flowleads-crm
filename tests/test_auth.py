@@ -1,9 +1,16 @@
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pyotp
 import pytest
+from app.auth.models import PasswordResetToken
+from app.auth.services import (
+    consume_password_reset_token,
+    get_valid_password_reset_token,
+    issue_password_reset_token,
+)
 from app.core.permissions import TWO_FA_SESSION_KEY
-from app.core.security import hash_password
+from app.core.security import check_password, hash_password
 from app.extensions import db
 from app.users.models import AuditLog, User
 from app.users.services import create_organization, create_user
@@ -192,3 +199,123 @@ def test_audit_login_success_and_failed_and_logout(client, app):
     client.get("/auth/logout", follow_redirects=True)
     with app.app_context():
         assert AuditLog.query.filter_by(action="logout").count() == 1
+
+
+# --- Password reset: single-use, expiring token, simulated Mailgun delivery ---
+
+
+@patch("app.email.services._mailgun_send")
+def test_reset_password_request_sends_simulated_email(mock_send, client, app):
+    mock_send.return_value = (True, "<reset@test>", None)
+    user_id, _org_id = _create_org_user(app, email="reset1@acme.com")
+
+    response = client.post(
+        "/auth/reset-password",
+        data={"email": "reset1@acme.com"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    mock_send.assert_called_once()
+    kwargs = mock_send.call_args.kwargs
+    assert kwargs["to_email"] == "reset1@acme.com"
+    assert "/auth/reset-password/" in kwargs["body_html"]
+
+    with app.app_context():
+        assert PasswordResetToken.query.filter_by(user_id=user_id).count() == 1
+
+
+@patch("app.email.services._mailgun_send")
+def test_reset_password_request_handles_simulated_mailgun_failure(mock_send, client, app):
+    """A simulated Mailgun outage must not crash the request, nor leak whether the
+    account exists — the user still sees the generic confirmation flash."""
+    mock_send.return_value = (False, None, "Simulated Mailgun outage")
+    _create_org_user(app, email="reset-fail@acme.com")
+
+    response = client.post(
+        "/auth/reset-password",
+        data={"email": "reset-fail@acme.com"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "you will receive reset instructions".encode() in response.data
+
+
+def test_reset_token_is_single_use(app):
+    with app.app_context():
+        org = create_organization("SingleUse", "single-use-org")
+        db.session.flush()
+        user = create_user("single-use@acme.com", "securepassword1", role="user", organization_id=org.id)
+        db.session.commit()
+
+        token = issue_password_reset_token(user)
+        db.session.commit()
+
+        record = get_valid_password_reset_token(token)
+        assert record is not None
+
+        consume_password_reset_token(record)
+        db.session.commit()
+
+        # The same token must never validate again.
+        assert get_valid_password_reset_token(token) is None
+
+
+def test_reset_token_expires(app):
+    with app.app_context():
+        org = create_organization("Expiring", "expiring-org")
+        db.session.flush()
+        user = create_user("expiring@acme.com", "securepassword1", role="user", organization_id=org.id)
+        db.session.commit()
+
+        token = issue_password_reset_token(user)
+        db.session.commit()
+
+        record = PasswordResetToken.query.filter_by(user_id=user.id).one()
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.session.commit()
+
+        assert get_valid_password_reset_token(token) is None
+
+
+def test_requesting_new_reset_invalidates_previous_token(app):
+    with app.app_context():
+        org = create_organization("Renew", "renew-org")
+        db.session.flush()
+        user = create_user("renew@acme.com", "securepassword1", role="user", organization_id=org.id)
+        db.session.commit()
+
+        first_token = issue_password_reset_token(user)
+        db.session.commit()
+        assert get_valid_password_reset_token(first_token) is not None
+
+        second_token = issue_password_reset_token(user)
+        db.session.commit()
+
+        assert get_valid_password_reset_token(first_token) is None
+        assert get_valid_password_reset_token(second_token) is not None
+
+
+@patch("app.auth.routes.EmailService.send_password_reset_email")
+def test_reset_password_full_flow_via_routes(mock_send, client, app):
+    mock_send.return_value = {"success": True, "message_id": "<reset@test>", "error": None}
+    _create_org_user(app, email="fullflow@acme.com", password="oldpassword1")
+
+    client.post("/auth/reset-password", data={"email": "fullflow@acme.com"})
+    reset_url = mock_send.call_args.kwargs["reset_url"]
+    token = reset_url.rsplit("/", 1)[-1]
+
+    response = client.post(
+        f"/auth/reset-password/{token}",
+        data={"password": "brandnewpassword1", "password_confirm": "brandnewpassword1"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with app.app_context():
+        user = User.query.filter_by(email="fullflow@acme.com").one()
+        assert check_password("brandnewpassword1", user.password_hash)
+        assert not check_password("oldpassword1", user.password_hash)
+
+    # The link cannot be used a second time, even though it has not expired.
+    second_attempt = client.get(f"/auth/reset-password/{token}", follow_redirects=True)
+    assert b"invalid or has expired" in second_attempt.data

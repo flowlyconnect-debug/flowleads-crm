@@ -21,6 +21,10 @@ class Organization(db.Model):
     email_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mailgun_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # TODO: per-org Mailgun API key — store as mailgun_api_key_encrypted once encryption exists.
+    # Optional modules the org's admin opted into during invite onboarding (see
+    # app/admin/constants.py FEATURE_CATALOG). Not yet wired into feature gating
+    # elsewhere in the app — just captured for now.
+    enabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

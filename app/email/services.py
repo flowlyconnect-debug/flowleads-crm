@@ -368,6 +368,45 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    def send_customer_invite_email(
+        *, to_email: str, invite_url: str, organization_name: str, ttl_days: int
+    ) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        subject = f"Tervetuloa FlowLeadsiin, {organization_name}"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>Tervetuloa, {html.escape(organization_name)}</h2>"
+            "<p>Sinut on kutsuttu FlowLeads-CRM:ään. Viimeistele käyttöönotto alla olevasta "
+            "linkistä: aseta salasana ja valitse hakualueet.</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(invite_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Aloita käyttöönotto</a></p>"
+            f"<p style='color:#6B7280;font-size:13px;'>Linkki on kertakäyttöinen ja vanhenee "
+            f"{ttl_days} vuorokauden kuluttua.</p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = (
+            f"Tervetuloa, {organization_name}. Viimeistele käyttöönotto: {invite_url} "
+            f"(kertakäyttöinen, vanhenee {ttl_days} vuorokauden kuluttua)"
+        )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
     def send_lead_stale_alert(
         *, to_email: str, org_name: str, last_lead_at: datetime, days: int
     ) -> dict:

@@ -56,6 +56,138 @@ def _backup_dir() -> Path:
     return path
 
 
+def _s3_enabled() -> bool:
+    return (current_app.config.get("BACKUP_STORAGE_BACKEND") or "local").lower() == "s3"
+
+
+def _s3_bucket() -> str:
+    bucket = current_app.config.get("BACKUP_S3_BUCKET")
+    if not bucket:
+        raise BackupServiceError("BACKUP_S3_BUCKET is not configured.", "s3_not_configured")
+    return bucket
+
+
+def _s3_prefix() -> str:
+    return (current_app.config.get("BACKUP_S3_PREFIX") or "").strip("/")
+
+
+def _s3_key(filename: str) -> str:
+    prefix = _s3_prefix()
+    return f"{prefix}/{filename}" if prefix else filename
+
+
+def _s3_client(*, readonly: bool = False):
+    """Build an S3-compatible client. readonly=True uses the web admin UI's
+    restricted read-only credentials (falls back to the read-write ones if no
+    separate read-only key was configured)."""
+    import boto3
+
+    access_key = current_app.config.get("BACKUP_S3_ACCESS_KEY_ID")
+    secret_key = current_app.config.get("BACKUP_S3_SECRET_ACCESS_KEY")
+    if readonly:
+        access_key = current_app.config.get("BACKUP_S3_READONLY_ACCESS_KEY_ID") or access_key
+        secret_key = current_app.config.get("BACKUP_S3_READONLY_SECRET_ACCESS_KEY") or secret_key
+
+    return boto3.client(
+        "s3",
+        endpoint_url=current_app.config.get("BACKUP_S3_ENDPOINT_URL") or None,
+        region_name=current_app.config.get("BACKUP_S3_REGION") or None,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+    )
+
+
+def _upload_backup_to_s3(path: Path, filename: str) -> None:
+    try:
+        _s3_client().upload_file(str(path), _s3_bucket(), _s3_key(filename))
+    except BackupServiceError:
+        raise
+    except Exception as exc:
+        raise BackupServiceError(f"S3 upload failed: {exc}", "s3_upload_failed") from exc
+
+
+def _cleanup_old_backups_s3() -> int:
+    retention_days = int(current_app.config.get("BACKUP_RETENTION_DAYS", 30))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    client = _s3_client()
+    bucket = _s3_bucket()
+    prefix = _s3_prefix()
+    to_delete = []
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=f"{prefix}/" if prefix else ""):
+        for obj in page.get("Contents", []):
+            name = obj["Key"].rsplit("/", 1)[-1]
+            if not BACKUP_FILENAME_RE.match(name):
+                continue
+            last_modified = obj["LastModified"]
+            if last_modified.tzinfo is None:
+                last_modified = last_modified.replace(tzinfo=timezone.utc)
+            if last_modified < cutoff:
+                to_delete.append({"Key": obj["Key"]})
+    for i in range(0, len(to_delete), 1000):
+        batch = to_delete[i : i + 1000]
+        client.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+    return len(to_delete)
+
+
+def _list_backups_s3() -> list[dict]:
+    client = _s3_client(readonly=True)
+    bucket = _s3_bucket()
+    prefix = _s3_prefix()
+    items = []
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=f"{prefix}/" if prefix else ""):
+        for obj in page.get("Contents", []):
+            name = obj["Key"].rsplit("/", 1)[-1]
+            if not BACKUP_FILENAME_RE.match(name):
+                continue
+            last_modified = obj["LastModified"]
+            if last_modified.tzinfo is None:
+                last_modified = last_modified.replace(tzinfo=timezone.utc)
+            items.append(
+                {
+                    "filename": name,
+                    "size": obj.get("Size", 0),
+                    "created_at": last_modified,
+                    "status": "available",
+                }
+            )
+    items.sort(key=lambda i: i["created_at"], reverse=True)
+    return items
+
+
+def backup_exists(filename: str) -> bool:
+    """Cheap existence check that never downloads the file (used by the restore
+    confirmation page)."""
+    name = sanitize_backup_filename(filename)
+    if _s3_enabled():
+        try:
+            _s3_client(readonly=True).head_object(Bucket=_s3_bucket(), Key=_s3_key(name))
+            return True
+        except Exception:
+            return False
+    return (_backup_dir() / name).is_file()
+
+
+def download_backup_to_temp(filename: str) -> Path:
+    """Return a local path to the backup, downloading it from S3 to a fresh temp
+    file first if that's where backups live. Callers that got a temp download are
+    responsible for nothing extra — it's cleaned up on next reboot/tmp sweep — but
+    for a long-lived process prefer deleting it once done."""
+    name = sanitize_backup_filename(filename)
+    if not _s3_enabled():
+        return get_backup_path(name)
+
+    dest_dir = Path(tempfile.mkdtemp(prefix="flowleads_backup_dl_"))
+    dest = dest_dir / name
+    try:
+        _s3_client(readonly=True).download_file(_s3_bucket(), _s3_key(name), str(dest))
+    except Exception as exc:
+        shutil.rmtree(dest_dir, ignore_errors=True)
+        raise BackupServiceError("Backup file not found.", "not_found") from exc
+    return dest
+
+
 def _uploads_dir() -> Path:
     raw = current_app.config.get("UPLOAD_DIR", "./uploads")
     return Path(raw).resolve()
@@ -306,7 +438,12 @@ def create_backup(*, triggered_by_user_id: int | None = None) -> str:
             for item in work_dir.iterdir():
                 tar.add(item, arcname=item.name)
 
-        removed = _cleanup_old_backups(backup_dir)
+        if _s3_enabled():
+            _upload_backup_to_s3(archive_path, filename)
+            removed = _cleanup_old_backups_s3()
+            archive_path.unlink(missing_ok=True)
+        else:
+            removed = _cleanup_old_backups(backup_dir)
 
         log_audit(
             "backup_created",
@@ -351,6 +488,8 @@ def create_backup(*, triggered_by_user_id: int | None = None) -> str:
 
 
 def list_backups() -> list[dict]:
+    if _s3_enabled():
+        return _list_backups_s3()
     backup_dir = _backup_dir()
     items = []
     for path in sorted(backup_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
@@ -392,8 +531,8 @@ def _verify_superadmin_restore(user: User, password: str, totp_code: str) -> Non
         raise BackupServiceError("Invalid 2FA code.", "invalid_totp")
 
 
-def _restore_pg_dump(sql_gz: Path) -> None:
-    database_url = current_app.config.get("SQLALCHEMY_DATABASE_URI")
+def _restore_pg_dump(sql_gz: Path, database_url: str | None = None) -> None:
+    database_url = database_url or current_app.config.get("SQLALCHEMY_DATABASE_URI")
     if not _is_postgres_uri(database_url):
         raise BackupServiceError("Restore requires PostgreSQL.", "unsupported_database")
 
@@ -442,21 +581,32 @@ def restore_backup(
     confirmed_by_user_id: int,
     totp_code: str,
     password: str,
+    target_database_url: str | None = None,
 ) -> None:
-    """Restore from backup after superadmin password + TOTP verification."""
+    """Restore from backup after superadmin password + TOTP verification.
+
+    By default this restores IN PLACE, into this app's own database — that is
+    what a real disaster-recovery restore needs to do. For a restore DRILL
+    (testing that backups are actually restorable, without touching
+    production), pass `target_database_url` pointing at a separate PostgreSQL
+    database instead; the dump is applied there and this app's own database
+    is never touched.
+    """
     user = db.session.get(User, confirmed_by_user_id)
     if not user:
         raise BackupServiceError("User not found.", "not_found")
 
     _verify_superadmin_restore(user, password, totp_code)
-    archive_path = get_backup_path(backup_filename)
+    archive_path = download_backup_to_temp(backup_filename)
+    downloaded_dir = archive_path.parent if _s3_enabled() else None
 
     safety_name = None
-    try:
-        safety_name = create_backup(triggered_by_user_id=confirmed_by_user_id)
-        logger.info("Safety backup created before restore: %s", safety_name)
-    except BackupServiceError:
-        logger.warning("Safety backup before restore failed; continuing restore")
+    if target_database_url is None:
+        try:
+            safety_name = create_backup(triggered_by_user_id=confirmed_by_user_id)
+            logger.info("Safety backup created before restore: %s", safety_name)
+        except BackupServiceError:
+            logger.warning("Safety backup before restore failed; continuing restore")
 
     extract_dir = Path(tempfile.mkdtemp(prefix="flowleads_restore_"))
     try:
@@ -466,32 +616,40 @@ def restore_backup(
         db_dump = extract_dir / "database.sql.gz"
         if db_dump.is_file():
             if current_app.config.get("TESTING") and not _is_postgres_uri(
-                current_app.config.get("SQLALCHEMY_DATABASE_URI")
+                target_database_url or current_app.config.get("SQLALCHEMY_DATABASE_URI")
             ):
                 pass
             else:
-                _restore_pg_dump(db_dump)
+                _restore_pg_dump(db_dump, target_database_url)
 
         uploads_backup = extract_dir / "uploads"
-        uploads_dest = _uploads_dir()
-        if uploads_backup.is_dir():
-            uploads_dest.mkdir(parents=True, exist_ok=True)
-            if uploads_dest.exists():
-                shutil.rmtree(uploads_dest)
-            shutil.copytree(uploads_backup, uploads_dest)
+        if target_database_url is None:
+            # Uploads live on local disk, not in the database — only restore them
+            # for a real in-place restore, never for a drill into another DB.
+            uploads_dest = _uploads_dir()
+            if uploads_backup.is_dir():
+                uploads_dest.mkdir(parents=True, exist_ok=True)
+                if uploads_dest.exists():
+                    shutil.rmtree(uploads_dest)
+                shutil.copytree(uploads_backup, uploads_dest)
 
         log_audit(
             "backup_restored",
             user_id=confirmed_by_user_id,
             target_type="backup",
-            metadata={"filename": sanitize_backup_filename(backup_filename), "safety_backup": safety_name},
+            metadata={
+                "filename": sanitize_backup_filename(backup_filename),
+                "safety_backup": safety_name,
+                "drill_into_separate_database": target_database_url is not None,
+            },
         )
         db.session.commit()
 
-        _notify_superadmins(
-            "FlowLeads backup restored",
-            f"Backup {backup_filename} was restored by {user.email}.",
-        )
+        if target_database_url is None:
+            _notify_superadmins(
+                "FlowLeads backup restored",
+                f"Backup {backup_filename} was restored by {user.email}.",
+            )
 
     except Exception as exc:
         db.session.rollback()
@@ -512,3 +670,5 @@ def restore_backup(
         raise BackupServiceError("Restore failed.", "restore_failed") from exc
     finally:
         shutil.rmtree(extract_dir, ignore_errors=True)
+        if downloaded_dir is not None:
+            shutil.rmtree(downloaded_dir, ignore_errors=True)

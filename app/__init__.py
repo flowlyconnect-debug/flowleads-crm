@@ -1,47 +1,10 @@
-import os
-import secrets
-
-from flask import Flask, redirect, request, url_for
-from flask_login import current_user, login_user
+from flask import Flask, redirect, url_for
+from flask_login import current_user
 
 from app.config import apply_testing_defaults, get_config
 from app.core.diagnostics import configure_stdout_logging
 from app.core.errors import register_error_handlers
 from app.extensions import cache, csrf, db, limiter, login_manager, mail, migrate
-
-
-DEV_AUTO_LOGIN_HOSTS = ("localhost", "127.0.0.1", "[::1]")
-DEV_AUTO_LOGIN_EMAIL = "dev@flowleads.test"
-
-
-def _register_dev_auto_login(app):
-    @app.before_request
-    def dev_auto_login():
-        if current_user.is_authenticated:
-            return None
-        if request.host.rsplit(":", 1)[0] not in DEV_AUTO_LOGIN_HOSTS:
-            return None
-        if request.endpoint == "static" or request.path.startswith("/api/"):
-            return None
-
-        from app.core.permissions import set_2fa_verified
-        from app.users.models import Organization, User
-        from app.users.services import create_user
-
-        email = os.environ.get("DEV_AUTO_LOGIN_EMAIL", DEV_AUTO_LOGIN_EMAIL)
-        user = User.query.filter_by(email=email).first()
-        if user is None:
-            org = Organization.query.order_by(Organization.id.desc()).first()
-            user = create_user(
-                email,
-                secrets.token_urlsafe(24),
-                role="admin",
-                organization_id=org.id if org else None,
-            )
-            db.session.commit()
-        login_user(user)
-        set_2fa_verified(True)
-        return None
 
 
 def create_app(config_object=None):
@@ -140,14 +103,8 @@ def _init_extensions(app):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-    # Local dev convenience only: DEV_AUTO_LOGIN=true skips login and 2FA on localhost.
-    # Hard-gated on app.debug (never True under ProductionConfig) so a leaked env var
-    # can never activate this outside local development, regardless of Host header.
-    if app.debug and os.environ.get("DEV_AUTO_LOGIN", "false").lower() == "true":
-        app.config["DEV_AUTO_LOGIN"] = True
-        _register_dev_auto_login(app)
-
     with app.app_context():
+        from app.admin import models as admin_models  # noqa: F401
         from app.api import models as api_models  # noqa: F401
         from app.auth import models as auth_models  # noqa: F401
         from app.email import models as email_models  # noqa: F401
@@ -171,6 +128,7 @@ def _init_extensions(app):
 
 
 def _register_blueprints(app):
+    from app.admin.invite_routes import invite_bp
     from app.admin.routes import admin_bp
     from app.analytics import analytics_bp
     from app.api import api_bp, web_api_bp
@@ -193,6 +151,7 @@ def _register_blueprints(app):
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(invite_bp)
     app.register_blueprint(backups_bp, url_prefix="/admin")
     app.register_blueprint(leads_bp)
     app.register_blueprint(companies_bp)

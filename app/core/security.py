@@ -4,7 +4,6 @@ import secrets
 import string
 
 import bcrypt
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from flask import current_app
 
@@ -74,29 +73,6 @@ def verify_backup_code(code: str, code_hash: str) -> bool:
     if not code or not code_hash:
         return False
     return hash_backup_code(code) == code_hash
-
-
-def get_password_reset_serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(
-        current_app.config["SECRET_KEY"],
-        salt=current_app.config.get("PASSWORD_RESET_SALT", "password-reset-salt"),
-    )
-
-
-def generate_password_reset_token(email: str) -> str:
-    serializer = get_password_reset_serializer()
-    return serializer.dumps(normalize_email(email))
-
-
-def verify_password_reset_token(token: str, max_age: int | None = None) -> str | None:
-    if not token:
-        return None
-    serializer = get_password_reset_serializer()
-    age = max_age or current_app.config.get("PASSWORD_RESET_MAX_AGE", 3600)
-    try:
-        return serializer.loads(token, max_age=age)
-    except (BadSignature, SignatureExpired):
-        return None
 
 
 def validate_slug(slug: str | None) -> bool:

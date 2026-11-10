@@ -4,12 +4,15 @@ import time
 from flask import Blueprint, abort, jsonify, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
+from app.admin.constants import FEATURE_CATALOG
+from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
 from app.admin.services import get_accessible_organizations, get_dashboard_stats, list_customers_summary
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
 from app.search.constants import FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.models import SearchProfile
 from app.users.services import UserServiceError, create_organization
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -201,6 +204,149 @@ def create_customer_result():
         flash("Asiakkaan luontitulosta ei ole enää saatavilla.", "warning")
         return redirect(url_for("admin.create_customer_route"))
     return render_template("admin/customer_onboarding_result.html", result=result)
+
+
+_PENDING_INVITE_RESULT_SESSION = "pending_invite_result"
+
+
+def _store_invite_result(result: dict) -> None:
+    session[_PENDING_INVITE_RESULT_SESSION] = {
+        **result,
+        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
+    }
+    session.modified = True
+
+
+def _consume_invite_result() -> dict | None:
+    entry = session.get(_PENDING_INVITE_RESULT_SESSION)
+    if not entry:
+        return None
+    if int(entry.get("expires_at", 0)) < int(time.time()):
+        session.pop(_PENDING_INVITE_RESULT_SESSION, None)
+        session.modified = True
+        return None
+    session.pop(_PENDING_INVITE_RESULT_SESSION, None)
+    session.modified = True
+    return entry
+
+
+def _send_invite_and_store_result(*, organization, invite, token) -> None:
+    from app.admin.models import INVITE_DEFAULT_TTL_DAYS
+    from app.email.services import EmailService
+
+    invite_url = url_for("invite.accept_invite", token=token, _external=True)
+    EmailService.send_customer_invite_email(
+        to_email=invite.email,
+        invite_url=invite_url,
+        organization_name=organization.name,
+        ttl_days=INVITE_DEFAULT_TTL_DAYS,
+    )
+    _store_invite_result(
+        {
+            "organization_name": organization.name,
+            "admin_email": invite.email,
+            "invite_url": invite_url,
+            "expires_at_label": invite.expires_at.strftime("%d.%m.%Y %H:%M UTC"),
+        }
+    )
+
+
+@admin_bp.route("/customers/invite", methods=["GET", "POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def create_invite_route():
+    if request.method == "GET":
+        return render_template(
+            "admin/customer_invite.html",
+            remonttityypit=REMONTTITYYPIT,
+            feature_catalog=FEATURE_CATALOG,
+            form_data={},
+        )
+
+    allowed_features = request.form.getlist("allowed_features")
+    form_data = {
+        "organization_name": request.form.get("organization_name", "").strip(),
+        "admin_email": request.form.get("admin_email", "").strip(),
+        "search_profile_name": request.form.get("search_profile_name", "").strip(),
+        "remonttityyppi": request.form.get("remonttityyppi", "").strip(),
+        "source": (request.form.get("source") or "oikotie").strip(),
+        "allowed_features": allowed_features,
+    }
+
+    try:
+        result = create_invite(
+            actor=current_user,
+            organization_name=form_data["organization_name"],
+            admin_email=form_data["admin_email"],
+            search_profile_name=form_data["search_profile_name"],
+            remonttityyppi=form_data["remonttityyppi"],
+            source=form_data["source"],
+            allowed_features=allowed_features,
+        )
+        db.session.commit()
+    except InviteServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return render_template(
+            "admin/customer_invite.html",
+            remonttityypit=REMONTTITYYPIT,
+            feature_catalog=FEATURE_CATALOG,
+            form_data=form_data,
+        )
+
+    _send_invite_and_store_result(organization=result.organization, invite=result.invite, token=result.token)
+    db.session.commit()
+    return redirect(url_for("admin.create_invite_result"))
+
+
+@admin_bp.route("/customers/invite/result")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def create_invite_result():
+    result = _consume_invite_result()
+    if not result:
+        flash("Kutsun tulosta ei ole enää saatavilla.", "warning")
+        return redirect(url_for("admin.create_invite_route"))
+    return render_template("admin/customer_invite_result.html", result=result)
+
+
+@admin_bp.route("/customers/invite/<int:invite_id>/renew", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def renew_invite_route(invite_id: int):
+    from app.admin.models import CustomerInvite
+
+    invite = db.session.get(CustomerInvite, invite_id)
+    if invite is None:
+        abort(404)
+
+    result = renew_invite(invite, actor=current_user)
+    db.session.commit()
+    _send_invite_and_store_result(organization=result.organization, invite=result.invite, token=result.token)
+    db.session.commit()
+    return redirect(url_for("admin.create_invite_result"))
+
+
+@admin_bp.route("/customers/profiles/<int:profile_id>/activate-source", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def activate_source_route(profile_id: int):
+    profile = db.session.get(SearchProfile, profile_id)
+    if profile is None:
+        abort(404)
+
+    try:
+        activate_source(profile, actor=current_user)
+        db.session.commit()
+        flash(f"Lähde aktivoitu: {profile.name}. Ensimmäinen hakutyö luotu.", "success")
+    except InviteServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    return redirect(url_for("admin.customers_list"))
 
 
 @admin_bp.route("/api-keys", methods=["GET"])

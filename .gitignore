@@ -15,3 +15,13 @@ build/
 /uploads/
 *.db
 flowleads_dev.db
+
+# Generated data exports (may contain real organization/lead data)
+exports/*.zip
+
+# Temp design-mockup scratch output
+docs/design-mockups-temp/
+
+# One-off debug/dev artifacts
+_pdfcheck.png
+*.zip.zip

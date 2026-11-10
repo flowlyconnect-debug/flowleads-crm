@@ -1,11 +1,14 @@
 import base64
+import hashlib
 import io
+import secrets
+from datetime import datetime, timedelta, timezone
 
 import pyotp
 import qrcode
 from flask import current_app
 
-from app.auth.models import BackupCode
+from app.auth.models import BackupCode, PasswordResetToken
 from app.auth.totp_utils import (
     fresh_user_totp_secret,
     normalize_totp_secret,
@@ -19,6 +22,52 @@ from app.users.models import User
 from app.users.services import UserServiceError, get_user_by_email, reset_login_attempts
 
 BACKUP_CODE_COUNT = 10
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+
+
+def issue_password_reset_token(user: User) -> str:
+    """Issue a fresh single-use, expiring reset token.
+
+    Any previous outstanding (unused) tokens for this user are deleted first,
+    so only the most recently requested link is ever valid.
+    """
+    now = datetime.now(timezone.utc)
+    PasswordResetToken.query.filter_by(user_id=user.id, used_at=None).delete()
+
+    max_age_seconds = current_app.config.get("PASSWORD_RESET_MAX_AGE", 3600)
+    token = secrets.token_urlsafe(32)
+    db.session.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_reset_token(token),
+            expires_at=now + timedelta(seconds=max_age_seconds),
+        )
+    )
+    db.session.flush()
+    return token
+
+
+def get_valid_password_reset_token(token: str | None) -> PasswordResetToken | None:
+    """Return the token row if it exists, is unused, and has not expired."""
+    if not token:
+        return None
+    record = PasswordResetToken.query.filter_by(token_hash=_hash_reset_token(token)).first()
+    if record is None or record.used_at is not None:
+        return None
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) >= expires_at:
+        return None
+    return record
+
+
+def consume_password_reset_token(record: PasswordResetToken) -> None:
+    """Mark a token used so it can never be replayed."""
+    record.used_at = datetime.now(timezone.utc)
 
 
 def generate_totp_secret() -> str:
