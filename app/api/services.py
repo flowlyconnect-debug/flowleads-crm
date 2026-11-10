@@ -235,6 +235,58 @@ def _apply_custom_fields_from_payload(
         raise ApiServiceError(exc.message, exc.code) from exc
 
 
+def _sync_contact_for_lead(lead: Lead, organization_id: int) -> None:
+    """Link the lead to a shared Contact instead of leaving contact info
+    duplicated per lead row. Matches by email first (most reliable), and
+    falls back to name + company for leads that arrive without an email."""
+    if not lead.first_name and not lead.last_name and not lead.email:
+        return
+
+    from app.companies.models import Contact
+
+    normalized_email = normalize_email(lead.email) if lead.email else None
+    contact = None
+    if normalized_email:
+        contact = Contact.query.filter(
+            Contact.organization_id == organization_id,
+            func.lower(Contact.email) == normalized_email.lower(),
+        ).first()
+
+    if contact is None and not normalized_email and lead.first_name and lead.company_id:
+        contact = Contact.query.filter(
+            Contact.organization_id == organization_id,
+            Contact.company_id == lead.company_id,
+            func.lower(Contact.first_name) == lead.first_name.strip().lower(),
+            func.lower(func.coalesce(Contact.last_name, "")) == (lead.last_name or "").strip().lower(),
+        ).first()
+
+    if contact is None:
+        contact = Contact(
+            organization_id=organization_id,
+            company_id=lead.company_id,
+            first_name=lead.first_name or (lead.email or "Unknown").split("@")[0],
+            last_name=lead.last_name,
+            email=lead.email,
+            phone=lead.phone,
+            title=lead.title,
+        )
+        db.session.add(contact)
+        db.session.flush()
+    else:
+        if not contact.email and lead.email:
+            contact.email = lead.email
+        if not contact.phone and lead.phone:
+            contact.phone = lead.phone
+        if not contact.title and lead.title:
+            contact.title = lead.title
+        if contact.company_id is None and lead.company_id:
+            contact.company_id = lead.company_id
+        db.session.flush()
+
+    if contact not in lead.contacts:
+        lead.contacts.append(contact)
+
+
 def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
     raw_payload = payload if isinstance(payload, dict) else {}
     data = validate_api_lead_payload(
@@ -298,6 +350,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
                     db.session.add(new_company)
                     db.session.flush()
                     existing.company_id = new_company.id
+        _sync_contact_for_lead(existing, organization_id)
         return _load_lead(existing.id, organization_id), "updated"
 
     stage = get_default_stage(organization_id)
@@ -372,6 +425,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
             _apply_custom_fields_from_payload(
                 dup, organization_id, raw_payload, partial=True
             )
+            _sync_contact_for_lead(dup, organization_id)
             return _load_lead(dup.id, organization_id), "updated"
         raise ApiServiceError(
             "A lead with this source and reference already exists.",
@@ -400,6 +454,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         organization_id,
     )
     _apply_custom_fields_from_payload(lead, organization_id, raw_payload, partial=True)
+    _sync_contact_for_lead(lead, organization_id)
     return _load_lead(lead.id, organization_id), "created"
 
 
