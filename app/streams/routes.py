@@ -10,7 +10,7 @@ from app.core.permissions import require_role
 from app.extensions import db
 from app.leads.models import PipelineStage
 from app.streams.services import LeadRoutingService
-from app.users.models import User
+from app.users.models import Organization, User
 
 
 def _format_user_label(user: User) -> str:
@@ -39,8 +39,17 @@ def register_stream_settings_routes(settings_bp):
     @require_role("admin", "superadmin")
     def lead_settings():
         organization_id = current_user.organization_id
+        if current_user.is_superadmin():
+            org_id_param = request.args.get("organization_id") or request.form.get("organization_id")
+            if org_id_param:
+                try:
+                    organization_id = int(org_id_param)
+                except (TypeError, ValueError):
+                    organization_id = None
         if organization_id is None:
             abort(403)
+        if db.session.get(Organization, organization_id) is None:
+            abort(404)
 
         if request.method == "POST":
             settings = LeadRoutingService.get_settings(organization_id)
@@ -56,7 +65,7 @@ def register_stream_settings_routes(settings_bp):
                 owner_id = int(owner_raw) if owner_raw else None
             except (TypeError, ValueError):
                 flash("Virheellinen arvo.", "danger")
-                return redirect(url_for("settings.lead_settings"))
+                return redirect(url_for("settings.lead_settings", organization_id=organization_id))
 
             tags = [item.strip() for item in tags_raw.split(",") if item.strip()]
 
@@ -67,7 +76,7 @@ def register_stream_settings_routes(settings_bp):
                 ).first()
                 if not stage:
                     flash("Virheellinen vaihe.", "danger")
-                    return redirect(url_for("settings.lead_settings"))
+                    return redirect(url_for("settings.lead_settings", organization_id=organization_id))
 
             if owner_id:
                 owner = User.query.filter_by(
@@ -77,7 +86,7 @@ def register_stream_settings_routes(settings_bp):
                 ).first()
                 if not owner:
                     flash("Virheellinen omistaja.", "danger")
-                    return redirect(url_for("settings.lead_settings"))
+                    return redirect(url_for("settings.lead_settings", organization_id=organization_id))
 
             settings.default_pipeline_stage_id = stage_id
             settings.default_owner_id = owner_id
@@ -102,7 +111,7 @@ def register_stream_settings_routes(settings_bp):
             )
             db.session.commit()
             flash("Asetukset tallennettu", "success")
-            return redirect(url_for("settings.lead_settings"))
+            return redirect(url_for("settings.lead_settings", organization_id=organization_id))
 
         settings = LeadRoutingService.get_settings(organization_id)
         stages = (
@@ -124,6 +133,7 @@ def register_stream_settings_routes(settings_bp):
             users=users,
             user_display_map=user_display_map,
             relative_last_lead_at=_relative_time_fi(settings.last_lead_at, now),
+            organization_id=organization_id,
         )
 
     @settings_bp.route("/streams", methods=["GET"])

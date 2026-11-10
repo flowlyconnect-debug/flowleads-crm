@@ -47,6 +47,8 @@ def email_settings():
         abort(403)
 
     org = db.session.get(Organization, org_id)
+    if org is None:
+        abort(404)
     form = OrganizationEmailSettingsForm(obj=org)
     if form.validate_on_submit():
         try:

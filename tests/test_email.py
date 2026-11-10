@@ -576,3 +576,13 @@ def test_send_to_lead_falls_back_to_shared_domain_when_unverified(mock_send, app
             lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
         )
         assert mock_send.call_args.kwargs["domain"] is None
+
+
+def test_email_settings_404_for_nonexistent_organization(client, app):
+    with app.app_context():
+        create_user("sa-email-404@test.com", "securepassword1", role="superadmin")
+        db.session.commit()
+
+    client.post("/auth/login", data={"email": "sa-email-404@test.com", "password": "securepassword1"})
+    response = client.get("/settings/email?organization_id=999999")
+    assert response.status_code == 404
