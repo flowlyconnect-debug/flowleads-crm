@@ -1,3 +1,5 @@
+> **VANHENTUNUT (2026-11-10):** korvattu v2-pipelinella, ks. [README.md](README.md). Säilytetty historian vuoksi.
+
 # FlowLeads n8n — asennusohje (anna tämä ChatGPT:lle)
 
 > **Konteksti ChatGPT:lle:** Olen rakentamassa FlowLeads-CRM:n (Flask + Postgres, Render) ja

@@ -193,6 +193,15 @@
                   {% endif %}
                 </dd>
               </div>
+              {% if latest_job and latest_job.progress %}
+              <div>
+                <dt>Edistyminen</dt>
+                <dd class="text-sm">
+                  {{ latest_job.progress }}
+                  {% if latest_job.pages_done %} · {{ latest_job.pages_done }} sivua{% if latest_job.pages_failed %}, {{ latest_job.pages_failed }} epäonnistui{% endif %}{% endif %}
+                </dd>
+              </div>
+              {% endif %}
               {% if latest_job and latest_job.leads_found %}
               <div>
                 <dt>Löydetyt</dt>

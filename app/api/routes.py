@@ -37,6 +37,7 @@ from app.core.errors import json_error, json_success
 from app.core.audit import log_audit
 from app.extensions import db, limiter
 from app.leads.models import LeadStream
+from app.search.services import record_job_token_lead
 from app.streams.services import LeadRoutingService
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -133,6 +134,8 @@ def create_lead():
                 "tags": lead.tags or [],
             },
         )
+        if action == "created":
+            record_job_token_lead(getattr(g, "n8n_job_id", None), created=1)
         db.session.commit()
     except ApiServiceError as exc:
         db.session.rollback()
@@ -165,6 +168,9 @@ def bulk_leads():
 
     try:
         result = bulk_upsert_leads(g.organization_id, items)
+        if result.get("created"):
+            record_job_token_lead(getattr(g, "n8n_job_id", None), created=int(result["created"]))
+            db.session.commit()
     except ApiServiceError as exc:
         db.session.rollback()
         return json_error(exc.code, exc.message, 400)

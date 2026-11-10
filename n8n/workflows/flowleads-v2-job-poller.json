@@ -1,0 +1,319 @@
+{
+  "name": "FlowLeads v2 – Job Poller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9df21db9-6d34-4cb6-ae2c-2ae68d4b06b8",
+      "name": "Every 15 minutes"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "d82ce283-e8d3-430d-a862-bc4d5fe1649a",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "955418e2-b0de-4a71-b5a8-af743bb01751",
+              "name": "crm_base_url",
+              "value": "https://flowleads-crm.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "03733678-1334-4124-b68b-6c3ad7281e91",
+              "name": "n8n_secret",
+              "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        100
+      ],
+      "id": "410f012d-b46a-4f73-bbd7-e2df510b44f3",
+      "name": "SET – Config",
+      "notes": "Ainoa paikka johon CRM-osoite ja N8N_MASTER_SECRET asetetaan. Arvot kulkevat jobin mukana Liidi Ohjaajalle ja Lead Workerille."
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.crm_base_url.replace(/\\/$/, '') }}/api/v1/n8n/jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "pending"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "id": "427ccb12-78ee-4487-9609-05dc6eec73ca",
+      "name": "HTTP – Claim Pending Job",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "GET pending jobs claims the job atomically (marks it running and mints a job token). limit=1: one job per poller execution."
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('SET – Config').first().json;\nconst jobs = $input.first().json.jobs || [];\nreturn jobs.map(job => ({\n  json: {\n    ...job,\n    crm_base_url: String(cfg.crm_base_url || '').replace(/\\/$/, ''),\n    n8n_secret: cfg.n8n_secret,\n  },\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "id": "c676e37b-46cd-4bc0-8b56-1b6f910c5cf0",
+      "name": "CODE – Split Jobs"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        100
+      ],
+      "id": "5457612a-f3e5-42f7-aa31-3f7036fc4bf4",
+      "name": "LOOP – Jobs"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "FlowLeads v2 – Liidi Ohjaaja"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        180
+      ],
+      "id": "cf97d30a-3cbb-48c4-8e61-5101357b32cc",
+      "name": "CALL – Liidi Ohjaaja",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('LOOP – Jobs').first().json;\nconst r = $input.first()?.json || {};\nlet err = '';\nif (r.error) {\n  err = typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\n} else if (r.worker_error) {\n  err = String(r.worker_error);\n}\nconst body = err\n  ? { status: 'failed', error: err.slice(0, 1000) }\n  : { status: 'completed', error: '' };\nreturn [{ json: { job_id: job.job_id, crm_base_url: job.crm_base_url, n8n_secret: job.n8n_secret, body } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        180
+      ],
+      "id": "7fd9c399-6dde-445c-92e5-0ac74e08c9bf",
+      "name": "CODE – Job Outcome"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.crm_base_url }}/api/v1/n8n/jobs/{{ $json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        180
+      ],
+      "id": "785dfd68-1848-4651-b448-16c4d87b944d",
+      "name": "HTTP – PATCH Job Final",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "notes": "Ei lähetä leads_found/leads_sent: CRM on kerännyt ne itse (sivu-heartbeatit + job-tokenilla luodut liidit)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "SET – Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "SET – Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET – Config": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Claim Pending Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Claim Pending Job": {
+      "main": [
+        [
+          {
+            "node": "CODE – Split Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Split Jobs": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOP – Jobs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "CALL – Liidi Ohjaaja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CALL – Liidi Ohjaaja": {
+      "main": [
+        [
+          {
+            "node": "CODE – Job Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Job Outcome": {
+      "main": [
+        [
+          {
+            "node": "HTTP – PATCH Job Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – PATCH Job Final": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "description": "Every 15 min: claim one pending FlowLeads SearchJob, run Liidi Ohjaaja, close the job."
+  }
+}

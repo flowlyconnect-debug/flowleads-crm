@@ -127,9 +127,27 @@ def update_job_for_n8n(
     leads_found: int | None = None,
     leads_sent: int | None = None,
     error: str | None = None,
+    leads_found_delta: int | None = None,
+    leads_sent_delta: int | None = None,
+    page_done: bool = False,
+    page_failed: bool = False,
+    progress: str | None = None,
 ) -> SearchJob | None:
+    """Apply an n8n status/progress update to a job.
+
+    Two styles are supported:
+    - absolute counters (`leads_found` / `leads_sent`), the original contract;
+    - per-page heartbeats (`status="running"` + `*_delta`, `page_done`,
+      `page_failed`, `progress`) sent by the dispatcher after every Oikotie
+      page. Each heartbeat also slides the job token's expiry forward, so a
+      multi-hour full-region run keeps a valid credential for as long as it
+      keeps reporting in, without making the token long-lived up front.
+    """
     if status not in ("running", "completed", "failed"):
         raise ValueError(f"Invalid status: {status}")
+    for name, value in (("leads_found_delta", leads_found_delta), ("leads_sent_delta", leads_sent_delta)):
+        if value is not None and value < 0:
+            raise ValueError(f"{name} must be >= 0")
 
     job = (
         SearchJob.query.options(joinedload(SearchJob.profile))
@@ -139,6 +157,11 @@ def update_job_for_n8n(
     if job is None:
         return None
 
+    # A late heartbeat (e.g. the last page finishing after the poller already
+    # closed the job) must never reopen a finished job.
+    if status == "running" and job.status in ("completed", "failed"):
+        return job
+
     now = datetime.now(timezone.utc)
     job.status = status
 
@@ -146,12 +169,25 @@ def update_job_for_n8n(
         job.leads_found = leads_found
     if leads_sent is not None:
         job.leads_sent = leads_sent
+    if leads_found_delta:
+        job.leads_found = (job.leads_found or 0) + leads_found_delta
+    if leads_sent_delta:
+        job.leads_sent = (job.leads_sent or 0) + leads_sent_delta
+    if page_done or page_failed:
+        job.pages_done = (job.pages_done or 0) + 1
+    if page_failed:
+        job.pages_failed = (job.pages_failed or 0) + 1
+    if progress is not None:
+        job.progress = progress[:255] or None
     if error is not None:
         job.error_message = error or None
 
     if status == "running":
         if job.started_at is None:
             job.started_at = now
+        job.heartbeat_at = now
+        if job.n8n_token_hash:
+            job.n8n_token_expires_at = now + timedelta(minutes=N8N_JOB_TOKEN_TTL_MINUTES)
     elif status in ("completed", "failed"):
         job.completed_at = now
         # Invalidate the job's n8n token immediately rather than waiting out
@@ -161,10 +197,25 @@ def update_job_for_n8n(
         profile = job.profile
         profile.last_run_at = now
         profile.total_runs = (profile.total_runs or 0) + 1
-        if status == "completed" and leads_sent is not None:
-            profile.total_leads_sent = (profile.total_leads_sent or 0) + leads_sent
+        if status == "completed":
+            # Counters may have been accumulated by heartbeats / job-token lead
+            # posts rather than sent in this final PATCH.
+            sent = leads_sent if leads_sent is not None else (job.leads_sent or 0)
+            profile.total_leads_sent = (profile.total_leads_sent or 0) + sent
 
     return job
+
+
+def record_job_token_lead(job_id: int | None, *, created: int) -> None:
+    """Count leads created through a job token straight onto the job, so the
+    job's leads_sent is accurate even if n8n never reports a total."""
+    if not job_id or created <= 0:
+        return
+    db.session.execute(
+        update(SearchJob)
+        .where(SearchJob.id == job_id)
+        .values(leads_sent=SearchJob.leads_sent + created)
+    )
 
 
 def check_dedupe_for_n8n(organization_id: int, source_ids: list[str]) -> dict:

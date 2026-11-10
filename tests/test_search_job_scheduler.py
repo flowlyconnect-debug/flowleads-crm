@@ -208,7 +208,7 @@ def _create_running_job(app, *, started_at, retry_count=0, slug_suffix=""):
 
 def test_reap_requeues_stuck_job_with_retries_left(app):
     now = datetime.now(timezone.utc)
-    ctx = _create_running_job(app, started_at=now - timedelta(minutes=45), retry_count=0)
+    ctx = _create_running_job(app, started_at=now - timedelta(minutes=90), retry_count=0)
 
     with app.app_context():
         result = reap_stuck_running_jobs(now=now)
@@ -222,7 +222,7 @@ def test_reap_requeues_stuck_job_with_retries_left(app):
 
 def test_reap_fails_job_after_max_retries(app):
     now = datetime.now(timezone.utc)
-    ctx = _create_running_job(app, started_at=now - timedelta(minutes=45), retry_count=2)
+    ctx = _create_running_job(app, started_at=now - timedelta(minutes=90), retry_count=2)
 
     with app.app_context():
         result = reap_stuck_running_jobs(now=now, max_retries=2)
@@ -287,3 +287,35 @@ def test_notify_failed_search_jobs_sends_once_per_job(mock_send, app):
         count_again = notify_failed_search_jobs()
         assert count_again == 0
         mock_send.assert_not_called()
+
+
+def test_reap_ignores_long_running_job_with_recent_heartbeat(app):
+    """A full-region run can take hours; as long as the dispatcher keeps
+    sending per-page heartbeats the reaper must leave it alone."""
+    now = datetime.now(timezone.utc)
+    ctx = _create_running_job(app, started_at=now - timedelta(hours=5), slug_suffix="hb")
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        job.heartbeat_at = now - timedelta(minutes=10)
+        db.session.commit()
+
+        result = reap_stuck_running_jobs(now=now)
+        assert result == {"requeued": 0, "failed": 0}
+        assert db.session.get(SearchJob, ctx["job_id"]).status == "running"
+
+
+def test_reap_requeues_job_whose_heartbeat_went_silent(app):
+    now = datetime.now(timezone.utc)
+    ctx = _create_running_job(app, started_at=now - timedelta(hours=5), slug_suffix="hbs")
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        job.heartbeat_at = now - timedelta(minutes=90)
+        job.n8n_token_hash = "x" * 64
+        db.session.commit()
+
+        result = reap_stuck_running_jobs(now=now)
+        assert result == {"requeued": 1, "failed": 0}
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.status == "pending"
+        assert job.heartbeat_at is None
+        assert job.n8n_token_hash is None

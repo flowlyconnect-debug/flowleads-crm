@@ -334,6 +334,9 @@ def test_search_profiles_sidepanel_shows_latest_job(app, client):
                 completed_at=datetime.now(timezone.utc) - timedelta(hours=1),
                 leads_found=20,
                 leads_sent=7,
+                pages_done=12,
+                pages_failed=1,
+                progress="Uusimaa sivu 12/12 (maakunta 1/1)",
             )
         )
         db.session.commit()
@@ -345,6 +348,8 @@ def test_search_profiles_sidepanel_shows_latest_job(app, client):
     assert response.status_code == 200
     assert "7 (viimeisin ajo)" in text
     assert "Valmis" in text
+    assert "Uusimaa sivu 12/12" in text
+    assert "12 sivua, 1 epäonnistui" in text
 
 
 def _profile_with_key(app, key="fl_live_original_key_12345"):

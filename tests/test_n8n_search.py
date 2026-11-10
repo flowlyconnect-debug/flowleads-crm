@@ -315,3 +315,137 @@ def test_dedupe_check_and_mark(client, app):
         headers=_n8n_headers(),
     )
     assert mark_again.get_json()["marked"] == 0
+
+
+def _claim_token(client):
+    jobs = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers()
+    ).get_json()["jobs"]
+    return jobs[0]["crm_api_key"]
+
+
+def test_page_heartbeat_accumulates_progress_and_slides_token(client, app):
+    ctx = _create_profile_and_job(app)
+    _claim_token(client)
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        job.n8n_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=1)
+        db.session.commit()
+
+    for page, failed in ((1, False), (2, True)):
+        resp = client.patch(
+            f"/api/v1/n8n/jobs/{ctx['job_id']}",
+            data=json.dumps(
+                {
+                    "status": "running",
+                    "leads_found_delta": 24,
+                    "page_done": True,
+                    "page_failed": failed,
+                    "progress": f"Uusimaa sivu {page}/2",
+                }
+            ),
+            headers=_n8n_headers(),
+        )
+        assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["leads_found"] == 48
+    assert body["pages_done"] == 2
+    assert body["pages_failed"] == 1
+    assert body["progress"] == "Uusimaa sivu 2/2"
+
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.heartbeat_at is not None
+        expires = job.n8n_token_expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        assert expires > datetime.now(timezone.utc) + timedelta(minutes=60)
+
+
+def test_late_heartbeat_does_not_reopen_finished_job(client, app):
+    ctx = _create_profile_and_job(app, status="running")
+    client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "completed"}),
+        headers=_n8n_headers(),
+    )
+    resp = client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "running", "page_done": True}),
+        headers=_n8n_headers(),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+
+
+def test_heartbeat_rejects_bad_types(client, app):
+    ctx = _create_profile_and_job(app, status="running")
+    resp = client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "running", "leads_found_delta": "5"}),
+        headers=_n8n_headers(),
+    )
+    assert resp.status_code == 400
+    resp = client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "running", "page_done": "yes"}),
+        headers=_n8n_headers(),
+    )
+    assert resp.status_code == 400
+
+
+def test_job_token_leads_are_counted_on_job_and_profile(client, app):
+    ctx = _create_profile_and_job(app)
+    token = _claim_token(client)
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    for ref in ("oikotie-10", "oikotie-11"):
+        resp = client.post(
+            "/api/v1/leads",
+            data=json.dumps({"source": "oikotie", "source_ref": ref, "company": "Isännöinti Oy"}),
+            headers=headers,
+        )
+        assert resp.status_code == 201
+    # Re-posting the same listing updates, it must not count twice.
+    resp = client.post(
+        "/api/v1/leads",
+        data=json.dumps({"source": "oikotie", "source_ref": "oikotie-10", "company": "Isännöinti Oy"}),
+        headers=headers,
+    )
+    assert resp.status_code == 200
+
+    client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "completed"}),
+        headers=_n8n_headers(),
+    )
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        profile = db.session.get(SearchProfile, ctx["profile_id"])
+        assert job.leads_sent == 2
+        assert profile.total_leads_sent == 2
+
+
+def test_oikotie_lead_without_email_accepted_with_metadata(client, app):
+    _create_profile_and_job(app)
+    token = _claim_token(client)
+    resp = client.post(
+        "/api/v1/leads",
+        data=json.dumps(
+            {
+                "source": "oikotie",
+                "source_ref": "oikotie-99",
+                "company": "Isännöinti Oy",
+                "phone": "0401234567",
+                "gdpr_legal_basis": "legitimate_interest",
+                "metadata": {"taloyhtio": "As Oy Testi", "oikotie_url": "https://asunnot.oikotie.fi/x"},
+            }
+        ),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    with app.app_context():
+        from app.leads.models import Lead
+
+        lead = Lead.query.filter_by(source_ref="oikotie-99").first()
+        assert lead.ai_contact_info["taloyhtio"] == "As Oy Testi"

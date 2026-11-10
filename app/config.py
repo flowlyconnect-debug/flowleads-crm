@@ -75,6 +75,8 @@ class Config:
 
     LOGIN_RATE_LIMIT = os.environ.get("LOGIN_RATE_LIMIT", "5/minute")
     API_RATE_LIMIT = os.environ.get("API_RATE_LIMIT", "100/hour")
+    # Separate, higher limit for n8n job tokens (full-region Oikotie runs).
+    N8N_JOB_RATE_LIMIT = os.environ.get("N8N_JOB_RATE_LIMIT", "2000/hour")
     FORM_SUBMISSION_RATE_LIMIT = os.environ.get("FORM_SUBMISSION_RATE_LIMIT", "10/hour")
 
     PASSWORD_RESET_SALT = os.environ.get("PASSWORD_RESET_SALT", "password-reset-salt")

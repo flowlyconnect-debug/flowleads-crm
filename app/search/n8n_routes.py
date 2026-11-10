@@ -57,13 +57,29 @@ def patch_job(job_id: int):
     leads_found = body.get("leads_found")
     leads_sent = body.get("leads_sent")
     error = body.get("error")
+    leads_found_delta = body.get("leads_found_delta")
+    leads_sent_delta = body.get("leads_sent_delta")
+    page_done = body.get("page_done", False)
+    page_failed = body.get("page_failed", False)
+    progress = body.get("progress")
 
-    if leads_found is not None and not isinstance(leads_found, int):
-        return _json_error("leads_found must be an integer.", 400)
-    if leads_sent is not None and not isinstance(leads_sent, int):
-        return _json_error("leads_sent must be an integer.", 400)
+    def _is_int(value) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool)
+
+    for name, value in (
+        ("leads_found", leads_found),
+        ("leads_sent", leads_sent),
+        ("leads_found_delta", leads_found_delta),
+        ("leads_sent_delta", leads_sent_delta),
+    ):
+        if value is not None and not _is_int(value):
+            return _json_error(f"{name} must be an integer.", 400)
     if error is not None and not isinstance(error, str):
         return _json_error("error must be a string.", 400)
+    if progress is not None and not isinstance(progress, str):
+        return _json_error("progress must be a string.", 400)
+    if not isinstance(page_done, bool) or not isinstance(page_failed, bool):
+        return _json_error("page_done and page_failed must be booleans.", 400)
 
     try:
         job = update_job_for_n8n(
@@ -72,6 +88,11 @@ def patch_job(job_id: int):
             leads_found=leads_found,
             leads_sent=leads_sent,
             error=error,
+            leads_found_delta=leads_found_delta,
+            leads_sent_delta=leads_sent_delta,
+            page_done=page_done,
+            page_failed=page_failed,
+            progress=progress,
         )
     except ValueError as exc:
         return _json_error(str(exc), 400)
@@ -92,6 +113,9 @@ def patch_job(job_id: int):
             "leads_found": job.leads_found,
             "leads_sent": job.leads_sent,
             "error": job.error_message or "",
+            "pages_done": job.pages_done or 0,
+            "pages_failed": job.pages_failed or 0,
+            "progress": job.progress or "",
         }
     )
 

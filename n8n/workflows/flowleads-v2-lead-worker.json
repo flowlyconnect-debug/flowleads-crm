@@ -1,0 +1,1913 @@
+{
+  "name": "FlowLeads v2 – Lead Worker",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -8672,
+        688
+      ],
+      "id": "21a59a34-916b-45b3-a3ab-f3c69980c88e",
+      "name": "TRIGGER – Start from Parent Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json || {};\nconst maakunta = j.maakunta || j.current_region || '';\nconst page = Number(j.page || 1);\nconst limit = 24;\nconst offset = (page - 1) * limit;\nif (!j.organization_id || !j.crm_endpoint || !j.crm_api_key || !j.crm_base_url || !j.n8n_secret) {\n  throw new Error('Lead Worker: jobin CRM-kentät puuttuvat (aja Liidi Ohjaajan kautta).');\n}\nreturn [{ json: { ...j, maakunta, page, offset, limit, pageLabel: j.pageLabel || String(page) } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8480,
+        688
+      ],
+      "id": "0559a94f-293c-4d6e-bc4d-b852053111d2",
+      "name": "TRANSFORM – Normalize Input"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "700f5540-f88d-45aa-9f76-4f2a31163ca7",
+              "name": "filters",
+              "value": "={{ { maakunta: $json.maakunta } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8288,
+        688
+      ],
+      "id": "60bf6e8e-e22c-4b52-bf01-ca99c2dca6bb",
+      "name": "SET – Lead Search Parameters"
+    },
+    {
+      "parameters": {
+        "jsCode": "const maakunta = $json.filters?.maakunta || $json.maakunta || \"\";\nconst map = {\"Uusimaa\": {\"pageSlug\": \"uusimaa\", \"apiLocation\": \"uusimaa\"}, \"Varsinais-Suomi\": {\"pageSlug\": \"varsinais-suomi\", \"apiLocation\": \"varsinais-suomi\"}, \"Satakunta\": {\"pageSlug\": \"satakunta\", \"apiLocation\": \"satakunta\"}, \"Kanta-Häme\": {\"pageSlug\": \"kanta-hame\", \"apiLocation\": \"kanta-hame\"}, \"Pirkanmaa\": {\"pageSlug\": \"pirkanmaa\", \"apiLocation\": \"pirkanmaa\"}, \"Päijät-Häme\": {\"pageSlug\": \"paijat-hame\", \"apiLocation\": \"paijat-hame\"}, \"Kymenlaakso\": {\"pageSlug\": \"kymenlaakso\", \"apiLocation\": \"kymenlaakso\"}, \"Etelä-Karjala\": {\"pageSlug\": \"etela-karjala\", \"apiLocation\": \"etela-karjala\"}, \"Etelä-Savo\": {\"pageSlug\": \"etela-savo\", \"apiLocation\": \"etela-savo\"}, \"Pohjois-Savo\": {\"pageSlug\": \"pohjois-savo\", \"apiLocation\": \"pohjois-savo\"}, \"Pohjois-Karjala\": {\"pageSlug\": \"pohjois-karjala\", \"apiLocation\": \"pohjois-karjala\"}, \"Keski-Suomi\": {\"pageSlug\": \"keski-suomi\", \"apiLocation\": \"keski-suomi\"}, \"Etelä-Pohjanmaa\": {\"pageSlug\": \"etela-pohjanmaa\", \"apiLocation\": \"etela-pohjanmaa\"}, \"Pohjanmaa\": {\"pageSlug\": \"pohjanmaa\", \"apiLocation\": \"pohjanmaa\"}, \"Keski-Pohjanmaa\": {\"pageSlug\": \"keski-pohjanmaa\", \"apiLocation\": \"keski-pohjanmaa\"}, \"Pohjois-Pohjanmaa\": {\"pageSlug\": \"pohjois-pohjanmaa\", \"apiLocation\": \"pohjois-pohjanmaa\"}, \"Kainuu\": {\"pageSlug\": \"kainuu\", \"apiLocation\": \"kainuu\"}, \"Lappi\": {\"pageSlug\": \"lappi\", \"apiLocation\": \"lappi\"}};\nconst region = map[maakunta];\nif (!region) throw new Error('Tuntematon maakunta: ' + maakunta);\nreturn [{ json: { ...$json, region } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8096,
+        688
+      ],
+      "id": "bf5d6c36-abbe-495e-a10f-9883e4b22359",
+      "name": "TRANSFORM – Map Region to Oikotie Area"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://asunnot.oikotie.fi/myytavat-asunnot/' + $('TRANSFORM – Map Region to Oikotie Area').first().json.region.pageSlug }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cardType",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "={{$json.offset}}"
+            },
+            {
+              "name": "limit",
+              "value": "={{ $json.limit || 24 }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "accept-language",
+              "value": "fi-FI,fi;q=0.9,en-US;q=0.8,en;q=0.7"
+            },
+            {
+              "name": "upgrade-insecure-requests",
+              "value": "1"
+            },
+            {
+              "name": "sec-fetch-site",
+              "value": "none"
+            },
+            {
+              "name": "sec-fetch-mode",
+              "value": "navigate"
+            },
+            {
+              "name": "sec-fetch-user",
+              "value": "?1"
+            },
+            {
+              "name": "sec-fetch-dest",
+              "value": "document"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -7904,
+        688
+      ],
+      "id": "12db9f96-ea5e-49e2-a09b-07bda688e144",
+      "name": "HTTP – Fetch Oikotie Search Page"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data || \"\";\n\nconst maakunta = $('TRANSFORM – Map Region to Oikotie Area').first().json.filters.maakunta;\nconst pageSlug = $('TRANSFORM – Map Region to Oikotie Area').first().json.region.pageSlug;\nconst fallbackApiLocation = $('TRANSFORM – Map Region to Oikotie Area').first().json.region.apiLocation;\n\nlet parsedLocations = null;\n\nconst locationsMatch = html.match(/\"locations\"\\s*:\\s*(\\[[^\\]]*\\])/i);\n\nif (locationsMatch && locationsMatch[1]) {\n  try {\n    parsedLocations = JSON.parse(locationsMatch[1]);\n  } catch (e) {\n    parsedLocations = null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      maakunta,\n      pageSlug,\n      fallbackApiLocation,\n      parsedLocations,\n      useParsedLocations: Array.isArray(parsedLocations) && parsedLocations.length > 0\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7696,
+        688
+      ],
+      "id": "d159b3a6-ad5e-44ef-8bc7-ebe1810a97c8",
+      "name": "PARSE – Extract apiLocation"
+    },
+    {
+      "parameters": {
+        "url": "https://asunnot.oikotie.fi/myytavat-asunnot?cardType=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "cookie",
+              "value": "={{ ($json.headers?.['set-cookie'] || []).map(c => String(c).split(';')[0]).join('; ') }}"
+            },
+            {
+              "name": "referer",
+              "value": "https://asunnot.oikotie.fi/"
+            },
+            {
+              "name": "accept-language",
+              "value": "fi-FI,fi;q=0.9,en-US;q=0.8,en;q=0.7"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -7488,
+        688
+      ],
+      "id": "2ea09889-b14a-4a89-a5f5-4253dbf30633",
+      "name": "HTTP – Fetch Oikotie API Bootstrap"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function getMeta(name) {\n  const html = $json.data || '';\n  const regex = new RegExp(`<meta[^>]+name=[\"']${name}[\"'][^>]+content=[\"']([^\"']+)[\"']`, 'i');\n  const match = html.match(regex);\n  return match ? match[1] : null;\n}\n\nconst otaToken = getMeta('api-token');\nconst otaCuid = getMeta('cuid');\nconst otaLoaded = getMeta('loaded');\n\n\nconst setCookie = $json.headers?.['set-cookie'] || [];\nconst cookie = Array.isArray(setCookie)\n  ? setCookie.map(c => c.split(';')[0]).join('; ')\n  : '';\n\nreturn {\n  json: {\n    ...$json,\n    cookie,\n    otaToken,\n    otaCuid,\n    otaLoaded,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7296,
+        688
+      ],
+      "id": "98d4a5dc-2a1b-4fbf-a62f-7db5f2532663",
+      "name": "TRANSFORM – Extract Session Cookie"
+    },
+    {
+      "parameters": {
+        "url": "https://asunnot.oikotie.fi/api/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cardType",
+              "value": "100"
+            },
+            {
+              "name": "limit",
+              "value": "={{ 24 }}"
+            },
+            {
+              "name": "offset",
+              "value": "={{ $('TRANSFORM – Normalize Input').first().json.offset }}"
+            },
+            {
+              "name": "sortBy",
+              "value": "published_sort_desc"
+            },
+            {
+              "name": "locations",
+              "value": "={{ $('PARSE – Extract apiLocation').first().json.useParsedLocations\n  ? JSON.stringify(\n      $('PARSE – Extract apiLocation').first().json.parsedLocations.map(loc => [loc.id, loc.type, loc.name])\n    )\n  : JSON.stringify([$('TRANSFORM – Map Region to Oikotie Area').first().json.region.apiLocation]) }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "cookie",
+              "value": "={{$json.cookie}}"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "referer",
+              "value": "https://asunnot.oikotie.fi/myytavat-asunnot"
+            },
+            {
+              "name": "ota-token",
+              "value": "={{$json.otaToken}}"
+            },
+            {
+              "name": "ota-cuid",
+              "value": "={{$json.otaCuid}}"
+            },
+            {
+              "name": "ota-loaded",
+              "value": "={{$json.otaLoaded}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -7088,
+        688
+      ],
+      "id": "de17a116-9755-4431-a85a-fcaa774516d4",
+      "name": "HTTP – Fetch Oikotie Listings API"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae14766a-e8f3-448e-bcf8-d84607b174d8",
+              "name": "filters",
+              "value": "={{ { maakunta: $('SET – Lead Search Parameters').first().json.filters.maakunta } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6880,
+        688
+      ],
+      "id": "a5229e3f-d15b-4e4f-bd46-a0d5c75d0293",
+      "name": "SET – Prepare Listing Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const src = item.json || {};\n\n  \n  const cards =\n    src.cards ||\n    src.data?.cards ||\n    [];\n\n  \n  const selectedMaakunta =\n    src.filters?.maakunta ||\n    src.maakunta ||\n    \"\";\n\n  for (const card of cards) {\n    const location = card.location || {};\n    const data = card.data || {};\n\n    output.push({\n      json: {\n        \"Lähde\": \"oikotie\",\n        \"Maakunta\": selectedMaakunta,\n\n        \"ID\": String(card.cardId || \"\"),\n        \"URL\": card.url || \"\",\n\n        \"Kaupunki\":\n          location.city ||\n          location.municipality ||\n          \"\",\n\n        \"Osoite\":\n          location.address ||\n          \"\",\n\n        \"Hinta\":\n          data.price ||\n          \"\",\n\n        \"Alue\":\n          data.size ||\n          data.sizeMax ||\n          \"\",\n\n        \"Yhteenveto\":\n          data.description ||\n          \"\",\n\n        \"Taloyhtiö\": \"\",\n        \"Tulev. Remontit\": \"\",\n        \"Isännöitsijä\": \"\",\n        \"IN puh\": \"\",\n        \"IN email\": \"\",\n        \"RM löyty\": \"\",\n        \"remontti\": \"\",\n\n        \"raw_location\": location,\n        \"raw_data\": data\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6672,
+        688
+      ],
+      "id": "209982bc-0cdb-442b-9d13-230f80b06fb3",
+      "name": "PARSE – Normalize Listing Results",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const patterns = [\n  /\\biloq\\b/i,\n  /lukkoremont/i,\n  /lukitusremont/i,\n  /lukituksen uusim/i,\n  /lukitusjärjestelmä[aä]n uusim/i,\n  /lukosto(n)? uusim/i,\n  /avaim(ien|et)? uusim/i,\n  /sarjoit(us|ukset|taa|taminen)/i,\n  /lukituks(en|en modernisointi)/i,\n  /sähköinen lukitus/i,\n  /älyluk/i,\n\n  /kulunvalvonta/i,\n  /kulunvalvontajärjestelm[aä]/i,\n  /kulunvalvonnan uusim/i,\n  /kulunvalvonnan päivitys/i,\n  /kulunvalvonnan modernisointi/i,\n  /kulunvalvonnan asennus/i,\n  /kulunvalvontajärjestelm[aä]n uusim/i,\n  /kulunvalvontajärjestelm[aä]n päivitys/i,\n  /kulunvalvontajärjestelm[aä]n modernisointi/i,\n  /kulunvalvontajärjestelm[aä]n asennus/i,\n  /sähkölukitus/i,\n  /ovipuhelinjärjestelm[aä]/i,\n  /oviautomatiikka/i\n];\n\nfunction collectEvidence(text) {\n  if (!text || typeof text !== \"string\") return [];\n\n  const hits = [];\n\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) hits.push(m[0]);\n  }\n\n  return [...new Set(hits)];\n}\n\nreturn items.map(item => {\n  const row = item.json;\n\n  const tulevat = row[\"Tulev. Remontit\"] || row[\"Tulev. remontit\"] || row[\"tulevat_remontit\"] || \"\";\n  const taloyhtio = row[\"Taloyhtiö\"] || row[\"taloyhtio\"] || \"\";\n  const yhteenveto = row[\"Yhteenveto\"] || row[\"yhteenveto\"] || \"\";\n  const aiTeksti = row[\"AI_teksti\"] || row[\"ai_teksti\"] || \"\";\n  const remontti = row[\"remontti\"] || \"\";\n\n  const primaryText = `${tulevat}`;\n  const fallbackText = `${taloyhtio}\\n${yhteenveto}\\n${aiTeksti}\\n${remontti}`;\n\n  const primaryEvidence = collectEvidence(primaryText);\n  const fallbackEvidence = collectEvidence(fallbackText);\n\n  const evidence = primaryEvidence.length > 0 ? primaryEvidence : fallbackEvidence;\n  const relevant = evidence.length > 0;\n\n  return {\n    json: {\n      ...row,\n      relevant,\n      match_source:\n        primaryEvidence.length > 0\n          ? \"Tulev. Remontit\"\n          : (fallbackEvidence.length > 0 ? \"Muut kentät\" : \"\"),\n      evidence,\n      remontti: evidence.join(\", \")\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6480,
+        688
+      ],
+      "id": "9d5cebc2-a494-4f87-95c6-fa01bf8e75b8",
+      "name": "TRANSFORM – Build Iteration Payload"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5536,
+        608
+      ],
+      "id": "38ab5921-3678-4796-a699-121353f98dcb",
+      "name": "LOOP – Process Listings"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const { pageHtml, ...listing } = $json || {};\nconst html = String(pageHtml || \"\").slice(0, 200000);\n\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, \" \")\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, \" \")\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, \" \")\n  .replace(/<svg[\\s\\S]*?<\\/svg>/gi, \" \")\n  .replace(/<img[^>]*>/gi, \" \")\n  .replace(/<[^>]+>/g, \" \")\n  .replace(/&nbsp;/gi, \" \")\n  .replace(/&amp;/gi, \"&\")\n  .replace(/&quot;/gi, '\"')\n  .replace(/&#39;/gi, \"'\")\n  .replace(/\\s+/g, \" \")\n  .trim();\n\nconst startMarkers = [\n  \"Taloyhtiö\",\n  \"Tulevat remontit\",\n  \"Asunnon lisätiedot\",\n  \"Perustiedot\",\n  \"Kohdenumero\",\n  \"Rakennuksen tiedot\",\n  \"Asunnon kuvaus\"\n];\n\nlet cropped = text;\nfor (const marker of startMarkers) {\n  const idx = text.indexOf(marker);\n  if (idx >= 0) {\n    cropped = text.slice(idx);\n    break;\n  }\n}\n\nconst finalText = cropped.slice(0, 12000);\n\nreturn { json: { ...listing, pageText: finalText, pageTextLength: finalText.length } };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5312,
+        752
+      ],
+      "id": "d976603f-179f-49a4-b25f-ffee4f261287",
+      "name": "PARSE – Extract Raw Listing Content"
+    },
+    {
+      "parameters": {
+        "jsCode": "const LOCK_PROMPT = \"Analysoi vain käyttäjän syötteessä annetut tekstikentät.\\nÄlä päättele mitään URL-osoitteen, domainin tai linkin perusteella.\\nÄlä käytä ulkoista tietoa.\\n\\nTavoite:\\nTunnista, mainitaanko tekstissä kohteen tulevissa remonteissa, suunnitelmissa tai muissa tiedoissa lukitukseen, sähkölukitukseen tai ovien kulunhallintaan liittyvä tuleva työ.\\n\\nTÄRKEÄ RAJAUS:\\nRelevantiksi lasketaan vain sellainen työ, joka liittyy rakennuksen, taloyhtiön tai kiinteistön:\\n- lukitukseen\\n- lukkojen vaihtoon tai uusimiseen\\n- lukitusjärjestelmän uusimiseen tai modernisointiin\\n- sähkölukitukseen\\n- ovien kulunvalvontaan\\n- ovien pääsynhallintaan\\n- kulkuoikeuksien hallintaan sisäänkäynneissä tai ovissa\\n- kulkukortti-, tagi-, avain- tai mobiilipääsyjärjestelmään, jos se liittyy ovien tai sisäänkäynnin hallintaan\\n\\nRelevantiksi EI lasketa:\\n- kameravalvontaa\\n- murtohälytintä\\n- paloilmoitinjärjestelmää\\n- yleistä turvallisuusjärjestelmää\\n- IT-identiteetinhallintaa\\n- pelkkää tunnistautumista ilman yhteyttä oviin, sisäänkäyntiin, lukitukseen tai kulkuoikeuksiin\\n- ovipuhelinta, summeria tai porttipuhelinta, ellei tekstissä ole selvä yhteys lukitukseen, sähkölukkoon tai kulunhallintaan\\n- jo tehtyä, valmistunutta tai aiemmin toteutettua työtä\\n\\nREMONTTI TAI UUDISTUS EI SAA OLLA JO TEHTY.\\nMerkitse relevant=true VAIN jos tekstissä on viite tulevasta, suunnitellusta, päätetystä, ehdotetusta, budjetoidusta tai muuten vielä tekemättömästä työstä.\\n\\nMerkitse relevant=false jos työ on:\\n- jo tehty\\n- aiemmin toteutettu\\n- valmistunut\\n- uusittu menneisyydessä\\n- tehty osana aiempaa remonttia\\n- historiallinen tieto ilman viitettä tulevaan tekemiseen\\n\\nAjallisesti relevantteja ilmauksia voivat olla esimerkiksi:\\n- suunnitteilla\\n- tulossa\\n- tulevissa remonteissa\\n- budjetoitu\\n- päätetty\\n- esitetty\\n- ehdotettu\\n- toteutetaan myöhemmin\\n- vuonna 2025 / 2026 toteutettava\\n- varauduttu\\n- valmistelussa\\n\\nLukitukseen / ovien kulunhallintaan liittyviä ilmauksia voivat olla esimerkiksi:\\n- lukituksen uusiminen\\n- lukkojen vaihto\\n- lukitusjärjestelmän modernisointi\\n- iLOQ / sähköinen lukitus / sähkölukitus\\n- kulunvalvonta, jos liittyy oviin tai sisäänkäyntiin\\n- pääsynhallinta, jos liittyy oviin tai kulkuoikeuksiin\\n- kulkukorttijärjestelmä, jos liittyy rakennuksen kulkuun\\n- ovien ohjaus\\n- sähköinen lukitusjärjestelmä\\n\\nÄlä merkitse relevant=true epävarman tai liian epäsuoran osuman perusteella.\\nJos yhteys lukitukseen tai ovien kulunhallintaan ei ole selvä, merkitse relevant=false.\\n\\nArvioi vain analysoitava tekstiblokki yhtenäisenä lähteenä.\\nÄlä yhdistä eri kenttien eri aikatasoja toisiinsa.\\nRelevant=true vain jos samassa analysoitavassa tekstissä on selvä viite sekä:\\n1. lukitukseen, sähkölukitukseen tai ovien kulunhallintaan liittyvästä työstä\\nja\\n2. että juuri tämä työ on tuleva, suunnitteilla, budjetoitu, ehdotettu tai muuten vielä tekemättä.\\n\\nJos tekstissä on tulevia remontteja yleisesti, mutta lukitukseen liittyvä asia mainitaan vain menneenä tai historiallisena tietona, palauta relevant=false.\\n\\nPalauta VAIN validi JSON, ei markdownia:\\n\\n{\\n  \\\"relevant\\\": true,\\n  \\\"confidence\\\": 0,\\n  \\\"ai_huomio\\\": \\\"lyhyt perustelu suomeksi\\\",\\n  \\\"evidence\\\": [\\\"täsmällinen tekstifragmentti 1\\\", \\\"täsmällinen tekstifragmentti 2\\\"]\\n}\";\nconst GENERIC_PROMPT = \"Analysoi vain käyttäjän syötteessä annetut tekstikentät.\\nÄlä päättele mitään URL-osoitteen, domainin tai linkin perusteella.\\nÄlä käytä ulkoista tietoa.\\n\\nTavoite:\\nTunnista, mainitaanko tekstissä kohteen tulevissa remonteissa, suunnitelmissa tai muissa tiedoissa remonttityyppiin \\\"__REMONTTITYYPPI__\\\" liittyvä TULEVA työ.\\n\\nREMONTTI TAI UUDISTUS EI SAA OLLA JO TEHTY.\\nMerkitse relevant=true VAIN jos tekstissä on viite tulevasta, suunnitellusta, päätetystä, ehdotetusta, budjetoidusta tai muuten vielä tekemättömästä työstä, joka selvästi kuuluu remonttityyppiin \\\"__REMONTTITYYPPI__\\\".\\n\\nMerkitse relevant=false jos työ on jo tehty, valmistunut, aiemmin toteutettu tai pelkkä historiallinen tieto, tai jos yhteys remonttityyppiin ei ole selvä.\\n\\nPalauta VAIN validi JSON, ei markdownia:\\n\\n{\\n  \\\"relevant\\\": true,\\n  \\\"confidence\\\": 0,\\n  \\\"ai_huomio\\\": \\\"lyhyt perustelu suomeksi\\\",\\n  \\\"evidence\\\": [\\\"täsmällinen tekstifragmentti 1\\\", \\\"täsmällinen tekstifragmentti 2\\\"]\\n}\";\nconst remonttityyppi = String($('TRANSFORM – Normalize Input').first().json.remonttityyppi || '').trim();\nconst isLock = !remonttityyppi || /lukko|lukitus|kulunvalvon/i.test(remonttityyppi);\nconst systemPrompt = isLock ? LOCK_PROMPT : GENERIC_PROMPT.split('__REMONTTITYYPPI__').join(remonttityyppi);\n\nreturn items.map(item => {\n  const tulevat = item.json[\"Tulev. Remontit\"] || \"\";\n  const yhteenveto = item.json[\"Yhteenveto\"] || \"\";\n\n  item.json.lead_analysis_text = `\nTulevat remontit:\n${tulevat}\n\nYhteenveto:\n${yhteenveto}\n  `.trim();\n  item.json.ai_system_prompt = systemPrompt;\n\n  return item;\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5104,
+        752
+      ],
+      "id": "3d1e97c8-ea0d-4f3e-8826-cc9843813b2e",
+      "name": "TRANSFORM – Build AI Classification Prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $json.ai_system_prompt }}"
+            },
+            {
+              "content": "=URL: {{$json[\"URL\"]}}\n\nKohdesivun teksti:\n{{$json[\"pageText\"]}}\n\nArvioi vain tämä teksti. Älä käytä mitään muita itemin kenttiä.\n\n{{$json.lead_analysis_text}}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -4928,
+        752
+      ],
+      "id": "f1d44ec3-08f6-4471-81b0-e7b5e613fe6a",
+      "name": "AI – Classify Lead Relevance",
+      "credentials": {
+        "openAiApi": {
+          "id": "pJYgTk36FgV9XSMi",
+          "name": "OpenAi account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const modelOutput = $json;\nconst row = $('PARSE – Extract Raw Listing Content').item.json || {};\n\nconst aiText = String(\n  modelOutput.output?.[0]?.content?.[0]?.text ||\n  modelOutput.output?.[0]?.text ||\n  modelOutput.text ||\n  \"\"\n).trim().replace(/^```json\\s*/i, \"\").replace(/^```\\s*/i, \"\").replace(/```$/i, \"\").trim();\n\nlet ai = { relevant: false, confidence: 0, evidence: [], ai_huomio: \"\" };\nlet aiFailed = false;\n\nif (modelOutput.error) {\n  aiFailed = true;\n  ai.ai_huomio = \"AI error\";\n} else {\n  try {\n    const parsed = JSON.parse(aiText);\n    ai = {\n      relevant: parsed.relevant === true,\n      confidence: Number(parsed.confidence || 0),\n      evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],\n      ai_huomio: typeof parsed.ai_huomio === \"string\" ? parsed.ai_huomio : \"\"\n    };\n  } catch (err) {\n    aiFailed = true;\n    ai.ai_huomio = \"JSON parse failed\";\n  }\n}\n\nconst { ai_system_prompt, ...rest } = row;\nreturn {\n  json: {\n    ...rest,\n    \"RM löyty\": ai.relevant ? \"Kyllä\" : \"Ei\",\n    \"remontti\": ai.evidence.join(\", \"),\n    \"relevant\": ai.relevant,\n    \"confidence\": ai.confidence,\n    \"ai_huomio\": ai.ai_huomio,\n    \"ai_failed\": aiFailed\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4624,
+        752
+      ],
+      "id": "d0042d74-fc35-48ee-afca-b292733db419",
+      "name": "PARSE – Interpret AI Classification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "81892fb5-f4d2-4806-9627-c85bce2c5ae0",
+              "leftValue": "={{$json[\"relevant\"]}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4432,
+        752
+      ],
+      "id": "60531538-8bec-47d9-b5cf-5b3b49e12d65",
+      "name": "IF – Lead Is Relevant"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Poimi käyttäjän antamasta kohdesivun tekstistä vain seuraavat tiedot.\n\nPalauta VAIN validi JSON, ei markdownia.\n\nPoimittavat kentät:\n- taloyhtio\n- tulevat_remontit\n- isannoitsija\n- in_puh\n- in_email\n\nSäännöt:\n- Käytä vain syötteessä näkyviä tietoja.\n- Älä päättele tai keksi puuttuvia tietoja.\n- Jos tietoa ei löydy varmasti, palauta tyhjä merkkijono \"\".\n- \"taloyhtio\" = taloyhtiön nimi, jos näkyy.\n- \"tulevat_remontit\" = vain tulevat tai suunnitellut remontit.\n- \"isannoitsija\" = isännöitsijän tai isännöintiyhtiön nimi.\n- \"in_puh\" = isännöitsijän tai isännöintiyhtiön puhelinnumero.\n- \"in_email\" = isännöitsijän tai isännöintiyhtiön sähköposti.\n\nJos tekstissä ei ole näitä tietoja, palauta tyhjät kentät.\n\nPalauta täsmälleen tämä JSON:\n\n{\n  \"taloyhtio\": \"\",\n  \"tulevat_remontit\": \"\",\n  \"isannoitsija\": \"\",\n  \"in_puh\": \"\",\n  \"in_email\": \"\"\n}"
+            },
+            {
+              "content": "=URL: {{$json[\"URL\"]}}\nKaupunki: {{$json[\"Kaupunki\"]}}\nOsoite: {{$json[\"Osoite\"]}}\nYhteenveto: {{$json[\"Yhteenveto\"]}}\n\nKohdesivun teksti:\n{{$json[\"pageText\"]}}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -4160,
+        752
+      ],
+      "id": "79750112-2cfc-457a-bace-143596e015dd",
+      "name": "AI – Extract Company and Contact Clues",
+      "credentials": {
+        "openAiApi": {
+          "id": "pJYgTk36FgV9XSMi",
+          "name": "OpenAi account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const modelOutput = $json;\nconst base = $('PARSE – Interpret AI Classification').item.json || {};\n\nconst aiText =\n  modelOutput.output?.[0]?.content?.[0]?.text ||\n  modelOutput.output?.[0]?.text ||\n  modelOutput.text ||\n  \"\";\n\nlet ai = {\n  taloyhtio: \"\",\n  tulevat_remontit: \"\",\n  isannoitsija: \"\",\n  in_puh: \"\",\n  in_email: \"\"\n};\n\ntry {\n  const parsed = JSON.parse(aiText);\n\n  if (parsed && typeof parsed === \"object\") {\n    ai = {\n      taloyhtio: typeof parsed.taloyhtio === \"string\" ? parsed.taloyhtio : \"\",\n      tulevat_remontit: typeof parsed.tulevat_remontit === \"string\" ? parsed.tulevat_remontit : \"\",\n      isannoitsija: typeof parsed.isannoitsija === \"string\" ? parsed.isannoitsija : \"\",\n      in_puh: typeof parsed.in_puh === \"string\" ? parsed.in_puh : \"\",\n      in_email: typeof parsed.in_email === \"string\" ? parsed.in_email : \"\"\n    };\n  }\n\n} catch (err) {\n  \n}\n\nreturn {\n  json: {\n    ...base,\n\n    \"Taloyhtiö\": base[\"Taloyhtiö\"] || ai.taloyhtio || \"\",\n    \"Tulev. Remontit\": base[\"Tulev. Remontit\"] || ai.tulevat_remontit || \"\",\n    \"Isännöitsijä\": base[\"Isännöitsijä\"] || ai.isannoitsija || \"\",\n    \"IN puh\": base[\"IN puh\"] || ai.in_puh || \"\",\n    \"IN email\": base[\"IN email\"] || ai.in_email || \"\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3856,
+        752
+      ],
+      "id": "2d58b23d-c8db-4cba-b730-2ae6f0825a07",
+      "name": "PARSE – Normalize AI Extraction"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json || {};\n\nconst isEmpty = (value) => {\n  if (value === undefined || value === null) return true;\n  const s = String(value).trim().toLowerCase();\n  return s === \"\" || s === \"ei löytynyt\" || s === \"ei tiedossa\" || s === \"unknown\" || s === \"null\" || s === \"-\";\n};\n\nconst missingName = isEmpty(j[\"Isännöitsijä\"]);\nconst missingPhone = isEmpty(j[\"IN puh\"]);\nconst missingEmail = isEmpty(j[\"IN email\"]);\n\nreturn { json: { ...j, needsFallback: missingName || (missingPhone && missingEmail) } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3696,
+        752
+      ],
+      "id": "447ee2a2-49bb-48af-a903-9cb63025caff",
+      "name": "CHECK – Missing Company / Manager Info"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b5bd26a9-4788-477f-b810-d380688fe420",
+              "leftValue": "={{ $json.needsFallback }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3520,
+        752
+      ],
+      "id": "fe2fd511-8632-4187-9442-305a7dde3063",
+      "name": "IF – Fallback Search Needed"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "97ad6e13-a5ec-4e49-a23f-534d1553bce0",
+              "name": "lead_key",
+              "value": "={{$json.ID}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3296,
+        528
+      ],
+      "id": "1644dcd2-3bae-4215-880e-14f3cc825b86",
+      "name": "SET – Mark Fallback Strategy"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ...$json,\n    fallbackPathEntered: true,\n    fallbackStage: \"pending_lookup\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3136,
+        528
+      ],
+      "id": "c00e6874-fc51-4922-9e58-e9bff59ae8ab",
+      "name": "TRANSFORM – Flag Fallback Route"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json || {};\n\nconst isannoitsija = String(j[\"Isännöitsijä\"] || \"\").trim();\nconst taloyhtio = String(j[\"Taloyhtiö\"] || \"\").trim();\nconst osoite = String(j[\"Osoite\"] || \"\").trim();\nconst kaupunki = String(j[\"Kaupunki\"] || \"\").trim();\n\n\nconst normalizeCompanyName = (name) => {\n  return String(name || \"\")\n    .replace(/\\byhteystiedot\\b/gi, \"\")\n    .replace(/\\bisännöitsijä\\b/gi, \"\")\n    .replace(/\\s{2,}/g, \" \")\n    .trim();\n};\n\nlet fallbackQuery = \"\";\nlet fallbackTargetType = \"\";\n\n\nlet finderQuery = \"\";\n\n\nlet asiakastietoQuery = \"\";\n\nif (isannoitsija) {\n  const cleanName = normalizeCompanyName(isannoitsija);\n\n  fallbackQuery = `${cleanName} ${kaupunki}`.trim();\n  finderQuery = cleanName;\n  asiakastietoQuery = `${cleanName} ${kaupunki}`.trim();\n  fallbackTargetType = \"isannoitsija\";\n} else if (taloyhtio) {\n  fallbackQuery = `${taloyhtio} ${osoite} ${kaupunki}`.trim();\n  finderQuery = `${taloyhtio}`.trim();\n  asiakastietoQuery = `${taloyhtio} ${kaupunki}`.trim();\n  fallbackTargetType = \"taloyhtio\";\n} else {\n  fallbackQuery = `${osoite} ${kaupunki}`.trim();\n  finderQuery = `${osoite}`.trim();\n  asiakastietoQuery = `${osoite} ${kaupunki}`.trim();\n  fallbackTargetType = \"osoite\";\n}\n\nreturn {\n  json: {\n    ...j,\n    fallbackPathEntered: true,\n    fallbackQuery,\n    finderQuery,\n    asiakastietoQuery,\n    fallbackTargetType,\n    fallbackStage: \"query_built\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2960,
+        528
+      ],
+      "id": "9bd6b60c-0cf9-499f-a10c-a6667c3c80ec",
+      "name": "TRANSFORM – Build Company Search Query"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ...$json,\n    fallbackDebug: \"ok\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2752,
+        528
+      ],
+      "id": "aeca9886-6f0f-4123-9130-abd985188324",
+      "name": "DEBUG – Fallback Query Output"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json || {};\n\nconst finderQuery = String(j.finderQuery || j.fallbackQuery || \"\").trim();\nconst asiakastietoQuery = String(j.asiakastietoQuery || j.fallbackQuery || \"\").trim();\n\nreturn {\n  json: {\n    ...j,\n    fallbackStage: \"company_search_urls_built\",\n    companySearchTerm: finderQuery,\n    finderSearchUrl: `https://www.finder.fi/search?what=${encodeURIComponent(finderQuery)}`,\n    asiakastietoSearchUrl: `https://www.asiakastieto.fi/yritykset/haku?query=${encodeURIComponent(asiakastietoQuery)}`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2544,
+        528
+      ],
+      "id": "1129ad62-411e-4fa0-903f-05631dd087fe",
+      "name": "TRANSFORM – Build URLs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4bc300c5-d8ba-4cc4-892b-0afbd42157c8",
+              "leftValue": "={{ !!$json.companySearchTerm && $json.companySearchTerm.trim() !== \"\" }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2352,
+        528
+      ],
+      "id": "efb21e1c-8889-4919-8f69-e3330a2078b6",
+      "name": "IF – Finder Search Enabled"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.finderSearchUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2208,
+        368
+      ],
+      "id": "7df5bc29-9767-4347-9889-fdef002d1661",
+      "name": "HTTP – Search Finder.fi",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('TRANSFORM – Build URLs').item.json || {};\nconst current = $json || {};\n\nconst asText = (value) => {\n  if (value === undefined || value === null) return \"\";\n  if (typeof value === \"string\") return value;\n  try {\n    return JSON.stringify(value);\n  } catch (e) {\n    return String(value);\n  }\n};\n\nconst html = asText(current.data || current.body || current.response || current);\n\n\nconst noResults =\n  /Haullasi ei löytynyt tietoja/i.test(html) ||\n  /Kaikki hakutulokset\\s*0/i.test(html) ||\n  /Yritykset\\s*0/i.test(html);\n\nif (noResults) {\n  return {\n    json: {\n      ...base,\n      data: current.data || current.body || current.response || \"\",\n      finderCompanyUrl: \"\",\n      finderLinkFound: false,\n      finderNoResults: true,\n      finderLinkCandidates: [],\n      finderSearchHtmlPreview: html.slice(0, 1500)\n    }\n  };\n}\n\n\nconst hrefMatches = [\n  ...html.matchAll(/href=[\"']([^\"']+)[\"']/gi)\n].map(m => m[1]);\n\nconst candidates = hrefMatches\n  .map(href => href.startsWith(\"http\") ? href : `https://www.finder.fi${href}`)\n  .filter(url => {\n    const u = url.toLowerCase();\n\n    if (!u.startsWith(\"https://www.finder.fi/\")) return false;\n    if (u.includes(\"/search?\")) return false;\n    if (u.includes(\"/fonts/\")) return false;\n    if (u.includes(\".css\")) return false;\n    if (u.includes(\".js\")) return false;\n    if (u.includes(\".png\")) return false;\n    if (u.includes(\".jpg\")) return false;\n    if (u.includes(\".jpeg\")) return false;\n    if (u.includes(\".svg\")) return false;\n    if (u.includes(\".webp\")) return false;\n    if (u.includes(\"/kartta\")) return false;\n    if (u.includes(\"/hakemistot\")) return false;\n\n    const path = u.replace(\"https://www.finder.fi\", \"\");\n    const segments = path.split(\"/\").filter(Boolean);\n\n    \n    return segments.length >= 2;\n  });\n\nconst uniqueCandidates = [...new Set(candidates)];\nconst finderCompanyUrl = uniqueCandidates[0] || \"\";\n\nreturn {\n  json: {\n    ...base,\n    data: current.data || current.body || current.response || \"\",\n    finderCompanyUrl,\n    finderLinkFound: !!finderCompanyUrl,\n    finderNoResults: false,\n    finderLinkCandidates: uniqueCandidates.slice(0, 10),\n    finderSearchHtmlPreview: html.slice(0, 1500)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2000,
+        368
+      ],
+      "id": "bfd718f2-d0b7-48d4-becf-bfd8f1c3f0ee",
+      "name": "PARSE – Extract Finder Company URL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2bad580e-228e-408e-9bbf-56ea33d05968",
+              "leftValue": "={{ !!$json.finderCompanyUrl && $json.finderCompanyUrl.trim() !== \"\" }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1792,
+        368
+      ],
+      "id": "ec5525f5-690c-4853-a863-7cb2e08997b8",
+      "name": "IF – Finder Company URL Found"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.finderCompanyUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1408,
+        368
+      ],
+      "id": "576f2272-ff0b-466f-a91e-7315cfad4180",
+      "name": "HTTP – Fetch Finder Company Page",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('TRANSFORM – Build URLs').item.json || {};\nconst current = $json || {};\n\nconst asText = (value) => {\n  if (value === undefined || value === null) return \"\";\n  if (typeof value === \"string\") return value;\n  try {\n    return JSON.stringify(value);\n  } catch (e) {\n    return String(value);\n  }\n};\n\nconst finderRaw = asText(\n  current.data || current.body || current.response || current\n);\n\nreturn {\n  json: {\n    ...base,\n    finderRaw,\n    debug_storeFinder: {\n      keys: Object.keys(current || {}),\n      hasData: !!current.data,\n      hasBody: !!current.body,\n      preview: finderRaw.slice(0, 1000)\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        368
+      ],
+      "id": "f4a2d27d-c31f-4538-b1cc-270ddf35d299",
+      "name": "STORE – Save Finder Response"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.asiakastietoSearchUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -912,
+        256
+      ],
+      "id": "41af4f08-2077-43c2-95ad-0ad78326dd56",
+      "name": "HTTP – Search Asiakastieto",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('STORE – Save Finder Response').item.json || {};\nconst current = $json || {};\n\nconst asText = (value) => {\n  if (value === undefined || value === null) return \"\";\n  if (typeof value === \"string\") return value;\n  try {\n    return JSON.stringify(value);\n  } catch (e) {\n    return String(value);\n  }\n};\n\nconst html = asText(current.data || current.body || current.response || current);\n\nconst noResults =\n  /Hakusi ei tuottanut tuloksia/i.test(html) ||\n  /Ei hakutuloksia/i.test(html);\n\nif (noResults) {\n  return {\n    json: {\n      ...base,\n      asiakastietoCompanyUrl: \"\",\n      asiakastietoLinkFound: false,\n      asiakastietoNoResults: true,\n      asiakastietoLinkCandidates: [],\n      asiakastietoSearchHtmlPreview: html.slice(0, 1500)\n    }\n  };\n}\n\nconst hrefMatches = [\n  ...html.matchAll(/href=[\"']([^\"']+)[\"']/gi)\n].map(m => m[1]);\n\nconst toAbsoluteUrl = (href) => {\n  if (!href) return \"\";\n  if (href.startsWith(\"http\")) return href;\n  if (href.startsWith(\"/\")) return `https://www.asiakastieto.fi${href}`;\n  return \"\";\n};\n\nconst isValidCompanyPage = (url) => {\n  const u = String(url || \"\").toLowerCase().trim();\n  if (!u.startsWith(\"https://www.asiakastieto.fi/\")) return false;\n\n  const blockedPatterns = [\n    \"/web/fi/\",\n    \"/web/en/\",\n    \"/opensso/\",\n    \"/yritykset/haku\",\n    \"/yritykset/unohtuiko-salasana\",\n    \"/yritykset/rekisteroidy\",\n    \"/yritykset/tuotteet-ja-palvelut\",\n    \"/asiakastieto-yrityksena/\",\n    \"/palvelut-yrityksille/\",\n    \"/verkkokauppa/\",\n    \"/kuluttajille/\",\n    \"/kiinteisto-ja-huoneistotiedot/\",\n    \"/media/\",\n    \".css\",\n    \".js\",\n    \".png\",\n    \".jpg\",\n    \".jpeg\",\n    \".svg\",\n    \".webp\"\n  ];\n\n  if (blockedPatterns.some(p => u.includes(p))) return false;\n\n  \n  if (!u.includes(\"/yritykset/\")) return false;\n\n  const path = u.replace(\"https://www.asiakastieto.fi\", \"\");\n  const segments = path.split(\"/\").filter(Boolean);\n\n  \n  if (segments.length < 4) return false;\n\n  return true;\n};\n\nconst candidates = hrefMatches\n  .map(toAbsoluteUrl)\n  .filter(Boolean)\n  .filter(isValidCompanyPage);\n\nconst uniqueCandidates = [...new Set(candidates)];\nconst asiakastietoCompanyUrl = uniqueCandidates[0] || \"\";\n\nreturn {\n  json: {\n    ...base,\n    asiakastietoCompanyUrl,\n    asiakastietoLinkFound: !!asiakastietoCompanyUrl,\n    asiakastietoNoResults: false,\n    asiakastietoLinkCandidates: uniqueCandidates.slice(0, 10),\n    asiakastietoSearchHtmlPreview: html.slice(0, 1500)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        256
+      ],
+      "id": "529becad-d54e-477f-9edd-6e3639fa95fd",
+      "name": "PARSE – Extract Asiakastieto Company URL"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.asiakastietoCompanyUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -448,
+        240
+      ],
+      "id": "a63beac9-2e5a-4d80-b9d1-7d9cfb69a4f3",
+      "name": "HTTP – Fetch Asiakastieto Company Page",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('STORE – Save Finder Response').item.json || {};\nconst current = $json || {};\n\nconst asText = (value) => {\n  if (value === undefined || value === null) return \"\";\n  if (typeof value === \"string\") return value;\n  if (typeof value === \"object\") {\n    try {\n      return JSON.stringify(value);\n    } catch (e) {\n      return String(value);\n    }\n  }\n  return String(value);\n};\n\nconst unique = (arr) => {\n  return [...new Set(arr.map(v => String(v).trim()).filter(Boolean))];\n};\n\nconst cleanPhone = (phone) => {\n  if (!phone) return \"\";\n  return String(phone)\n    .replace(/\\s+/g, \" \")\n    .replace(/[^\\d+ ]/g, \"\")\n    .trim();\n};\n\nconst LIMIT = 30000;\n\nconst finderRaw = asText(\n  base.finderRaw || base.body || base.data || base.response || \"\"\n).slice(0, LIMIT);\n\nconst asiakastietoRaw = asText(\n  current.data || current.body || current.response || current\n).slice(0, LIMIT);\n\nconst combinedSearchText = [finderRaw, asiakastietoRaw]\n  .filter(Boolean)\n  .join(\"\\n\\n---SOURCE_BREAK---\\n\\n\");\n\n\nconst emailMatches =\n  combinedSearchText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [];\n\nconst emails = unique(\n  emailMatches.filter(email => {\n    const e = email.toLowerCase();\n    if (e.includes(\"finder.fi\")) return false;\n    if (e.includes(\"asiakastieto.fi\")) return false;\n    return true;\n  })\n);\n\n\nconst websiteMatches =\n  combinedSearchText.match(/https?:\\/\\/[^\\s\"'<>]+/gi) || [];\n\nconst badWebsitePatterns = [\n  \"finder.fi\",\n  \"asiakastieto.fi\",\n  \"ucarecdn\",\n  \"googletagmanager\",\n  \"google-analytics\",\n  \"doubleclick\",\n  \"facebook.com\",\n  \"fbcdn\",\n  \"instagram.com\",\n  \"linkedin.com\",\n  \"youtube.com\",\n  \"connect.facebook.net\",\n  \"fonts.googleapis.com\",\n  \"fonts.gstatic.com\",\n  \"code.jquery.com\",\n  \"cdnjs.cloudflare.com\",\n  \"maxcdn.bootstrapcdn.com\",\n  \"service.giosg.com\",\n  \"track.adform.net\",\n  \"google.com\",\n  \"google.fi\",\n  \"w3.org\",\n  \"upseller.cloud\",\n  \"enento.com/sijoittajat\",\n  \".js\",\n  \".css\",\n  \".svg\",\n  \".png\",\n  \".jpg\",\n  \".jpeg\",\n  \".webp\",\n  \"cookie\",\n  \"consent\"\n];\n\nconst websites = unique(\n  websiteMatches.filter(url => {\n    const u = String(url || \"\").toLowerCase();\n    if (!u) return false;\n    if (badWebsitePatterns.some(x => u.includes(x))) return false;\n    return true;\n  })\n);\n\n// PUHELIMET yleisesti\nconst allPhoneMatches =\n  combinedSearchText.match(/(?:\\+358|0)\\d(?:[\\d ]{5,20}\\d)/g) || [];\n\nconst allPhones = unique(\n  allPhoneMatches\n    .map(p => cleanPhone(p))\n    .filter(p => {\n      const digits = p.replace(/\\D/g, \"\");\n      return digits.length >= 8 && digits.length <= 15;\n    })\n);\n\nlet finderPrimaryPhone = \"\";\nconst finderLabelMatch =\n  finderRaw.match(/Puhelin(?:numero)?[\\s\\S]{0,250}?((?:\\+358|0)\\d(?:[\\d ]{5,20}\\d))/i) ||\n  finderRaw.match(/Soita[\\s\\S]{0,120}?((?:\\+358|0)\\d(?:[\\d ]{5,20}\\d))/i);\n\nif (finderLabelMatch) {\n  finderPrimaryPhone = cleanPhone(finderLabelMatch[1]);\n}\n\nlet asiakastietoPrimaryPhone = \"\";\nconst asiakastietoLabelMatch =\n  asiakastietoRaw.match(/Puhelin(?:numero)?[\\s\\S]{0,250}?((?:\\+358|0)\\d(?:[\\d ]{5,20}\\d))/i);\n\nif (asiakastietoLabelMatch) {\n  asiakastietoPrimaryPhone = cleanPhone(asiakastietoLabelMatch[1]);\n}\n\nconst fallbackCandidatePhones = unique([\n  asiakastietoPrimaryPhone,\n  finderPrimaryPhone,\n  ...allPhones\n].filter(Boolean));\n\nconst fallbackPrimaryPhone =\n  asiakastietoPrimaryPhone ||\n  finderPrimaryPhone ||\n  fallbackCandidatePhones[0] ||\n  \"\";\n\nconst fallbackPrimaryWebsite = websites[0] || \"\";\n\nlet fallbackSourceHint = \"\";\nif (asiakastietoRaw.trim() && (asiakastietoPrimaryPhone || emails.length || websites.length)) {\n  fallbackSourceHint = \"asiakastieto\";\n} else if (finderRaw.trim() && (finderPrimaryPhone || emails.length || websites.length)) {\n  fallbackSourceHint = \"finder\";\n} else if (finderRaw.trim()) {\n  fallbackSourceHint = \"finder\";\n}\n\nconst foundSomething =\n  emails.length > 0 ||\n  fallbackCandidatePhones.length > 0 ||\n  websites.length > 0;\n\nreturn {\n  json: {\n    ...base,\n    fallbackStage: \"company_search_responses_parsed\",\n    finderRaw,\n    asiakastietoRaw,\n    finderRawPreview: finderRaw.slice(0, 1500),\n    asiakastietoRawPreview: asiakastietoRaw.slice(0, 1500),\n    combinedSearchText: combinedSearchText.slice(0, 6000),\n\n    finderPrimaryPhone,\n    asiakastietoPrimaryPhone,\n\n    debug_raw_keys: {\n      baseKeys: Object.keys(base || {}),\n      currentKeys: Object.keys(current || {})\n    },\n\n    fallbackCandidateEmails: emails,\n    fallbackCandidatePhones,\n    fallbackCandidateWebsites: websites,\n    fallbackPrimaryPhone,\n    fallbackPrimaryWebsite,\n    fallbackSourceHint,\n    fallbackFoundSomething: foundSomething\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        128
+      ],
+      "id": "16db6f8c-888f-49f7-adc9-7d67a514c9c1",
+      "name": "PARSE – Combine Company Search Responses"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json || {};\n\nconst rawPhones = Array.isArray(j.fallbackCandidatePhones) ? j.fallbackCandidatePhones : [];\nconst rawWebsites = Array.isArray(j.fallbackCandidateWebsites) ? j.fallbackCandidateWebsites : [];\n\nconst blacklistDomains = [\n  \"schema.org\",\n  \"ogp.me\",\n  \"twitter.com\",\n  \"facebook.com\",\n  \"instagram.com\",\n  \"linkedin.com\",\n  \"youtube.com\",\n  \"youtu.be\",\n  \"adx.adform.net\",\n  \"google.com\",\n  \"googletagmanager.com\",\n  \"doubleclick.net\",\n  \"gstatic.com\",\n  \"tiktok.com\"\n];\n\nfunction normalizePhone(phone) {\n  if (!phone) return \"\";\n  return String(phone)\n    .replace(/[^\\d+]/g, \"\")\n    .trim();\n}\n\nfunction isValidPhone(phone) {\n  const p = normalizePhone(phone);\n  if (!p) return false;\n  const digits = p.replace(/\\D/g, \"\");\n  return digits.length >= 6;\n}\n\nfunction normalizeWebsite(url) {\n  if (!url) return \"\";\n  return String(url).trim();\n}\n\nfunction isGoodWebsite(url) {\n  if (!url) return false;\n\n  const lower = url.toLowerCase();\n\n  if (!lower.startsWith(\"http\")) return false;\n\n  return !blacklistDomains.some(domain => lower.includes(domain));\n}\n\nconst cleanedPhones = [...new Set(\n  rawPhones\n    .map(normalizePhone)\n    .filter(isValidPhone)\n)];\n\nconst cleanedWebsites = [...new Set(\n  rawWebsites\n    .map(normalizeWebsite)\n    .filter(isGoodWebsite)\n)];\n\nconst primaryPhone =\n  normalizePhone(j.fallbackPrimaryPhone) ||\n  cleanedPhones[0] ||\n  \"\";\n\nconst primaryWebsite =\n  isGoodWebsite(j.fallbackPrimaryWebsite)\n    ? j.fallbackPrimaryWebsite\n    : (cleanedWebsites[0] || \"\");\n\nreturn {\n  json: {\n    ...j,\n    fallbackCandidatePhones: cleanedPhones,\n    fallbackCandidateWebsites: cleanedWebsites,\n    fallbackPrimaryPhone: primaryPhone,\n    fallbackPrimaryWebsite: primaryWebsite,\n    fallbackFoundSomething: cleanedPhones.length > 0 || cleanedWebsites.length > 0\n  }\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a7982259-a4ef-40e6-ab7c-6636960fdf6a",
+      "name": "TRANSFORM – Normalize Fallback Candidates"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Tehtävä:\nPoimi alla olevista tiedoista kohteen isännöitsijän tai isännöintiyhtiön yhteystiedot.\n\nKohteen tiedot:\n- Taloyhtiö: {{$json[\"Taloyhtiö\"]}}\n- Osoite: {{$json[\"Osoite\"]}}\n- Kaupunki: {{$json[\"Kaupunki\"]}}\n- Isännöitsijä ilmoituksessa: {{$json[\"Isännöitsijä\"]}}\n\nMahdolliset puhelimet:\n{{$json.fallbackCandidatePhones}}\n\nMahdolliset sähköpostit:\n{{$json.fallbackCandidateEmails}}\n\nMahdolliset nettisivut:\n{{$json.fallbackCandidateWebsites}}\n\nMahdollinen lähdevihje:\n{{$json.fallbackSourceHint}}\n\nTehtävä:\nPoimi alla olevista tiedoista kohteen isännöitsijän tai isännöintiyhtiön yhteystiedot.\n\nKäytä vain annettuja tietoja.\nÄlä keksi mitään.\nJos tietoa ei löydy varmasti, jätä kenttä tyhjäksi.\n\nKohteen tiedot:\n- Taloyhtiö: {{$json[\"Taloyhtiö\"]}}\n- Osoite: {{$json[\"Osoite\"]}}\n- Kaupunki: {{$json[\"Kaupunki\"]}}\n- Isännöitsijä ilmoituksessa: {{$json[\"Isännöitsijä\"]}}\n\nMahdolliset puhelimet:\n{{$json.fallbackCandidatePhones}}\n\nMahdolliset sähköpostit:\n{{$json.fallbackCandidateEmails}}\n\nMahdolliset nettisivut:\n{{$json.fallbackCandidateWebsites}}\n\nMahdollinen lähdevihje:\n{{$json.fallbackSourceHint}}\n\nPalauta VAIN validi JSON.\nÄlä käytä markdownia.\nÄlä lisää selityksiä.\nÄlä lisää koodiblokkia.\nÄlä kirjoita mitään ennen tai jälkeen JSONin.\n\nJos fallbackPrimaryPhone on annettu eikä se ole tyhjä, käytä sitä sellaisenaan kenttään fallback_in_puh.\nÄlä muuta puhelinnumeroa toiseen muotoon paitsi säilytä se luettavana.\nÄlä keksi puhelinnumeroa.\nJos sähköpostia ei löydy varmasti, jätä fallback_in_email tyhjäksi.\n\nOhita kaikki seuraavat verkkotunnukset, vaikka ne näkyisivät tekstissä:\nschema.org, ogp.me, twitter.com, facebook.com, instagram.com, linkedin.com, youtube.com, adform.net\n\nPalauta täsmälleen tässä muodossa:\n{\n  \"fallback_isannoitsija\": \"\",\n  \"fallback_isannointiyhtio\": \"\",\n  \"fallback_in_puh\": \"\",\n  \"fallback_in_email\": \"\",\n  \"fallback_source\": \"\",\n  \"fallback_confidence\": 0\n}\n\nSäännöt:\n- fallback_source voi olla vain \"finder\", \"asiakastieto\" tai \"\"\n- fallback_confidence on kokonaisluku 0-100\n- jos varmuus on heikko, käytä matalaa confidence-arvoa\n- jos et pysty päättelemään yhteystietoa varmasti, jätä kenttä tyhjäksi"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        304,
+        112
+      ],
+      "id": "ad75dcf9-bbc1-4be2-9c09-d1df5549e3f0",
+      "name": "AI – Extract Fallback Contact Info",
+      "credentials": {
+        "openAiApi": {
+          "id": "pJYgTk36FgV9XSMi",
+          "name": "OpenAi account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base = $('TRANSFORM – Normalize Fallback Candidates').item.json || {};\nconst input = $json || {};\n\nconst raw =\n  input.output?.[0]?.content?.[0]?.text ||\n  input.text ||\n  input.response ||\n  input.content ||\n  input.message ||\n  \"\";\n\nlet cleaned = String(raw).trim()\n  .replace(/^```json\\s*/i, \"\")\n  .replace(/^```\\s*/i, \"\")\n  .replace(/```$/i, \"\")\n  .trim();\n\nlet parsed = {};\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { fallback_confidence: 0, parse_error: true };\n}\n\nconst normalizePhone = (value) => value ? String(value).replace(/[^\\d+]/g, \"\").trim() : \"\";\nconst normalizeEmail = (value) => value ? String(value).trim().toLowerCase() : \"\";\n\nconst fallbackPhone = normalizePhone(parsed.fallback_in_puh);\nconst fallbackEmail = normalizeEmail(parsed.fallback_in_email);\n\nreturn {\n  json: {\n    ...base,\n    fallback_isannoitsija: parsed.fallback_isannoitsija || \"\",\n    fallback_isannointiyhtio: parsed.fallback_isannointiyhtio || \"\",\n    fallback_in_puh: fallbackPhone,\n    fallback_in_email: fallbackEmail,\n    fallback_source: parsed.fallback_source || \"\",\n    fallback_confidence: Number(parsed.fallback_confidence || 0),\n    fallback_has_phone: !!fallbackPhone,\n    fallback_has_email: !!fallbackEmail,\n    fallback_has_any: !!fallbackPhone || !!fallbackEmail\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        352
+      ],
+      "id": "7ba57e5c-48ba-4df9-8dac-dc3e60bc0c22",
+      "name": "PARSE – Normalize Fallback Contact Data"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json || {};\n\nconst originalPhone = (j[\"IN puh\"] || \"\").toString().trim();\nconst originalEmail = (j[\"IN email\"] || \"\").toString().trim();\n\nconst aiPhone = (j.fallback_in_puh || \"\").toString().trim();\nconst aiEmail = (j.fallback_in_email || \"\").toString().trim();\n\nconst parsedPhone = (j.fallbackPrimaryPhone || \"\").toString().trim();\n\nconst finalPhone = originalPhone || aiPhone || parsedPhone || \"\";\nconst finalEmail = originalEmail || aiEmail || \"\";\n\nconst usedFallbackPhone = !originalPhone && !!(aiPhone || parsedPhone);\nconst usedFallbackEmail = !originalEmail && !!aiEmail;\n\nreturn {\n  json: {\n    ...j,\n\n    fallbackEnrichmentApplied: usedFallbackPhone || usedFallbackEmail,\n\n    \"Isännöitsijä\": j[\"Isännöitsijä\"] || j.fallback_isannoitsija || \"\",\n    \"Isännöintiyhtiö\": j[\"Isännöintiyhtiö\"] || j.fallback_isannointiyhtio || \"\",\n\n    \"IN puh\": finalPhone,\n    \"IN email\": finalEmail,\n\n    in_puh: finalPhone,\n    in_email: finalEmail,\n\n    fallback_source_used:\n      usedFallbackPhone || usedFallbackEmail\n        ? (j.fallback_source || j.fallbackSourceHint || \"\")\n        : \"\",\n\n    fallback_confidence_used:\n      usedFallbackPhone || usedFallbackEmail\n        ? Number(j.fallback_confidence || 0)\n        : 0,\n\n    final_contact_status:\n      finalPhone && finalEmail\n        ? \"phone_and_email\"\n        : finalPhone\n        ? \"phone_only\"\n        : finalEmail\n        ? \"email_only\"\n        : \"no_contact\",\n\n    shouldSendToCRM: true\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        368
+      ],
+      "id": "05cfe2af-628e-4a7a-b7a3-a39c63e36fd0",
+      "name": "TRANSFORM – Apply Company Enrichment"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    ...$json,\n    finderRaw: \"\",\n    asiakastietoRaw: \"\",\n    combinedSearchText: \"\",\n    fallbackCandidateEmails: [],\n    fallbackCandidatePhones: [],\n    fallbackFoundSomething: false,\n    fallbackStage: \"company_search_skipped\"\n  }\n};\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        592
+      ],
+      "id": "cdf8f026-b67a-4911-b9ef-1ac4b93135a5",
+      "name": "BYPASS – Skip Company Search"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b3875ad6-f6c7-44b9-8e62-b3c2340126ab",
+              "leftValue": "={{ $json['RM löyty'] }}",
+              "rightValue": "={{false}}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1392,
+        800
+      ],
+      "id": "b903ca67-ca11-43ac-8f85-279d3fec1a9a",
+      "name": "IF – Lead Has Minimum Required Data",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -5792,
+        832
+      ],
+      "id": "a3bc33db-c5e7-461f-9e2d-b99a643e0441",
+      "name": "RATE LIMIT – Wait Between Requests",
+      "webhookId": "10e621a2-1eea-409e-9032-4c63ec07d673"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('LOOP – Process Listings').item.json[\"URL\"] }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "fi-FI,fi;q=0.9,en-US;q=0.8,en;q=0.7"
+            },
+            {
+              "name": "Referer",
+              "value": "={{$json[\"URL\"]}}"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache"
+            },
+            {
+              "name": "Pragma",
+              "value": "no-cache"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text",
+              "outputPropertyName": "pageHtml"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -5600,
+        832
+      ],
+      "id": "44469e9c-e968-46c4-ba76-890ecfcd2f8d",
+      "name": "HTTP – Fetch Listing Detail Page"
+    },
+    {
+      "parameters": {
+        "jsCode": "const listing = $('LOOP – Process Listings').item.json;\nconst h = $json || {};\nconst html = String(h.pageHtml ?? h.body ?? h.data ?? '');\nreturn { json: { ...listing, pageHtml: html.slice(0, 300000), detailStatus: h.statusCode || null } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5400,
+        992
+      ],
+      "id": "923f50d3-8258-47a3-85b3-6ce994f29799",
+      "name": "CODE – Attach Listing Page"
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('TRANSFORM – Normalize Input').first().json;\nconst ids = [];\nfor (const item of $input.all()) {\n  const id = String(item.json?.ID || '').trim();\n  if (!id) continue;\n  ids.push('oikotie-' + id);                          // already sent to CRM\n  ids.push(`oikotie-${id}:p${job.profile_id}`);       // already judged not relevant for this profile\n}\nif (!ids.length) return [];\nreturn [{ json: {\n  organization_id: Number(job.organization_id),\n  source_ids: [...new Set(ids)],\n  crm_base_url: job.crm_base_url,\n  n8n_secret: job.n8n_secret,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6300,
+        688
+      ],
+      "id": "57ec0300-120b-44a0-93af-899584fc9518",
+      "name": "CODE – Build Dedupe Check"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_base_url }}/api/v1/n8n/dedupe/check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ organization_id: $json.organization_id, source_ids: $json.source_ids }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -6120,
+        688
+      ],
+      "id": "f4ff6252-9ea9-42df-b6f7-73ac78ea7637",
+      "name": "HTTP – CRM Dedupe Check",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('TRANSFORM – Normalize Input').first().json;\nconst existing = new Set($input.first().json.existing_ids || []);\nreturn $('TRANSFORM – Build Iteration Payload').all()\n  .map(i => i.json)\n  .filter(r => r.ID)\n  .filter(r => !existing.has('oikotie-' + r.ID) && !existing.has(`oikotie-${r.ID}:p${job.profile_id}`))\n  .map(r => ({ json: r }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5940,
+        688
+      ],
+      "id": "39636ba0-c10c-49da-a7a1-eb5ae9527dbe",
+      "name": "CODE – Keep New Listings"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json || {};\nconst job = $('TRANSFORM – Normalize Input').first().json;\nconst s = (v) => (v === undefined || v === null) ? '' : String(v).trim();\nconst isUrl = (u) => /^https?:\\/\\/[^\\s]+$/i.test(u);\n\nconst id = s(item.ID);\nconst source_ref = 'oikotie-' + id;\nlet email = s(item['IN email']).toLowerCase();\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) email = '';\nconst phone = s(item['IN puh']);\nconst manager = s(item['Isännöitsijä']) || s(item['Isännöintiyhtiö']);\nconst taloyhtio = s(item['Taloyhtiö']);\nconst url = s(item.URL);\nconst website = s(item.fallbackPrimaryWebsite);\nconst tulevat = s(item['Tulev. Remontit']);\n\nconst notes = [\n  taloyhtio && `Taloyhtiö: ${taloyhtio}`,\n  `Kohde: ${[s(item['Osoite']), s(item['Kaupunki'])].filter(Boolean).join(', ')}`,\n  tulevat && `Tulevat remontit: ${tulevat}`,\n  s(item.remontti) && `Osuma: ${s(item.remontti)}`,\n  s(item.ai_huomio) && `AI: ${s(item.ai_huomio)}`,\n  url && `Oikotie: ${url}`,\n].filter(Boolean).join('\\n');\n\nconst tags = [s(job.remonttityyppi), 'oikotie', s(job.maakunta)]\n  .filter(Boolean)\n  .map(t => t.slice(0, 50));\n\nconst lead = {\n  source: 'oikotie',\n  source_ref,\n  company: manager || taloyhtio || null,\n  title: manager ? 'Isännöitsijä' : null,\n  phone: phone || null,\n  email: email || null,\n  website: isUrl(website) ? website : null,\n  notes,\n  tags,\n  gdpr_legal_basis: 'legitimate_interest',\n  metadata: {\n    isannoitsija_yritys: manager,\n    isannoitsija_puh: phone,\n    isannoitsija_email: email,\n    isannoitsija_ytunnus: s(item['IN business_id']) || s(item['IN y_tunnus']) || s(item['IN Y-tunnus']),\n    taloyhtio,\n    remonttityyppi: s(job.remonttityyppi),\n    tulevat_remontit: tulevat,\n    oikotie_url: url,\n    kaupunki: s(item['Kaupunki']),\n    osoite: s(item['Osoite']),\n    hinta: s(item['Hinta']),\n    alue: s(item['Alue']),\n    maakunta: s(job.maakunta),\n    ai_confidence: Number(item.confidence || 0),\n    ai_huomio: s(item.ai_huomio),\n    yhteystieto_lahde: s(item.fallback_source_used),\n    search_job_id: job.job_id,\n  },\n};\n\nreturn { json: { lead, source_ref, crm_endpoint: job.crm_endpoint, crm_api_key: job.crm_api_key } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        720
+      ],
+      "id": "b8d6ab18-1d3d-42bf-9318-a0478a39de55",
+      "name": "TRANSFORM – Build FlowLeads Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.crm_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.lead) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1872,
+        720
+      ],
+      "id": "b6cdb1ec-4f9d-4806-a52c-6362cca73eca",
+      "name": "HTTP – POST Lead to FlowLeads",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('TRANSFORM – Build FlowLeads Payload').item.json;\nconst status = Number($json.statusCode || 0);\nconst ok = status >= 200 && status < 300;\nreturn { json: {\n  source_id: p.source_ref,\n  ok,\n  status,\n  crm_error: ok ? '' : JSON.stringify($json.body || $json).slice(0, 300),\n} };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        720
+      ],
+      "id": "fb6f9f45-bf29-4b63-84c1-e8556cc88593",
+      "name": "CODE – Collect Sent Lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json || {};\nconst job = $('TRANSFORM – Normalize Input').first().json;\n// Only remember listings the AI actually judged; AI errors are retried next run.\nconst ok = !!j.ID && j.ai_failed !== true;\nreturn { json: { source_id: ok ? `oikotie-${j.ID}:p${job.profile_id}` : '', ok } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4192,
+        1072
+      ],
+      "id": "771c485f-ddb0-4a3f-a4cd-c1fed0bf0ddc",
+      "name": "CODE – Mark Not Relevant"
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $('TRANSFORM – Normalize Input').first().json;\nconst ids = [...new Set($input.all().map(i => i.json).filter(r => r.ok && r.source_id).map(r => r.source_id))];\nif (!ids.length) return [];\nreturn [{ json: {\n  organization_id: Number(job.organization_id),\n  source_ids: ids,\n  crm_base_url: job.crm_base_url,\n  n8n_secret: job.n8n_secret,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        880
+      ],
+      "id": "70cfaca4-433d-47b5-8572-fee5af42925c",
+      "name": "CODE – Build Dedupe Mark"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_base_url }}/api/v1/n8n/dedupe/mark",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ organization_id: $json.organization_id, source_ids: $json.source_ids }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2592,
+        880
+      ],
+      "id": "2b4e6de5-8292-4cdc-ad2b-221467c09eb3",
+      "name": "HTTP – CRM Dedupe Mark",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "TRIGGER – Start from Parent Workflow": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "SET – Lead Search Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET – Lead Search Parameters": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Map Region to Oikotie Area",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Map Region to Oikotie Area": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Oikotie Search Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Oikotie Search Page": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Extract apiLocation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Extract apiLocation": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Oikotie API Bootstrap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Oikotie API Bootstrap": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Extract Session Cookie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Extract Session Cookie": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Oikotie Listings API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Oikotie Listings API": {
+      "main": [
+        [
+          {
+            "node": "SET – Prepare Listing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET – Prepare Listing Fields": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Normalize Listing Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Normalize Listing Results": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Build Iteration Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Build Iteration Payload": {
+      "main": [
+        [
+          {
+            "node": "CODE – Build Dedupe Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOP – Process Listings": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Extract Raw Listing Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RATE LIMIT – Wait Between Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Extract Raw Listing Content": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Build AI Classification Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Build AI Classification Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI – Classify Lead Relevance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI – Classify Lead Relevance": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Interpret AI Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Interpret AI Classification": {
+      "main": [
+        [
+          {
+            "node": "IF – Lead Is Relevant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Lead Is Relevant": {
+      "main": [
+        [
+          {
+            "node": "AI – Extract Company and Contact Clues",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CODE – Mark Not Relevant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI – Extract Company and Contact Clues": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Normalize AI Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Normalize AI Extraction": {
+      "main": [
+        [
+          {
+            "node": "CHECK – Missing Company / Manager Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECK – Missing Company / Manager Info": {
+      "main": [
+        [
+          {
+            "node": "IF – Fallback Search Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Fallback Search Needed": {
+      "main": [
+        [
+          {
+            "node": "SET – Mark Fallback Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF – Lead Has Minimum Required Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET – Mark Fallback Strategy": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Flag Fallback Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Flag Fallback Route": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Build Company Search Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Build Company Search Query": {
+      "main": [
+        [
+          {
+            "node": "DEBUG – Fallback Query Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEBUG – Fallback Query Output": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Build URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Build URLs": {
+      "main": [
+        [
+          {
+            "node": "IF – Finder Search Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Finder Search Enabled": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Search Finder.fi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BYPASS – Skip Company Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Search Finder.fi": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Extract Finder Company URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Extract Finder Company URL": {
+      "main": [
+        [
+          {
+            "node": "IF – Finder Company URL Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Finder Company URL Found": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Finder Company Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BYPASS – Skip Company Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Finder Company Page": {
+      "main": [
+        [
+          {
+            "node": "STORE – Save Finder Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STORE – Save Finder Response": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Search Asiakastieto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Search Asiakastieto": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Extract Asiakastieto Company URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Extract Asiakastieto Company URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Asiakastieto Company Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Asiakastieto Company Page": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Combine Company Search Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Normalize Fallback Candidates": {
+      "main": [
+        [
+          {
+            "node": "AI – Extract Fallback Contact Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Normalize Fallback Contact Data": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Apply Company Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Apply Company Enrichment": {
+      "main": [
+        [
+          {
+            "node": "IF – Lead Has Minimum Required Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RATE LIMIT – Wait Between Requests": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Listing Detail Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Build Dedupe Check": {
+      "main": [
+        [
+          {
+            "node": "HTTP – CRM Dedupe Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – CRM Dedupe Check": {
+      "main": [
+        [
+          {
+            "node": "CODE – Keep New Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Keep New Listings": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Process Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Listing Detail Page": {
+      "main": [
+        [
+          {
+            "node": "CODE – Attach Listing Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Attach Listing Page": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Process Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BYPASS – Skip Company Search": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Apply Company Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE – Combine Company Search Responses": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Normalize Fallback Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI – Extract Fallback Contact Info": {
+      "main": [
+        [
+          {
+            "node": "PARSE – Normalize Fallback Contact Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Mark Not Relevant": {
+      "main": [
+        [
+          {
+            "node": "CODE – Build Dedupe Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Lead Has Minimum Required Data": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM – Build FlowLeads Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM – Build FlowLeads Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP – POST Lead to FlowLeads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – POST Lead to FlowLeads": {
+      "main": [
+        [
+          {
+            "node": "CODE – Collect Sent Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Collect Sent Lead": {
+      "main": [
+        [
+          {
+            "node": "CODE – Build Dedupe Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Build Dedupe Mark": {
+      "main": [
+        [
+          {
+            "node": "HTTP – CRM Dedupe Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "description": "One Oikotie page: dedupe via CRM, AI relevance + isännöitsijä enrichment, POST leads to FlowLeads."
+  }
+}

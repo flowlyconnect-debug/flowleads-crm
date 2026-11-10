@@ -1,0 +1,341 @@
+{
+  "name": "Liidi Ohjaaja",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Valitse alue liidihakuun",
+        "formDescription": "Valitse maakunta, jolta haluat hakea kohteet.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Maakunta",
+              "fieldType": "dropdown",
+              "fieldName": "maakunta",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Lappi"
+                  },
+                  {
+                    "option": "Pohjois-Pohjanmaa"
+                  },
+                  {
+                    "option": "Kainuu"
+                  },
+                  {
+                    "option": "Pohjois-Savo"
+                  },
+                  {
+                    "option": "Pohjois-Karjala"
+                  },
+                  {
+                    "option": "Keski-Suomi"
+                  },
+                  {
+                    "option": "Pohjanmaa"
+                  },
+                  {
+                    "option": "Etelä-Pohjanmaa"
+                  },
+                  {
+                    "option": "Satakunta"
+                  },
+                  {
+                    "option": "Pirkanmaa"
+                  },
+                  {
+                    "option": "Päijät-Häme"
+                  },
+                  {
+                    "option": "Kanta-Häme"
+                  },
+                  {
+                    "option": "Varsinais-Suomi"
+                  },
+                  {
+                    "option": "Etelä-Savo"
+                  },
+                  {
+                    "option": "Etelä-Karjala"
+                  },
+                  {
+                    "option": "Kymenlaakso"
+                  },
+                  {
+                    "option": "Uusimaa"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        -144
+      ],
+      "id": "d7f4c575-6fbb-4f97-a486-8636936495af",
+      "name": "On form submission",
+      "webhookId": "d07c8869-e300-4357-831f-fdbd07890d32"
+    },
+    {
+      "parameters": {
+        "jsCode": "const maakunta = $json.maakunta || \"\";\nconst chunkSize = 100;\n\nconst map = {\n  \"Lappi\": \"lappi\",\n  \"Pohjois-Pohjanmaa\": \"pohjois-pohjanmaa\",\n  \"Kainuu\": \"kainuu\",\n  \"Pohjois-Savo\": \"pohjois-savo\",\n  \"Pohjois-Karjala\": \"pohjois-karjala\",\n  \"Keski-Suomi\": \"keski-suomi\",\n  \"Pohjanmaa\": \"pohjanmaa\",\n  \"Etelä-Pohjanmaa\": \"etela-pohjanmaa\",\n  \"Satakunta\": \"satakunta\",\n  \"Pirkanmaa\": \"pirkanmaa\",\n  \"Päijät-Häme\": \"paijat-hame\",\n  \"Kanta-Häme\": \"kanta-hame\",\n  \"Varsinais-Suomi\": \"varsinais-suomi\",\n  \"Etelä-Savo\": \"etela-savo\",\n  \"Etelä-Karjala\": \"etela-karjala\",\n  \"Kymenlaakso\": \"kymenlaakso\",\n  \"Uusimaa\": \"uusimaa\"\n};\n\nconst pageSlug = map[maakunta] || \"\";\n\nreturn [\n  {\n    json: {\n      maakunta,\n      chunkSize,\n      pageSlug\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        -144
+      ],
+      "id": "54500776-48e2-4a41-b02e-bf2ff35de54e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://asunnot.oikotie.fi/myytavat-asunnot/' + $json.pageSlug }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cardType",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            },
+            {
+              "name": "limit",
+              "value": "24"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        640,
+        -144
+      ],
+      "id": "e55ed517-6b30-4a6d-8f88-6395582c2ded",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $json.data || \"\";\n\n\nconst maakunta = $('Code in JavaScript').first().json.maakunta || \"\";\nconst chunkSize = Number($('Code in JavaScript').first().json.chunkSize || 100);\n\n\nconst countMatch = html.match(/:\\s*([\\d\\s]+)\\s*kpl/i);\n\nlet totalCount = 0;\n\nif (countMatch && countMatch[1]) {\n  totalCount = parseInt(countMatch[1].replace(/\\s+/g, \"\"), 10);\n}\n\nconst perPage = 24;\nconst totalPages = Math.max(1, Math.ceil(totalCount / perPage));\n\nreturn [\n  {\n    json: {\n      data: html,\n      maakunta,\n      chunkSize,\n      totalCount,\n      totalPages\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -144
+      ],
+      "id": "e462e257-d6f5-4e5f-9859-12aa133ef1ea",
+      "name": "Total Pages"
+    },
+    {
+      "parameters": {
+        "jsCode": "const maakunta = $json.maakunta || \"\";\nconst totalPages = Number($json.totalPages || 1);\n\nconst pages = [];\n\nfor (let page = 1; page <= totalPages; page++) {\n  pages.push({\n    json: {\n      maakunta,\n      page,\n      pageLabel: String(page)\n    }\n  });\n}\n\nreturn pages;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -144
+      ],
+      "id": "3f6fd523-10e3-42a1-89fd-929652772248",
+      "name": "Luo chunkit"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1296,
+        -144
+      ],
+      "id": "0026f4ea-2d82-41cf-bb0c-ca37db3cc516",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "q1TNz5Wr9J6lmVnG",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/q1TNz5Wr9J6lmVnG",
+          "cachedResultName": "Lead Worker copy 2"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "maakunta": "={{ $json.maakunta }}",
+            "page": "={{ $json.page }}",
+            "pageLabel": "={{ String($json.pageLabel) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "maakunta",
+              "displayName": "maakunta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "page",
+              "displayName": "page",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "pageLabel",
+              "displayName": "pageLabel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1520,
+        -64
+      ],
+      "id": "279fe43e-5c91-480c-965f-0ada29a5fc58",
+      "name": "Call 'Lead Worker copy 2'",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Total Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Total Pages": {
+      "main": [
+        [
+          {
+            "node": "Luo chunkit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Luo chunkit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Call 'Lead Worker copy 2'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Lead Worker copy 2'": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1cb6b472-fcd6-4daa-8115-f8c0164efc50",
+  "meta": {
+    "instanceId": "626264c71d55dc57628df863a326433802569e35ebd373a6121970414e38b921"
+  },
+  "id": "e1Vrst7hTXBlO3w8",
+  "tags": [
+    {
+      "updatedAt": "2026-04-20T19:31:51.499Z",
+      "createdAt": "2026-04-20T19:31:51.499Z",
+      "id": "JdyiH0x9mZ5981xQ",
+      "name": "VALMIS"
+    }
+  ]
+}

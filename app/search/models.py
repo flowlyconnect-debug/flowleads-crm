@@ -99,6 +99,14 @@ class SearchJob(db.Model):
     # scoped to this one job, not a standing key for the whole organization.
     n8n_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     n8n_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Progress reporting from the n8n dispatcher. A full-region run walks every
+    # Oikotie result page one at a time and can take hours, so the dispatcher
+    # PATCHes a heartbeat after each page. The stuck-job reaper keys off
+    # heartbeat_at (not started_at) so a long but healthy run is never requeued.
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pages_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    pages_failed: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    progress: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
