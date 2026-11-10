@@ -9,11 +9,11 @@
   --color-sidebar-hover:  #1A2235;
   --color-border-dark:    #1E2D47;
 
-  /* Primary accent */
-  --color-accent:         #1D6BF3;
-  --color-accent-hover:   #1558D6;
-  --color-accent-soft:    #EBF2FF;
-  --color-accent-border:  #BFDBFE;
+  /* Primary accent — violet, matches the flowlysolutions.net brand */
+  --color-accent:         #6948DC;
+  --color-accent-hover:   #5334B3;
+  --color-accent-soft:    #F1EDFC;
+  --color-accent-border:  #DDD3F7;
 
   /* Highlight */
   --color-highlight:      #38BDF8;
@@ -34,7 +34,7 @@
   --color-text-secondary: #5C6170;
   --color-text-muted:     #9CA3AF;
   --color-text-inverse:   #FFFFFF;
-  --color-text-accent:    #6366F1;
+  --color-text-accent:    #6948DC;
   --color-text-highlight: #38BDF8;
 
   /* Status */
@@ -52,7 +52,7 @@
   --color-info-emphasis:  #1E40AF;
   --color-neutral-soft:   #F3F4F6;
   --color-neutral-emphasis: #374151;
-  --color-accent-emphasis: #3730A3;
+  --color-accent-emphasis: #4A2FAE;
 
   /* Pipeline stages */
   --stage-new:            #8B5CF6;
@@ -132,7 +132,7 @@
   --shadow-sm:  0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-accent: 0 4px 14px rgba(29, 107, 243, 0.30);
+  --shadow-accent: 0 4px 14px rgba(105, 72, 220, 0.30);
 
   /* Transitions */
   --transition-fast: 120ms ease;
@@ -176,8 +176,8 @@ body {
 .app-main {
   background-color: #F4F6FB;
   background-image:
-    linear-gradient(rgba(29, 107, 243, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(29, 107, 243, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(105, 72, 220, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(105, 72, 220, 0.025) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -185,7 +185,7 @@ body {
   content: '';
   display: block;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(29, 107, 243, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(105, 72, 220, 0.15), transparent);
   margin-bottom: 20px;
   border-radius: 2px;
 }

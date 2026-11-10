@@ -45,7 +45,7 @@
 .dashboard-page .task-item__title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-accent, #1D6BF3);
+  color: var(--color-accent, #6948DC);
 }
 
 .dashboard-empty {
