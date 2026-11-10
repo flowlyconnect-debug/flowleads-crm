@@ -303,14 +303,20 @@ const r = $input.first()?.json || {};
 const page = Number(ctx.page_in_run || 1);
 // The CRM decides: incremental stops once a page brings nothing new, the
 // full pass stops after its per-run slice; max_pages is a local safety cap.
-const more = r.continue === true && page < Number(ctx.max_pages || 1);
-return [{ json: { ...ctx, more, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];
+// Oikotie's bot protection answers 403 (captcha) or 429 when we go too fast.
+// Then the whole run stops: no more pages and no further regions this hour.
+const err = String($('CODE – Normalize Cards').first().json.body.error || '');
+const blocked = /(403|429)|captcha/i.test(err);
+const more = !blocked && r.continue === true && page < Number(ctx.max_pages || 1);
+return [{ json: { ...ctx, more, blocked, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];
 """,
             [2860, 200],
         )
     )
-    nodes.append(bool_if("IF – More Pages", "={{ $json.more }}", [3080, 200]))
-    nodes.append(wait_node("WAIT – Between Pages", 2, [3300, 340]))
+    # true output is deliberately unconnected: a blocked run ends here.
+    nodes.append(bool_if("IF – Oikotie Blocked", "={{ $json.blocked }}", [3080, 200]))
+    nodes.append(bool_if("IF – More Pages", "={{ $json.more }}", [3300, 200]))
+    nodes.append(wait_node("WAIT – Between Pages", 10, [3520, 340]))
 
     connect(c, "Every hour", "SET – Config")
     connect(c, "Manual Trigger", "SET – Config")
@@ -326,7 +332,8 @@ return [{ json: { ...ctx, more, offset: Number(r.next_offset ?? (Number(ctx.offs
     connect(c, "HTTP – Fetch Oikotie Listings API", "CODE – Normalize Cards")
     connect(c, "CODE – Normalize Cards", "HTTP – CRM Ingest")
     connect(c, "HTTP – CRM Ingest", "CODE – Next Page")
-    connect(c, "CODE – Next Page", "IF – More Pages")
+    connect(c, "CODE – Next Page", "IF – Oikotie Blocked")
+    connect(c, "IF – Oikotie Blocked", "IF – More Pages", out_index=1)
     connect(c, "IF – More Pages", "WAIT – Between Pages", out_index=0)
     connect(c, "IF – More Pages", "LOOP – Tasks", out_index=1)
     connect(c, "WAIT – Between Pages", "CODE – Page Context")

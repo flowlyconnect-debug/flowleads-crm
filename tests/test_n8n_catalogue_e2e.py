@@ -70,7 +70,7 @@ def _workflow_with_config(name, base_url, tmp_path):
     return out
 
 
-def _run(name, base_url, tmp_path):
+def _run(name, base_url, tmp_path, env=None):
     path = _workflow_with_config(name, base_url, tmp_path)
     proc = subprocess.run(
         [NODE, str(SIM / "executor.js"), str(path), base_url, str(SIM / "mocks.js")],
@@ -78,6 +78,7 @@ def _run(name, base_url, tmp_path):
         text=True,
         encoding="utf-8",
         timeout=120,
+        env={**os.environ, **(env or {})},
     )
     lines = [l for l in proc.stdout.splitlines() if l.startswith("{")]
     assert lines, f"no output from executor: {proc.stdout}\n{proc.stderr}"
@@ -169,3 +170,19 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         lead = Lead.query.filter_by(organization_id=org_id, source_ref="oikotie-1002").one()
         assert lead.phone == "0409998888"
         assert lead.company == "Avaimeton Isännöinti Oy"
+
+
+def test_crawler_stops_the_whole_run_when_oikotie_blocks_it(live_crm, tmp_path):
+    """A 403/captcha from Oikotie ends the run: one error is recorded and no
+    further regions are requested (hammering on only prolongs the block)."""
+    app, base = live_crm
+    from app.listings.models import CrawlState, Listing
+
+    crawl = _run("flowleads-crawler.json", base, tmp_path, env={"MOCK_OIKOTIE_BLOCKED": "1"})
+    assert crawl["runs"]["HTTP – Fetch Oikotie Listings API"] == 1
+    assert crawl["runs"]["HTTP – CRM Ingest"] == 1
+    with app.app_context():
+        assert Listing.query.count() == 0
+        errors = [s.last_error for s in CrawlState.query.all() if s.last_error]
+        assert len(errors) == 1
+        assert "403" in errors[0]

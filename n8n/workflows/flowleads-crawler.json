@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "17bc471c-e5cb-49be-becc-a73a03e61383",
+      "id": "a36b21e8-2043-4413-9890-5273e365dbb8",
       "name": "Every hour"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "8b5da68b-65e0-4564-9a77-d5923160f34c",
+      "id": "3214202d-0b4f-4bca-a11f-da7aec775650",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "cafd8c6a-6cb6-41e1-bd22-ff9bd1ef685b",
+              "id": "748e52e6-a17c-4b4b-8d1a-7e0ec64df30a",
               "name": "crm_base_url",
               "value": "https://flowleads-crm-zv0a.onrender.com",
               "type": "string"
             },
             {
-              "id": "e0960b83-d216-44f7-93ba-2dd6cf29331f",
+              "id": "613d827f-8bd9-487e-a11d-a6b55a36e3a4",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "9d379443-f85d-4e43-968e-26f2908c8c9c",
+      "id": "194604ee-4055-450b-a774-0a55a37cd35e",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -82,7 +82,7 @@
         440,
         100
       ],
-      "id": "f845bcb2-a1fd-4232-b33b-7b74e70b3e44",
+      "id": "92911cde-bae7-424b-b90a-285626fc2728",
       "name": "HTTP – Get Crawl Plan",
       "retryOnFail": true,
       "maxTries": 3,
@@ -98,7 +98,7 @@
         660,
         100
       ],
-      "id": "6a8c1dfb-7056-4c06-9ef6-41e5a82b96f4",
+      "id": "bf527834-85f1-4ef7-a626-febe7250ad35",
       "name": "CODE – Split Tasks"
     },
     {
@@ -111,7 +111,7 @@
         880,
         100
       ],
-      "id": "522c6525-3d16-4eb4-8b20-b102d14c20e5",
+      "id": "5502c427-d73e-4202-be7a-d9e1f014686d",
       "name": "LOOP – Tasks",
       "notes": "Yksi tehtävä = yksi maakunta (incremental tai full-pass-viipale)."
     },
@@ -188,7 +188,7 @@
         1100,
         200
       ],
-      "id": "190e8c9f-cc7d-43bd-adef-7485e0aa4603",
+      "id": "136ec6c3-fd57-4b32-949e-8256fec17482",
       "name": "HTTP – Fetch Oikotie Search Page",
       "onError": "continueRegularOutput"
     },
@@ -202,7 +202,7 @@
         1320,
         200
       ],
-      "id": "73c518d1-c97b-4870-ab25-c42cbec48dc3",
+      "id": "3892311f-2a79-438c-baff-789cf7cf1943",
       "name": "PARSE – Extract apiLocation"
     },
     {
@@ -247,7 +247,7 @@
         1540,
         200
       ],
-      "id": "2b0b82cc-04cf-41fc-bff1-f260c2fefdff",
+      "id": "ac21ce3c-339b-4853-9d55-5c730b6cb5ca",
       "name": "HTTP – Fetch Oikotie API Bootstrap",
       "onError": "continueRegularOutput"
     },
@@ -261,7 +261,7 @@
         1760,
         200
       ],
-      "id": "ce12b4a8-2ecb-4df0-a03e-97f172b05f1a",
+      "id": "5d6f105f-ee17-4f4c-8e2f-dceb0c83d393",
       "name": "TRANSFORM – Extract Session Cookie"
     },
     {
@@ -274,7 +274,7 @@
         1980,
         200
       ],
-      "id": "218e5e81-96e0-47d6-bfae-85d2f27ea39f",
+      "id": "38268af0-a013-43f7-91fc-ac66d09957e0",
       "name": "CODE – Page Context"
     },
     {
@@ -350,7 +350,7 @@
         2200,
         200
       ],
-      "id": "9f888636-a506-4b59-b90e-d239198c3461",
+      "id": "8fa0e0a4-88cd-415c-84ee-b808d76284d2",
       "name": "HTTP – Fetch Oikotie Listings API",
       "onError": "continueRegularOutput",
       "retryOnFail": true,
@@ -367,7 +367,7 @@
         2420,
         200
       ],
-      "id": "ce522698-cfda-4600-816a-d365d0985f47",
+      "id": "4522601d-d69d-416c-a1a8-2b5e953a33a6",
       "name": "CODE – Normalize Cards"
     },
     {
@@ -398,7 +398,7 @@
         2640,
         200
       ],
-      "id": "3a2986ea-1e92-4dfa-9187-8e29efe7642d",
+      "id": "f203c4b5-cb18-4295-a72a-1cf4cd820d5a",
       "name": "HTTP – CRM Ingest",
       "retryOnFail": true,
       "maxTries": 3,
@@ -407,7 +407,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const { ctx } = $('CODE – Normalize Cards').first().json;\nconst r = $input.first()?.json || {};\nconst page = Number(ctx.page_in_run || 1);\n// The CRM decides: incremental stops once a page brings nothing new, the\n// full pass stops after its per-run slice; max_pages is a local safety cap.\nconst more = r.continue === true && page < Number(ctx.max_pages || 1);\nreturn [{ json: { ...ctx, more, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];\n"
+        "jsCode": "const { ctx } = $('CODE – Normalize Cards').first().json;\nconst r = $input.first()?.json || {};\nconst page = Number(ctx.page_in_run || 1);\n// The CRM decides: incremental stops once a page brings nothing new, the\n// full pass stops after its per-run slice; max_pages is a local safety cap.\n// Oikotie's bot protection answers 403 (captcha) or 429 when we go too fast.\n// Then the whole run stops: no more pages and no further regions this hour.\nconst err = String($('CODE – Normalize Cards').first().json.body.error || '');\nconst blocked = /\b(403|429)\b|captcha/i.test(err);\nconst more = !blocked && r.continue === true && page < Number(ctx.max_pages || 1);\nreturn [{ json: { ...ctx, more, blocked, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -415,7 +415,7 @@
         2860,
         200
       ],
-      "id": "7ab37343-a151-40d4-a9a8-58369fb7c4fa",
+      "id": "5473ec10-d40c-4af0-a524-005bcc7cde45",
       "name": "CODE – Next Page"
     },
     {
@@ -429,8 +429,8 @@
           },
           "conditions": [
             {
-              "id": "a0358928-192a-4661-b7ab-d0870d59e2ba",
-              "leftValue": "={{ $json.more }}",
+              "id": "995e59f9-573d-4f9f-9a5b-ded0545ec12e",
+              "leftValue": "={{ $json.blocked }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -450,23 +450,58 @@
         3080,
         200
       ],
-      "id": "505c2153-ada8-421a-b0f7-07b21788b91a",
+      "id": "eeb2f45d-1d51-4742-91af-8ac6479584a9",
+      "name": "IF – Oikotie Blocked"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dfd29df3-5205-45cf-bc77-dcebeee48a7c",
+              "leftValue": "={{ $json.more }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        200
+      ],
+      "id": "af81df90-d6c6-4809-826d-fe835258e30d",
       "name": "IF – More Pages"
     },
     {
       "parameters": {
-        "amount": 2,
+        "amount": 10,
         "unit": "seconds"
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        3300,
+        3520,
         340
       ],
-      "id": "2c51a6c5-5968-4c06-b435-8fcf439a643e",
+      "id": "996f298d-7cf8-4339-b6c5-aec19f10616d",
       "name": "WAIT – Between Pages",
-      "webhookId": "37e6304f-0464-4a2a-8f89-3d0ea1e0371b"
+      "webhookId": "8a9c5f46-5f29-4edb-bce7-6f5b01fcb249"
     }
   ],
   "pinData": {},
@@ -628,6 +663,18 @@
     },
     "CODE – Next Page": {
       "main": [
+        [
+          {
+            "node": "IF – Oikotie Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Oikotie Blocked": {
+      "main": [
+        [],
         [
           {
             "node": "IF – More Pages",
