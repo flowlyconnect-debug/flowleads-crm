@@ -1,14 +1,54 @@
-{% extends "base.html" %}
-{% block title %}Backup codes — FlowLeads{% endblock %}
-{% block content %}
-<div class="card">
-  <h1>Backup codes</h1>
-  <p>Store these codes securely. Each can be used once. They will not be shown again.</p>
-  <ul>
-    {% for code in backup_codes %}
-    <li><code>{{ code }}</code></li>
-    {% endfor %}
-  </ul>
-  <a class="btn" href="{{ url_for('analytics.dashboard') }}">Continue to dashboard</a>
+{% extends "auth/_card_layout.html" %}
+{% block title %}Varakoodit — FlowLeads{% endblock %}
+{% block card_class %}lp-card--wide{% endblock %}
+{% block step %}<p class="lp-solo__step">Kaksivaiheinen tunnistautuminen on käytössä</p>{% endblock %}
+{% block card %}
+<h1 class="lp-card__title">Tallenna varakoodit</h1>
+<p class="lp-card__lead">Varakoodilla pääset kirjautumaan, jos puhelimesi katoaa tai todennussovellus ei ole käytettävissä. Jokainen koodi toimii kerran. <strong>Koodeja ei näytetä uudelleen</strong>, joten tallenna ne nyt esimerkiksi salasanojen hallintaan.</p>
+
+<ul class="lp-solo__codes" id="backup-codes">
+  {% for code in backup_codes %}
+  <li><code>{{ code }}</code></li>
+  {% endfor %}
+</ul>
+
+<div class="lp-solo__actions">
+  <button type="button" class="lp-btn lp-btn--secondary" id="copy-backup-codes">Kopioi koodit</button>
+  <button type="button" class="lp-btn lp-btn--secondary" id="download-backup-codes">Lataa tiedostona</button>
+  <a class="lp-btn lp-btn--primary" href="{{ url_for('analytics.dashboard') }}">Olen tallentanut koodit, jatka</a>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    const codes = Array.from(document.querySelectorAll("#backup-codes code")).map(function (el) {
+      return el.textContent.trim();
+    });
+    const text = "FlowLeads CRM – varakoodit\n\n" + codes.join("\n") + "\n";
+    const copyBtn = document.getElementById("copy-backup-codes");
+    const downloadBtn = document.getElementById("download-backup-codes");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async function () {
+        try {
+          await navigator.clipboard.writeText(codes.join("\n"));
+          copyBtn.textContent = "Kopioitu";
+        } catch (err) {
+          copyBtn.textContent = "Kopiointi ei onnistunut";
+        }
+      });
+    }
+    if (downloadBtn) {
+      downloadBtn.addEventListener("click", function () {
+        const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "flowleads-varakoodit.txt";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      });
+    }
+  })();
+</script>
 {% endblock %}

@@ -162,7 +162,11 @@ def create_organization(name: str, slug: str) -> Organization:
     if not validate_slug(slug):
         raise UserServiceError("Invalid organization slug.", "invalid_slug")
 
-    org = Organization(name=name.strip(), slug=slug)
+    from app.admin.constants import FEATURE_CATALOG
+
+    # every optional module is on by default; a superadmin (or the invite the
+    # customer accepts) narrows it afterwards
+    org = Organization(name=name.strip(), slug=slug, enabled_features=list(FEATURE_CATALOG))
     db.session.add(org)
     try:
         db.session.flush()
@@ -212,6 +216,9 @@ def change_password(user: User, new_password: str, *, actor: User | None = None)
     if not ok:
         raise UserServiceError(msg or "Invalid password.", "invalid_password")
     user.password_hash = hash_password(new_password)
+    # the user has now chosen their own password (see User.must_change_password)
+    if actor is None or actor.id == user.id:
+        user.must_change_password = False
     log_audit(
         "password_changed",
         user_id=actor.id if actor else user.id,

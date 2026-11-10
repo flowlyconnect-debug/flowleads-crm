@@ -11,6 +11,8 @@
         <p class="text-muted">
           Luo organisaatio ja lähetä asiakkaalle kertakäyttöinen, 7 vuorokautta voimassa oleva
           kutsulinkki. Asiakas asettaa itse salasanansa ja valitsee hakualueensa linkin takaa.
+          Hakuprofiili aktivoituu heti, kun asiakas hyväksyy kutsun, ja ensimmäiset liidit
+          tulevat noin 10 minuutin kuluessa.
         </p>
 
         <form method="post" action="{{ url_for('admin.create_invite_route') }}" class="form-group" style="margin-top:1.5rem;">
@@ -30,7 +32,7 @@
             <span class="form-helper">Kutsulinkki lähetetään tähän osoitteeseen.</span>
           </label>
 
-          <h2 style="margin-top:1.5rem;">Hakuprofiili (n8n)</h2>
+          <h2 style="margin-top:1.5rem;">Hakuprofiili</h2>
           <label class="form-label">Hakuprofiilin nimi
             <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
                    placeholder="esim. Lukkoremontti Uusimaa"
@@ -47,15 +49,12 @@
             </select>
           </label>
 
-          <label class="form-label" style="margin-top:1rem;">Lähde
-            <input type="text" name="source" class="form-input" maxlength="50"
-                   value="{{ form_data.get('source', 'oikotie') }}">
-            <span class="form-helper">Tällä hetkellä tuettu lähde on "oikotie". Alueet ja "Koko Suomi" -valinta tehdään kutsulinkin takaa.</span>
-          </label>
+          <input type="hidden" name="source" value="oikotie">
+          <p class="form-helper">Asiakas valitsee alueet (tai Koko Suomen) kutsulinkin takaa. Muut suodattimet voi säätää hakuprofiilin asetuksista.</p>
 
           <fieldset style="margin-top:1rem;">
             <legend class="form-label">Sallitut toiminnot</legend>
-            <p class="form-helper mb-2">Asiakas voi ottaa käyttöön näistä haluamansa onboarding-vaiheessa.</p>
+            <p class="form-helper mb-2">Asiakas valitsee näistä haluamansa kutsua hyväksyessään. Voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
             {% set selected_features = form_data.get('allowed_features', []) %}
             {% for key, label in feature_catalog.items() %}
             <label class="form-check">

@@ -1,14 +1,27 @@
-{% extends "base.html" %}
-{% block title %}Register — FlowLeads{% endblock %}
-{% block content %}
-<div class="card">
-  <h1>Register</h1>
-  <form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <label>{{ form.email.label }}{{ form.email() }}</label>
-    <label>{{ form.password.label }}{{ form.password() }}</label>
-    <label>{{ form.password_confirm.label }}{{ form.password_confirm() }}</label>
-    {{ form.submit(class="btn") }}
-  </form>
-</div>
+{% extends "auth/_card_layout.html" %}
+{% block title %}Rekisteröidy — FlowLeads{% endblock %}
+{% block card %}
+<h1 class="lp-card__title">Luo tili</h1>
+<p class="lp-card__lead">Valitse vähintään 12 merkin salasana.</p>
+<form method="post" class="lp-form" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="lp-field">
+    <label for="{{ form.email.id }}" class="lp-field__label">Sähköposti</label>
+    {{ form.email(class="lp-field__input", autocomplete="username", inputmode="email", autofocus=True) }}
+    {% if form.email.errors %}<p class="lp-field__error">Tarkista sähköpostiosoite.</p>{% endif %}
+  </div>
+  <div class="lp-field">
+    <label for="{{ form.password.id }}" class="lp-field__label">Salasana</label>
+    {{ form.password(class="lp-field__input", autocomplete="new-password") }}
+    {% if form.password.errors %}<p class="lp-field__error">Salasanassa pitää olla vähintään 12 merkkiä.</p>{% endif %}
+  </div>
+  <div class="lp-field">
+    <label for="{{ form.password_confirm.id }}" class="lp-field__label">Vahvista salasana</label>
+    {{ form.password_confirm(class="lp-field__input", autocomplete="new-password") }}
+  </div>
+  {{ form.submit(class="lp-btn lp-btn--primary lp-btn--block", value="Luo tili") }}
+</form>
+{% endblock %}
+{% block below %}
+<p class="lp-solo__below">Onko sinulla jo tili? <a href="{{ url_for('auth.login') }}">Kirjaudu sisään</a></p>
 {% endblock %}

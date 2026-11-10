@@ -60,6 +60,9 @@ class Listing(db.Model):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # From the Oikotie card when present, otherwise from the AI analysis.
+    build_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    building_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
@@ -118,6 +121,8 @@ class ListingRenovation(db.Model):
     remonttityyppi: Mapped[str] = mapped_column(String(100), nullable=False)
     confidence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     timing: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # first year mentioned in `timing` (e.g. "PTS 2027-2029" -> 2027), if any
+    timing_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing", back_populates="renovations")

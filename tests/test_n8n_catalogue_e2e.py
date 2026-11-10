@@ -139,6 +139,11 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
 
         l1 = Listing.query.filter_by(external_id="1001").one()
         assert l1.taloyhtio == "As Oy Lukkotesti"
+        # building data: from the Oikotie card (1001) or from the AI (1002)
+        assert (l1.build_year, l1.building_type) == (1974, "Kerrostalo")
+        l2b = Listing.query.filter_by(external_id="1002").one()
+        assert (l2b.build_year, l2b.building_type) == (1988, "Rivitalo")
+        assert l1.renovations[0].timing_year == 2027
         assert [r.remonttityyppi for r in l1.renovations] == ["Lukkoremontti / kulunvalvonta"]
         assert l1.contact_status == "none"  # contacts were on the page
         l2 = Listing.query.filter_by(external_id="1002").one()

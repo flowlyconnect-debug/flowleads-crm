@@ -650,6 +650,39 @@ class EmailService:
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
+    @staticmethod
+    def send_catalogue_alert(*, to_email: str, problems: list[str]) -> dict:
+        """Operational alert to a superadmin: the Oikotie listing catalogue
+        (n8n Crawler / Analyzer) looks broken, so customers stop getting leads."""
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        items_html = "".join(f"<li>{html.escape(str(problem))}</li>" for problem in problems)
+        subject = "⚠ FlowLeads: kohdekatalogin keruussa on ongelma"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Kohdekatalogi tarvitsee huomiota</h2>"
+            f"<ul>{items_html}</ul>"
+            "<p>Asiakkaat eivät saa uusia liidejä ennen kuin tämä on korjattu. "
+            "Tarkista n8n:n Crawler- ja Analyzer-workflowt sekä hallinnan sivu Kohdekatalogi.</p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = "Kohdekatalogi tarvitsee huomiota:\n- " + "\n- ".join(str(p) for p in problems)
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
 
 class TemplateService:
     @staticmethod

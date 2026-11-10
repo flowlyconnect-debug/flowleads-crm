@@ -1,67 +1,70 @@
-{% extends "base.html" %}
+{% extends "auth/_card_layout.html" %}
 {% block title %}Käyttöönotto — FlowLeads{% endblock %}
-{% block content %}
-<div class="card">
-  {% if invite is none %}
-  <h1>Kutsu ei kelpaa</h1>
-  <p>Tämä kutsulinkki on vanhentunut, käytetty tai mitätöity. Pyydä uusi kutsu ylläpitäjältä.</p>
-  <a href="{{ url_for('auth.login') }}" class="btn">Kirjautumiseen</a>
-  {% else %}
-  <h1>Tervetuloa, {{ invite.organization.name }}</h1>
-  <p class="text-muted">Aseta salasana ja valitse hakualueet aloittaaksesi.</p>
+{% block card_class %}lp-card--wide{% endblock %}
+{% block step %}{% if invite is not none %}<p class="lp-solo__step">Tervetuloa FlowLeadsiin</p>{% endif %}{% endblock %}
+{% block card %}
+{% if invite is none %}
+<h1 class="lp-card__title">Kutsu ei kelpaa</h1>
+<p class="lp-card__lead">Tämä kutsulinkki on vanhentunut, käytetty tai mitätöity. Pyydä uusi kutsu FlowLeadsin yhteyshenkilöltäsi.</p>
+<a href="{{ url_for('auth.login') }}" class="lp-btn lp-btn--primary">Kirjautumiseen</a>
+{% else %}
+<h1 class="lp-card__title">Tervetuloa, {{ invite.organization.name }}</h1>
+<p class="lp-card__lead">Aseta salasana ja valitse alueet, joilta haluat liidejä. Tämä vie noin minuutin.</p>
 
-  <form method="post" novalidate style="margin-top:1rem;">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<form method="post" class="lp-form" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <h2>Salasana</h2>
-    <label class="form-label">Uusi salasana
-      <input type="password" name="password" class="form-input" minlength="12" required autocomplete="new-password">
-    </label>
-    <label class="form-label">Vahvista salasana
-      <input type="password" name="password_confirm" class="form-input" minlength="12" required autocomplete="new-password">
-    </label>
+  <div class="lp-field">
+    <label for="invite-password" class="lp-field__label">Salasana (vähintään 12 merkkiä)</label>
+    <input type="password" id="invite-password" name="password" class="lp-field__input" minlength="12" required autocomplete="new-password">
+  </div>
+  <div class="lp-field">
+    <label for="invite-password-confirm" class="lp-field__label">Vahvista salasana</label>
+    <input type="password" id="invite-password-confirm" name="password_confirm" class="lp-field__input" minlength="12" required autocomplete="new-password">
+  </div>
 
-    <h2 style="margin-top:1.5rem;">Hakualueet</h2>
-    <label class="form-check">
+  <div>
+    <h2 class="lp-solo__section-title">Hakualueet</h2>
+    <label class="lp-solo__check">
       <input type="radio" name="region_mode" value="all_finland" id="region-mode-all">
       Koko Suomi
     </label>
-    <label class="form-check">
+    <label class="lp-solo__check">
       <input type="radio" name="region_mode" value="specific" id="region-mode-specific" checked>
-      Valitse maakunnat erikseen
+      Valitse maakunnat
     </label>
-
-    <fieldset id="regions-fieldset" style="margin-top:0.75rem;">
-      <div class="search-profiles-regions__grid">
-        {% for region in finnish_regions %}
-        <label class="form-check">
-          <input type="checkbox" name="regions" value="{{ region }}">
-          {{ region }}
-        </label>
-        {% endfor %}
-      </div>
-    </fieldset>
-
-    <p class="form-helper" style="margin-top:0.5rem;">
-      Lähde: <strong>{{ invite.source }}</strong> — kattaa valitsemasi alueet / koko Suomen.
-      {% if invite.source == 'oikotie' %}Etuovi ei ole vielä käytössä tässä versiossa.{% endif %}
+    <div class="lp-solo__checks" id="regions-fieldset" style="margin-top:10px;">
+      {% for region in finnish_regions %}
+      <label class="lp-solo__check">
+        <input type="checkbox" name="regions" value="{{ region }}">
+        {{ region }}
+      </label>
+      {% endfor %}
+    </div>
+    <p class="lp-solo__hint" style="margin-top:10px;">
+      Saat liidejä kohteista, joissa on tulossa <strong>{{ invite.remonttityyppi }}</strong> valitsemillasi alueilla.
+      Ensimmäiset liidit tulevat noin 10 minuutin kuluttua, ja voit tarkentaa hakua myöhemmin asetuksista.
     </p>
+  </div>
 
-    {% if allowed_features %}
-    <h2 style="margin-top:1.5rem;">Toiminnot</h2>
-    <p class="form-helper mb-2">Valitse mitkä haluat ottaa käyttöön — voit muuttaa näitä myöhemmin.</p>
+  {% if allowed_features %}
+  <div>
+    <h2 class="lp-solo__section-title">Lisätoiminnot</h2>
+    <p class="lp-solo__hint" style="margin-bottom:8px;">Valitse, mitkä haluat ottaa käyttöön. Jos haluat muuttaa valintoja myöhemmin, ota yhteyttä FlowLeadsiin.</p>
     {% for key, label in allowed_features %}
-    <label class="form-check">
+    <label class="lp-solo__check">
       <input type="checkbox" name="enabled_features" value="{{ key }}">
       {{ label }}
     </label>
     {% endfor %}
-    {% endif %}
-
-    <button type="submit" class="btn btn-primary" style="margin-top:1.5rem;">Viimeistele käyttöönotto</button>
-  </form>
+  </div>
   {% endif %}
-</div>
+
+  <button type="submit" class="lp-btn lp-btn--primary lp-btn--block">Viimeistele käyttöönotto</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
 <script>
   (function () {
     const allRadio = document.getElementById("region-mode-all");

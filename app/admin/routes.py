@@ -11,7 +11,7 @@ from app.admin.services import get_accessible_organizations, get_dashboard_stats
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
-from app.search.constants import FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.constants import ALL_FINLAND_REGION, FINNISH_REGIONS, REMONTTITYYPIT
 from app.search.models import SearchProfile
 from app.users.services import UserServiceError, create_organization
 
@@ -108,7 +108,7 @@ def dashboard():
 @require_2fa
 def customers_list():
     customers = list_customers_summary()
-    return render_template("admin/customers.html", customers=customers)
+    return render_template("admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG)
 
 
 @admin_bp.route("/organizations", methods=["POST"])
@@ -141,7 +141,10 @@ def create_customer_route():
             form_data={},
         )
 
-    regions = [region for region in request.form.getlist("regions") if region in FINNISH_REGIONS]
+    if request.form.get("region_mode") == "all_finland":
+        regions = [ALL_FINLAND_REGION]
+    else:
+        regions = [region for region in request.form.getlist("regions") if region in FINNISH_REGIONS]
     form_data = {
         "organization_name": request.form.get("organization_name", "").strip(),
         "admin_name": request.form.get("admin_name", "").strip(),
@@ -185,10 +188,9 @@ def create_customer_route():
             "admin_email": result.admin_user.email,
             "admin_name": form_data["admin_name"] or None,
             "search_profile_name": result.search_profile_name,
-            "api_key_full": result.api_key_full,
             "temporary_password": result.temporary_password,
             "is_active": result.organization.is_active,
-            "initial_job_created": result.initial_job_created,
+            "login_url": url_for("auth.login", _external=True),
         }
     )
     return redirect(url_for("admin.create_customer_result"))
@@ -342,11 +344,51 @@ def activate_source_route(profile_id: int):
     try:
         activate_source(profile, actor=current_user)
         db.session.commit()
-        flash(f"Lähde aktivoitu: {profile.name}. Ensimmäinen hakutyö luotu.", "success")
+        flash(
+            f"Hakuprofiili aktivoitu: {profile.name}. Osumat katalogin viime viikoilta "
+            "tulevat liideiksi noin 10 minuutin kuluessa.",
+            "success",
+        )
     except InviteServiceError as exc:
         db.session.rollback()
         flash(exc.message, "danger")
     return redirect(url_for("admin.customers_list"))
+
+
+@admin_bp.route("/customers/<int:organization_id>/features", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def update_customer_features_route(organization_id: int):
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    features = [key for key in FEATURE_CATALOG if key in request.form.getlist("features")]
+    organization.enabled_features = features
+    log_audit(
+        "organization_features_updated",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"enabled_features": features},
+    )
+    db.session.commit()
+    flash(f"Toiminnot päivitetty: {organization.name}.", "success")
+    return redirect(url_for("admin.customers_list"))
+
+
+@admin_bp.route("/catalogue")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_status():
+    from app.listings.services import catalogue_health
+
+    return render_template("admin/catalogue.html", health=catalogue_health())
 
 
 @admin_bp.route("/api-keys", methods=["GET"])

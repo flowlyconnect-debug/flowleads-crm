@@ -1,0 +1,24 @@
+{#
+  Shared body of every error page. Standalone (auth/_card_layout.html), so an
+  error never renders a half-working app shell around it.
+  Each errors/<code>.html sets: code, heading, text, and optionally retry.
+#}
+{% extends "auth/_card_layout.html" %}
+{% block title %}{{ heading }} — FlowLeads{% endblock %}
+{% block card %}
+<p class="lp-solo__code-badge" aria-hidden="true">{{ code }}</p>
+<h1 class="lp-card__title">{{ heading }}</h1>
+<p class="lp-card__lead">{{ text }}</p>
+<div class="lp-solo__actions">
+  {% if current_user.is_authenticated %}
+  <a class="lp-btn lp-btn--primary" href="{{ url_for('analytics.dashboard') }}">Etusivulle</a>
+  {% else %}
+  <a class="lp-btn lp-btn--primary" href="{{ url_for('auth.login') }}">Kirjautumiseen</a>
+  {% endif %}
+  {% if retry %}
+  <a class="lp-btn lp-btn--secondary" href="{{ request.url }}">Yritä uudelleen</a>
+  {% else %}
+  <a class="lp-btn lp-btn--secondary" href="javascript:history.back()">Takaisin</a>
+  {% endif %}
+</div>
+{% endblock %}

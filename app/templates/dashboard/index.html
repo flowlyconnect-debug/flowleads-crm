@@ -1,10 +1,9 @@
-{% from "components/empty_state.html" import empty_state %}
 {% if org_picker %}
 <div class="dashboard-page dashboard-org-picker">
   <div class="page-header">
     <div>
       <h1>Kojelauta</h1>
-      <p class="page-subtitle">Valitse organisaatio nähdäksesi kojelautan.</p>
+      <p class="page-subtitle">Valitse organisaatio nähdäksesi sen työjonon.</p>
     </div>
   </div>
   <div class="card dashboard-org-picker">
@@ -30,105 +29,139 @@
 {% if form_submissions_today > 0 %}{% set alert_ns.count = alert_ns.count + 1 %}{% endif %}
 
 {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
+{% set new_leads = new_leads|default([]) %}
 {% set lead_meta_ns = namespace(rows=[]) %}
 {% for row in high_potential_leads %}
 {% set _ = lead_meta_ns.rows.append({'lead_id': row.lead_id, 'lead_name': row.lead_name, 'company': row.company, 'deal_value': row.deal_value, 'probability': row.probability}) %}
 {% endfor %}
+{% set new_leads_url = url_for('leads.list_leads', sort='created_at', dir='desc', **org_q) %}
 
-<div class="dashboard-page dashboard-action-first" id="dashboard-command-center"
+<div class="dashboard-page" id="dashboard-command-center"
      data-activity-feed='{{ activity_feed | tojson }}'
      data-org-query='{{ org_q | tojson }}'
-     data-lead-meta='{{ lead_meta_ns.rows | tojson }}'>
+     data-lead-meta='{{ lead_meta_ns.rows | tojson }}'
+     data-stage-labels='{{ STAGE_LABELS_FI | tojson }}'
+     data-source-labels='{{ SOURCE_LABELS_FI | tojson }}'
+     data-currency='{{ currency_symbol }}'
+     data-new-leads-url='{{ new_leads_url }}'>
+
+  <header class="dash-header">
+    <div class="dash-header__main">
+      <p class="dash-header__context">
+        <time id="dashboard-current-date" datetime=""></time>
+        {% if org %}<span class="dash-header__sep" aria-hidden="true">·</span><span class="dash-header__org">{{ org.name }}</span>{% endif %}
+      </p>
+      <h1 class="dash-header__title">Päivän työjono</h1>
+    </div>
+    <div class="dash-header__actions" role="toolbar" aria-label="Kojelaudan toiminnot">
+      <form method="get" action="{{ url_for('leads.list_leads') }}" class="dash-search" role="search" aria-label="Hae liidejä">
+        {% if org_q %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+        <span class="dash-search__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+        <input type="search" name="search" class="dash-search__input" placeholder="Hae liidiä…" autocomplete="off">
+      </form>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_q) }}">Kaikki liidit</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', **org_q) }}">+ Lisää liidi</a>
+    </div>
+  </header>
 
   {% if alert_ns.count > 0 %}
-  <div class="crm-notice-bar" role="alert" aria-live="polite">
-    <span class="crm-notice-bar__icon" aria-hidden="true">⚠</span>
-    <span class="crm-notice-bar__msg">{{ alert_ns.count }} asia odottaa toimia</span>
+  <div class="crm-notice-bar" role="status">
+    <svg class="crm-notice-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+    <span class="crm-notice-bar__msg">Odottaa käsittelyä</span>
     <span class="crm-notice-bar__links">
-      {% if tasks_overdue_count > 0 %}<a class="crm-notice-link" href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}">{{ tasks_overdue_count }} myöhässä olevaa tehtävää</a>{% endif %}
-      {% if open_proposals_count > 0 %}<a class="crm-notice-link" href="{{ url_for('proposals.list_proposals', **org_q) }}">{{ open_proposals_count }} avointa tarjousta</a>{% endif %}
-      {% if form_submissions_today > 0 %}<a class="crm-notice-link" href="{{ url_for('forms.list_forms', **org_q) }}">{{ form_submissions_today }} uutta lomakelähetystä</a>{% endif %}
+      {% if tasks_overdue_count > 0 %}<a class="crm-notice-link" href="{{ url_for('tasks.list_tasks', tab='overdue', **org_q) }}">{{ tasks_overdue_count }} {{ 'myöhässä oleva tehtävä' if tasks_overdue_count == 1 else 'myöhässä olevaa tehtävää' }}</a>{% endif %}
+      {% if open_proposals_count > 0 %}<a class="crm-notice-link" href="{{ url_for('proposals.list_proposals', **org_q) }}">{{ open_proposals_count }} {{ 'avoin tarjous' if open_proposals_count == 1 else 'avointa tarjousta' }}</a>{% endif %}
+      {% if form_submissions_today > 0 %}<a class="crm-notice-link" href="{{ url_for('forms.list_forms', **org_q) }}">{{ form_submissions_today }} {{ 'uusi lomakelähetys' if form_submissions_today == 1 else 'uutta lomakelähetystä' }}</a>{% endif %}
     </span>
   </div>
   {% endif %}
 
-  <header class="dash-header">
-    <div class="dash-header__main">
-      <time class="dash-header__date" id="dashboard-current-date" datetime=""></time>
-      <h1 class="dash-header__title">Tässä päivän tärkeimmät liidit.</h1>
-      <p class="dash-header__sub" id="dashboard-subtitle">Aloita ylimmästä — <span id="dashboard-action-count">—</span> toimea odottaa.</p>
-    </div>
-    <div class="dash-header__actions">
-      {% if current_user.is_superadmin() and organizations %}
-      <form method="get" action="{{ url_for('analytics.dashboard') }}" class="dash-header__org-form">
-        <label class="sr-only" for="dashboard-org-select">Organisaatio</label>
-        <select id="dashboard-org-select" name="organization_id" class="btn btn-secondary btn-sm" onchange="this.form.submit()">
-          {% for o in organizations %}
-          <option value="{{ o.id }}" {% if o.id == organization_id %}selected{% endif %}>{{ o.name }}</option>
-          {% endfor %}
-        </select>
-      </form>
-      {% elif org %}
-      <span class="dashboard-org-label">{{ org.name }}</span>
-      {% endif %}
-      <form method="get" action="{{ url_for('leads.list_leads', **org_q) }}" class="dash-search" role="search" aria-label="Hae liidejä">
-        <span class="dash-search__icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
-        </span>
-        <input type="search" name="search" class="dash-search__input" placeholder="Hae liidi…" autocomplete="off">
-      </form>
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', **org_q) }}">Uusi liidi</a>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_q) }}">Näytä kaikki liidit →</a>
-    </div>
-  </header>
-
-  <section class="dash-hero card" id="dashboardHero" aria-label="Aloita tästä" aria-live="polite">
-    <div class="dash-hero__main dash-hero__loading">
-      <div class="ai-worklist-skeleton-line"></div>
-      <div class="ai-worklist-skeleton-line dash-hero__skeleton-short"></div>
-    </div>
-    <div class="dash-hero__side dash-hero__side--loading" aria-hidden="true">
-      <div class="ai-worklist-skeleton-line dash-hero__skeleton-side"></div>
+  {# The one dark surface in the app: the item the user should handle first. #}
+  <section class="dash-focus" id="dashboardHero" aria-label="Käsittele ensin" aria-live="polite">
+    <div class="dash-focus__main">
+      <div class="dash-skeleton dash-skeleton--ink dash-skeleton--short"></div>
+      <div class="dash-skeleton dash-skeleton--ink dash-skeleton--tall"></div>
+      <div class="dash-skeleton dash-skeleton--ink"></div>
     </div>
   </section>
 
-  <div class="dash-list-header">
-    <h2 class="dash-list-header__title">Tärkeimmät liidit tänään</h2>
-    <span class="dash-list-header__meta" id="dashboard-list-meta"></span>
-  </div>
-  <div class="dash-list card" id="aiWorklistBody" aria-label="Tärkeimmät liidit tänään">
-    <div class="ai-worklist-loading">
-      <div class="ai-worklist-skeleton-line"></div>
-      <div class="ai-worklist-skeleton-line"></div>
-      <div class="ai-worklist-skeleton-line"></div>
-    </div>
+  <div class="dash-columns" id="dashColumns">
+    <section class="dash-panel" id="dashNewPanel" aria-labelledby="dash-new-title">
+      <header class="dash-panel__head">
+        <h2 class="dash-panel__title" id="dash-new-title">Uudet liidit</h2>
+        <span class="dash-panel__meta">viimeiset 7 pv, ei vielä kontaktia</span>
+        <a class="dash-panel__link" href="{{ new_leads_url }}">Näytä kaikki</a>
+      </header>
+      <div class="work-rows" id="dashNewLeads">
+        {% for lead in new_leads %}
+        {% set created_days = (now.date() - lead.created_at.date()).days if lead.created_at else none %}
+        <a class="work-row" href="{{ url_for('leads.detail', lead_id=lead.id, **org_q) }}"
+           data-lead-id="{{ lead.id }}"
+           data-name="{{ lead.company or lead.display_name }}"
+           data-contact="{{ lead.display_name if lead.company and lead.display_name != lead.company else '' }}"
+           data-source="{{ lead.source or '' }}"
+           data-stage="{{ lead.stage.name if lead.stage else '' }}"
+           data-stage-color="{{ lead.stage.color if lead.stage and lead.stage.color else '' }}"
+           data-deal-value="{{ lead.deal_value|float if lead.deal_value is not none else '' }}"
+           data-created-days="{{ created_days if created_days is not none else '' }}">
+          <span class="work-row__main">
+            <span class="work-row__name">{{ lead.company or lead.display_name }}</span>
+            <span class="work-row__meta">
+              <span class="lead-source">{{ source_label(lead.source) }}</span>
+              <span class="lead-stage"><span class="lead-stage__dot" style="background: {{ lead.stage.color if lead.stage and lead.stage.color else '#94A3B8' }}"></span>{{ stage_label(lead.stage.name if lead.stage else none) }}</span>
+              <span class="work-row__when">
+                {%- if created_days == 0 %}saapui tänään{% elif created_days == 1 %}saapui eilen{% elif created_days is not none %}saapui {{ created_days }} pv sitten{% endif -%}
+              </span>
+            </span>
+          </span>
+          <span class="lead-next">Ensikontakti<span class="lead-next__arrow" aria-hidden="true">→</span></span>
+        </a>
+        {% endfor %}
+      </div>
+      <p class="dash-panel__empty" id="dashNewEmpty" hidden>Ei muita uusia liidejä.</p>
+    </section>
+
+    <section class="dash-panel" id="dashFollowPanel" aria-labelledby="dash-follow-title">
+      <header class="dash-panel__head">
+        <h2 class="dash-panel__title" id="dash-follow-title">Seurattavat kohteet</h2>
+        <span class="dash-panel__meta" id="dashboard-list-meta"></span>
+        <a class="dash-panel__link" href="{{ url_for('leads.pipeline', **org_q) }}">Myyntiputki</a>
+      </header>
+      <div class="work-rows" id="aiWorklistBody" aria-label="Seurattavat kohteet">
+        <div class="dash-skeleton"></div>
+        <div class="dash-skeleton"></div>
+      </div>
+    </section>
   </div>
 
-  <section class="dash-stats card" aria-label="Yhteenveto">
+  <section class="dash-stats" aria-label="Tunnusluvut">
     <div class="dash-stat">
-      <div class="dash-stat__label">Uudet liidit</div>
+      <div class="dash-stat__label">Uudet liidit <span class="dash-stat__period">7 pv</span></div>
       <div class="dash-stat__row">
         <span class="dash-stat__value" id="metricNewLeads">—</span>
         <span class="dash-stat__sub" id="metricNewLeadsTrend"></span>
       </div>
     </div>
     <div class="dash-stat">
-      <div class="dash-stat__label">Avoin arvo</div>
+      <div class="dash-stat__label">Avoimen putken arvo <span class="dash-stat__period">nyt</span></div>
       <div class="dash-stat__row">
         <span class="dash-stat__value" id="metricPipelineValue">—</span>
       </div>
     </div>
     <div class="dash-stat">
-      <div class="dash-stat__label">Tärkeät toimet</div>
+      <div class="dash-stat__label">Tehtävät <span class="dash-stat__period">tänään</span></div>
       <div class="dash-stat__row">
         <span class="dash-stat__value" id="metricTasksToday">—</span>
+        <span class="dash-stat__sub" id="metricTasksOverdue"></span>
       </div>
     </div>
     <div class="dash-stat">
-      <div class="dash-stat__label">Lähellä sulkeutumista</div>
+      <div class="dash-stat__label">Todennäköiset kaupat <span class="dash-stat__period">≥ 50 %</span></div>
       <div class="dash-stat__row">
-        <span class="dash-stat__value dash-stat__value--success" id="metricHotLeads">—</span>
-        <span class="dash-stat__sub" id="metricTasksOverdue"></span>
+        <span class="dash-stat__value" id="metricHotLeads">—</span>
+        <span class="dash-stat__sub" id="metricHotLeadsValue"></span>
       </div>
     </div>
   </section>

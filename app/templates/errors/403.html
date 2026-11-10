@@ -1,3 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Forbidden{% endblock %}
-{% block content %}<div class="card"><h1>Forbidden</h1><p>You do not have permission to access this page.</p></div>{% endblock %}
+{% set code = "403" %}
+{% set heading = "Ei käyttöoikeutta" %}
+{% set text = "Sinulla ei ole oikeutta tähän sivuun. Jos tarvitset pääsyn, pyydä sitä organisaatiosi pääkäyttäjältä." %}
+{% set retry = false %}
+{% extends "errors/_error.html" %}

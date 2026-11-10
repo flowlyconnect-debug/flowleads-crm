@@ -57,6 +57,19 @@ class SearchProfile(db.Model):
     needs_rematch: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=sa.true(), nullable=False
     )
+    # Optional extra filters, all "empty = no restriction":
+    # remonttityypit = every renovation type the profile wants (remonttityyppi
+    #   above stays the primary one, = remonttityypit[0]);
+    # cities = kaupungit inside the chosen regions;
+    # timing_within_years = renovation at most N years ahead;
+    # build_year_min/max + building_types = the building itself.
+    # A listing whose value is unknown (no year / type / timing) passes.
+    remonttityypit: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
+    cities: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
+    timing_within_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    build_year_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    build_year_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    building_types: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -71,6 +84,11 @@ class SearchProfile(db.Model):
         server_default=func.now(),
         nullable=False,
     )
+
+    @property
+    def wanted_types(self) -> list[str]:
+        types = [t for t in (self.remonttityypit or []) if t]
+        return types or [self.remonttityyppi]
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     jobs: Mapped[list["SearchJob"]] = relationship(

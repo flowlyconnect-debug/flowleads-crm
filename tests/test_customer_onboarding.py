@@ -62,15 +62,18 @@ def test_create_customer_service_creates_full_stack(app):
         assert profile.source == "oikotie"
         assert profile.schedule_description == "daily"
         assert profile.is_active is True
-        assert profile.crm_api_key == result.api_key_full
-        assert result.api_key_full.startswith("fl_")
+        assert profile.needs_rematch is True
+        assert profile.crm_api_key is None
+        assert result.search_profile.id == profile.id
+        # the superadmin knows the password, so the customer must replace it
+        assert admin.must_change_password is True
+        assert org.enabled_features == ["sequences", "automations", "ai_enrichment"]
 
         stages = PipelineStage.query.filter_by(organization_id=org.id).all()
         assert len(stages) >= 5
 
-        job = SearchJob.query.filter_by(organization_id=org.id, search_profile_id=profile.id).first()
-        assert job is not None
-        assert job.status == "pending"
+        # catalogue model: nothing is scheduled per customer
+        assert SearchJob.query.filter_by(organization_id=org.id).count() == 0
 
         audit = AuditLog.query.filter_by(action="customer_onboarded", organization_id=org.id).first()
         assert audit is not None
@@ -98,40 +101,53 @@ def test_create_customer_generates_password_when_missing(app):
         assert len(result.temporary_password) >= 12
 
 
-def test_n8n_jobs_include_onboarded_customer(app, client):
+def test_onboarded_customer_gets_leads_from_catalogue_history(app):
+    """The whole point of onboarding: an active profile turns matching
+    catalogue listings into leads on the next scheduler run."""
+    from datetime import datetime, timezone
+
+    from app.leads.models import Lead
+    from app.listings.models import Listing, ListingRenovation
+    from app.listings.services import materialize_pending_matches, rematch_profiles
+
     with app.app_context():
+        now = datetime.now(timezone.utc)
+        listing = Listing(
+            source="oikotie",
+            external_id="555",
+            maakunta="Uusimaa",
+            kaupunki="Espoo",
+            osoite="Testikatu 1",
+            taloyhtio="As Oy Valmis",
+            analysis_status="done",
+            first_seen_at=now,
+            last_seen_at=now,
+            published_at=now,
+        )
+        listing.renovations.append(
+            ListingRenovation(remonttityyppi="Lukkoremontti / kulunvalvonta", confidence=90)
+        )
+        db.session.add(listing)
         actor = create_user("actor3@test.com", "securepassword1", role="superadmin")
         db.session.commit()
         result = create_customer(
             actor=actor,
-            organization_name="N8N Ready Oy",
-            admin_email="n8n@ready.fi",
+            organization_name="Katalogi Ready Oy",
+            admin_email="katalogi@ready.fi",
             admin_password="securepassword1",
             admin_name=None,
-            search_profile_name="N8N profiili",
+            search_profile_name="Katalogiprofiili",
             regions=["Uusimaa"],
             remonttityyppi="Lukkoremontti / kulunvalvonta",
             is_active=True,
         )
         db.session.commit()
-        api_key = result.api_key_full
+        org_id = result.organization.id
 
-    response = client.get(
-        "/api/v1/n8n/jobs?status=pending&limit=10",
-        headers={"X-N8N-Secret": "test-n8n-secret", "Content-Type": "application/json"},
-    )
-    assert response.status_code == 200
-    jobs = response.get_json()["jobs"]
-    # crm_api_key is now a short-lived job-scoped token, never the
-    # organization's permanent API key (api_key) — match by org instead.
-    with app.app_context():
-        org = Organization.query.filter_by(name="N8N Ready Oy").one()
-    match = [job for job in jobs if job.get("organization_id") == org.id]
-    assert len(match) == 1
-    assert match[0]["crm_api_key"] != api_key
-    assert match[0]["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
-    assert match[0]["regions"] == ["Uusimaa"]
-    assert match[0]["source"] == "oikotie"
+        assert rematch_profiles() == 1
+        assert materialize_pending_matches() == 1
+        lead = Lead.query.filter_by(organization_id=org_id).one()
+        assert lead.source_ref == "oikotie-555"
 
 
 def test_superadmin_customers_new_get_renders_form(client, app):
@@ -181,7 +197,8 @@ def test_superadmin_onboarding_form_and_result(client, app):
     assert "Web Onboard Oy" in page
     assert "webadmin@onboard.fi" in page
     assert "Web profiili" in page
-    assert "Valmis n8n-ajoon" in page
+    assert "Hakuprofiili on aktiivinen" in page
+    assert "fl_" not in page  # no API key is created or shown any more
 
     second_view = client.get("/admin/customers/result")
     assert second_view.status_code == 302

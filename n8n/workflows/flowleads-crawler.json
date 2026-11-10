@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "44b11db4-7131-43fe-84e0-fd1a38d79d82",
+      "id": "17bc471c-e5cb-49be-becc-a73a03e61383",
       "name": "Every hour"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "5a84e424-64bb-422f-89b4-e6b15f02fcf7",
+      "id": "8b5da68b-65e0-4564-9a77-d5923160f34c",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "4bfd3f5f-0523-4f85-97b1-c00e993d5d81",
+              "id": "cafd8c6a-6cb6-41e1-bd22-ff9bd1ef685b",
               "name": "crm_base_url",
-              "value": "https://flowleads-crm.onrender.com",
+              "value": "https://flowleads-crm-zv0a.onrender.com",
               "type": "string"
             },
             {
-              "id": "59588e0d-0643-48d4-bdfa-d4e9630df1d4",
+              "id": "e0960b83-d216-44f7-93ba-2dd6cf29331f",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "51ab5cf8-9bbe-48ef-b431-5c30be0ad467",
+      "id": "9d379443-f85d-4e43-968e-26f2908c8c9c",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -82,7 +82,7 @@
         440,
         100
       ],
-      "id": "49eea970-54dc-47ef-8b99-5d384624da76",
+      "id": "f845bcb2-a1fd-4232-b33b-7b74e70b3e44",
       "name": "HTTP – Get Crawl Plan",
       "retryOnFail": true,
       "maxTries": 3,
@@ -98,7 +98,7 @@
         660,
         100
       ],
-      "id": "28544d2e-58d5-4e1f-ba4e-21cd1efb15f0",
+      "id": "6a8c1dfb-7056-4c06-9ef6-41e5a82b96f4",
       "name": "CODE – Split Tasks"
     },
     {
@@ -111,7 +111,7 @@
         880,
         100
       ],
-      "id": "95428d4b-9024-4144-acb0-e13e67c2de9b",
+      "id": "522c6525-3d16-4eb4-8b20-b102d14c20e5",
       "name": "LOOP – Tasks",
       "notes": "Yksi tehtävä = yksi maakunta (incremental tai full-pass-viipale)."
     },
@@ -188,7 +188,7 @@
         1100,
         200
       ],
-      "id": "2d0f2f6e-6ee7-40b7-8bb4-a6273aca1849",
+      "id": "190e8c9f-cc7d-43bd-adef-7485e0aa4603",
       "name": "HTTP – Fetch Oikotie Search Page",
       "onError": "continueRegularOutput"
     },
@@ -202,7 +202,7 @@
         1320,
         200
       ],
-      "id": "904aca63-7e69-4e78-af11-5f481b887219",
+      "id": "73c518d1-c97b-4870-ab25-c42cbec48dc3",
       "name": "PARSE – Extract apiLocation"
     },
     {
@@ -247,7 +247,7 @@
         1540,
         200
       ],
-      "id": "2e6d5b53-b6ac-45c0-a398-714291cb8ebf",
+      "id": "2b0b82cc-04cf-41fc-bff1-f260c2fefdff",
       "name": "HTTP – Fetch Oikotie API Bootstrap",
       "onError": "continueRegularOutput"
     },
@@ -261,7 +261,7 @@
         1760,
         200
       ],
-      "id": "ac80f0a4-d903-48ba-bbce-10bf28fc678d",
+      "id": "ce12b4a8-2ecb-4df0-a03e-97f172b05f1a",
       "name": "TRANSFORM – Extract Session Cookie"
     },
     {
@@ -274,7 +274,7 @@
         1980,
         200
       ],
-      "id": "3b35383c-8669-46c1-98ed-fda310e89273",
+      "id": "218e5e81-96e0-47d6-bfae-85d2f27ea39f",
       "name": "CODE – Page Context"
     },
     {
@@ -350,7 +350,7 @@
         2200,
         200
       ],
-      "id": "5d473649-b1ba-4e24-8e69-60950346b7aa",
+      "id": "9f888636-a506-4b59-b90e-d239198c3461",
       "name": "HTTP – Fetch Oikotie Listings API",
       "onError": "continueRegularOutput",
       "retryOnFail": true,
@@ -359,7 +359,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('CODE – Page Context').first().json;\nconst r = $input.first()?.json || {};\nlet error = '';\nif (r.error) error = typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\nconst cards = r.cards || r.data?.cards;\nif (!error && !Array.isArray(cards)) error = 'Unexpected Oikotie response: ' + JSON.stringify(r).slice(0, 200);\nconst listings = (Array.isArray(cards) ? cards : []).map(card => {\n  const loc = card.location || {};\n  const d = card.data || {};\n  return {\n    external_id: String(card.cardId || card.id || ''),\n    url: card.url || '',\n    kaupunki: loc.city || loc.municipality || '',\n    osoite: loc.address || '',\n    hinta: d.price || '',\n    alue: d.size || d.sizeMax || '',\n    description: d.description || '',\n    published_at: card.published || d.published || card.meta?.published || null,\n  };\n});\nconst body = {\n  maakunta: ctx.maakunta,\n  mode: ctx.mode,\n  offset: Number(ctx.offset || 0),\n  page_in_run: Number(ctx.page_in_run || 1),\n  listings,\n};\nif (error) body.error = error.slice(0, 1000);\nreturn [{ json: { ctx, crm_base_url: ctx.crm_base_url, n8n_secret: ctx.n8n_secret, body } }];\n"
+        "jsCode": "const ctx = $('CODE – Page Context').first().json;\nconst r = $input.first()?.json || {};\nlet error = '';\nif (r.error) error = typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\nconst cards = r.cards || r.data?.cards;\nif (!error && !Array.isArray(cards)) error = 'Unexpected Oikotie response: ' + JSON.stringify(r).slice(0, 200);\nconst listings = (Array.isArray(cards) ? cards : []).map(card => {\n  const loc = card.location || {};\n  const d = card.data || {};\n  const b = card.buildingData || card.building || {};\n  return {\n    external_id: String(card.cardId || card.id || ''),\n    url: card.url || '',\n    kaupunki: loc.city || loc.municipality || '',\n    osoite: loc.address || '',\n    hinta: d.price || '',\n    alue: d.size || d.sizeMax || '',\n    description: d.description || '',\n    published_at: card.published || d.published || card.meta?.published || null,\n    // optional: the CRM falls back to the AI analysis when these are missing\n    build_year: b.year || d.buildYear || d.year || null,\n    building_type: b.buildingType || d.buildingType || card.buildingType || null,\n  };\n});\nconst body = {\n  maakunta: ctx.maakunta,\n  mode: ctx.mode,\n  offset: Number(ctx.offset || 0),\n  page_in_run: Number(ctx.page_in_run || 1),\n  listings,\n};\nif (error) body.error = error.slice(0, 1000);\nreturn [{ json: { ctx, crm_base_url: ctx.crm_base_url, n8n_secret: ctx.n8n_secret, body } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -367,7 +367,7 @@
         2420,
         200
       ],
-      "id": "536d659e-f5f0-4dba-9360-c8700df668e4",
+      "id": "ce522698-cfda-4600-816a-d365d0985f47",
       "name": "CODE – Normalize Cards"
     },
     {
@@ -398,7 +398,7 @@
         2640,
         200
       ],
-      "id": "13506b08-691b-465c-8553-bd84969c4f7f",
+      "id": "3a2986ea-1e92-4dfa-9187-8e29efe7642d",
       "name": "HTTP – CRM Ingest",
       "retryOnFail": true,
       "maxTries": 3,
@@ -415,7 +415,7 @@
         2860,
         200
       ],
-      "id": "06a986be-b484-4020-b840-af8f0a4458a0",
+      "id": "7ab37343-a151-40d4-a9a8-58369fb7c4fa",
       "name": "CODE – Next Page"
     },
     {
@@ -429,7 +429,7 @@
           },
           "conditions": [
             {
-              "id": "e37d5cde-5fed-4916-bf66-a3c93d2c8688",
+              "id": "a0358928-192a-4661-b7ab-d0870d59e2ba",
               "leftValue": "={{ $json.more }}",
               "rightValue": "",
               "operator": {
@@ -450,7 +450,7 @@
         3080,
         200
       ],
-      "id": "f5657413-36f7-4f37-887b-2b95bbf53380",
+      "id": "505c2153-ada8-421a-b0f7-07b21788b91a",
       "name": "IF – More Pages"
     },
     {
@@ -464,9 +464,9 @@
         3300,
         340
       ],
-      "id": "6a6d4600-0904-46b5-bb54-4278d3f3bdbc",
+      "id": "2c51a6c5-5968-4c06-b435-8fcf439a643e",
       "name": "WAIT – Between Pages",
-      "webhookId": "8539fc14-93b1-4ae0-8c80-994159af3480"
+      "webhookId": "37e6304f-0464-4a2a-8f89-3d0ea1e0371b"
     }
   ],
   "pinData": {},

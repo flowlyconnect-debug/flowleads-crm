@@ -70,10 +70,18 @@ asiakkaan API-avainta. CRM luo liidit itse.
 ### 3. Täsmäytys ja liidit – CRM (`app/listings/services.py`)
 
 - **Osuma** (`listing_matches`): profiili on aktiivinen, kohteen maakunta kuuluu profiilin alueisiin
-  ("Koko Suomi" = kaikki), ja kohteella on profiilin remonttityyppi vähintään `min_confidence`-varmuudella.
+  ("Koko Suomi" = kaikki), ja kohteella on jokin profiilin remonttityypeistä vähintään `min_confidence`-varmuudella.
+- **Lisäsuodattimet** (kaikki valinnaisia, tyhjä = ei rajaa): `remonttityypit` (useampi tyyppi; `remonttityyppi` on
+  listan ensimmäinen), `cities` (kaupungit, kirjainkoolla ei väliä), `timing_within_years` (remontti enintään N vuoden
+  päässä, vertaa `listing_renovations.timing_year`), `build_year_min`/`build_year_max` ja `building_types`
+  (`BUILDING_TYPES`). **Tuntematon arvo ei koskaan pudota kohdetta**: jos kohteen rakennusvuotta, talotyyppiä tai
+  remontin vuotta ei tiedetä, kohde tulee mukaan. Logiikka: `_listing_passes` + `_best_renovation`.
+- Asetussivun **esikatselu** (`POST /settings/search-profiles/preview`) laskee samalla funktiolla (`wanted_listings`),
+  montako osumaa tallentamaton suodatin antaisi nyt.
 - `match_listing(listing)` ajetaan, kun uusi kohde on analysoitu. `rematch_profile(profile)` ajetaan, kun
-  profiili luodaan tai sen suodatin muuttuu (`needs_rematch=True`), ja se ottaa kohteet viimeiseltä
-  `LISTING_MATCH_HISTORY_DAYS` (30) päivältä.
+  profiili luodaan, **aktivoidaan** tai sen suodatin muuttuu (`needs_rematch=True`), ja se ottaa kohteet viimeiseltä
+  `LISTING_MATCH_HISTORY_DAYS` (30) päivältä. Ei-aktiivisen profiilin lippu nollataan, joten aktivointi pitää tehdä
+  `activate_profile()`-funktiolla (asettaa lipun takaisin).
 - `materialize_pending_matches()` tekee odottavista osumista liidit uusimmat ensin, enintään profiilin
   `daily_lead_limit` (oletus 50, 0 = ei rajaa) per UTC-päivä. Loput odottavat seuraavaan päivään.
 - Liidi luodaan `upsert_lead`-funktiolla (sama kuin API) ja liidireitityksellä:
@@ -81,6 +89,11 @@ asiakkaan API-avainta. CRM luo liidit itse.
   - isännöitsijä = company
   - `gdpr_legal_basis=legitimate_interest`
   - kohteen tiedot `metadata`:ssa (`ai_contact_info`), jotka liidin sivu näyttää (`app/leads/property_info.py`)
+- **Liidi = taloyhtiön remonttikohde, ei isännöitsijä.** Katalogi tunnistaa liidin vain Oikotie-viitteellä
+  (`upsert_lead(..., match_by_email=False)`), koska sama isännöitsijän sähköposti on kymmenillä taloyhtiöillä.
+- **Sama taloyhtiö, toinen asunto myynnissä**: jos profiililla on jo liidi samasta taloyhtiöstä (nimi + kaupunki),
+  uusi osuma liitetään siihen (`status=merged`, liidille aktiviteettimerkintä). Uutta liidiä ei synny eikä päivärajaa
+  kulu. Myöhemmin löytyvät yhteystiedot päivitetään yhteiseen liidiin.
 - Osuman status pysyy `lead_created`, vaikka liidi poistettaisiin, joten poistettua liidiä ei luoda uudelleen.
 - Ajastin (`app/scheduler.py`, `listing_matching`, 10 min) ajaa `rematch_profiles` + `materialize_pending_matches`.
 
@@ -91,26 +104,53 @@ asiakkaan API-avainta. CRM luo liidit itse.
 - `POST /contacts/claim` → tuotannon Finder/Asiakastieto/AI-ketju (sama kuin vanhassa Lead Workerissa) → `POST /<id>/contacts`.
 - CRM täydentää kohteen tyhjät kentät ja päivittää kaikki kohteesta tehdyt liidit (puhelin, sähköposti, yritys, verkkosivu).
 
+### 5. Asiakkaan käyttöönotto (`app/admin/`)
+
+- **Luo asiakas** (`onboarding_services.create_customer`): organisaatio + admin + aktiivinen profiili. Ei API-avainta
+  eikä hakujobia. Admin saa väliaikaisen salasanan, joka on pakko vaihtaa ensikirjautumisessa
+  (`users.must_change_password`, `/auth/change-password`).
+- **Kutsu asiakas** (`invite_services`): asiakas asettaa itse salasanan ja valitsee alueet. Profiili on heti
+  aktiivinen, eli erillistä "aktivoi lähde" -vaihetta ei tarvita. `activate_source` on jäljellä vain pois kytketyille profiileille.
+- Kummassakin tapauksessa liidit katalogin viime viikoilta tulevat seuraavalla `listing_matching`-ajolla (≤ 10 min).
+- **Valinnaiset toiminnot** (`organizations.enabled_features`, `app/core/features.py`): sekvenssit, automaatiot ja
+  AI-rikastus. Uudella organisaatiolla kaikki päällä; kutsuttu asiakas valitsee sallituista. Superadmin muuttaa
+  asiakaslistasta. Superadminia ei rajata.
+- Laskutus tehdään toistaiseksi käsin, CRM:ssä ei ole tilaustenhallintaa.
+
+### 6. Valvonta ja säilytys
+
+- **Kohdekatalogin tila** (`/admin/catalogue`, `catalogue_health()`): maakuntakohtainen keruun tila ja virheet, jonot
+  sekä lista huomiota vaativista asioista.
+- **Hälytys** (ajastin `catalogue_health_check`, 1 h): jos keruu tai analyysi on ollut pysähdyksissä yli
+  `LISTING_STALE_HOURS` tai jossain maakunnassa on keruuvirhe, superadminit saavat sähköpostin, enintään kerran
+  `LISTING_ALERT_INTERVAL_HOURS` aikana (kirjataan audit-lokiin `catalogue_alert_sent`).
+- **Säilytys** (ajastin `listing_retention`, päivittäin): Oikotieltä poistuneet kohteet remontteineen ja osumineen
+  poistetaan `LISTING_RETENTION_DAYS` päivän kuluttua poistumisesta. Asiakkaan liidit jäävät asiakkaan CRM:ään.
+
 ## Tietomalli (`app/listings/models.py`)
 
 | Taulu | Sisältö |
 |---|---|
-| `listings` | Kohde (uniikki `source`+`external_id`): osoite, kaupunki, maakunta, hinta, kuvaus, `content_hash`, `first/last_seen_at`, `is_active`. Lisäksi analyysin tila ja isännöitsijätiedot sekä yhteystietojonon tila. |
-| `listing_renovations` | Kohteen tulevat remontit: `remonttityyppi` (yksi `REMONTTITYYPIT`-arvoista), `confidence`, `timing`, `evidence`. |
-| `listing_matches` | Profiili × kohde (uniikki). `status` = pending/lead_created, `lead_id` (SET NULL), `lead_created_at`. |
+| `listings` | Kohde (uniikki `source`+`external_id`): osoite, kaupunki, maakunta, hinta, kuvaus, `build_year`, `building_type`, `content_hash`, `first/last_seen_at`, `is_active`. Lisäksi analyysin tila ja isännöitsijätiedot sekä yhteystietojonon tila. |
+| `listing_renovations` | Kohteen tulevat remontit: `remonttityyppi` (yksi `REMONTTITYYPIT`-arvoista), `confidence`, `timing`, `timing_year`, `evidence`. |
+| `listing_matches` | Profiili × kohde (uniikki). `status` = pending/lead_created/merged, `lead_id` (SET NULL), `lead_created_at`. |
 | `listing_crawl_state` | Per maakunta: `full_offset`, `full_started_at`, `prev_full_started_at`, `full_completed_at`, `last_incremental_at`, `last_error`. |
-| `search_profiles` (+) | Uudet kentät `min_confidence` (60), `daily_lead_limit` (50) ja `needs_rematch`. |
+| `search_profiles` (+) | `min_confidence` (60), `daily_lead_limit` (50), `needs_rematch` sekä lisäsuodattimet `remonttityypit`, `cities`, `timing_within_years`, `build_year_min/max`, `building_types`. |
 
-Migraatio: `migrations/versions/e3f4a5b6c7d8_add_listing_catalogue.py`.
+Rakennusvuosi ja talotyyppi tulevat Oikotien kortista, jos kortissa on ne (`buildingData`), ja muuten AI-analyysistä
+(`rakennusvuosi`, `talotyyppi`). Kortin arvo voittaa. **Kortin kenttänimet on tarkistettava ensimmäisestä oikeasta
+Crawler-ajosta**, koska Oikotie ei vastaa kehityskoneelle; AI-polku toimii kortista riippumatta.
+
+Migraatiot: `e3f4a5b6c7d8_add_listing_catalogue.py` ja `f4a5b6c7d8e9_add_profile_filters_and_onboarding.py`.
 
 ## API (`app/listings/routes.py`, kaikki vaativat `X-N8N-Secret`)
 
 | Metodi ja polku | Kuka | Mitä |
 |---|---|---|
 | `GET /api/v1/n8n/listings/crawl-plan` | Crawler | `{tasks:[{maakunta, slug, mode, offset, max_pages}]}` |
-| `POST /api/v1/n8n/listings/ingest` | Crawler | `{maakunta, mode, offset, page_in_run, listings:[{external_id,url,kaupunki,osoite,hinta,alue,description,published_at}], error?}` → `{created, updated, removed, continue, next_offset}` |
-| `POST /api/v1/n8n/listings/analysis/claim` | Analyzer | `{limit}` → `{listings:[…], remonttityypit:[…]}` |
-| `POST /api/v1/n8n/listings/<id>/analysis` | Analyzer | `{status:"done", taloyhtio, isannoitsija, isannoitsija_puh, isannoitsija_email, tulevat_remontit, renovations:[{remonttityyppi, confidence, timing, evidence}]}` tai `{status:"failed", error}` |
+| `POST /api/v1/n8n/listings/ingest` | Crawler | `{maakunta, mode, offset, page_in_run, listings:[{external_id,url,kaupunki,osoite,hinta,alue,description,published_at,build_year?,building_type?}], error?}` → `{created, updated, removed, continue, next_offset}` |
+| `POST /api/v1/n8n/listings/analysis/claim` | Analyzer | `{limit}` → `{listings:[…], remonttityypit:[…], talotyypit:[…]}` |
+| `POST /api/v1/n8n/listings/<id>/analysis` | Analyzer | `{status:"done", taloyhtio, isannoitsija, isannoitsija_puh, isannoitsija_email, rakennusvuosi, talotyyppi, tulevat_remontit, renovations:[{remonttityyppi, confidence, timing, evidence}]}` tai `{status:"failed", error}` |
 | `POST /api/v1/n8n/listings/contacts/claim` | Enricher | `{limit}` → `{listings:[…]}` |
 | `POST /api/v1/n8n/listings/<id>/contacts` | Enricher | `{status:"done", isannoitsija, phone, email, website, source}`, `{status:"not_found"}` tai `{status:"failed"}` |
 
@@ -126,6 +166,9 @@ Migraatio: `migrations/versions/e3f4a5b6c7d8_add_listing_catalogue.py`.
 | `LISTING_MATCH_HISTORY_DAYS` | 30 | uuden profiilin historiaikkuna |
 | `LISTING_MAX_ATTEMPTS` | 3 | analyysin / yhteystietohaun yrityskerrat |
 | `LISTING_CLAIM_TIMEOUT_MINUTES` | 30 | jumissa olevan claimin vapautus |
+| `LISTING_RETENTION_DAYS` | 90 | poistuneen kohteen säilytysaika (0 = ei poisteta) |
+| `LISTING_STALE_HOURS` | 6 | näin pitkä hiljaisuus keruussa/analyysissä = hälytys |
+| `LISTING_ALERT_INTERVAL_HOURS` | 24 | hälytyssähköpostien vähimmäisväli |
 | `SEARCH_JOBS_ENABLED` | `false` | vanhan SearchJob-putken ajastimet (pois päältä) |
 
 ## Vanha SearchJob-putki
@@ -133,11 +176,14 @@ Migraatio: `migrations/versions/e3f4a5b6c7d8_add_listing_catalogue.py`.
 `app/search/` -jobikoodi (`/api/v1/n8n/jobs`, jobitokenit, heartbeatit) on yhä koodissa ja testattu,
 mutta ajastin ei luo jobeja (`SEARCH_JOBS_ENABLED=false`), eikä sille ole enää n8n-workflowta.
 Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käyttämättömiä, eikä niitä näytetä lomakkeella.
+Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
 ## Testit
 
 - `tests/test_listings_catalogue.py`: keruu, poistot, jonot, täsmäytys, päiväraja, historiaikkuna, yhteystiedot ja API.
+- `tests/test_catalogue_filters_and_onboarding.py`: lisäsuodattimet, esikatselu, liidi per taloyhtiö, säilytys,
+  hälytys, salasanan vaihtopakko ja valinnaiset toiminnot.
 - `tests/test_n8n_catalogue_e2e.py`: ajaa kolme generoitua n8n-workflowta node kerrallaan
   (`tests/n8n_sim/executor.js`, mini-n8n) oikeaa paikallista CRM-palvelinta vasten. Oikotie, Finder,
   Asiakastieto ja OpenAI on mockattu (`tests/n8n_sim/mocks.js`). Testi ohitetaan, jos Node.js puuttuu.
@@ -149,4 +195,7 @@ Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 - **Alkutäyttö**: koko Suomi on kymmeniä tuhansia kohteita. Keruu kestää noin 1–2 vrk (30 sivua × 2 maakuntaa per tunti),
   ja analyysi noin 300–400 kohdetta tunnissa, eli noin viikon. AI-kulu on suurin alkutäytössä, sen jälkeen pieni.
 - **Päiväraja**: alkutäytön aikana osumia voi tulla paljon. `daily_lead_limit` estää pipelinen tulvimisen.
-- **GDPR**: isännöitsijätiedot ovat B2B-tietoja, ja perusteena on oikeutettu etu. Poistuneiden kohteiden säilytysaikaa ei ole vielä toteutettu.
+- **GDPR**: isännöitsijätiedot ovat B2B-tietoja, ja perusteena on oikeutettu etu. Poistuneet kohteet poistetaan
+  `LISTING_RETENTION_DAYS` päivän jälkeen.
+- **Valinnaisten toimintojen rajaus** estää sivut, automaatioiden laukaisun ja AI-rikastuksen, mutta ei piilota
+  valikkolinkkejä eikä pysäytä jo käynnissä olevia sekvenssejä, jos toiminto otetaan asiakkaalta pois jälkikäteen.

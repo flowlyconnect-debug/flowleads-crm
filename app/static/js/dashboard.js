@@ -1,15 +1,42 @@
 /**
- * FlowLeads — Action-first Dashboard (Aloita tästä)
+ * FlowLeads — Kojelauta: päivän työjono.
+ *
+ * Reading order is the same as in Liidit and Myyntiputki:
+ * kohteen nimi → lähde ja vaihe → seuraava toimi.
  */
 (function () {
   'use strict';
 
   var SKIP_KEY = 'flowleads-dashboard-skipped';
-  var STAGE_BY_KIND = {
-    overdue_task: { label: 'Tarjous odottaa', color: 'var(--stage-proposal)' },
-    hot_lead_no_contact: { label: 'Reagoi seuraavaksi', color: 'var(--stage-interested)' },
-    warm_lead_no_contact: { label: 'Liukumassa pois', color: 'var(--color-warning)' },
-    new_unprocessed_lead: { label: 'Uusi liidi', color: 'var(--stage-new)' },
+
+  // Why an item is in the queue right now. Colour always comes with a label
+  // and an icon: blue = arrival, amber = real urgency.
+  var WHY_BY_KIND = {
+    overdue_task: { label: 'Tehtävä myöhässä', tone: 'urgent' },
+    hot_lead_no_contact: { label: 'Odottaa yhteydenottoa', tone: 'urgent' },
+    warm_lead_no_contact: { label: 'Hiljentynyt kohde', tone: 'urgent' },
+    new_unprocessed_lead: { label: 'Uusi liidi', tone: 'arrival' },
+    new_lead: { label: 'Uusi liidi', tone: 'arrival' },
+    recommendation: { label: 'Jatkotoimi odottaa', tone: 'neutral' },
+  };
+
+  var ICONS = {
+    arrival:
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>',
+    urgent:
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+    neutral:
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>',
+    done:
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>',
+  };
+
+  var root = null;
+  var state = {
+    worklist: null, // null = not loaded yet
+    today: null,
+    metrics: null,
+    failed: false,
   };
 
   function getCsrfToken() {
@@ -18,6 +45,15 @@
       document.getElementById('csrf-token')?.value ||
       ''
     );
+  }
+
+  function readJsonAttr(name, fallback) {
+    if (!root) return fallback;
+    try {
+      return JSON.parse(root.getAttribute(name) || '') || fallback;
+    } catch (e) {
+      return fallback;
+    }
   }
 
   function setCurrentDate() {
@@ -42,21 +78,43 @@
     return d.innerHTML;
   }
 
-  function formatEuro(value) {
-    if (value == null || Number(value) <= 0) return '—';
+  function currency() {
+    return (root && root.getAttribute('data-currency')) || '€';
+  }
+
+  /** null/'' = not estimated (distinct from a real zero). */
+  function hasValue(value) {
+    return value !== null && value !== undefined && value !== '' && !isNaN(Number(value));
+  }
+
+  function formatMoney(value) {
     return (
-      '€' +
+      currency() +
       new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 0 }).format(Number(value))
     );
   }
 
-  function displayMetric(el, value, fallback) {
-    if (!el) return;
-    if (value == null || value === '' || (typeof value === 'number' && isNaN(value))) {
-      el.textContent = fallback != null ? fallback : '—';
-      return;
-    }
-    el.textContent = String(value);
+  function stageLabel(name) {
+    if (!name) return '';
+    var map = readJsonAttr('data-stage-labels', {});
+    return map[String(name).trim().toLowerCase()] || name;
+  }
+
+  function sourceLabel(code) {
+    if (!code) return '';
+    var map = readJsonAttr('data-source-labels', {});
+    return map[String(code).trim().toLowerCase()] || code;
+  }
+
+  function orgQueryString() {
+    var params = new URLSearchParams(readJsonAttr('data-org-query', {}));
+    return params.toString();
+  }
+
+  function withOrg(url) {
+    var qs = orgQueryString();
+    if (!qs || !url) return url;
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + qs;
   }
 
   function parseLeadIdFromUrl(url) {
@@ -64,76 +122,133 @@
     return match ? parseInt(match[1], 10) : null;
   }
 
-  function parseActionText(actionText) {
-    var text = (actionText || '').trim();
-    var company = '';
-    var contact = '';
-    var paren = text.match(/\(([^)]+)\)\s*$/);
-
-    if (paren) {
-      company = paren[1].trim();
-      contact = text
-        .replace(/\s*\([^)]+\)\s*$/, '')
-        .replace(/^(Soita|Lähetä follow-up|Käy läpi)\s+/i, '')
-        .trim();
-    } else {
-      contact = text.replace(/^(Soita|Lähetä follow-up|Käy läpi)\s+/i, '').trim();
-      company = contact;
-      contact = '';
-    }
-
-    return { company: company, contact: contact };
-  }
-
-  function actionVerb(actionText) {
-    if (!actionText) return 'Avaa';
-    if (actionText.indexOf('Soita') === 0) return 'Soita';
-    if (actionText.indexOf('Lähetä') === 0) return 'Lähetä follow-up';
-    if (actionText.indexOf('Käy läpi') === 0) return 'Käy läpi';
-    return 'Seuraava toimi';
-  }
-
-  function stageForItem(item) {
-    if (item && STAGE_BY_KIND[item.kind]) return STAGE_BY_KIND[item.kind];
-    return { label: 'Seuraava toimi', color: 'var(--color-text-muted)' };
-  }
-
   function getLeadMetaMap() {
-    var root = document.getElementById('dashboard-command-center');
-    if (!root) return {};
-    try {
-      var rows = JSON.parse(root.getAttribute('data-lead-meta') || '[]');
-      var map = {};
-      rows.forEach(function (row) {
-        if (row.lead_id != null) map[row.lead_id] = row;
-      });
-      return map;
-    } catch (e) {
-      return {};
-    }
+    var rows = readJsonAttr('data-lead-meta', []);
+    var map = {};
+    rows.forEach(function (row) {
+      if (row.lead_id != null) map[row.lead_id] = row;
+    });
+    return map;
   }
 
-  function enrichItem(item, metaMap) {
-    var parsed = parseActionText(item.action_text);
-    var leadId = parseLeadIdFromUrl(item.url);
-    var meta = leadId != null ? metaMap[leadId] : null;
-    var company = (meta && meta.company) || parsed.company || '—';
-    var contact = (meta && meta.lead_name) || parsed.contact || '';
-    var dealValue = meta && meta.deal_value != null ? meta.deal_value : null;
+  /* ── Normalising the three data sources into one row shape ── */
 
+  function verbFromActionText(text) {
+    if (!text) return 'Avaa';
+    if (text.indexOf('Soita') === 0) return 'Soita';
+    if (text.indexOf('Lähetä') === 0) return 'Lähetä follow-up';
+    if (text.indexOf('Käy läpi') === 0) return 'Käy läpi';
+    return 'Avaa';
+  }
+
+  function nameFromActionText(text) {
+    var t = (text || '').trim();
+    var paren = t.match(/\(([^)]+)\)\s*$/);
+    if (paren) return paren[1].trim();
+    return t.replace(/^(Soita|Lähetä follow-up|Käy läpi)\s+/i, '').trim();
+  }
+
+  function rowFromWorklist(item, metaMap) {
+    var leadId = item.lead_id != null ? item.lead_id : parseLeadIdFromUrl(item.url);
+    var meta = leadId != null ? metaMap[leadId] : null;
+    var name = item.company || item.name || nameFromActionText(item.action_text) || 'Liidi';
+    var contact = item.name && item.company && item.name !== item.company ? item.name : '';
+    var value = hasValue(item.deal_value)
+      ? item.deal_value
+      : meta && Number(meta.deal_value) > 0 // forecast rows report unestimated as 0
+        ? meta.deal_value
+        : null;
     return {
-      item: item,
-      company: company,
-      contact: contact,
-      signal: item.reason || '',
-      value: dealValue,
-      stage: stageForItem(item),
-      verb: actionVerb(item.action_text),
+      key: leadId != null ? 'lead-' + leadId : item.url,
       leadId: leadId,
+      url: withOrg(item.url),
+      rawUrl: item.url,
+      kind: item.kind,
+      name: name,
+      contact: contact,
+      source: item.source || '',
+      stage: item.stage || '',
+      stageColor: item.stage_color || '',
+      value: value,
+      reason: item.reason || '',
+      // Same wording as Liidit and Myyntiputki use for an uncontacted arrival.
+      next: item.kind === 'new_unprocessed_lead' ? 'Ensikontakti' : verbFromActionText(item.action_text),
+      suggested: true,
     };
   }
 
-  function getSkippedUrls() {
+  function rowFromNewLeadEl(el) {
+    var leadId = parseInt(el.getAttribute('data-lead-id'), 10);
+    var days = el.getAttribute('data-created-days');
+    var when = '';
+    if (days !== '' && days != null) {
+      var d = Number(days);
+      when = d === 0 ? 'Saapui tänään' : d === 1 ? 'Saapui eilen' : 'Saapui ' + d + ' pv sitten';
+    }
+    var rawValue = el.getAttribute('data-deal-value');
+    return {
+      key: 'lead-' + leadId,
+      leadId: leadId,
+      url: el.getAttribute('href'),
+      rawUrl: '/leads/' + leadId,
+      kind: 'new_lead',
+      name: el.getAttribute('data-name') || 'Liidi',
+      contact: el.getAttribute('data-contact') || '',
+      source: el.getAttribute('data-source') || '',
+      stage: el.getAttribute('data-stage') || '',
+      stageColor: el.getAttribute('data-stage-color') || '',
+      value: rawValue === '' || rawValue == null ? null : Number(rawValue),
+      reason: when ? when + ', ei vielä kontaktia' : 'Ei vielä kontaktia',
+      next: 'Ensikontakti',
+      suggested: true,
+      el: el,
+    };
+  }
+
+  function rowFromRecommendation(rec) {
+    return {
+      key: 'lead-' + rec.id,
+      leadId: rec.id,
+      url: withOrg(rec.url),
+      rawUrl: rec.url,
+      kind: 'recommendation',
+      tone: rec.type === 'risk' ? 'urgent' : 'neutral',
+      name: rec.company || rec.name || 'Liidi',
+      contact: rec.name && rec.company && rec.name !== rec.company ? rec.name : '',
+      source: '',
+      stage: '',
+      stageColor: '',
+      value: null,
+      reason: '',
+      next: rec.recommendation || 'Avaa',
+      suggested: true,
+    };
+  }
+
+  function rowFromOverdueTask(task) {
+    var leadId = parseLeadIdFromUrl(task.lead_url);
+    var days = Number(task.days_overdue || 0);
+    return {
+      key: leadId != null ? 'lead-' + leadId : 'task-' + task.id,
+      leadId: leadId,
+      url: withOrg(task.lead_url || '/tasks'),
+      rawUrl: task.lead_url || '/tasks',
+      kind: 'overdue_task',
+      name: task.lead_name && task.lead_name !== '—' ? task.lead_name : task.title,
+      contact: '',
+      source: '',
+      stage: '',
+      stageColor: '',
+      value: null,
+      reason: days > 0 ? 'Tehtävä myöhässä ' + days + ' pv' : 'Tehtävä erääntyi tänään',
+      next: task.title || 'Avaa tehtävä',
+      suggested: false, // a task the user recorded, not a system suggestion
+    };
+  }
+
+  /* ── Skip (Ohita) — session-scoped, unchanged behaviour ── */
+
+  function getSkipped() {
     try {
       var raw = sessionStorage.getItem(SKIP_KEY);
       return raw ? JSON.parse(raw) : [];
@@ -142,375 +257,387 @@
     }
   }
 
-  function skipHeroUrl(url) {
-    if (!url) return;
-    var skipped = getSkippedUrls();
-    if (skipped.indexOf(url) === -1) skipped.push(url);
+  function skip(rawUrl) {
+    if (!rawUrl) return;
+    var skipped = getSkipped();
+    if (skipped.indexOf(rawUrl) === -1) skipped.push(rawUrl);
     try {
       sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped.slice(-20)));
     } catch (e) {}
   }
 
-  function filterSkipped(items) {
-    var skipped = getSkippedUrls();
-    return items.filter(function (item) {
-      return skipped.indexOf(item.url) === -1;
-    });
+  /* ── Shared row pieces ── */
+
+  function whyFor(row) {
+    var why = WHY_BY_KIND[row.kind] || WHY_BY_KIND.recommendation;
+    return { label: why.label, tone: row.tone || why.tone };
   }
 
-  function updateActionCount(count) {
-    var el = document.getElementById('dashboard-action-count');
-    if (el) el.textContent = String(count);
-  }
-
-  function updateListMeta(count) {
-    var el = document.getElementById('dashboard-list-meta');
-    if (!el) return;
-    if (!count) {
-      el.textContent = 'Ei muita kiireellisiä liidejä';
-      return;
+  function metaHtml(row) {
+    var parts = [];
+    if (row.source) {
+      parts.push('<span class="lead-source">' + escapeHtml(sourceLabel(row.source)) + '</span>');
     }
-    var word = count === 1 ? 'liidi' : 'liidiä';
-    el.textContent = count + ' ' + word + ' · reagoi seuraavaksi';
-  }
-
-  function heroHeadline(row) {
-    var verb = row.verb;
-    var company = row.company !== '—' ? row.company : '';
-    var contact = row.contact || '';
-    if (company) return verb + ' ' + company;
-    if (contact) return verb + ' ' + contact;
-    return row.item.action_text || verb;
-  }
-
-  function heroReasonHtml(row) {
-    var signal = row.signal || '';
-    var value = row.value;
-    if (signal && value != null && Number(value) > 0 && signal.indexOf('€') === -1) {
-      return (
-        escapeHtml(signal) +
-        ' (<strong>' +
-        escapeHtml(formatEuro(value)) +
-        '</strong>)'
+    if (row.stage) {
+      parts.push(
+        '<span class="lead-stage"><span class="lead-stage__dot" style="background:' +
+          escapeHtml(row.stageColor || '#94A3B8') +
+          '"></span>' +
+          escapeHtml(stageLabel(row.stage)) +
+          '</span>'
       );
     }
-    return escapeHtml(signal);
-  }
-
-  function heroContactLine(row) {
-    if (row.contact && row.company && row.company !== '—' && row.company !== row.contact) {
-      return escapeHtml(row.contact) + ' · ' + escapeHtml(row.company);
+    if (row.contact) {
+      parts.push('<span class="work-row__when">' + escapeHtml(row.contact) + '</span>');
     }
-    if (row.contact) return escapeHtml(row.contact);
-    if (row.company && row.company !== '—') return escapeHtml(row.company);
-    return '';
+    if (row.reason) {
+      parts.push('<span class="work-row__when">' + escapeHtml(row.reason) + '</span>');
+    }
+    return parts.join('');
   }
 
-  var cachedNewLeadsCount = null;
-
-  function leadsListUrl() {
-    var qs = getOrgQueryParams();
-    return '/leads' + qs;
-  }
-
-  function maybeRenderCompactHero() {
-    var hero = document.getElementById('dashboardHero');
-    if (!hero || !hero.classList.contains('dash-hero--idle')) return;
-    renderHeroEmpty();
-  }
-
-  function renderHeroSideEmpty() {
+  function rowHtml(row) {
+    var why = whyFor(row);
     return (
-      '<aside class="dash-hero__side dash-hero__side--summary" aria-label="Yhteenveto">' +
-      '<div class="dash-hero__side-label">Yhteenveto</div>' +
-      '<div class="dash-hero__side-value">0</div>' +
-      '<div class="dash-hero__side-value-sub">toimea odottaa</div>' +
-      '<div class="dash-hero__side-divider" aria-hidden="true"></div>' +
-      '<div class="dash-hero__side-signal">' +
-      '<span class="dash-hero__side-signal-dot dash-hero__side-signal-dot--ok" aria-hidden="true"></span>' +
-      '<span>Liidit ajan tasalla</span>' +
-      '</div>' +
-      '</aside>'
+      '<a class="work-row" href="' + escapeHtml(row.url) + '">' +
+      '<span class="work-row__main">' +
+      '<span class="work-row__name">' + escapeHtml(row.name) + '</span>' +
+      '<span class="work-row__meta">' + metaHtml(row) + '</span>' +
+      '</span>' +
+      (hasValue(row.value)
+        ? '<span class="work-row__value">' + escapeHtml(formatMoney(row.value)) + '</span>'
+        : '') +
+      '<span class="lead-next' + (why.tone === 'urgent' ? ' lead-next--urgent' : '') + '">' +
+      escapeHtml(row.next) +
+      '<span class="lead-next__arrow" aria-hidden="true">→</span></span>' +
+      '</a>'
     );
   }
 
-  function renderHeroEmpty() {
+  /* ── Focus panel (the dark one) ── */
+
+  function renderFocus(row, counts) {
     var hero = document.getElementById('dashboardHero');
     if (!hero) return;
-    hero.className = 'dash-hero card dash-hero--idle dash-hero--compact';
+    var why = whyFor(row);
+    var valueText = hasValue(row.value) ? formatMoney(row.value) : 'Arvoa ei ole arvioitu';
 
-    var leadsPart = '';
-    if (cachedNewLeadsCount != null && cachedNewLeadsCount > 0) {
-      leadsPart =
-        '<a class="dash-hero__compact-link" href="' + escapeHtml(leadsListUrl()) + '">' +
-        String(cachedNewLeadsCount) + (cachedNewLeadsCount === 1 ? ' uusi liidi odottaa' : ' uutta liidiä odottaa') +
-        ' tarkistusta →</a>';
+    var facts = [];
+    if (row.source) facts.push('<span class="lead-source">' + escapeHtml(sourceLabel(row.source)) + '</span>');
+    if (row.stage) {
+      facts.push(
+        '<span class="lead-stage"><span class="lead-stage__dot" style="background:' +
+          escapeHtml(row.stageColor || '#94A3B8') + '"></span>' + escapeHtml(stageLabel(row.stage)) + '</span>'
+      );
     }
-
-    hero.innerHTML =
-      '<div class="dash-hero__compact-row">' +
-      '<span class="dash-hero__compact-icon" aria-hidden="true">' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>' +
-      '</span>' +
-      '<span class="dash-hero__compact-text">Ei kiireellisiä toimia juuri nyt.</span>' +
-      leadsPart +
-      '</div>' +
-      '<span class="dash-hero__mark" aria-hidden="true">' + flowMarkSvg() + '</span>';
-  }
-
-  function flowMarkSvg() {
-    return (
-      '<svg viewBox="0 0 120 80" width="120" height="80" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-      '<path d="M14 66C40 66 58 50 66 30" stroke="var(--color-highlight, #2F6FED)" stroke-width="2.5" stroke-linecap="round" opacity="0.35"/>' +
-      '<path d="M28 70C54 70 76 52 86 24" stroke="var(--color-accent, #623DD6)" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>' +
-      '<circle cx="88" cy="19" r="3.5" fill="var(--color-accent, #623DD6)" opacity="0.6"/>' +
-      '</svg>'
+    if (row.contact) facts.push('<span>' + escapeHtml(row.contact) + '</span>');
+    facts.push(
+      '<span class="' + (hasValue(row.value) ? 'dash-focus__value' : 'dash-focus__value dash-focus__value--missing') + '">' +
+        escapeHtml(valueText) + '</span>'
     );
-  }
 
-  function renderHero(row) {
-    var hero = document.getElementById('dashboardHero');
-    if (!hero || !row) {
-      renderHeroEmpty();
-      return;
-    }
-
-    var item = row.item;
-    var label = row.company !== '—' ? row.company : row.contact || 'liidi';
-    var contactLine = heroContactLine(row);
-    var signalText = row.signal || row.stage.label;
-
-    hero.className = 'dash-hero card';
+    hero.className = 'dash-focus';
     hero.innerHTML =
-      '<div class="dash-hero__main">' +
-      '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
-      '<h2 class="dash-hero__action">' + escapeHtml(heroHeadline(row)) + '</h2>' +
-      (row.signal ? '<p class="dash-hero__reason">' + heroReasonHtml(row) + '</p>' : '') +
-      '<div class="dash-hero__cta-row">' +
-      '<a class="btn btn-primary btn-lg" href="' + escapeHtml(item.url) + '">Avaa ' + escapeHtml(label) + ' →</a>' +
-      '<button type="button" class="dash-hero__skip" data-skip-url="' + escapeHtml(item.url) + '">Ohita</button>' +
+      '<div class="dash-focus__main">' +
+      '<div class="dash-focus__why dash-focus__why--' + why.tone + '">' +
+      ICONS[why.tone] + '<span>' + escapeHtml(why.label) + '</span>' +
+      (row.reason ? '<span class="dash-focus__why-detail">' + escapeHtml(row.reason) + '</span>' : '') +
+      '</div>' +
+      '<h2 class="dash-focus__name"><a href="' + escapeHtml(row.url) + '">' + escapeHtml(row.name) + '</a></h2>' +
+      '<div class="dash-focus__facts">' + facts.join('') + '</div>' +
+      '<div class="dash-focus__action">' +
+      '<div class="dash-focus__next">' +
+      '<span class="dash-focus__next-label">' + (row.suggested ? 'Ehdotettu seuraava toimi' : 'Kirjattu seuraava toimi') + '</span>' +
+      '<span class="dash-focus__next-text">' + escapeHtml(row.next) + '</span>' +
+      '</div>' +
+      '<div class="dash-focus__cta">' +
+      '<a class="btn btn-primary btn-lg dash-focus__open" href="' + escapeHtml(row.url) + '">Avaa liidi <span aria-hidden="true">→</span></a>' +
+      '<button type="button" class="dash-focus__skip">Ohita toistaiseksi</button>' +
       '</div>' +
       '</div>' +
-      '<aside class="dash-hero__side" aria-label="Liidin tiedot">' +
-      '<div class="dash-hero__side-label">Kaupan arvo</div>' +
-      '<div class="dash-hero__side-value">' + escapeHtml(formatEuro(row.value)) + '</div>' +
-      '<div class="dash-hero__side-divider" aria-hidden="true"></div>' +
-      '<div class="dash-hero__side-signal">' +
-      '<span class="dash-hero__side-signal-dot" style="background:' + escapeHtml(row.stage.color) + '"></span>' +
-      '<span>' + escapeHtml(signalText) + '</span>' +
       '</div>' +
-      (contactLine ? '<div class="dash-hero__side-contact">' + contactLine + '</div>' : '') +
-      '</aside>' +
-      '<span class="dash-hero__mark" aria-hidden="true">' + flowMarkSvg() + '</span>';
+      queueSummaryHtml(counts);
 
-    var skipBtn = hero.querySelector('.dash-hero__skip');
+    var skipBtn = hero.querySelector('.dash-focus__skip');
     if (skipBtn) {
       skipBtn.addEventListener('click', function () {
-        skipHeroUrl(item.url);
-        refreshAiWorklist();
+        skip(row.rawUrl);
+        render();
       });
     }
   }
 
-  function renderLeadList(rows) {
-    var body = document.getElementById('aiWorklistBody');
-    if (!body) return;
+  function countLine(n, one, many, extraClass) {
+    return (
+      '<li class="dash-queue__item' + (n === 0 ? ' is-zero' : '') + (extraClass && n > 0 ? ' ' + extraClass : '') + '">' +
+      '<span class="dash-queue__num">' + n + '</span>' +
+      '<span class="dash-queue__label">' + (n === 1 ? one : many) + '</span>' +
+      '</li>'
+    );
+  }
 
-    if (!rows.length) {
-      body.innerHTML =
-        '<div class="dash-list-empty">' +
-        '<p class="dash-list-empty__title">Ei muita kiireellisiä liidejä tänään.</p>' +
-        '<p class="dash-list-empty__sub">Prioriteettitoimet näkyvät yllä olevassa hero-kortissa.</p>' +
+  function queueSummaryHtml(counts) {
+    return (
+      '<aside class="dash-focus__side" aria-label="Työjonon tilanne">' +
+      '<div class="dash-queue__title">Jonossa nyt</div>' +
+      '<ul class="dash-queue">' +
+      countLine(counts.newLeads, 'uusi liidi', 'uutta liidiä') +
+      countLine(counts.follow, 'seurattava kohde', 'seurattavaa kohdetta') +
+      countLine(counts.urgent, 'kiireellinen', 'kiireellistä', 'is-urgent') +
+      '</ul>' +
+      '</aside>'
+    );
+  }
+
+  /** Nothing named to open: one compact, light status line. */
+  function renderFocusIdle(counts) {
+    var hero = document.getElementById('dashboardHero');
+    if (!hero) return;
+    var newCount = state.metrics && state.metrics.new_leads_7d != null ? Number(state.metrics.new_leads_7d) : 0;
+    var newUrl = (root && root.getAttribute('data-new-leads-url')) || '/leads';
+    hero.className = 'dash-focus dash-focus--idle';
+
+    if (newCount > 0 && counts.newLeads === 0) {
+      // Only a count is available (e.g. the leads already have activity).
+      hero.innerHTML =
+        '<div class="dash-idle">' +
+        '<span class="dash-idle__icon dash-idle__icon--arrival">' + ICONS.arrival + '</span>' +
+        '<div class="dash-idle__text"><strong>' +
+        newCount + (newCount === 1 ? ' uusi liidi' : ' uutta liidiä') +
+        ' viimeisen 7 päivän aikana.</strong> Ei kiireellisiä toimia.</div>' +
+        '<a class="btn btn-primary btn-sm" href="' + escapeHtml(newUrl) + '">' +
+        (newCount === 1 ? 'Katso uusi liidi' : 'Katso uudet liidit') + ' <span aria-hidden="true">→</span></a>' +
         '</div>';
       return;
     }
 
-    body.innerHTML = rows
-      .map(function (row) {
-        var contactPart = row.contact
-          ? '<span class="dash-lead-row__title-muted"> · ' + escapeHtml(row.contact) + '</span>'
-          : '';
-        return (
-          '<a class="dash-lead-row" href="' +
-          escapeHtml(row.item.url) +
-          '">' +
-          '<div class="dash-lead-row__main">' +
-          '<div class="dash-lead-row__title">' +
-          escapeHtml(row.company) +
-          contactPart +
-          '</div>' +
-          '<div class="dash-lead-row__signal">' +
-          escapeHtml(row.signal) +
-          '</div>' +
-          '</div>' +
-          '<div class="dash-lead-row__value">' +
-          escapeHtml(formatEuro(row.value)) +
-          '</div>' +
-          '<div class="dash-lead-row__stage">' +
-          '<span class="dash-lead-row__stage-dot" style="background:' +
-          escapeHtml(row.stage.color) +
-          '"></span>' +
-          escapeHtml(row.stage.label) +
-          '</div>' +
-          '<span class="dash-lead-row__next">' +
-          escapeHtml(row.verb) +
-          ' →</span>' +
-          '</a>'
-        );
-      })
-      .join('');
+    hero.innerHTML =
+      '<div class="dash-idle">' +
+      '<span class="dash-idle__icon">' + ICONS.done + '</span>' +
+      '<div class="dash-idle__text"><strong>Työjono on tyhjä.</strong> ' +
+      'Uudet liidit ja jatkotoimet ilmestyvät tähän, kun niitä tulee.</div>' +
+      '<a class="btn btn-secondary btn-sm" href="' + escapeHtml(withOrg('/leads/pipeline')) + '">Avaa myyntiputki</a>' +
+      '</div>';
   }
 
-  function toggleSecondaryList(show) {
-    var header = document.querySelector('.dash-list-header');
-    var list = document.getElementById('aiWorklistBody');
-    if (header) header.style.display = show ? '' : 'none';
-    if (list) list.style.display = show ? '' : 'none';
+  function renderFocusError() {
+    var hero = document.getElementById('dashboardHero');
+    if (!hero) return;
+    hero.className = 'dash-focus dash-focus--idle';
+    hero.innerHTML =
+      '<div class="dash-idle">' +
+      '<div class="dash-idle__text"><strong>Työjonoa ei voitu ladata.</strong></div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="location.reload()">Yritä uudelleen</button>' +
+      '</div>';
   }
 
-  function renderDashboardWorklist(items) {
-    var metaMap = getLeadMetaMap();
-    var available = filterSkipped(items || []);
-    var enriched = available.map(function (item) {
-      return enrichItem(item, metaMap);
-    });
+  /* ── Main render ── */
 
-    updateActionCount(enriched.length);
-    toggleSecondaryList(enriched.length > 1);
-
-    if (!enriched.length) {
-      renderHeroEmpty();
-      updateListMeta(0);
-      var tasksEl = document.getElementById('metricTasksToday');
-      if (tasksEl) tasksEl.textContent = '0';
+  function render() {
+    if (state.failed) {
+      renderFocusError();
+      var bodyErr = document.getElementById('aiWorklistBody');
+      if (bodyErr) bodyErr.innerHTML = '<p class="dash-panel__empty">Listaa ei voitu ladata.</p>';
       return;
     }
+    if (state.worklist === null || state.today === null) return; // still loading
 
-    renderHero(enriched[0]);
-    renderLeadList(enriched.slice(1));
-    updateListMeta(enriched.length > 1 ? enriched.length - 1 : 0);
+    var skipped = getSkipped();
+    var metaMap = getLeadMetaMap();
+    var notSkipped = function (row) {
+      return skipped.indexOf(row.rawUrl) === -1;
+    };
 
-    var tasksEl = document.getElementById('metricTasksToday');
-    if (tasksEl) tasksEl.textContent = String(enriched.length);
+    var newEls = Array.prototype.slice.call(document.querySelectorAll('#dashNewLeads .work-row'));
+    var newRows = newEls.map(rowFromNewLeadEl);
+    var newIds = {};
+    newRows.forEach(function (r) {
+      newIds[r.key] = true;
+    });
+
+    var workRows = state.worklist.map(function (item) {
+      return rowFromWorklist(item, metaMap);
+    });
+
+    // Focus: the ranked worklist first (existing prioritisation), otherwise
+    // the newest arrived lead.
+    var focus = workRows.filter(notSkipped)[0] || newRows.filter(notSkipped)[0] || null;
+
+    // Seurattavat kohteet: everything that is not a fresh arrival.
+    var follow = [];
+    var seen = {};
+    function pushFollow(row) {
+      if (!row || seen[row.key] || newIds[row.key]) return;
+      if (focus && row.key === focus.key) return;
+      seen[row.key] = true;
+      follow.push(row);
+    }
+    workRows.forEach(function (row) {
+      if (row.kind !== 'new_unprocessed_lead') pushFollow(row);
+    });
+    (state.today.overdue_tasks || []).map(rowFromOverdueTask).forEach(pushFollow);
+    (state.today.ai_recommendations || []).map(rowFromRecommendation).forEach(pushFollow);
+
+    // Uudet liidit: hide the one already shown in the focus panel.
+    var visibleNew = 0;
+    newRows.forEach(function (row) {
+      var hide = !!(focus && row.key === focus.key);
+      row.el.hidden = hide;
+      if (!hide) visibleNew += 1;
+    });
+
+    var urgent = follow.filter(function (r) {
+      return whyFor(r).tone === 'urgent';
+    }).length + (focus && whyFor(focus).tone === 'urgent' ? 1 : 0);
+
+    var counts = {
+      newLeads: newRows.length,
+      follow: follow.length + (focus && !newIds[focus.key] ? 1 : 0),
+      urgent: urgent,
+    };
+
+    if (focus) renderFocus(focus, counts);
+    else renderFocusIdle(counts);
+
+    // Lists
+    var body = document.getElementById('aiWorklistBody');
+    var columns = document.getElementById('dashColumns');
+    var newPanel = document.getElementById('dashNewPanel');
+    var followPanel = document.getElementById('dashFollowPanel');
+    var newEmpty = document.getElementById('dashNewEmpty');
+    var listMeta = document.getElementById('dashboard-list-meta');
+
+    if (body) body.innerHTML = follow.slice(0, 6).map(rowHtml).join('');
+    if (listMeta) {
+      listMeta.textContent = follow.length > 6 ? '6 / ' + follow.length + ' tärkeintä' : '';
+    }
+
+    var hasNew = visibleNew > 0;
+    var hasFollow = follow.length > 0;
+    if (columns) {
+      // When neither section has work, the focus panel already says so.
+      columns.hidden = !hasNew && !hasFollow;
+      columns.classList.toggle('dash-columns--single', hasNew !== hasFollow);
+    }
+    if (newPanel) newPanel.hidden = !hasNew;
+    if (followPanel) followPanel.hidden = !hasFollow;
+    if (newEmpty) newEmpty.hidden = true;
   }
 
-  function renderNearCloseStats(metaMap) {
-    var rows = Object.keys(metaMap).map(function (key) {
-      return metaMap[key];
-    });
-    var near = rows.filter(function (row) {
-      return Number(row.probability || 0) >= 0.5 && Number(row.deal_value || 0) > 0;
-    });
-    var countEl = document.getElementById('metricHotLeads');
-    var valueEl = document.getElementById('metricTasksOverdue');
-    if (countEl) countEl.textContent = String(near.length);
-    if (valueEl) {
-      var total = near.reduce(function (sum, row) {
-        return sum + Number(row.deal_value || 0);
-      }, 0);
-      valueEl.textContent = total > 0 ? formatEuro(total) : '';
+  /* ── Stats ── */
+
+  function setStat(id, text, isZero) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('is-zero', !!isZero);
+  }
+
+  function renderNearCloseStats() {
+    var metaMap = getLeadMetaMap();
+    var near = Object.keys(metaMap)
+      .map(function (k) {
+        return metaMap[k];
+      })
+      .filter(function (row) {
+        return Number(row.probability || 0) >= 0.5 && Number(row.deal_value || 0) > 0;
+      });
+    setStat('metricHotLeads', String(near.length), near.length === 0);
+    var total = near.reduce(function (sum, row) {
+      return sum + Number(row.deal_value || 0);
+    }, 0);
+    var valueEl = document.getElementById('metricHotLeadsValue');
+    if (valueEl) valueEl.textContent = total > 0 ? formatMoney(total) : '';
+  }
+
+  function renderMetrics(metrics) {
+    if (!metrics) return;
+    var newLeads = Number(metrics.new_leads_7d || 0);
+    setStat('metricNewLeads', String(newLeads), newLeads === 0);
+
+    var trend = document.getElementById('metricNewLeadsTrend');
+    if (trend) {
+      // A percentage is only meaningful against a non-zero previous week.
+      var prev = Number(metrics.new_leads_prev_7d || 0);
+      var delta = Number(metrics.new_leads_delta_pct);
+      if (prev > 0 && !isNaN(delta) && delta !== 0) {
+        trend.textContent = (delta > 0 ? '+' : '−') + Math.abs(delta) + ' % ed. 7 pv:ään';
+      } else if (prev > 0) {
+        trend.textContent = 'sama kuin ed. 7 pv';
+      } else {
+        trend.textContent = '';
+      }
+    }
+
+    if (metrics.pipeline_value == null) {
+      setStat('metricPipelineValue', 'Ei arvioitu', true);
+    } else {
+      setStat('metricPipelineValue', formatMoney(metrics.pipeline_value), Number(metrics.pipeline_value) === 0);
+    }
+
+    var tasksToday = Number(metrics.tasks_today || 0);
+    setStat('metricTasksToday', String(tasksToday), tasksToday === 0);
+    var overdueEl = document.getElementById('metricTasksOverdue');
+    if (overdueEl) {
+      var overdue = Number(metrics.overdue_tasks || 0);
+      overdueEl.textContent = overdue > 0 ? overdue + ' myöhässä' : '';
+      overdueEl.classList.toggle('dash-stat__sub--urgent', overdue > 0);
     }
   }
 
-  function getOrgQueryParams() {
-    var root = document.getElementById('dashboard-command-center');
-    if (!root) return '';
-    var orgQuery = {};
-    try {
-      orgQuery = JSON.parse(root.getAttribute('data-org-query') || '{}');
-    } catch (e) {
-      orgQuery = {};
-    }
-    var params = new URLSearchParams(orgQuery);
-    return params.toString() ? '?' + params.toString() : '';
-  }
+  /* ── Data loading ── */
 
-  function fetchDashboardJson(path) {
-    return fetch(path + getOrgQueryParams(), { credentials: 'same-origin' }).then(function (r) {
+  function fetchJson(path) {
+    var qs = orgQueryString();
+    return fetch(path + (qs ? '?' + qs : ''), { credentials: 'same-origin' }).then(function (r) {
       if (!r.ok) throw new Error('request failed');
       return r.json();
     });
   }
 
-  function renderDashboardMetrics(metrics) {
-    if (!metrics) return;
-    var newLeads = document.getElementById('metricNewLeads');
-    var trend = document.getElementById('metricNewLeadsTrend');
-    var pipeline = document.getElementById('metricPipelineValue');
-
-    cachedNewLeadsCount = metrics.new_leads_7d != null ? Number(metrics.new_leads_7d) : 0;
-    displayMetric(newLeads, metrics.new_leads_7d != null ? metrics.new_leads_7d : 0, '0');
-    if (trend) {
-      var delta = Number(metrics.new_leads_delta_pct);
-      if (!isNaN(delta) && delta !== 0) {
-        var sign = delta >= 0 ? '+' : '';
-        trend.textContent = sign + Math.abs(delta) + '% vs edellinen vko';
-      } else {
-        trend.textContent = '7 pv';
-      }
-    }
-    if (pipeline) {
-      pipeline.textContent =
-        metrics.pipeline_value == null || Number(metrics.pipeline_value) <= 0
-          ? '—'
-          : formatEuro(metrics.pipeline_value);
-    }
-    maybeRenderCompactHero();
-  }
-
-  function refreshDashboardMetrics() {
-    fetchDashboardJson('/api/dashboard/metrics')
+  function refreshMetrics() {
+    fetchJson('/api/dashboard/metrics')
       .then(function (data) {
         if (!data.success || !data.data) return;
-        renderDashboardMetrics(data.data);
+        state.metrics = data.data;
+        renderMetrics(data.data);
+        render();
       })
       .catch(function () {});
   }
 
-  function refreshAiWorklist() {
-    fetchDashboardJson('/api/dashboard/ai-worklist')
+  function refreshWorklist() {
+    fetchJson('/api/dashboard/ai-worklist')
       .then(function (data) {
-        if (!data.success || !data.data) {
-          renderDashboardWorklist([]);
-          return;
-        }
-        var items = data.data.items;
-        renderDashboardWorklist(Array.isArray(items) ? items : []);
+        var items = data && data.success && data.data ? data.data.items : [];
+        state.worklist = Array.isArray(items) ? items : [];
+        state.failed = false;
+        render();
       })
       .catch(function () {
-        var hero = document.getElementById('dashboardHero');
-        var body = document.getElementById('aiWorklistBody');
-        if (hero) {
-          hero.className = 'dash-hero card dash-hero--idle';
-          hero.innerHTML =
-            '<div class="dash-hero__main">' +
-            '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
-            '<p class="dash-hero__action dash-hero__action--muted">Tietoja ei voitu ladata</p>' +
-            '<p class="dash-hero__reason"><button type="button" class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
-            '</div>' +
-            renderHeroSideEmpty();
-        }
-        if (body) {
-          body.innerHTML =
-            '<div class="dash-list-empty dash-list-empty--error">' +
-            '<p class="dash-list-empty__title">Lista ei latautunut</p>' +
-            '<p class="dash-list-empty__sub"><button type="button" class="lead-retry" onclick="location.reload()">Yritä uudelleen</button></p>' +
-            '</div>';
-        }
+        state.failed = true;
+        render();
+      });
+  }
+
+  function refreshToday() {
+    fetchJson('/api/dashboard/today')
+      .then(function (data) {
+        state.today = data && data.success && data.data ? data.data : {};
+        render();
+      })
+      .catch(function () {
+        // Secondary source: the queue still works from the worklist alone.
+        state.today = {};
+        render();
       });
   }
 
   window.completeTask = function (taskId, btn) {
-    var url =
-      btn.getAttribute('data-complete-url') ||
-      '/tasks/' + taskId + '/complete';
-
+    var url = btn.getAttribute('data-complete-url') || '/tasks/' + taskId + '/complete';
     fetch(url, {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'X-CSRFToken': getCsrfToken(),
-      },
+      headers: { Accept: 'application/json', 'X-CSRFToken': getCsrfToken() },
       credentials: 'same-origin',
     })
       .then(function (r) {
@@ -520,17 +647,21 @@
       })
       .then(function (result) {
         if (!result.ok || !result.data.success) return;
-        refreshDashboardMetrics();
-        refreshAiWorklist();
+        refreshMetrics();
+        refreshWorklist();
+        refreshToday();
       })
       .catch(function () {});
   };
 
   function init() {
+    root = document.getElementById('dashboard-command-center');
+    if (!root) return;
     setCurrentDate();
-    renderNearCloseStats(getLeadMetaMap());
-    refreshDashboardMetrics();
-    refreshAiWorklist();
+    renderNearCloseStats();
+    refreshMetrics();
+    refreshWorklist();
+    refreshToday();
   }
 
   if (document.readyState === 'loading') {

@@ -1,0 +1,87 @@
+{#
+  Standalone single-card page: 2FA, password change / reset, invite
+  acceptance and error pages.
+
+  Deliberately does NOT extend base.html: these pages are shown to people who
+  are signed in but not yet allowed into the app (2FA pending, temporary
+  password) or who hit an error, and must never be wrapped in the app's
+  sidebar and top bar. Looks like the login page (login.css + auth-card.css).
+
+  Blocks: title, step (small label above the title), card (content),
+  card_class, below (links under the card).
+#}
+{% set fi_messages = {
+  "Invalid email or password.": "Sähköposti tai salasana on virheellinen.",
+  "Invalid verification code.": "Koodi ei kelpaa. Tarkista koodi sovelluksesta ja yritä uudelleen.",
+  "2FA is not initialized.": "Kaksivaiheista tunnistautumista ei ole vielä aloitettu. Lataa sivu uudelleen.",
+  "Unable to initialize 2FA.": "Kaksivaiheisen tunnistautumisen aloitus epäonnistui. Yritä uudelleen.",
+  "Two-factor authentication has been enabled.": "Kaksivaiheinen tunnistautuminen on nyt käytössä.",
+  "Passwords do not match.": "Salasanat eivät täsmää.",
+  "Password is required.": "Anna salasana.",
+  "Password must be at least 12 characters.": "Salasanassa pitää olla vähintään 12 merkkiä.",
+  "The reset link is invalid or has expired.": "Linkki ei kelpaa tai se on vanhentunut. Pyydä uusi linkki.",
+  "If an account exists for that email, you will receive reset instructions.": "Jos osoitteella on käyttäjätili, lähetimme siihen ohjeet salasanan vaihtamiseen.",
+  "Unable to reset password. Please try again.": "Salasanan vaihto epäonnistui. Yritä uudelleen.",
+  "Registration is disabled.": "Rekisteröityminen ei ole käytössä.",
+  "Registration is not available.": "Rekisteröityminen ei ole käytössä.",
+  "Please log in to access this page.": "Kirjaudu sisään jatkaaksesi.",
+  "This field is required.": "Täytä tämä kenttä.",
+  "Invalid email address.": "Tarkista sähköpostiosoite.",
+} %}
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}FlowLeads CRM{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth-card.css') }}">
+</head>
+<body class="app-guest login-page">
+  <div class="lp lp-solo">
+    <header class="lp-header">
+      <div class="lp-container lp-header__inner">
+        <a href="{{ url_for('auth.login') }}" class="lp-logo">
+          <img src="{{ url_for('static', filename='img/flowleads-logo.png') }}" alt="FlowLeads CRM" width="1335" height="340" class="lp-logo__img">
+        </a>
+        {% if current_user.is_authenticated %}
+        <nav class="lp-header__nav" aria-label="Tili">
+          <a href="{{ url_for('auth.logout') }}" class="lp-header__site">Kirjaudu ulos</a>
+        </nav>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="lp-solo__main" role="main">
+      <div class="lp-card {% block card_class %}{% endblock %}">
+        {% block step %}{% endblock %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="lp-alerts">
+          {% for category, message in messages %}
+          {% set is_error = category in ['danger', 'error', 'warning'] %}
+          <div class="lp-alert lp-alert--{{ 'error' if is_error else ('success' if category == 'success' else 'info') }}" role="{{ 'alert' if is_error else 'status' }}">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="currentColor" class="lp-alert__icon">
+              {% if is_error %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>{% else %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.25v3.25a.75.75 0 0 0 1.5 0V9.75A.75.75 0 0 0 10 9H9Z" clip-rule="evenodd"/>{% endif %}
+            </svg>
+            <span>{{ fi_messages.get(message, message) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% block card %}{% endblock %}
+      </div>
+      {% block below %}{% endblock %}
+    </main>
+
+    <footer class="lp-solo__footer">FlowLeads CRM · Flowly Solutions</footer>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

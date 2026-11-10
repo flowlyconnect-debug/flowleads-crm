@@ -123,12 +123,45 @@ def _regenerate_backup_codes(user: User) -> list[str]:
 
 
 def verify_totp_login(user: User, token: str | None) -> bool:
+    """Second login factor: the authenticator app's code, or one of the
+    single-use backup codes shown when 2FA was enabled. Backup codes are the
+    only self-service way back in when the phone is lost, now that mandatory
+    2FA is enforced on every page."""
     secret = fresh_user_totp_secret(user)
     if not secret:
         return False
-    return verify_totp_token(
-        secret, token, context="login", user_id=user.id
+    if verify_totp_token(secret, token, context="login", user_id=user.id):
+        return True
+    return consume_backup_code(user, token)
+
+
+def consume_backup_code(user: User, code: str | None) -> bool:
+    """Accept an unused backup code exactly once (commits the use)."""
+    candidate = (code or "").strip().upper().replace(" ", "")
+    # codes look like ABCD-EFGH-IJKL; accept them typed without dashes too
+    compact = candidate.replace("-", "")
+    if len(compact) != 12 or not compact.isalnum():
+        return False
+    formatted = "-".join(compact[i : i + 4] for i in range(0, 12, 4))
+    record = BackupCode.query.filter_by(
+        user_id=user.id, code_hash=hash_backup_code(formatted), used=False
+    ).first()
+    if record is None:
+        return False
+    record.used = True
+    remaining = BackupCode.query.filter_by(user_id=user.id, used=False).count() - 1
+    log_audit(
+        "2fa_backup_code_used",
+        user_id=user.id,
+        organization_id=user.organization_id,
+        metadata={"remaining": max(remaining, 0)},
     )
+    db.session.commit()
+    return True
+
+
+def remaining_backup_codes(user: User) -> int:
+    return BackupCode.query.filter_by(user_id=user.id, used=False).count()
 
 
 def complete_2fa_session(user: User) -> None:

@@ -87,7 +87,7 @@ def test_get_valid_invite_rejects_expired_revoked_or_accepted(app):
 
 
 @patch("app.email.services._mailgun_send")
-def test_accept_invite_creates_admin_and_inactive_profile(mock_send, app):
+def test_accept_invite_creates_admin_and_active_profile(mock_send, app):
     mock_send.return_value = (True, "<msg@test>", None)
     with app.app_context():
         actor = create_user("actor-invite3@test.com", "securepassword1", role="superadmin")
@@ -102,7 +102,7 @@ def test_accept_invite_creates_admin_and_inactive_profile(mock_send, app):
         )
         db.session.commit()
 
-        acceptance = accept_invite(
+        accept_invite(
             result.invite,
             password="brandnewpassword1",
             regions=["Uusimaa", "Pirkanmaa"],
@@ -116,8 +116,13 @@ def test_accept_invite_creates_admin_and_inactive_profile(mock_send, app):
 
         profile = SearchProfile.query.filter_by(organization_id=result.organization.id).one()
         assert profile.regions == ["Uusimaa", "Pirkanmaa"]
-        assert profile.is_active is False  # not started until source activated
-        assert profile.crm_api_key == acceptance.api_key_full
+        # a profile is only a filter over the shared catalogue: it starts
+        # right away, with nothing per-customer to schedule or key
+        assert profile.is_active is True
+        assert profile.needs_rematch is True
+        assert profile.crm_api_key is None
+        assert SearchJob.query.filter_by(search_profile_id=profile.id).count() == 0
+        assert admin.must_change_password is False  # they chose the password themselves
 
         org = Organization.query.get(result.organization.id)
         assert org.enabled_features == ["sequences"]  # only what was allowed AND chosen
@@ -158,7 +163,12 @@ def test_accept_invite_stores_all_finland_as_its_own_value(mock_send, app):
 
 
 @patch("app.email.services._mailgun_send")
-def test_activate_source_turns_profile_on_and_creates_job(mock_send, app):
+def test_activate_source_rematches_instead_of_creating_a_job(mock_send, app):
+    """Regression: an inactive profile has needs_rematch cleared by the
+    scheduler, so activating it must set the flag again or the customer never
+    gets leads from the catalogue's history."""
+    from app.listings.services import rematch_profiles
+
     mock_send.return_value = (True, "<msg@test>", None)
     with app.app_context():
         actor = create_user("actor-invite5@test.com", "securepassword1", role="superadmin")
@@ -175,18 +185,23 @@ def test_activate_source_turns_profile_on_and_creates_job(mock_send, app):
         db.session.commit()
 
         profile = SearchProfile.query.filter_by(organization_id=result.organization.id).one()
-        assert profile.is_active is False
-        assert SearchJob.query.filter_by(search_profile_id=profile.id).count() == 0
+        with pytest.raises(InviteServiceError, match="aktiivinen"):
+            activate_source(profile, actor=actor)
+        db.session.rollback()
+
+        # switched off -> the scheduler clears the rematch flag
+        profile.is_active = False
+        db.session.commit()
+        rematch_profiles()
+        assert SearchProfile.query.get(profile.id).needs_rematch is False
 
         activate_source(profile, actor=actor)
         db.session.commit()
 
         profile = SearchProfile.query.get(profile.id)
         assert profile.is_active is True
-        assert SearchJob.query.filter_by(search_profile_id=profile.id, status="pending").count() == 1
-
-        with pytest.raises(InviteServiceError, match="aktivoitu"):
-            activate_source(profile, actor=actor)
+        assert profile.needs_rematch is True
+        assert SearchJob.query.filter_by(search_profile_id=profile.id).count() == 0
 
 
 def test_renew_invite_invalidates_previous_link(app):
@@ -270,8 +285,9 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
         profile_b = SearchProfile.query.filter_by(organization_id=org_b.id).one()
         assert profile_a.regions == ["Uusimaa"]
         assert profile_b.regions == [ALL_FINLAND_REGION]
-        assert profile_a.is_active is False
-        assert profile_b.is_active is False
+        assert profile_a.is_active is True
+        assert profile_b.is_active is True
+        assert org_a.enabled_features == []  # allowed "sequences" but did not tick it
 
     # Each admin logs in and sees ONLY their own organization's search profile.
     # Each gets its own fresh app context: Flask caches the resolved current_user
@@ -292,19 +308,9 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
         assert "Toka profiili" in page_b
         assert "Eka profiili" not in page_b
 
-    # Superadmin activates both sources; each gets exactly one job of its own.
+    # No per-customer search job is ever created.
     with app.app_context():
-        profile_a_id = SearchProfile.query.filter_by(organization_id=org_a.id).one().id
-        profile_b_id = SearchProfile.query.filter_by(organization_id=org_b.id).one().id
-
-    client.post(f"/admin/customers/profiles/{profile_a_id}/activate-source", follow_redirects=True)
-    client.post(f"/admin/customers/profiles/{profile_b_id}/activate-source", follow_redirects=True)
-
-    with app.app_context():
-        assert SearchProfile.query.get(profile_a_id).is_active is True
-        assert SearchProfile.query.get(profile_b_id).is_active is True
-        assert SearchJob.query.filter_by(search_profile_id=profile_a_id).count() == 1
-        assert SearchJob.query.filter_by(search_profile_id=profile_b_id).count() == 1
+        assert SearchJob.query.count() == 0
 
     # Re-visiting a now-accepted invite link must show it as no longer valid.
     stale = app.test_client().get(f"/invite/{token_a}")

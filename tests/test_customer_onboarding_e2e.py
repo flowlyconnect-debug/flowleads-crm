@@ -3,7 +3,7 @@
 import pytest
 
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
-from app.api.models import APIKey
+from app.api.services import create_api_key
 from app.core.permissions import TWO_FA_SESSION_KEY
 from app.extensions import db
 from app.leads.models import Lead, PipelineStage
@@ -29,14 +29,20 @@ def _onboard_customer(app, *, slug_suffix="e2e"):
             source="oikotie",
             is_active=True,
         )
+        # Onboarding no longer creates an API key (the catalogue needs none);
+        # these tests still exercise the public lead API with one.
+        _key, api_key_full = create_api_key(
+            result.organization.id, "integraatio", created_by=actor.id, test_mode=True
+        )
+        # ...and the forced password change is covered in test_onboarding_flow_v2
+        result.admin_user.must_change_password = False
         db.session.commit()
         return {
             "org_id": result.organization.id,
             "org_slug": result.organization.slug,
             "admin_email": result.admin_user.email,
-            "api_key": result.api_key_full,
+            "api_key": api_key_full,
             "profile_id": SearchProfile.query.filter_by(organization_id=result.organization.id).one().id,
-            "job_id": SearchJob.query.filter_by(organization_id=result.organization.id).one().id,
         }
 
 
@@ -88,46 +94,17 @@ def test_e2e_onboarding_creates_all_entities(app):
         assert admin.role == "admin"
         assert admin.organization_id == org.id
 
-        api_key = APIKey.query.filter_by(organization_id=org.id, name="n8n").one()
-        assert api_key.is_active is True
-        assert api_key.revoked_at is None
-
         profile = SearchProfile.query.filter_by(organization_id=org.id).one()
-        assert profile.crm_api_key == ctx["api_key"]
+        assert profile.crm_api_key is None
         assert profile.is_active is True
-
-        job = SearchJob.query.filter_by(id=ctx["job_id"]).one()
-        assert job.status == "pending"
-        assert job.search_profile_id == profile.id
+        assert profile.needs_rematch is True
+        assert SearchJob.query.filter_by(organization_id=org.id).count() == 0
 
         stages = PipelineStage.query.filter_by(organization_id=org.id).all()
         assert len(stages) == 6
 
         settings = OrgLeadSettings.query.filter_by(organization_id=org.id).one()
         assert settings is not None
-
-
-def test_e2e_n8n_job_payload_complete(app, client):
-    ctx = _onboard_customer(app, slug_suffix="n8n-payload")
-
-    response = client.get(
-        "/api/v1/n8n/jobs?status=pending&limit=50",
-        headers={"X-N8N-Secret": "test-n8n-secret"},
-    )
-    assert response.status_code == 200
-    jobs = response.get_json()["jobs"]
-    job = next(j for j in jobs if j["job_id"] == ctx["job_id"])
-
-    assert job["organization_id"] == ctx["org_id"]
-    assert job["profile_id"] == ctx["profile_id"]
-    assert job["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
-    assert job["regions"] == ["Uusimaa", "Pirkanmaa"]
-    assert job["source"] == "oikotie"
-    # crm_api_key is a short-lived job-scoped token now, never the
-    # organization's permanent API key (see claim_pending_jobs_for_n8n).
-    assert job["crm_api_key"] != ctx["api_key"]
-    assert len(job["crm_api_key"]) > 20
-    assert job["crm_endpoint"].endswith("/api/v1/leads")
 
 
 def test_e2e_n8n_lead_submission(app, client):
@@ -227,7 +204,7 @@ def test_e2e_admin_login_sees_own_data_only(app, client):
     assert api_keys_resp.status_code == 200
     api_page = api_keys_resp.get_data(as_text=True)
     assert ctx["api_key"] not in api_page
-    assert "n8n" in api_page
+    assert "integraatio" in api_page
 
 
 def test_e2e_admin_cannot_access_superadmin_routes(app, client):
@@ -265,21 +242,19 @@ def test_e2e_admin_cannot_access_superadmin_routes(app, client):
         assert lead.organization_id == other["org_id"]
 
 
-def test_e2e_search_profile_update_preserves_crm_api_key(app, client):
-    ctx = _onboard_customer(app, slug_suffix="profile-key")
+def test_e2e_customer_admin_can_edit_own_profile(app, client):
+    ctx = _onboard_customer(app, slug_suffix="profile-edit")
 
     _login(client, ctx["admin_email"])
-    with app.app_context():
-        profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
-        original_key = profile.crm_api_key
-
+    _bypass_2fa_for(client, app, ctx["admin_email"])
     update_resp = client.post(
         f"/settings/search-profiles/{ctx['profile_id']}",
         data={
             "name": "Päivitetty profiili",
-            "remonttityyppi": "Lukkoremontti / kulunvalvonta",
+            "remonttityypit": ["Putkiremontti", "Julkisivuremontti"],
+            "region_mode": "specific",
             "regions": ["Uusimaa"],
-            "schedule_description": "daily",
+            "cities": "helsinki, Espoo",
             "is_active": "y",
         },
         follow_redirects=True,
@@ -288,34 +263,11 @@ def test_e2e_search_profile_update_preserves_crm_api_key(app, client):
 
     with app.app_context():
         profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
-        assert profile.crm_api_key == original_key
         assert profile.name == "Päivitetty profiili"
-
-
-def test_e2e_search_profile_update_preserves_key_when_empty(app, client):
-    ctx = _onboard_customer(app, slug_suffix="clear-key")
-
-    _login(client, ctx["admin_email"])
-    with app.app_context():
-        original_key = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one().crm_api_key
-
-    response = client.post(
-        f"/settings/search-profiles/{ctx['profile_id']}",
-        data={
-            "name": "Avain säilyy",
-            "remonttityyppi": "Lukkoremontti / kulunvalvonta",
-            "regions": ["Uusimaa"],
-            "schedule_description": "daily",
-            "crm_api_key": "",
-            "is_active": "y",
-        },
-        follow_redirects=True,
-    )
-    assert response.status_code == 200
-
-    with app.app_context():
-        profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
-        assert profile.crm_api_key == original_key
+        assert profile.remonttityyppi == "Putkiremontti"
+        assert profile.wanted_types == ["Putkiremontti", "Julkisivuremontti"]
+        assert profile.cities == ["Helsinki", "Espoo"]
+        assert profile.needs_rematch is True
 
 
 def test_e2e_duplicate_email_rejected(app):
@@ -404,8 +356,9 @@ def test_e2e_superadmin_ui_onboarding_flow(client, app):
     assert result_resp.status_code == 200
     page = result_resp.get_data(as_text=True)
     assert "UI Flow Oy" in page
-    assert "fl_" in page
+    assert "fl_" not in page
 
     with app.app_context():
         org = Organization.query.filter_by(name="UI Flow Oy").one()
-        assert SearchJob.query.filter_by(organization_id=org.id, status="pending").count() == 1
+        assert SearchJob.query.filter_by(organization_id=org.id).count() == 0
+        assert SearchProfile.query.filter_by(organization_id=org.id).one().is_active is True

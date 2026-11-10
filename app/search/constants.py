@@ -13,6 +13,15 @@ REMONTTITYYPIT: tuple[str, ...] = (
     "Muu remontti",
 )
 
+# Talotyypit, joihin kohde luokitellaan (Oikotien kortti / AI-analyysi).
+BUILDING_TYPES: tuple[str, ...] = (
+    "Kerrostalo",
+    "Rivitalo",
+    "Paritalo",
+    "Omakotitalo",
+    "Muu",
+)
+
 ALL_FINLAND_REGION = "Koko Suomi"
 
 FINNISH_REGIONS: tuple[str, ...] = (

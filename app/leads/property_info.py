@@ -11,6 +11,9 @@ PROPERTY_INFO_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("kaupunki", "Kaupunki", False),
     ("osoite", "Osoite", False),
     ("hinta", "Hinta", False),
+    ("talotyyppi", "Talotyyppi", False),
+    ("rakennusvuosi", "Rakennusvuosi", False),
+    ("remontin_ajankohta", "Remontin ajankohta", False),
     ("oikotie_url", "Oikotie-linkki", True),
 )
 

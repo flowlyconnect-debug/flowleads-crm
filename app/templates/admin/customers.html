@@ -9,12 +9,13 @@
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Asiakkaat</h1>
-          <p class="settings-panel__subtitle">Kaikki organisaatiot ja niiden hakuprofiilit.</p>
+          <p class="settings-panel__subtitle">Kaikki organisaatiot, niiden hakuprofiilit ja käytössä olevat toiminnot.</p>
         </header>
 
-        <p style="margin-bottom: 1rem;display:flex;gap:0.75rem;">
+        <p style="margin-bottom: 1rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
           <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo asiakas</a>
           <a href="{{ url_for('admin.create_invite_route') }}" class="btn btn-secondary">Kutsu asiakas</a>
+          <a href="{{ url_for('admin.catalogue_status') }}" class="btn btn-secondary">Kohdekatalogin tila</a>
         </p>
 
         {% if customers %}
@@ -22,34 +23,69 @@
           <thead>
             <tr>
               <th>Asiakas</th>
-              <th>Hakuprofiili</th>
+              <th>Hakuprofiilit</th>
               <th>Liidejä</th>
-              <th>Viimeisin haku</th>
-              <th>Status</th>
-              <th>Toiminnot</th>
+              <th>Viimeisin liidi</th>
+              <th>Toiminnot käytössä</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {% for row in customers %}
             <tr>
-              <td>{{ row.org.name }}</td>
-              <td>{{ row.profile_name or '—' }}</td>
-              <td>{{ row.lead_count }}</td>
+              <td>
+                {{ row.org.name }}
+                {% if not row.is_active %}<span class="badge badge-inactive">Ei aktiivinen</span>{% endif %}
+                {% if row.admin_email %}
+                <div class="text-muted text-sm">{{ row.admin_email }}</div>
+                {% else %}
+                <div class="text-muted text-sm">Kutsua ei ole vielä hyväksytty</div>
+                {% endif %}
+                {% if row.password_pending %}
+                <div class="text-muted text-sm">Väliaikainen salasana vaihtamatta</div>
+                {% endif %}
+              </td>
+              <td>
+                {% for profile in row.profiles %}
+                <div style="margin-bottom:0.35rem;">
+                  <a href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id, id=profile.id) }}">{{ profile.name }}</a>
+                  {% if profile.is_active %}
+                  <span class="badge badge-active">Aktiivinen</span>
+                  {% else %}
+                  <span class="badge badge-inactive">Pois</span>
+                  <form method="post" action="{{ url_for('admin.activate_source_route', profile_id=profile.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary btn-sm">Aktivoi</button>
+                  </form>
+                  {% endif %}
+                </div>
+                {% else %}
+                —
+                {% endfor %}
+              </td>
+              <td>
+                {{ row.lead_count }}
+                {% if row.pending_matches %}
+                <div class="text-muted text-sm">+{{ row.pending_matches }} odottaa päivärajaa</div>
+                {% endif %}
+              </td>
               <td>{{ row.last_search_label }}</td>
               <td>
-                {% if row.profile_id and not row.profile_is_active %}
-                Käyttöönotto valmis — lähde ei aktiivinen
-                {% elif row.is_active %}Aktiivinen{% else %}Ei aktiivinen{% endif %}
+                <form method="post" action="{{ url_for('admin.update_customer_features_route', organization_id=row.org.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% for key, label in feature_catalog.items() %}
+                  <label class="form-check">
+                    <input type="checkbox" name="features" value="{{ key }}"
+                      {% if key in row.enabled_features %}checked{% endif %}>
+                    {{ label }}
+                  </label>
+                  {% endfor %}
+                  <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
+                </form>
               </td>
               <td>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=row.org.id) }}">Avaa</a>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id) }}">Muokkaa</a>
-                {% if row.profile_id and not row.profile_is_active %}
-                <form method="post" action="{{ url_for('admin.activate_source_route', profile_id=row.profile_id) }}" style="display:inline;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn btn-primary btn-sm">Aktivoi lähde</button>
-                </form>
-                {% endif %}
               </td>
             </tr>
             {% endfor %}

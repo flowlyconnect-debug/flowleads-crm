@@ -63,7 +63,7 @@ def config_node(pos):
         {
             "assignments": {
                 "assignments": [
-                    {"id": _id(), "name": "crm_base_url", "value": "https://flowleads-crm.onrender.com", "type": "string"},
+                    {"id": _id(), "name": "crm_base_url", "value": "https://flowleads-crm-zv0a.onrender.com", "type": "string"},
                     {"id": _id(), "name": "n8n_secret", "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET", "type": "string"},
                 ]
             },
@@ -257,6 +257,7 @@ if (!error && !Array.isArray(cards)) error = 'Unexpected Oikotie response: ' + J
 const listings = (Array.isArray(cards) ? cards : []).map(card => {
   const loc = card.location || {};
   const d = card.data || {};
+  const b = card.buildingData || card.building || {};
   return {
     external_id: String(card.cardId || card.id || ''),
     url: card.url || '',
@@ -266,6 +267,9 @@ const listings = (Array.isArray(cards) ? cards : []).map(card => {
     alue: d.size || d.sizeMax || '',
     description: d.description || '',
     published_at: card.published || d.published || card.meta?.published || null,
+    // optional: the CRM falls back to the AI analysis when these are missing
+    build_year: b.year || d.buildYear || d.year || null,
+    building_type: b.buildingType || d.buildingType || card.buildingType || null,
   };
 });
 const body = {
@@ -357,8 +361,10 @@ Säännöt tuleville remonteille:
 
 Yhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (henkilö tai isännöintiyritys), isännöitsijän puhelin ja sähköposti. Muuten "".
 
+Rakennus: rakennusvuosi = rakennuksen valmistumis- tai rakennusvuosi numerona (esim. 1972), tai null jos tekstissä ei ole. talotyyppi = yksi näistä: "Kerrostalo", "Rivitalo", "Paritalo", "Omakotitalo", "Muu", tai "" jos tekstistä ei selviä (luhtitalo = "Kerrostalo", erillistalo = "Omakotitalo").
+
 Palauta VAIN validi JSON ilman markdownia:
-{"taloyhtio":"","isannoitsija":"","isannoitsija_puh":"","isannoitsija_email":"","tulevat_remontit":"lyhyt tiivistelmä tulevista remonteista","renovations":[{"remonttityyppi":"","confidence":0,"timing":"","evidence":""}]}"""
+{"taloyhtio":"","isannoitsija":"","isannoitsija_puh":"","isannoitsija_email":"","rakennusvuosi":null,"talotyyppi":"","tulevat_remontit":"lyhyt tiivistelmä tulevista remonteista","renovations":[{"remonttityyppi":"","confidence":0,"timing":"","evidence":""}]}"""
 
 
 def build_analyzer(lib):
@@ -509,6 +515,8 @@ return [{ json: { ...base, body: {
   isannoitsija_puh: s(a.isannoitsija_puh),
   isannoitsija_email: s(a.isannoitsija_email),
   tulevat_remontit: s(a.tulevat_remontit),
+  rakennusvuosi: Number.isFinite(Number(a.rakennusvuosi)) && Number(a.rakennusvuosi) > 0 ? Number(a.rakennusvuosi) : null,
+  talotyyppi: s(a.talotyyppi),
   renovations,
 } } }];
 """,

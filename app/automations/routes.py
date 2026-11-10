@@ -21,6 +21,10 @@ from app.users.models import User
 
 automations_bp = Blueprint("automations", __name__, url_prefix="/automations")
 
+from app.core.features import feature_guard  # noqa: E402
+
+automations_bp.before_request(feature_guard("automations"))
+
 UI_ROLES = ("superadmin", "admin", "user")
 
 

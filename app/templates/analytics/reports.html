@@ -56,7 +56,7 @@
     <input type="hidden" name="organization_id" value="{{ organization_id }}">
     {% endif %}
     <input type="hidden" name="report" value="{{ report_type }}">
-    <label class="form-label">Aikaväli
+    <label class="form-label reports-filters__range"><span>Aikaväli</span>
       <select name="range" id="range-select" class="form-select">
         <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>Tämä viikko</option>
         <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>Tämä kuukausi</option>

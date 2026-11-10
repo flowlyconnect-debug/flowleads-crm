@@ -18,16 +18,8 @@
   'note': 'Muistiinpano', 'meeting': 'Tapaaminen', 'meeting_scheduled': 'Tapaaminen',
   'stage_change': 'Vaihe muuttunut', 'stage_changed': 'Vaihe muuttunut',
 } %}
-{% set stage_display_labels = {
-  'new lead': 'Uusi liidi', 'uusi liidi': 'Uusi liidi', 'uusi': 'Uusi liidi',
-  'contacted': 'Kontaktoitu', 'kontaktoitu': 'Kontaktoitu',
-  'interested': 'Kiinnostunut', 'kiinnostunut': 'Kiinnostunut',
-  'kvalifioitu': 'Kvalifioitu', 'qualified': 'Kvalifioitu',
-  'proposal sent': 'Tarjous lähetetty', 'tarjous lähetetty': 'Tarjous lähetetty',
-  'proposal': 'Tarjous lähetetty', 'tarjous': 'Tarjous lähetetty',
-  'won': 'Voitettu', 'voitettu': 'Voitettu', 'closed won': 'Voitettu',
-  'lost': 'Hävitty', 'hävitty': 'Hävitty', 'closed lost': 'Hävitty',
-} %}
+{% set stage_display_labels = STAGE_LABELS_FI %}
+{% set source_labels = SOURCE_LABELS_FI %}
 {% set signal_display_overrides = {
   'created via api': 'Luotu automaatiolla',
   'created via n8n': 'Luotu automaatiolla',
@@ -61,7 +53,6 @@
   <header class="pipeline-page-header">
     <div class="pipeline-page-header__main">
       <h1 class="pipeline-page-header__title">Myyntiputki</h1>
-      <p class="pipeline-page-header__subtitle">Näe missä raha liikkuu ja mihin pitää tarttua.</p>
     </div>
 
     <div class="pipeline-page-actions">
@@ -70,12 +61,12 @@
         <svg class="pipeline-search__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
         </svg>
-        <input id="pipeline-search" class="pipeline-search__input" type="search" placeholder="Hae nimi, yritys…" autocomplete="off" />
+        <input id="pipeline-search" class="pipeline-search__input" type="search" placeholder="Hae nimeä tai yritystä…" autocomplete="off" />
       </label>
 
       <div class="pipeline-filters">
-        <button type="button" class="btn btn-secondary btn-sm pipeline-filters__toggle" id="pipeline-filters-toggle" aria-expanded="false" aria-controls="pipeline-filters-panel">
-          <svg class="pipeline-filters__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
+        <button type="button" class="btn btn-secondary btn-sm pipeline-filters__toggle{% if filters.get('assigned_to') or filters.get('source') %} has-active{% endif %}" id="pipeline-filters-toggle" aria-expanded="false" aria-controls="pipeline-filters-panel">
+          <svg class="pipeline-filters__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
           Suodattimet
         </button>
 
@@ -100,7 +91,7 @@
                 <span class="pipeline-filter__label">Lähde</span>
                 <select name="source">
                   <option value="">Kaikki</option>
-                  <option value="manual" {% if filters.get('source') == 'manual' %}selected{% endif %}>Manuaalinen</option>
+                  <option value="manual" {% if filters.get('source') == 'manual' %}selected{% endif %}>Lisätty käsin</option>
                   <option value="n8n" {% if filters.get('source') == 'n8n' %}selected{% endif %}>Automaatio</option>
                   <option value="import" {% if filters.get('source') == 'import' %}selected{% endif %}>Tuonti</option>
                   <option value="webform" {% if filters.get('source') == 'webform' %}selected{% endif %}>Lomake</option>
@@ -126,40 +117,22 @@
   <div class="pipeline-summary" id="pipeline-summary" aria-label="Putken yhteenveto">
     <div class="pipeline-summary__stats">
       <span class="pipeline-summary__item">
-        Putkessa <strong id="pipeline-total-value">{{ currency_symbol }}{{ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ') if ns.total_value else '0' }}</strong>
+        Putken arvo <strong id="pipeline-total-value">{{ (currency_symbol ~ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ')) if ns.total_value else '—' }}</strong>
       </span>
-      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
       <span class="pipeline-summary__item">
-        <strong id="pipeline-total-leads">{{ ns.total_leads if ns.total_leads is not none else 0 }}</strong> liidiä
+        <strong id="pipeline-total-leads">{{ ns.total_leads if ns.total_leads is not none else 0 }}</strong> <span id="pipeline-total-leads-label">{{ 'liidi' if ns.total_leads == 1 else 'liidiä' }}</span>
       </span>
-      {% if ns.slipping > 0 %}
-      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
-      <span class="pipeline-summary__flag pipeline-summary__flag--warn" id="pipeline-slipping-wrap">
-        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+      {# Attention signals appear only when there is something to act on. #}
+      <span class="pipeline-summary__flag pipeline-summary__flag--warn" id="pipeline-slipping-wrap"{% if ns.slipping == 0 %} hidden{% endif %}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
         <span id="pipeline-slipping-count">{{ ns.slipping }}</span>
         <span id="pipeline-slipping-label">{{ 'liidi' if ns.slipping == 1 else 'liidiä' }} liukumassa pois</span>
       </span>
-      {% else %}
-      <span class="pipeline-summary__flag pipeline-summary__flag--warn" id="pipeline-slipping-wrap" hidden>
-        <span class="pipeline-summary__dot" aria-hidden="true"></span>
-        <span id="pipeline-slipping-count">0</span>
-        <span id="pipeline-slipping-label">liidiä liukumassa pois</span>
-      </span>
-      {% endif %}
-      {% if ns.near_close > 0 %}
-      <span class="pipeline-summary__sep" aria-hidden="true">·</span>
-      <span class="pipeline-summary__flag pipeline-summary__flag--success" id="pipeline-near-wrap">
-        <span class="pipeline-summary__dot" aria-hidden="true"></span>
+      <span class="pipeline-summary__flag pipeline-summary__flag--success" id="pipeline-near-wrap"{% if ns.near_close == 0 %} hidden{% endif %}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>
         <span id="pipeline-near-count">{{ ns.near_close }}</span>
         <span id="pipeline-near-label">lähellä sulkeutumista</span>
       </span>
-      {% else %}
-      <span class="pipeline-summary__flag pipeline-summary__flag--success" id="pipeline-near-wrap" hidden>
-        <span class="pipeline-summary__dot" aria-hidden="true"></span>
-        <span id="pipeline-near-count">0</span>
-        <span id="pipeline-near-label">lähellä sulkeutumista</span>
-      </span>
-      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -168,21 +141,15 @@
     <div class="card pipeline-empty">
       {{ empty_state(
         "ti-layout-kanban",
-        "Ei liidejä tässä vaiheessa",
-        "Vedä liidi tähän kun se etenee tai muuta pipeline-vaiheiden järjestystä.",
-        "Hallinnoi pipelinea",
-        "/settings/pipeline"
+        "Myyntiputkella ei ole vielä vaiheita",
+        "Vaiheet luodaan organisaation asetuksissa.",
+        none,
+        none
       ) }}
     </div>
   {% elif ns.total_leads == 0 %}
-    <div class="card pipeline-empty">
-      {{ empty_state(
-        "ti-layout-kanban",
-        "Ei liidejä tässä vaiheessa",
-        "Vedä liidi tähän kun se etenee tai lisää uusi liidi putkeen.",
-        "Lisää liidi",
-        url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead')
-      ) }}
+    <div class="pipeline-summary" role="status">
+      <span class="pipeline-summary__item">Putkessa ei ole vielä liidejä. Uudet liidit ilmestyvät ensimmäiseen vaiheeseen automaattisesti.</span>
     </div>
   {% endif %}
 
@@ -231,28 +198,28 @@
         <header class="pipeline-col__header">
           <div class="pipeline-col__title-row">
             <span class="pipeline-col__dot" style="background: {{ stage.color or '#94A3B8' }};" aria-hidden="true"></span>
-            <h2 class="pipeline-col__title">{{ stage_display }}</h2>
-            <span class="pipeline-col__count">{{ stage_count }}</span>
+            <h2 class="pipeline-col__title" title="{{ stage_display }}">{{ stage_display }}</h2>
+            <span class="pipeline-col__count" aria-label="{{ stage_count }} liidiä">{{ stage_count }}</span>
           </div>
-          <div class="pipeline-col__value" data-col-value>
-            {{ currency_symbol }}{{ '{:,.0f}'.format(stage_total|float).replace(',', ' ') if stage_total else '0' }}
+          <div class="pipeline-col__meta">
+            <span class="pipeline-col__value" data-col-value>{{ (currency_symbol ~ '{:,.0f}'.format(stage_total|float).replace(',', ' ')) if stage_total else '—' }}</span>
+            <span class="pipeline-col__note pipeline-col__note--{{ col_note_mod }}" data-col-note{% if not col_note %} hidden{% endif %}>{{ col_note or '' }}</span>
           </div>
-          <div class="pipeline-col__note pipeline-col__note--{{ col_note_mod }}" data-col-note{% if not col_note %} hidden{% endif %}>{{ col_note or '' }}</div>
         </header>
 
         <div class="pipeline-col__list kanban-list" data-stage-id="{{ stage.id }}" role="list">
           {% if stage_count == 0 %}
             <div class="pipeline-col__placeholder">
-              <div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div>
-              <div class="pipeline-col__placeholder-text">Vedä liidi tähän kun se etenee</div>
+              <div class="pipeline-col__placeholder-title">Ei liidejä</div>
             </div>
           {% endif %}
 
           {% for item in stage_leads %}
           {% set lead = item.get('lead') if item is mapping else item %}
           {% if lead %}
-          {% set company_label = lead.company or 'Tuntematon yritys' %}
-          {% set contact_label = lead.display_name %}
+          {% set company_label = lead.company or lead.display_name %}
+          {% set contact_label = lead.display_name if lead.company and lead.display_name != lead.company else '' %}
+          {% set in_new_stage = stage_display == 'Uusi liidi' %}
           {% set deal_amount = lead.deal_value|float if lead.deal_value else 0 %}
           {% set stage_days = item.get('stage_days', 0) if item is mapping else 0 %}
           {% set ai_rec = item.get('ai_recommendation') if item is mapping else none %}
@@ -296,12 +263,8 @@
             {% set signal_text = lead.score_reason|truncate(40, True, '…') %}
           {% elif last_activity and last_activity.content %}
             {% set signal_text = last_activity.content|truncate(40, True, '…') %}
-          {% elif last_activity %}
-            {% set signal_text = act_labels.get(last_activity.type, 'Aktiviteetti') %}
-          {% elif created_days is not none and created_days <= 3 %}
-            {% set signal_text = 'Uusi liidi' %}
           {% else %}
-            {% set signal_text = 'Ei viimeisintä signaalia' %}
+            {% set signal_text = '' %}
           {% endif %}
           {% set signal_key = signal_text|lower|trim %}
           {% if signal_key in signal_display_overrides %}
@@ -330,9 +293,10 @@
             {% set contact_text = created_days ~ ' pv hiljaa' %}
             {% set contact_mod = 'danger' %}
           {% else %}
-            {% set contact_text = 'Ei kontaktia' %}
+            {% set contact_text = 'Ei vielä kontaktia' %}
             {% set contact_mod = 'muted' %}
           {% endif %}
+          {% if signal_key.startswith('luotu') or signal_key.startswith('tuotu') or signal_key == 'uusi liidi' %}{% set signal_text = '' %}{% endif %}
           {% if ai_rec and ai_rec.get('text') %}
             {% set next_action = ai_rec.get('text') %}
           {% elif next_task and next_task.title %}
@@ -347,6 +311,12 @@
             {% set next_action = 'Ensikontakti' %}
           {% else %}
             {% set next_action = 'Avaa' %}
+          {% endif %}
+          {% if is_won_stage or stage_key in ['lost', 'hävitty', 'closed lost'] %}
+            {% set next_action = 'Avaa' %}
+            {% set is_slipping = false %}
+            {% set status.mod = '' %}
+            {% set card_mod = 'won' if is_won_stage else '' %}
           {% endif %}
           {% set detail_url = url_for('leads.detail', lead_id=lead.id, organization_id=organization_id) if is_superadmin else url_for('leads.detail', lead_id=lead.id) %}
 
@@ -365,20 +335,35 @@
             role="listitem"
             aria-label="{{ company_label }}"
           >
+            {# 1) kohde + arvo #}
             <div class="lead-card__top">
-              <a class="lead-card__company" href="{{ detail_url }}">{{ company_label }}</a>
-              <span class="lead-card__value">{{ currency_symbol }}{{ '{:,.0f}'.format(deal_amount).replace(',', ' ') if deal_amount else '0' }}</span>
+              <a class="lead-card__company" href="{{ detail_url }}" title="{{ company_label }}">{{ company_label }}</a>
+              {% if lead.deal_value is not none %}
+              <span class="lead-card__value">{{ currency_symbol }}{{ '{:,.0f}'.format(deal_amount).replace(',', ' ') }}</span>
+              {% endif %}
             </div>
-            <div class="lead-card__contact">{{ contact_label }}</div>
-            {% if status.label %}
-            <span class="lead-card__chip lead-card__chip--{{ status.mod }}">{{ status.label }}</span>
-            {% endif %}
-            <p class="lead-card__signal">
-              {{ signal_text }}
-              <span class="lead-card__signal-sep" aria-hidden="true">·</span>
-              <span class="lead-card__contact-time lead-card__contact-time--{{ contact_mod }}">{{ contact_text }}</span>
-            </p>
-            <a class="lead-card__next" href="{{ detail_url }}">Seuraava toimi: {{ next_action }} →</a>
+            {# 2) tarpeellisin taustatieto #}
+            <div class="lead-card__mid">
+              {% if contact_label %}<div class="lead-card__contact">{{ contact_label }}</div>{% endif %}
+              <div class="lead-card__facts">
+                <span class="lead-source">{{ source_labels.get(lead.source, lead.source or '—') }}</span>
+                <span class="lead-card__contact-time lead-card__contact-time--{{ contact_mod }}">{{ contact_text }}</span>
+                {% if lead.deal_value is none %}<span>arvo arvioimatta</span>{% endif %}
+              </div>
+              {% if signal_text and signal_text|lower|trim != next_action|lower|trim %}<p class="lead-card__signal">{{ signal_text }}</p>{% endif %}
+              {# The column already states the stage; flags only add what it does not. #}
+              {% if status.mod == 'slipping' %}
+              <div class="lead-card__flags"><span class="lead-flag lead-flag--urgent">Liukumassa pois</span></div>
+              {% elif status.mod == 'hot' %}
+              <div class="lead-card__flags"><span class="lead-flag lead-flag--hot">Kuuma</span></div>
+              {% elif status.mod == 'proposal' %}
+              <div class="lead-card__flags"><span class="lead-flag lead-flag--urgent">Tarjous odottaa</span></div>
+              {% elif status.mod == 'new' and not in_new_stage %}
+              <div class="lead-card__flags"><span class="lead-fresh">Uusi</span></div>
+              {% endif %}
+            </div>
+            {# 3) seuraava toimi #}
+            <a class="lead-card__next lead-next{% if is_slipping %} lead-next--urgent{% elif next_action == 'Avaa' %} lead-next--plain{% endif %}" href="{{ detail_url }}">{{ next_action }}<span class="lead-next__arrow" aria-hidden="true">→</span></a>
           </article>
           {% endif %}
           {% endfor %}
@@ -730,7 +715,7 @@
     if (listEl.querySelector('.pipeline-col__placeholder')) return;
     const placeholder = document.createElement('div');
     placeholder.className = 'pipeline-col__placeholder';
-    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä tässä vaiheessa</div><div class="pipeline-col__placeholder-text">Vedä liidi tähän kun se etenee</div>';
+    placeholder.innerHTML = '<div class="pipeline-col__placeholder-title">Ei liidejä</div>';
     listEl.prepend(placeholder);
   }
 
@@ -754,7 +739,7 @@
     const valueEl = col.querySelector('[data-col-value]');
 
     if (countEl) countEl.textContent = String(count);
-    if (valueEl) valueEl.textContent = formatEuro(total);
+    if (valueEl) valueEl.textContent = total > 0 ? formatEuro(total) : '—';
     col.classList.toggle('pipeline-col--empty', count === 0);
     syncPlaceholder(listEl);
     updateColumnNote(col, listEl);
@@ -778,7 +763,9 @@
     const leadsEl = root.querySelector('#pipeline-total-leads');
     const valueEl = root.querySelector('#pipeline-total-value');
     if (leadsEl) leadsEl.textContent = String(totalLeads);
-    if (valueEl) valueEl.textContent = formatEuro(totalValue);
+    if (valueEl) valueEl.textContent = totalValue > 0 ? formatEuro(totalValue) : '—';
+    const leadsLabelEl = root.querySelector('#pipeline-total-leads-label');
+    if (leadsLabelEl) leadsLabelEl.textContent = totalLeads === 1 ? 'liidi' : 'liidiä';
 
     const slippingWrap = root.querySelector('#pipeline-slipping-wrap');
     const slippingCount = root.querySelector('#pipeline-slipping-count');

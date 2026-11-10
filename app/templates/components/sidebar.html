@@ -36,15 +36,42 @@
     </a>
   </div>
 
+  {# Organisation context: one consistent place for every role. Superadmins
+     get the existing organization_id switcher when the view provides the
+     list; everyone else sees their own organisation's name. #}
+  {% if current_user.is_superadmin() %}
+    {% if organizations is defined and organizations %}
+    <form method="get" class="sidebar-org" action="{{ request.path }}">
+      <label class="sidebar-org__label" for="sidebar-org-select">Organisaatio</label>
+      <select id="sidebar-org-select" name="organization_id" class="sidebar-org__select" onchange="this.form.submit()">
+        {% if not org_id_param %}<option value="" selected disabled>Valitse organisaatio</option>{% endif %}
+        {% for o in organizations %}
+        <option value="{{ o.id }}"{% if org_id_param and org_id_param|int == o.id %} selected{% endif %}>{{ o.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% else %}
+    <div class="sidebar-org">
+      <span class="sidebar-org__label">Organisaatio</span>
+      <span class="sidebar-org__name">{% if org is defined and org and org.name is defined %}{{ org.name }}{% elif org_id_param %}Valittu organisaatio{% else %}Kaikki organisaatiot{% endif %}</span>
+    </div>
+    {% endif %}
+  {% elif current_user.organization %}
+  <div class="sidebar-org">
+    <span class="sidebar-org__label">Organisaatio</span>
+    <span class="sidebar-org__name" title="{{ current_user.organization.name }}">{{ current_user.organization.name }}</span>
+  </div>
+  {% endif %}
+
   <div class="sidebar-scroll">
     <nav aria-label="Päävalikko">
-      <p class="sidebar-section">Päävalikko</p>
+      <p class="sidebar-section">Myynti</p>
       <ul>
         <li>
           <a href="{{ nav_url('analytics.dashboard') }}"
              class="sidebar-item{% if ep == 'analytics.dashboard' %} active{% endif %}"
              {% if ep == 'analytics.dashboard' %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-home" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9.5h4.5V14h3v5.5H18V10"/></svg>
             <span class="sidebar-item__label">Kojelauta</span>
           </a>
         </li>
@@ -52,7 +79,7 @@
           <a href="{{ nav_url('leads.pipeline') }}"
              class="sidebar-item{% if ep == 'leads.pipeline' %} active{% endif %}"
              {% if ep == 'leads.pipeline' %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-layout-kanban" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="4.5" height="16" rx="1.2"/><rect x="9.75" y="4" width="4.5" height="10.5" rx="1.2"/><rect x="16" y="4" width="4.5" height="13" rx="1.2"/></svg>
             <span class="sidebar-item__label">Myyntiputki</span>
           </a>
         </li>
@@ -60,7 +87,7 @@
           <a href="{{ nav_url('leads.list_leads') }}"
              class="sidebar-item{% if ep in ('leads.list_leads', 'leads.detail', 'leads.new_lead', 'leads.edit_lead', 'leads.create_lead', 'leads.update_lead') %} active{% endif %}"
              {% if ep in ('leads.list_leads', 'leads.detail') %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-user-plus" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16l-6 7v5l-4 1.5v-6.5z"/></svg>
             <span class="sidebar-item__label">Liidit</span>
           </a>
         </li>
@@ -69,7 +96,7 @@
           <a href="{{ nav_url('companies.list_companies') }}"
              class="sidebar-item{% if ep and (ep.startswith('companies.')) %} active{% endif %}"
              {% if ep and ep.startswith('companies.') %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-building" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h7A1.5 1.5 0 0 1 15 5.5V20"/><path d="M15 10h3.5A1.5 1.5 0 0 1 20 11.5V20"/><path d="M3.5 20h17"/><path d="M8.5 8h3M8.5 11.5h3M8.5 15h3"/></svg>
             <span class="sidebar-item__label">Yritykset</span>
           </a>
         </li>
@@ -79,7 +106,7 @@
           <a href="{{ nav_url('contacts.list_contacts') }}"
              class="sidebar-item{% if ep and (ep.startswith('contacts.')) %} active{% endif %}"
              {% if ep and ep.startswith('contacts.') %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-users" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.25"/><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M15.5 5.6a3.25 3.25 0 0 1 0 5.8M17.5 14.9c1.9.6 3.1 2.2 3.5 4.6"/></svg>
             <span class="sidebar-item__label">Kontaktit</span>
           </a>
         </li>
@@ -90,7 +117,7 @@
           <a href="{{ nav_url('tasks.list_tasks') }}"
              class="sidebar-item{% if ep and ep.startswith('tasks.') %} active{% endif %}"
              {% if ep and ep.startswith('tasks.') %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-circle-check" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-4.9"/></svg>
             <span class="sidebar-item__label">Tehtävät</span>
             {% if nav_overdue_count %}<span class="sidebar-badge">{{ nav_overdue_count }}</span>{% endif %}
           </a>
@@ -99,7 +126,7 @@
           <a href="{{ nav_url('calendar.my_calendar') }}"
              class="sidebar-item{% if ep and ep.startswith('calendar.') %} active{% endif %}"
              {% if ep == 'calendar.my_calendar' %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-calendar" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
             <span class="sidebar-item__label">Kalenteri</span>
           </a>
         </li>
@@ -109,7 +136,7 @@
           <a href="{{ nav_url('analytics.reports') }}"
              class="sidebar-item{% if ep == 'analytics.reports' %} active{% endif %}"
              {% if ep == 'analytics.reports' %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-chart-bar" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 20v-7M12 20V5M17 20v-10"/></svg>
             <span class="sidebar-item__label">Raportit</span>
           </a>
         </li>
@@ -117,7 +144,7 @@
           <a href="{{ nav_url(settings_home_ep) }}"
              class="sidebar-item{% if settings_active %} active{% endif %}"
              {% if settings_active %}aria-current="page"{% endif %}>
-            <i class="sidebar-icon ti ti-settings" aria-hidden="true"></i>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>
             <span class="sidebar-item__label">Asetukset</span>
           </a>
         </li>
@@ -154,9 +181,7 @@
         <div class="sidebar-user-info">
           <div class="sidebar-user-name truncate" title="{{ current_user.email }}">{{ current_user.email.split('@')[0] }}</div>
           <div class="sidebar-user-email truncate" title="{{ current_user.email }}">{{ current_user.email }}</div>
-          {% if current_user.organization %}
-          <div class="sidebar-user-plan truncate" title="{{ current_user.organization.name }}">{{ current_user.organization.name }}</div>
-          {% else %}
+          {% if not current_user.organization %}
           <div class="sidebar-user-plan">{{ current_user.role|capitalize }}</div>
           {% endif %}
         </div>

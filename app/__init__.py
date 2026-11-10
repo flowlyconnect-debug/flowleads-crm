@@ -214,13 +214,67 @@ def _register_blueprints(app):
     csrf.exempt(listings_n8n_bp)
 
 
+# Display labels shared by every lead view (dashboard, list, pipeline, detail)
+# so the same lead reads the same everywhere. Presentation only: stored stage
+# names and source codes are untouched.
+STAGE_LABELS_FI = {
+    "new lead": "Uusi liidi",
+    "uusi liidi": "Uusi liidi",
+    "uusi": "Uusi liidi",
+    "contacted": "Kontaktoitu",
+    "kontaktoitu": "Kontaktoitu",
+    "interested": "Kiinnostunut",
+    "kiinnostunut": "Kiinnostunut",
+    "kvalifioitu": "Kvalifioitu",
+    "qualified": "Kvalifioitu",
+    "proposal sent": "Tarjous lähetetty",
+    "tarjous lähetetty": "Tarjous lähetetty",
+    "proposal": "Tarjous lähetetty",
+    "tarjous": "Tarjous lähetetty",
+    "won": "Voitettu",
+    "voitettu": "Voitettu",
+    "closed won": "Voitettu",
+    "lost": "Hävitty",
+    "hävitty": "Hävitty",
+    "closed lost": "Hävitty",
+}
+
+# "n8n" is how a lead arrived, not where it came from, so the sales views call
+# it Automaatio; technical detail stays in the integration settings.
+SOURCE_LABELS_FI = {
+    "manual": "Lisätty käsin",
+    "n8n": "Automaatio",
+    "import": "Tuonti",
+    "webform": "Lomake",
+    "oikotie": "Oikotie",
+}
+
+
+def stage_label_fi(name) -> str:
+    if not name:
+        return "—"
+    return STAGE_LABELS_FI.get(str(name).strip().lower(), str(name))
+
+
+def source_label_fi(code) -> str:
+    if not code:
+        return "—"
+    return SOURCE_LABELS_FI.get(str(code).strip().lower(), str(code))
+
+
 def _register_root_routes(app):
     @app.context_processor
     def inject_ui_helpers():
         def has_endpoint(endpoint_name: str) -> bool:
             return endpoint_name in app.view_functions
 
-        return {"has_endpoint": has_endpoint}
+        return {
+            "has_endpoint": has_endpoint,
+            "stage_label": stage_label_fi,
+            "source_label": source_label_fi,
+            "STAGE_LABELS_FI": STAGE_LABELS_FI,
+            "SOURCE_LABELS_FI": SOURCE_LABELS_FI,
+        }
 
     @app.template_filter("fi_percent")
     def fi_percent(value, decimals=1):

@@ -6,10 +6,10 @@ from dataclasses import dataclass
 
 from flask import current_app
 
-from app.api.services import APIKeyServiceError, create_api_key
 from app.core.audit import log_audit
 from app.extensions import db
-from app.search.profile_services import SearchProfileServiceError, create_profile, create_test_search_job
+from app.search.models import SearchProfile
+from app.search.profile_services import SearchProfileServiceError, create_profile
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_organization, create_user
 
@@ -25,10 +25,12 @@ class CustomerOnboardingError(Exception):
 class CustomerOnboardingResult:
     organization: Organization
     admin_user: User
-    search_profile_name: str
-    api_key_full: str
+    search_profile: SearchProfile
     temporary_password: str | None
-    initial_job_created: bool
+
+    @property
+    def search_profile_name(self) -> str:
+        return self.search_profile.name
 
 
 _FINNISH_SLUG_MAP = str.maketrans(
@@ -85,8 +87,18 @@ def create_customer(
     source: str = "oikotie",
     is_active: bool = True,
     slug: str | None = None,
-    create_initial_job: bool = True,
+    min_confidence: int = 60,
+    daily_lead_limit: int = 50,
+    cities: list[str] | None = None,
 ) -> CustomerOnboardingResult:
+    """Create organization + admin + search profile in one go.
+
+    The profile is a filter over the shared listing catalogue
+    (docs/ARKKITEHTUURI_KOHDEKATALOGI.md): nothing is scheduled per customer.
+    An active profile gets its matches from the last 30 days of the catalogue
+    on the next `listing_matching` scheduler run (needs_rematch=True).
+    The admin must change the (temporary) password on first login.
+    """
     organization_name = (organization_name or "").strip()
     if not organization_name:
         raise CustomerOnboardingError("Organisaation nimi on pakollinen.", "invalid_name")
@@ -116,12 +128,7 @@ def create_customer(
             is_active=is_active,
         )
 
-        _api_key, api_key_full = create_api_key(
-            organization.id,
-            "n8n",
-            created_by=actor.id,
-            test_mode=bool(current_app.config.get("TESTING")),
-        )
+        admin_user.must_change_password = True
 
         profile = create_profile(
             organization.id,
@@ -129,16 +136,14 @@ def create_customer(
             remonttityyppi=remonttityyppi,
             regions=regions,
             schedule_description="daily",
-            crm_api_key=api_key_full,
+            crm_api_key=None,
             is_active=is_active,
             source=source,
+            min_confidence=min_confidence,
+            daily_lead_limit=daily_lead_limit,
+            cities=cities,
         )
         db.session.flush()
-
-        initial_job_created = False
-        if create_initial_job and is_active:
-            create_test_search_job(organization.id, profile.id)
-            initial_job_created = True
 
         log_audit(
             "customer_onboarded",
@@ -153,12 +158,9 @@ def create_customer(
                 "search_profile_id": profile.id,
                 "source": source,
                 "is_active": is_active,
-                "initial_job_created": initial_job_created,
             },
         )
     except UserServiceError as exc:
-        raise CustomerOnboardingError(exc.message, exc.code) from exc
-    except APIKeyServiceError as exc:
         raise CustomerOnboardingError(exc.message, exc.code) from exc
     except SearchProfileServiceError as exc:
         raise CustomerOnboardingError(exc.message, exc.code) from exc
@@ -166,8 +168,6 @@ def create_customer(
     return CustomerOnboardingResult(
         organization=organization,
         admin_user=admin_user,
-        search_profile_name=profile.name,
-        api_key_full=api_key_full,
+        search_profile=profile,
         temporary_password=generated_password,
-        initial_job_created=initial_job_created,
     )

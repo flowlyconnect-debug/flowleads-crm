@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from flask_login import UserMixin
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -27,9 +28,9 @@ class Organization(db.Model):
     # but via the shared FlowLeads domain.
     mailgun_domain_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # TODO: per-org Mailgun API key — store as mailgun_api_key_encrypted once encryption exists.
-    # Optional modules the org's admin opted into during invite onboarding (see
-    # app/admin/constants.py FEATURE_CATALOG). Not yet wired into feature gating
-    # elsewhere in the app — just captured for now.
+    # Optional modules this organization may use (keys of
+    # app/admin/constants.py FEATURE_CATALOG). Enforced by
+    # app/core/features.py; a superadmin edits them on /admin/customers.
     enabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -39,6 +40,9 @@ class Organization(db.Model):
     )
 
     users: Mapped[list["User"]] = relationship("User", back_populates="organization")
+
+    def has_feature(self, key: str) -> bool:
+        return key in (self.enabled_features or [])
 
     def __repr__(self):
         return f"<Organization {self.slug}>"
@@ -59,6 +63,11 @@ class User(UserMixin, db.Model):
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when a superadmin created the account with a temporary password:
+    # the user is forced to pick their own before using the app.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false(), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

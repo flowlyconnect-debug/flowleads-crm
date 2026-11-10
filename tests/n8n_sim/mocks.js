@@ -16,6 +16,8 @@ function card(id) {
     url: `https://asunnot.oikotie.fi/myytavat-asunnot/espoo/${id}`,
     location: { city: 'Espoo', address: `Testikatu ${id}` },
     data: { price: '250 000 €', size: '62 m²', description: `Valoisa koti ${id}` },
+    // 1001 carries building data on the card; for the rest the AI supplies it
+    ...(id === 1001 ? { buildingData: { year: 1974, buildingType: 1 } } : {}),
   };
 }
 
@@ -85,6 +87,8 @@ exports.openai = (values, nodeName) => {
       isannoitsija_puh: text.includes('040 123 4567') ? '040 123 4567' : '',
       isannoitsija_email: text.includes('testi@isannointi.fi') ? 'testi@isannointi.fi' : '',
       tulevat_remontit: renovations.length ? 'Lukitus uusitaan' : '',
+      rakennusvuosi: text.includes('As Oy Avaimeton') ? 1988 : null,
+      talotyyppi: text.includes('As Oy Avaimeton') ? 'Rivitalo' : '',
       renovations,
     };
     return '```json\n' + JSON.stringify(out) + '\n```';

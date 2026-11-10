@@ -98,7 +98,7 @@ def test_enable_totp_and_login_verify(client, app):
     assert response.location is not None
 
 
-def test_backup_code_rejected_for_login(app):
+def test_backup_code_works_once_for_login(app):
     with app.app_context():
         user = create_user("totp-backup@test.com", "securepassword1", role="superadmin")
         secret = generate_totp_secret()
@@ -109,4 +109,8 @@ def test_backup_code_rejected_for_login(app):
         user.totp_enabled = True
         db.session.commit()
 
-        assert verify_totp_login(user, raw_codes[0]) is False
+        assert verify_totp_login(user, "ZZZZ-ZZZZ-ZZZZ") is False
+        assert verify_totp_login(user, raw_codes[0]) is True
+        assert verify_totp_login(user, raw_codes[0]) is False  # single use
+        # typed in lower case without dashes
+        assert verify_totp_login(user, raw_codes[1].replace("-", "").lower()) is True
