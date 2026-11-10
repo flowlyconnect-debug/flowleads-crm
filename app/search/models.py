@@ -93,6 +93,12 @@ class SearchJob(db.Model):
 
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failure_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Short-lived, job-scoped credential minted when this job is claimed (see
+    # claim_pending_jobs_for_n8n). n8n uses it instead of the organization's
+    # permanent crm_api_key, so a leaked execution log only exposes a token
+    # scoped to this one job, not a standing key for the whole organization.
+    n8n_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    n8n_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

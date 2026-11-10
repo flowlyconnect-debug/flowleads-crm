@@ -1,7 +1,7 @@
 from flask import Blueprint, abort, g, request
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.auth import require_api_key
+from app.api.auth import require_api_key, require_api_key_or_job_token
 from app.api.rate_limit import api_rate_limit, api_rate_limit_key
 from app.api.crm_api import (
     create_custom_field_definition,
@@ -107,7 +107,7 @@ def me():
 
 
 @api_bp.route("/leads", methods=["POST"])
-@require_api_key
+@require_api_key_or_job_token
 @limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
 def create_lead():
     if not request.is_json:
@@ -149,7 +149,7 @@ def create_lead():
 
 
 @api_bp.route("/leads/bulk", methods=["POST"])
-@require_api_key
+@require_api_key_or_job_token
 @limiter.limit(api_rate_limit, key_func=api_rate_limit_key)
 def bulk_leads():
     if not request.is_json:
