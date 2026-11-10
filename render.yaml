@@ -3,6 +3,7 @@ databases:
     plan: free
 
 services:
+  # Serves the web UI/API. Also runs `flask db upgrade` on every deploy.
   - type: web
     name: flowleads-crm
     runtime: python
@@ -15,7 +16,55 @@ services:
         value: production
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flowleads-db
+          property: connectionString
+      # Everything below is set once in the Render dashboard (sync: false keeps
+      # Render from overwriting it on redeploy). See docs/ for the full list and
+      # what each one is for.
+      - key: SECRET_KEY
+        sync: false
+      - key: MAILGUN_API_KEY
+        sync: false
+      - key: MAILGUN_DOMAIN
+        sync: false
+      - key: MAILGUN_FROM_EMAIL
+        sync: false
+      - key: MAILGUN_FROM_NAME
+        sync: false
+      - key: MAILGUN_WEBHOOK_SIGNING_KEY
+        sync: false
+      - key: N8N_MASTER_SECRET
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: CALENDAR_ENCRYPTION_KEY
+        sync: false
+      - key: WEBHOOK_ENCRYPTION_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      # Backups: S3-compatible object storage (required — Render's web/worker
+      # dynos do not share a local disk). The web admin UI only needs a
+      # READ-ONLY key to list/download backups; it must never hold the
+      # write/delete key below (that belongs to the scheduler worker only).
+      - key: BACKUP_STORAGE_BACKEND
+        value: s3
+      - key: BACKUP_S3_BUCKET
+        sync: false
+      - key: BACKUP_S3_REGION
+        sync: false
+      - key: BACKUP_S3_ENDPOINT_URL
+        sync: false
+      - key: BACKUP_S3_READONLY_ACCESS_KEY_ID
+        sync: false
+      - key: BACKUP_S3_READONLY_SECRET_ACCESS_KEY
+        sync: false
 
+  # Runs the APScheduler loop: daily/weekly search job creation, the daily
+  # backup, stream/lead health alerts. Separate dyno from web on purpose so a
+  # web deploy/restart never interrupts the schedule.
   - type: worker
     name: flowleads-scheduler
     runtime: python
@@ -42,3 +91,67 @@ services:
           name: flowleads-crm
           type: web
           envVarKey: N8N_MASTER_SECRET
+      - key: APP_BASE_URL
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: APP_BASE_URL
+      - key: MAILGUN_API_KEY
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: MAILGUN_API_KEY
+      - key: MAILGUN_DOMAIN
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: MAILGUN_DOMAIN
+      - key: MAILGUN_FROM_EMAIL
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: MAILGUN_FROM_EMAIL
+      - key: MAILGUN_FROM_NAME
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: MAILGUN_FROM_NAME
+      - key: CALENDAR_ENCRYPTION_KEY
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: CALENDAR_ENCRYPTION_KEY
+      - key: WEBHOOK_ENCRYPTION_KEY
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: WEBHOOK_ENCRYPTION_KEY
+      - key: REDIS_URL
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: REDIS_URL
+      - key: BACKUP_STORAGE_BACKEND
+        value: s3
+      - key: BACKUP_S3_BUCKET
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: BACKUP_S3_BUCKET
+      - key: BACKUP_S3_REGION
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: BACKUP_S3_REGION
+      - key: BACKUP_S3_ENDPOINT_URL
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: BACKUP_S3_ENDPOINT_URL
+      # Write+delete key for uploading backups and enforcing retention. Set
+      # directly on this service (dashboard), NOT pulled from web — web only
+      # ever gets the read-only pair above.
+      - key: BACKUP_S3_ACCESS_KEY_ID
+        sync: false
+      - key: BACKUP_S3_SECRET_ACCESS_KEY
+        sync: false

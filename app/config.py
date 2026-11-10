@@ -50,6 +50,26 @@ class Config:
     BACKUP_RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", 30))
     UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "./uploads")
 
+    # Backup storage backend: "local" (default, ephemeral disk — fine for dev only)
+    # or "s3" (any S3-compatible object store: AWS S3, Cloudflare R2, Backblaze B2,
+    # MinIO...). S3 is required for a real deployment since Render's web and worker
+    # dynos do not share a local disk.
+    BACKUP_STORAGE_BACKEND = os.environ.get("BACKUP_STORAGE_BACKEND", "local")
+    BACKUP_S3_BUCKET = os.environ.get("BACKUP_S3_BUCKET")
+    BACKUP_S3_REGION = os.environ.get("BACKUP_S3_REGION")
+    BACKUP_S3_ENDPOINT_URL = os.environ.get("BACKUP_S3_ENDPOINT_URL")
+    BACKUP_S3_PREFIX = os.environ.get("BACKUP_S3_PREFIX", "backups")
+    # Read-write credentials: used by the scheduler worker to upload backups and
+    # enforce retention (delete old ones).
+    BACKUP_S3_ACCESS_KEY_ID = os.environ.get("BACKUP_S3_ACCESS_KEY_ID")
+    BACKUP_S3_SECRET_ACCESS_KEY = os.environ.get("BACKUP_S3_SECRET_ACCESS_KEY")
+    # Read-only credentials: used by the web admin UI to list/download backups.
+    # Falls back to the read-write credentials above if not set separately, but a
+    # real deployment should issue a dedicated read-only key for the web service
+    # (least privilege: web should never be able to delete or overwrite backups).
+    BACKUP_S3_READONLY_ACCESS_KEY_ID = os.environ.get("BACKUP_S3_READONLY_ACCESS_KEY_ID")
+    BACKUP_S3_READONLY_SECRET_ACCESS_KEY = os.environ.get("BACKUP_S3_READONLY_SECRET_ACCESS_KEY")
+
     REDIS_URL = os.environ.get("REDIS_URL")
     RATELIMIT_STORAGE_URI = os.environ.get("REDIS_URL", "memory://")
 
