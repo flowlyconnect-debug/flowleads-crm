@@ -44,7 +44,7 @@ def require_2fa(view):
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login", next=request.url))
 
-        if current_user.is_superadmin():
+        if current_user.requires_mandatory_2fa():
             if not current_user.totp_enabled:
                 return redirect(url_for("auth.two_fa_setup"))
             if not is_2fa_verified():

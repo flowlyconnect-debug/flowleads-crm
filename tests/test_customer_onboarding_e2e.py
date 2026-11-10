@@ -49,6 +49,23 @@ def _login(client, email, password="securepassword1"):
     assert response.status_code == 302
 
 
+def _bypass_2fa_for(client, app, email):
+    """2FA is now mandatory for admin (not just superadmin); tests that only
+    care about role/tenant checks skip past it like this.
+
+    Deliberately does NOT open a fresh `app.app_context()`: Flask-SQLAlchemy
+    scopes `db.session` per app-context object, and the already-pushed
+    pytest fixture context (reused by every test-client request here) has
+    its own identity-mapped User instance. Mutating a *different* session's
+    copy wouldn't be visible to the requests at all.
+    """
+    user = User.query.filter_by(email=email).one()
+    user.totp_enabled = True
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+
+
 def _login_superadmin(client, app, email="sa-ui@test.com"):
     with app.app_context():
         user = create_user(email, "securepassword1", role="superadmin")
@@ -218,6 +235,7 @@ def test_e2e_admin_cannot_access_superadmin_routes(app, client):
     other = _onboard_customer(app, slug_suffix="no-sa-other")
 
     _login(client, ctx["admin_email"])
+    _bypass_2fa_for(client, app, ctx["admin_email"])
 
     for path in (
         "/admin/customers/new",

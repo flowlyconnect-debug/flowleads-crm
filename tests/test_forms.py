@@ -5,12 +5,14 @@ from unittest.mock import patch
 
 import pytest
 
+from app.core.permissions import TWO_FA_SESSION_KEY
 from app.extensions import db
 from app.forms.models import WebForm, WebFormSubmission
 from app.forms.services import WebFormService, get_active_form_by_token
 from app.forms.validators import validate_fields_config, validate_submission_payload
 from app.leads.models import Lead
 from app.sequences.models import EmailSequence
+from app.users.models import User
 from app.users.services import create_organization, create_user
 
 
@@ -41,6 +43,17 @@ def _login(client, email):
         follow_redirects=False,
     )
     assert response.status_code == 302
+
+
+def _bypass_2fa(client, app, email):
+    # No nested app_context here: db.session is scoped per app-context
+    # object, and the request-handling context (reused from the pytest
+    # fixture) must see this same mutation, not a separate session's copy.
+    user = User.query.filter_by(email=email).one()
+    user.totp_enabled = True
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
 
 
 def _default_fields():
@@ -335,6 +348,7 @@ def test_cross_tenant_isolation(client, app):
         db.session.commit()
         form_id_b = form_b.id
     _login(client, email_a)
+    _bypass_2fa(client, app, email_a)
     response_other = client.get(f"/forms/{form_id_b}/submissions")
     assert response_other.status_code == 404
 
@@ -390,6 +404,7 @@ def test_spam_honeypot(client, app):
 def test_admin_list_and_embed_code(client, app):
     org_id, admin_id, email, _ = _setup_org(app, "admin-ui")
     _login(client, email)
+    _bypass_2fa(client, app, email)
     with app.app_context():
         form = _create_form(org_id, admin_id)
         db.session.commit()

@@ -66,7 +66,7 @@ def login():
                 organization_id=user.organization_id,
             )
             db.session.commit()
-            if user.is_superadmin():
+            if user.requires_mandatory_2fa():
                 if not user.totp_enabled:
                     return redirect(url_for("auth.two_fa_setup"))
                 if not is_2fa_verified():
@@ -172,7 +172,7 @@ def reset_password(token):
 @auth_bp.route("/2fa/setup", methods=["GET", "POST"])
 @login_required
 def two_fa_setup():
-    if not current_user.is_superadmin():
+    if not current_user.requires_mandatory_2fa():
         return redirect(url_for("analytics.dashboard"))
 
     form = TwoFASetupForm()
@@ -207,7 +207,7 @@ def two_fa_setup():
 @auth_bp.route("/2fa/verify", methods=["GET", "POST"])
 @login_required
 def two_fa_verify():
-    if not current_user.is_superadmin() or not current_user.totp_enabled:
+    if not current_user.requires_mandatory_2fa() or not current_user.totp_enabled:
         return redirect(url_for("analytics.dashboard"))
 
     if is_2fa_verified():
