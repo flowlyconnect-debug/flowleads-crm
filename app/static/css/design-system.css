@@ -3,39 +3,39 @@
 :root {
   /* === FLOWLY BRAND COLORS === */
 
-  /* Sidebar */
-  --color-sidebar:        #0B0F1A;
-  --color-sidebar-light:  #111827;
-  --color-sidebar-hover:  #1A2235;
-  --color-border-dark:    #1E2D47;
+  /* Sidebar — ink navy, matches the F-logo's dark mark */
+  --color-sidebar:        #111827;
+  --color-sidebar-light:  #1A2235;
+  --color-sidebar-hover:  #212B42;
+  --color-border-dark:    #26324A;
 
-  /* Primary accent — violet, matches the flowlysolutions.net brand */
-  --color-accent:         #6948DC;
-  --color-accent-hover:   #5334B3;
-  --color-accent-soft:    #F1EDFC;
-  --color-accent-border:  #DDD3F7;
+  /* Primary accent — violet, FlowLeads' own identity */
+  --color-accent:         #623DD6;
+  --color-accent-hover:   #4F2EB3;
+  --color-accent-soft:    #F1ECFF;
+  --color-accent-border:  #DDD0FA;
 
-  /* Highlight */
-  --color-highlight:      #38BDF8;
-  --color-highlight-dark: #0EA5E9;
+  /* Highlight — logo blue, used sparingly for small brand details */
+  --color-highlight:      #2F6FED;
+  --color-highlight-dark: #1D54C4;
 
   /* Backgrounds */
-  --color-bg:             #F4F6FB;
-  --color-bg-secondary:   #ECEEF5;
+  --color-bg:             #F6F8FC;
+  --color-bg-secondary:   #ECEFF6;
   --color-card:           #FFFFFF;
   --color-card-hover:     #FAFBFF;
 
   /* Borders */
-  --color-border:         #E4E7EF;
-  --color-border-light:   #F0F2F8;
+  --color-border:         #E2E7F0;
+  --color-border-light:   #EDF0F6;
 
   /* Text */
-  --color-text-primary:   #0F1117;
-  --color-text-secondary: #5C6170;
-  --color-text-muted:     #9CA3AF;
+  --color-text-primary:   #172033;
+  --color-text-secondary: #526079;
+  --color-text-muted:     #8A94A6;
   --color-text-inverse:   #FFFFFF;
-  --color-text-accent:    #6948DC;
-  --color-text-highlight: #38BDF8;
+  --color-text-accent:    #623DD6;
+  --color-text-highlight: #2F6FED;
 
   /* Status */
   --color-success:        #10B981;
@@ -52,7 +52,7 @@
   --color-info-emphasis:  #1E40AF;
   --color-neutral-soft:   #F3F4F6;
   --color-neutral-emphasis: #374151;
-  --color-accent-emphasis: #4A2FAE;
+  --color-accent-emphasis: #4F2EB3;
 
   /* Pipeline stages */
   --stage-new:            #8B5CF6;
@@ -132,7 +132,7 @@
   --shadow-sm:  0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-accent: 0 4px 14px rgba(105, 72, 220, 0.30);
+  --shadow-accent: 0 4px 14px rgba(98, 61, 214, 0.28);
 
   /* Transitions */
   --transition-fast: 120ms ease;
@@ -174,20 +174,7 @@ body {
 }
 
 .app-main {
-  background-color: #F4F6FB;
-  background-image:
-    linear-gradient(rgba(105, 72, 220, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(105, 72, 220, 0.025) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.page-content::before {
-  content: '';
-  display: block;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(105, 72, 220, 0.15), transparent);
-  margin-bottom: 20px;
-  border-radius: 2px;
+  background: var(--color-bg);
 }
 
 img {

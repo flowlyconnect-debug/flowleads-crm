@@ -218,6 +218,29 @@ def _register_root_routes(app):
 
         return {"has_endpoint": has_endpoint}
 
+    @app.template_filter("fi_percent")
+    def fi_percent(value, decimals=1):
+        """Render a number as Finnish-locale percent text, e.g. 0,0 %."""
+        if value is None:
+            return "—"
+        try:
+            formatted = f"{float(value):.{decimals}f}"
+        except (TypeError, ValueError):
+            return str(value)
+        return formatted.replace(".", ",") + " %"
+
+    @app.template_filter("initials")
+    def initials(name, fallback="–"):
+        """Return up to 2 uppercase initials from a person's full name."""
+        if not name:
+            return fallback
+        parts = [p for p in str(name).split() if p]
+        if not parts:
+            return fallback
+        if len(parts) == 1:
+            return parts[0][:2].upper()
+        return (parts[0][0] + parts[-1][0]).upper()
+
     @app.route("/")
     def index():
         if current_user.is_authenticated:

@@ -138,9 +138,9 @@
           </form>
         </div>
       </div>
-      <a class="btn btn-ghost btn-sm leads-opp-export" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">Vie CSV</a>
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
-        Lisää liidi
+      <a class="btn btn-secondary btn-sm leads-opp-export" href="{{ url_for('leads.export_leads', organization_id=organization_id, **filters) if current_user.is_superadmin() else url_for('leads.export_leads', **filters) }}">Vie CSV</a>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">
+        + Lisää liidi
       </a>
     </div>
   </header>
@@ -334,6 +334,7 @@
           </label>
           <div class="leads-opp-row__main">
             <div class="leads-opp-row__headline">
+              <span class="leads-opp-row__avatar" aria-hidden="true">{{ lead.display_name|initials }}</span>
               <span class="leads-opp-row__company">{{ company_name }}</span>
               <span class="leads-opp-row__contact">{{ lead.display_name }}</span>
               {% if urgency.label %}

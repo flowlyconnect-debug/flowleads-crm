@@ -116,7 +116,7 @@
         </div>
       </div>
 
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">Lisää liidi</a>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if is_superadmin else url_for('leads.new_lead') }}">+ Lisää liidi</a>
     </div>
 
     <div class="pipeline-toast" id="pipeline-toast" aria-live="polite" aria-atomic="true"></div>

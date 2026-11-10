@@ -642,7 +642,7 @@ class AnalyticsService:
                 "lead_count": cnt,
                 "avg_score": round(float(avg), 1) if avg is not None else None,
                 "conversion_from_previous": None,
-                "avg_time_in_stage": avg_times.get(stage.id, "Insufficient data"),
+                "avg_time_in_stage": avg_times.get(stage.id, "Liian vähän tietoa"),
             }
             stage_rows.append(row)
 
@@ -757,7 +757,7 @@ class AnalyticsService:
             .all()
         )
         if len(rows) < 2:
-            return {sid: "Insufficient data" for sid in []}
+            return {sid: "Liian vähän tietoa" for sid in []}
 
         durations: dict[int, list[float]] = defaultdict(list)
         by_lead: dict[int, list[Activity]] = defaultdict(list)
@@ -783,7 +783,7 @@ class AnalyticsService:
         result: dict[int, str | float] = {}
         for stage_id, values in durations.items():
             if len(values) < 2:
-                result[stage_id] = "Insufficient data"
+                result[stage_id] = "Liian vähän tietoa"
             else:
                 avg_seconds = sum(values) / len(values)
                 result[stage_id] = round(avg_seconds / 86400, 1)
