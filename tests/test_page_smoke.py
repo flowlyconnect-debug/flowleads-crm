@@ -85,6 +85,23 @@ def test_superadmin_main_pages_render(client, app, superadmin, path):
     _assert_page_ok(response)
 
 
+def test_superadmin_settings_sidebar_link_works_without_org_param(client, app, superadmin):
+    """The sidebar's "Asetukset" link has no organization_id for a fresh
+    superadmin (they don't belong to any org), so it must not point at an
+    org-scoped settings page like settings.email_settings (403)."""
+    _login(client, superadmin["email"])
+    with client.session_transaction() as sess:
+        sess["two_fa_verified"] = True
+
+    dashboard_resp = client.get("/dashboard", follow_redirects=True)
+    assert dashboard_resp.status_code == 200
+    body = dashboard_resp.get_data(as_text=True)
+    assert 'href="/admin/customers"' in body
+
+    settings_resp = client.get("/admin/customers", follow_redirects=True)
+    assert settings_resp.status_code == 200
+
+
 def test_superadmin_invalid_org_redirects_to_dashboard(client, app, superadmin):
     _login(client, superadmin["email"])
     response = client.get("/leads?organization_id=999999", follow_redirects=False)

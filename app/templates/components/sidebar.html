@@ -2,7 +2,11 @@
 {% set org_id_param = request.args.get('organization_id') %}
 {% set use_org = current_user.is_superadmin() and org_id_param %}
 {% set ep = request.endpoint or '' %}
-{% if current_user.role in ('admin', 'superadmin') %}
+{% if current_user.is_superadmin() %}
+  {# Superadmins have no organization_id of their own, so any org-scoped
+     settings page (e.g. settings.email_settings) would 403 here. #}
+  {% set settings_home_ep = 'admin.customers_list' %}
+{% elif current_user.role == 'admin' %}
   {% set settings_home_ep = 'settings.email_settings' %}
 {% else %}
   {% set settings_home_ep = 'settings.email_templates_list' %}
