@@ -116,6 +116,18 @@ def _resolve_sender(organization: Organization) -> tuple[str, str]:
     return default_name, default_email
 
 
+def _resolve_sending_domain(organization: Organization) -> str | None:
+    """Only use the organization's own domain once Mailgun has actually
+    verified it — otherwise envelope (Mailgun domain) and From-header domain
+    would mismatch, which is exactly the SPF/DKIM alignment problem this is
+    meant to fix. Falls back to the shared FlowLeads domain (None → global
+    MAILGUN_DOMAIN) until then."""
+    domain = (organization.mailgun_domain or "").strip()
+    if domain and organization.mailgun_domain_verified_at is not None:
+        return domain
+    return None
+
+
 def _mailgun_send(
     *,
     to_email: str,
@@ -124,10 +136,10 @@ def _mailgun_send(
     body_text: str,
     from_name: str,
     from_email: str,
+    domain: str | None = None,
 ) -> tuple[bool, str | None, str | None]:
     api_key = current_app.config.get("MAILGUN_API_KEY")
-    domain = current_app.config.get("MAILGUN_DOMAIN")
-    org_domain_override = None
+    domain = (domain or "").strip() or current_app.config.get("MAILGUN_DOMAIN")
 
     if not api_key or not domain:
         return False, None, "Email sending is not configured."
@@ -245,6 +257,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            domain=_resolve_sending_domain(org),
         )
 
         if ok:
@@ -675,7 +688,10 @@ def update_organization_email_settings(
         raise EmailServiceError("Invalid from email address.", "validation_error")
     organization.email_from_name = (email_from_name or "").strip()[:120] or None
     organization.email_from_email = (email_from_email or "").strip()[:255] or None
-    organization.mailgun_domain = (mailgun_domain or "").strip()[:255] or None
+    new_domain = (mailgun_domain or "").strip()[:255] or None
+    if new_domain != organization.mailgun_domain:
+        organization.mailgun_domain_verified_at = None
+    organization.mailgun_domain = new_domain
     log_audit(
         "email_settings_updated",
         user_id=user_id,
@@ -684,6 +700,67 @@ def update_organization_email_settings(
         target_id=organization.id,
     )
     return organization
+
+
+def register_organization_domain(organization: Organization) -> list[dict]:
+    """Register organization.mailgun_domain with Mailgun. Returns the DNS
+    records (SPF/DKIM) the customer needs to add at their DNS provider."""
+    from app.email.mailgun_domains import MailgunDomainError, add_domain, extract_sending_dns_records
+
+    domain = (organization.mailgun_domain or "").strip()
+    if not domain:
+        raise EmailServiceError("Set a sending domain first.", "no_domain")
+
+    try:
+        record = add_domain(domain)
+    except MailgunDomainError as exc:
+        raise EmailServiceError(exc.message, exc.code) from exc
+
+    log_audit(
+        "mailgun_domain_registered",
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"domain": domain},
+    )
+    return extract_sending_dns_records(record)
+
+
+def check_organization_domain_status(organization: Organization) -> list[dict]:
+    """Refresh verification status from Mailgun. Sets/clears
+    mailgun_domain_verified_at based on whether every DNS record is valid."""
+    from app.email.mailgun_domains import (
+        MailgunDomainError,
+        extract_sending_dns_records,
+        get_domain_status,
+        is_domain_fully_verified,
+        trigger_verification,
+    )
+
+    domain = (organization.mailgun_domain or "").strip()
+    if not domain:
+        raise EmailServiceError("No sending domain configured.", "no_domain")
+
+    try:
+        trigger_verification(domain)
+        record = get_domain_status(domain)
+    except MailgunDomainError as exc:
+        raise EmailServiceError(exc.message, exc.code) from exc
+
+    verified = is_domain_fully_verified(record)
+    was_verified = organization.mailgun_domain_verified_at is not None
+    organization.mailgun_domain_verified_at = datetime.now(timezone.utc) if verified else None
+
+    if verified and not was_verified:
+        log_audit(
+            "mailgun_domain_verified",
+            organization_id=organization.id,
+            target_type="organization",
+            target_id=organization.id,
+            metadata={"domain": domain},
+        )
+
+    return extract_sending_dns_records(record)
 
 
 def verify_mailgun_webhook_signature(timestamp: str, token: str, signature: str) -> bool:

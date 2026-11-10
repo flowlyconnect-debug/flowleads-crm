@@ -8,6 +8,8 @@ from app.email.seed import seed_system_email_templates
 from app.email.services import (
     EmailServiceError,
     TemplateService,
+    check_organization_domain_status,
+    register_organization_domain,
     update_organization_email_settings,
 )
 from app.extensions import db
@@ -62,12 +64,77 @@ def email_settings():
             flash(exc.message, "danger")
         return redirect(url_for("settings.email_settings", organization_id=org_id))
 
+    dns_records = request.args.get("_show_dns") and _consume_dns_records(org_id)
     return render_template(
         "settings/email.html",
         form=form,
         organization=org,
         organization_id=org_id,
+        dns_records=dns_records,
     )
+
+
+_DNS_RECORDS_SESSION = "pending_mailgun_dns_records"
+
+
+def _store_dns_records(org_id: int, records: list[dict]) -> None:
+    from flask import session
+
+    pending = session.get(_DNS_RECORDS_SESSION, {})
+    pending[str(org_id)] = records
+    session[_DNS_RECORDS_SESSION] = pending
+    session.modified = True
+
+
+def _consume_dns_records(org_id: int) -> list[dict] | None:
+    from flask import session
+
+    pending = session.get(_DNS_RECORDS_SESSION, {})
+    records = pending.pop(str(org_id), None)
+    session[_DNS_RECORDS_SESSION] = pending
+    session.modified = True
+    return records
+
+
+@settings_bp.route("/email/domain/register", methods=["POST"])
+@login_required
+@require_role("admin", "superadmin")
+def email_domain_register():
+    org_id = _settings_org_id(require_admin=True)
+    org = db.session.get(Organization, org_id)
+    try:
+        records = register_organization_domain(org)
+        db.session.commit()
+        _store_dns_records(org_id, records)
+        flash(
+            "Verkkotunnus rekisteröity Mailguniin. Lisää alla näkyvät DNS-tietueet "
+            "verkkotunnuksesi DNS-hallinnassa, sitten paina “Tarkista tila”.",
+            "success",
+        )
+    except EmailServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    return redirect(url_for("settings.email_settings", organization_id=org_id, _show_dns=1))
+
+
+@settings_bp.route("/email/domain/verify", methods=["POST"])
+@login_required
+@require_role("admin", "superadmin")
+def email_domain_verify():
+    org_id = _settings_org_id(require_admin=True)
+    org = db.session.get(Organization, org_id)
+    try:
+        records = check_organization_domain_status(org)
+        db.session.commit()
+        _store_dns_records(org_id, records)
+        if org.mailgun_domain_verified_at:
+            flash("Verkkotunnus on vahvistettu — myyntisähköposti lähtee nyt tältä domainilta.", "success")
+        else:
+            flash("Verkkotunnus ei ole vielä vahvistettu. DNS-muutokset voivat kestää hetken.", "warning")
+    except EmailServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    return redirect(url_for("settings.email_settings", organization_id=org_id, _show_dns=1))
 
 
 @settings_bp.route("/email-templates", methods=["GET"])

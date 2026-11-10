@@ -415,3 +415,164 @@ def test_verify_mailgun_signature_helper(app):
         ts, tok = "123", "abc"
         sig = hmac.new(b"secret", f"{ts}{tok}".encode(), hashlib.sha256).hexdigest()
         assert verify_mailgun_webhook_signature(ts, tok, sig)
+
+
+# --- Per-organization verified sending domain ---
+
+
+def test_extract_and_check_dns_records_pure_helpers():
+    from app.email.mailgun_domains import extract_sending_dns_records, is_domain_fully_verified
+
+    record = {
+        "domain": {
+            "sending_dns_records": [
+                {"record_type": "TXT", "name": "mg.example.com", "value": "v=spf1...", "valid": "valid"},
+                {"record_type": "TXT", "name": "k1._domainkey.mg.example.com", "value": "k=rsa...", "valid": "unknown"},
+            ]
+        }
+    }
+    records = extract_sending_dns_records(record)
+    assert len(records) == 2
+    assert records[0]["record_type"] == "TXT"
+    assert not is_domain_fully_verified(record)
+
+    record["domain"]["sending_dns_records"][1]["valid"] = "valid"
+    assert is_domain_fully_verified(record)
+
+
+def test_is_domain_fully_verified_false_when_no_records():
+    from app.email.mailgun_domains import is_domain_fully_verified
+
+    assert is_domain_fully_verified({"domain": {"sending_dns_records": []}}) is False
+
+
+@patch("app.email.mailgun_domains.add_domain")
+def test_register_organization_domain_returns_dns_records(mock_add, app):
+    from app.email.services import register_organization_domain
+
+    mock_add.return_value = {
+        "domain": {
+            "sending_dns_records": [
+                {"record_type": "TXT", "name": "mg.example.com", "value": "v=spf1...", "valid": "unknown"},
+            ]
+        }
+    }
+    ctx = _setup_org(app, "domain-register")
+    with app.app_context():
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.example.com"
+        db.session.commit()
+
+        records = register_organization_domain(org)
+        mock_add.assert_called_once_with("mg.example.com")
+        assert records[0]["record_type"] == "TXT"
+        assert AuditLog.query.filter_by(action="mailgun_domain_registered").count() == 1
+
+
+@patch("app.email.mailgun_domains.trigger_verification")
+@patch("app.email.mailgun_domains.get_domain_status")
+def test_check_domain_status_sets_verified_at_when_valid(mock_status, mock_verify, app):
+    from app.email.services import check_organization_domain_status
+
+    mock_status.return_value = {
+        "domain": {
+            "sending_dns_records": [
+                {"record_type": "TXT", "name": "mg.example.com", "value": "v=spf1...", "valid": "valid"},
+            ]
+        }
+    }
+    ctx = _setup_org(app, "domain-verify")
+    with app.app_context():
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.example.com"
+        db.session.commit()
+
+        check_organization_domain_status(org)
+        assert org.mailgun_domain_verified_at is not None
+        assert AuditLog.query.filter_by(action="mailgun_domain_verified").count() == 1
+
+
+@patch("app.email.mailgun_domains.trigger_verification")
+@patch("app.email.mailgun_domains.get_domain_status")
+def test_check_domain_status_clears_verified_at_when_invalid(mock_status, mock_verify, app):
+    from app.email.services import check_organization_domain_status
+
+    mock_status.return_value = {
+        "domain": {
+            "sending_dns_records": [
+                {"record_type": "TXT", "name": "mg.example.com", "value": "v=spf1...", "valid": "unknown"},
+            ]
+        }
+    }
+    ctx = _setup_org(app, "domain-verify-fail")
+    with app.app_context():
+        from datetime import datetime, timezone
+
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.example.com"
+        org.mailgun_domain_verified_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        check_organization_domain_status(org)
+        assert org.mailgun_domain_verified_at is None
+
+
+def test_changing_domain_clears_verification(app):
+    from app.email.services import update_organization_email_settings
+
+    ctx = _setup_org(app, "domain-change")
+    with app.app_context():
+        from datetime import datetime, timezone
+
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.old.com"
+        org.mailgun_domain_verified_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        update_organization_email_settings(
+            org,
+            email_from_name="Acme Sales",
+            email_from_email="sales@acme.com",
+            mailgun_domain="mg.new.com",
+            user_id=ctx["admin_id"],
+        )
+        assert org.mailgun_domain_verified_at is None
+
+
+@patch("app.email.services._mailgun_send")
+def test_send_to_lead_uses_verified_domain(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
+    ctx = _setup_org(app, "domain-send-verified")
+    lead_id = _create_lead_with_email(app, ctx["org_id"], ctx["stage_id"], ctx["admin_id"])
+
+    with app.app_context():
+        from datetime import datetime, timezone
+
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.verified.com"
+        org.mailgun_domain_verified_at = datetime.now(timezone.utc)
+        org.email_from_email = "sales@verified.com"
+        db.session.commit()
+
+        EmailService.send_to_lead(
+            lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
+        )
+        assert mock_send.call_args.kwargs["domain"] == "mg.verified.com"
+
+
+@patch("app.email.services._mailgun_send")
+def test_send_to_lead_falls_back_to_shared_domain_when_unverified(mock_send, app):
+    mock_send.return_value = (True, "<msg@test>", None)
+    ctx = _setup_org(app, "domain-send-unverified")
+    lead_id = _create_lead_with_email(app, ctx["org_id"], ctx["stage_id"], ctx["admin_id"])
+
+    with app.app_context():
+        org = Organization.query.get(ctx["org_id"])
+        org.mailgun_domain = "mg.unverified.com"  # set but never verified
+        org.email_from_email = "sales@unverified.com"
+        db.session.commit()
+
+        EmailService.send_to_lead(
+            lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
+        )
+        assert mock_send.call_args.kwargs["domain"] is None
