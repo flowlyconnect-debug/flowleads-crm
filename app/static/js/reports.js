@@ -5,7 +5,7 @@
   'use strict';
 
   var CHART_COLORS = [
-    '#1D6BF3',
+    '#6948DC',
     '#38BDF8',
     '#10B981',
     '#F59E0B',
