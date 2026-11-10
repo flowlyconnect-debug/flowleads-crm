@@ -116,6 +116,18 @@ def _resolve_sender(organization: Organization) -> tuple[str, str]:
     return default_name, default_email
 
 
+def _resolve_sending_domain(organization: Organization) -> str | None:
+    """Only use the organization's own domain once Mailgun has actually
+    verified it — otherwise envelope (Mailgun domain) and From-header domain
+    would mismatch, which is exactly the SPF/DKIM alignment problem this is
+    meant to fix. Falls back to the shared FlowLeads domain (None → global
+    MAILGUN_DOMAIN) until then."""
+    domain = (organization.mailgun_domain or "").strip()
+    if domain and organization.mailgun_domain_verified_at is not None:
+        return domain
+    return None
+
+
 def _mailgun_send(
     *,
     to_email: str,
@@ -124,10 +136,10 @@ def _mailgun_send(
     body_text: str,
     from_name: str,
     from_email: str,
+    domain: str | None = None,
 ) -> tuple[bool, str | None, str | None]:
     api_key = current_app.config.get("MAILGUN_API_KEY")
-    domain = current_app.config.get("MAILGUN_DOMAIN")
-    org_domain_override = None
+    domain = (domain or "").strip() or current_app.config.get("MAILGUN_DOMAIN")
 
     if not api_key or not domain:
         return False, None, "Email sending is not configured."
@@ -245,6 +257,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            domain=_resolve_sending_domain(org),
         )
 
         if ok:
@@ -449,6 +462,98 @@ class EmailService:
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
+    @staticmethod
+    def send_new_leads_digest(*, to_email: str, org_name: str, leads: list[dict]) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        app_base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        leads_url = f"{app_base_url}/leads" if app_base_url else "/leads"
+        rows_html = "".join(
+            "<tr>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('label') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('source') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('region') or ''))}</td>"
+            "</tr>"
+            for item in leads
+        )
+        subject = f"{len(leads)} uutta liidiä — {org_name}"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>{len(leads)} uutta liidiä</h2>"
+            "<table style='border-collapse:collapse;width:100%;'>"
+            "<thead><tr>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Liidi</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Lähde</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Alue</th>"
+            "</tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            f"<p style='margin-top:16px;'><a href='{html.escape(leads_url)}'>Avaa liidit CRM:ssä</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads — voit poistaa tämän koosteen "
+            "käytöstä liidiasetuksista.</p>"
+            "</div>"
+        )
+        body_text = f"{len(leads)} uutta liidiä. Avaa CRM:ssä: {leads_url}"
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
+    def send_search_job_failed_alert(*, to_email: str, failed_jobs: list[dict]) -> dict:
+        """Operational alert to a superadmin: one or more search jobs ended up
+        failed (incl. jobs the stuck-job reaper gave up on after max retries)."""
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        rows_html = "".join(
+            "<tr>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('organization_name') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('profile_name') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{item.get('job_id')}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('error_message') or '')[:200])}</td>"
+            "</tr>"
+            for item in failed_jobs
+        )
+        subject = f"⚠ {len(failed_jobs)} hakutyö epäonnistui"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Hakutyöt epäonnistuivat</h2>"
+            "<table style='border-collapse:collapse;width:100%;'>"
+            "<thead><tr>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Organisaatio</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Hakuprofiili</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Job</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Virhe</th>"
+            "</tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = f"{len(failed_jobs)} hakutyö(t) epäonnistuivat. Tarkista admin-paneelista."
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
 
 class TemplateService:
     @staticmethod
@@ -583,7 +688,10 @@ def update_organization_email_settings(
         raise EmailServiceError("Invalid from email address.", "validation_error")
     organization.email_from_name = (email_from_name or "").strip()[:120] or None
     organization.email_from_email = (email_from_email or "").strip()[:255] or None
-    organization.mailgun_domain = (mailgun_domain or "").strip()[:255] or None
+    new_domain = (mailgun_domain or "").strip()[:255] or None
+    if new_domain != organization.mailgun_domain:
+        organization.mailgun_domain_verified_at = None
+    organization.mailgun_domain = new_domain
     log_audit(
         "email_settings_updated",
         user_id=user_id,
@@ -592,6 +700,67 @@ def update_organization_email_settings(
         target_id=organization.id,
     )
     return organization
+
+
+def register_organization_domain(organization: Organization) -> list[dict]:
+    """Register organization.mailgun_domain with Mailgun. Returns the DNS
+    records (SPF/DKIM) the customer needs to add at their DNS provider."""
+    from app.email.mailgun_domains import MailgunDomainError, add_domain, extract_sending_dns_records
+
+    domain = (organization.mailgun_domain or "").strip()
+    if not domain:
+        raise EmailServiceError("Set a sending domain first.", "no_domain")
+
+    try:
+        record = add_domain(domain)
+    except MailgunDomainError as exc:
+        raise EmailServiceError(exc.message, exc.code) from exc
+
+    log_audit(
+        "mailgun_domain_registered",
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"domain": domain},
+    )
+    return extract_sending_dns_records(record)
+
+
+def check_organization_domain_status(organization: Organization) -> list[dict]:
+    """Refresh verification status from Mailgun. Sets/clears
+    mailgun_domain_verified_at based on whether every DNS record is valid."""
+    from app.email.mailgun_domains import (
+        MailgunDomainError,
+        extract_sending_dns_records,
+        get_domain_status,
+        is_domain_fully_verified,
+        trigger_verification,
+    )
+
+    domain = (organization.mailgun_domain or "").strip()
+    if not domain:
+        raise EmailServiceError("No sending domain configured.", "no_domain")
+
+    try:
+        trigger_verification(domain)
+        record = get_domain_status(domain)
+    except MailgunDomainError as exc:
+        raise EmailServiceError(exc.message, exc.code) from exc
+
+    verified = is_domain_fully_verified(record)
+    was_verified = organization.mailgun_domain_verified_at is not None
+    organization.mailgun_domain_verified_at = datetime.now(timezone.utc) if verified else None
+
+    if verified and not was_verified:
+        log_audit(
+            "mailgun_domain_verified",
+            organization_id=organization.id,
+            target_type="organization",
+            target_id=organization.id,
+            metadata={"domain": domain},
+        )
+
+    return extract_sending_dns_records(record)
 
 
 def verify_mailgun_webhook_signature(timestamp: str, token: str, signature: str) -> bool:

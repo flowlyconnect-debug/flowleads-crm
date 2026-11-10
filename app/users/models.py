@@ -20,6 +20,12 @@ class Organization(db.Model):
     email_from_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     email_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mailgun_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Set only once Mailgun confirms the domain's SPF/DKIM DNS records are
+    # valid — cleared whenever mailgun_domain changes. Sending only uses this
+    # domain's envelope once it's set (see _resolve_sending_domain); until
+    # then, sales email still goes out (From-header shows the org's address)
+    # but via the shared FlowLeads domain.
+    mailgun_domain_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # TODO: per-org Mailgun API key — store as mailgun_api_key_encrypted once encryption exists.
     # Optional modules the org's admin opted into during invite onboarding (see
     # app/admin/constants.py FEATURE_CATALOG). Not yet wired into feature gating

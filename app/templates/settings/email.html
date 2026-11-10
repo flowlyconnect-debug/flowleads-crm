@@ -33,6 +33,56 @@
             {{ form.submit(class_='btn btn-primary') }}
           </div>
         </form>
+
+        {% if organization.mailgun_domain %}
+        <div class="card p-4" style="margin-top:1.5rem;">
+          <h2>Lähetysverkkotunnuksen vahvistus (SPF/DKIM)</h2>
+          {% if organization.mailgun_domain_verified_at %}
+          <p class="flash success">Vahvistettu — myyntisähköposti lähtee domainilta <code>{{ organization.mailgun_domain }}</code>.</p>
+          {% else %}
+          <p class="form-helper">
+            Domain <code>{{ organization.mailgun_domain }}</code> ei ole vielä vahvistettu. Myyntisähköposti
+            lähtee toistaiseksi FlowLeadsin jaetulta domainilta (From-nimi/-osoite näyttävät kuitenkin omasi).
+          </p>
+          {% endif %}
+
+          <div style="display:flex;gap:0.75rem;margin-top:0.75rem;">
+            <form method="post" action="{{ url_for('settings.email_domain_register', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_domain_register') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% if current_user.is_superadmin() %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+              <button type="submit" class="btn btn-secondary btn-sm">Rekisteröi Mailguniin</button>
+            </form>
+            <form method="post" action="{{ url_for('settings.email_domain_verify', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_domain_verify') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% if current_user.is_superadmin() %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+              <button type="submit" class="btn btn-secondary btn-sm">Tarkista tila</button>
+            </form>
+          </div>
+
+          {% if dns_records %}
+          <table style="margin-top:1rem;width:100%;">
+            <thead>
+              <tr><th>Tyyppi</th><th>Nimi</th><th>Arvo</th><th>Tila</th></tr>
+            </thead>
+            <tbody>
+              {% for record in dns_records %}
+              <tr>
+                <td>{{ record.record_type }}</td>
+                <td><code style="word-break:break-all;">{{ record.name }}</code></td>
+                <td><code style="word-break:break-all;">{{ record.value }}</code></td>
+                <td>{% if record.valid == 'valid' %}✓{% else %}odottaa{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="form-helper" style="margin-top:0.5rem;">
+            Lisää myös DMARC-TXT-tietue itse (Mailgun ei hallitse sitä) — esim.
+            <code>_dmarc.{{ organization.mailgun_domain }}</code> arvolla
+            <code>v=DMARC1; p=none; rua=mailto:dmarc@{{ organization.mailgun_domain }}</code>.
+          </p>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

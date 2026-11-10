@@ -121,6 +121,9 @@ class LeadStream(db.Model):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_lead_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when a stale-stream alert is sent, cleared on the next lead — prevents
+    # re-sending the same alert every day the stream stays stale.
+    last_alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     lead_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

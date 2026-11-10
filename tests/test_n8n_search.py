@@ -69,6 +69,37 @@ def test_list_pending_jobs(client, app):
     assert job["crm_endpoint"] == "http://localhost/api/v1/leads"
 
 
+def test_list_pending_jobs_atomically_claims_them(client, app):
+    """GET status=pending must mark the job 'running' as part of the same
+    call — this is what prevents two overlapping n8n runs from both
+    processing the same job (see claim_pending_jobs_for_n8n)."""
+    ctx = _create_profile_and_job(app)
+
+    response = client.get("/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers())
+    assert len(response.get_json()["jobs"]) == 1
+
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.status == "running"
+        assert job.started_at is not None
+
+    # A second, concurrent poll for pending jobs must not see it again.
+    second = client.get("/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers())
+    assert second.get_json()["jobs"] == []
+
+
+def test_claim_pending_jobs_is_safe_against_concurrent_claims(app):
+    """Two 'simultaneous' claim calls for the same job must never both win."""
+    from app.search.services import claim_pending_jobs_for_n8n
+
+    ctx = _create_profile_and_job(app)
+    with app.app_context():
+        first = claim_pending_jobs_for_n8n(limit=10)
+        second = claim_pending_jobs_for_n8n(limit=10)
+        assert [j.id for j in first] == [ctx["job_id"]]
+        assert second == []
+
+
 def test_list_jobs_skips_inactive_profiles(client, app):
     _create_profile_and_job(app, is_active=False)
     response = client.get("/api/v1/n8n/jobs", headers=_n8n_headers())
