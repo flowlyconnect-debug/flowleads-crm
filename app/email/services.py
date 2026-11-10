@@ -22,7 +22,7 @@ from app.email.templates import (
 )
 from app.extensions import db
 from app.leads.models import Activity, Lead
-from app.leads.services import get_lead_for_org
+from app.leads.services import LeadService, get_lead_for_org
 from app.users.models import Organization, User
 
 MAX_SUBJECT_LEN = 255
@@ -935,6 +935,63 @@ def handle_mailgun_webhook(event_data: dict) -> bool:
         target_type="email_log",
         target_id=log.id,
         metadata={"event": event, "message_id": message_id},
+    )
+    return True
+
+
+def _message_id_variants(value: str | None) -> list[str]:
+    """Both forms ("<id>" and bare "id") since EmailLog.mailgun_message_id
+    is stored exactly as Mailgun's send API returned it (usually bracketed),
+    while header values we need to match against are not guaranteed to be."""
+    if not value:
+        return []
+    trimmed = value.strip()
+    if not trimmed:
+        return []
+    bare = trimmed.strip("<>").strip()
+    if not bare:
+        return []
+    return [bare, f"<{bare}>"]
+
+
+def handle_inbound_reply(form_data: dict) -> bool:
+    """Match an inbound Mailgun reply back to the lead it answers.
+
+    Deliberately matches only via the In-Reply-To/References header against
+    EmailLog.mailgun_message_id — the message we actually sent — rather than
+    by sender address, which could resolve to the wrong lead/organization if
+    the same person's address appears in more than one tenant's data.
+    """
+    references = form_data.get("References") or ""
+    candidate_ids: list[str] = []
+    for raw_id in [form_data.get("In-Reply-To"), *references.split()]:
+        candidate_ids.extend(_message_id_variants(raw_id))
+    if not candidate_ids:
+        return False
+
+    log = EmailLog.query.filter(EmailLog.mailgun_message_id.in_(candidate_ids)).first()
+    if not log:
+        return False
+
+    from app.sequences.services import SequenceService
+
+    SequenceService.handle_reply(log.lead_id)
+
+    body_preview_text = body_preview(form_data.get("stripped-text") or form_data.get("body-plain") or "")
+    LeadService.log_activity(
+        log.lead_id,
+        None,
+        "email_reply_received",
+        content=body_preview_text,
+        metadata={"email_log_id": log.id, "sender": form_data.get("sender")},
+    )
+
+    log_audit(
+        "email_reply_received",
+        organization_id=log.organization_id,
+        target_type="email_log",
+        target_id=log.id,
+        metadata={"lead_id": log.lead_id},
     )
     return True
 
