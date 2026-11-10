@@ -106,7 +106,10 @@ def test_e2e_n8n_job_payload_complete(app, client):
     assert job["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
     assert job["regions"] == ["Uusimaa", "Pirkanmaa"]
     assert job["source"] == "oikotie"
-    assert job["crm_api_key"] == ctx["api_key"]
+    # crm_api_key is a short-lived job-scoped token now, never the
+    # organization's permanent API key (see claim_pending_jobs_for_n8n).
+    assert job["crm_api_key"] != ctx["api_key"]
+    assert len(job["crm_api_key"]) > 20
     assert job["crm_endpoint"].endswith("/api/v1/leads")
 
 

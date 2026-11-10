@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app, url_for
 from sqlalchemy import update
 from sqlalchemy.orm import joinedload
 
+from app.core.security import hash_api_key
 from app.extensions import db
 from app.search.models import SEARCH_JOB_STATUSES, SearchDedupe, SearchJob, SearchProfile
+
+# How long a job's n8n token stays valid after being claimed. Generous
+# relative to a single search run, but short enough that a leaked execution
+# log is only useful while this job is actually in flight.
+N8N_JOB_TOKEN_TTL_MINUTES = 120
 
 
 def crm_leads_endpoint() -> str:
@@ -20,7 +27,13 @@ def crm_leads_endpoint() -> str:
         return "/api/v1/leads"
 
 
-def serialize_job_for_n8n(job: SearchJob) -> dict:
+def serialize_job_for_n8n(job: SearchJob, *, job_token: str | None = None) -> dict:
+    """`crm_api_key` here is a short-lived job-scoped token (see
+    claim_pending_jobs_for_n8n), never the organization's permanent API key —
+    a leaked n8n execution log only exposes a credential good for this one
+    job, not a standing key for the whole organization. Only the "pending"
+    listing (which claims and mints the token) ever populates it; any other
+    status listing is visibility-only and carries no usable credential."""
     profile = job.profile
     return {
         "job_id": job.id,
@@ -29,7 +42,7 @@ def serialize_job_for_n8n(job: SearchJob) -> dict:
         "remonttityyppi": profile.remonttityyppi,
         "regions": list(profile.regions or []),
         "source": profile.source,
-        "crm_api_key": profile.crm_api_key or "",
+        "crm_api_key": job_token or "",
         "crm_endpoint": crm_leads_endpoint(),
     }
 
@@ -39,8 +52,8 @@ def list_jobs_for_n8n(*, status: str, limit: int) -> list[dict]:
         raise ValueError(f"Invalid status: {status}")
 
     if status == "pending":
-        jobs = claim_pending_jobs_for_n8n(limit=limit)
-        return [serialize_job_for_n8n(job) for job in jobs]
+        claimed = claim_pending_jobs_for_n8n(limit=limit)
+        return [serialize_job_for_n8n(job, job_token=token) for job, token in claimed]
 
     jobs = (
         SearchJob.query.options(joinedload(SearchJob.profile))
@@ -53,7 +66,7 @@ def list_jobs_for_n8n(*, status: str, limit: int) -> list[dict]:
     return [serialize_job_for_n8n(job) for job in jobs]
 
 
-def claim_pending_jobs_for_n8n(*, limit: int) -> list[SearchJob]:
+def claim_pending_jobs_for_n8n(*, limit: int) -> list[tuple[SearchJob, str]]:
     """Atomically hand out up to `limit` due pending jobs, marking each one
     "running" as part of the same call that returns it.
 
@@ -80,19 +93,27 @@ def claim_pending_jobs_for_n8n(*, limit: int) -> list[SearchJob]:
         .all()
     )
 
-    claimed: list[SearchJob] = []
+    claimed: list[tuple[SearchJob, str]] = []
     for job in candidates:
         if len(claimed) >= limit:
             break
+        token = secrets.token_urlsafe(32)
+        expires_at = now + timedelta(minutes=N8N_JOB_TOKEN_TTL_MINUTES)
         result = db.session.execute(
             update(SearchJob)
             .where(SearchJob.id == job.id, SearchJob.status == "pending")
-            .values(status="running", started_at=now)
+            .values(
+                status="running",
+                started_at=now,
+                n8n_token_hash=hash_api_key(token),
+                n8n_token_expires_at=expires_at,
+            )
         )
         if result.rowcount == 1:
             job.status = "running"
             job.started_at = now
-            claimed.append(job)
+            job.n8n_token_expires_at = expires_at
+            claimed.append((job, token))
 
     if claimed:
         db.session.commit()
@@ -133,6 +154,10 @@ def update_job_for_n8n(
             job.started_at = now
     elif status in ("completed", "failed"):
         job.completed_at = now
+        # Invalidate the job's n8n token immediately rather than waiting out
+        # its TTL — once a job is done, nothing should authenticate with it.
+        job.n8n_token_hash = None
+        job.n8n_token_expires_at = None
         profile = job.profile
         profile.last_run_at = now
         profile.total_runs = (profile.total_runs or 0) + 1

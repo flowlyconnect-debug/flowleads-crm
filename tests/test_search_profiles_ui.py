@@ -453,6 +453,9 @@ def test_search_profiles_edit_page_does_not_render_full_api_key(app, client):
 
 
 def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client):
+    """Blanking crm_api_key on a profile update must not wipe the stored key
+    (DB-level check) — and the job endpoint must still hand n8n a usable
+    (now job-scoped, not the profile's permanent) token either way."""
     ctx = _setup_org(app, "n8n-full-key")
     secret_key = "fl_live_n8n_full_key_value"
     _login(client, ctx["admin_email"])
@@ -473,6 +476,10 @@ def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client
         ),
         follow_redirects=True,
     )
+    with app.app_context():
+        profile = db.session.get(SearchProfile, profile_id)
+        assert profile.crm_api_key == secret_key
+
     client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
 
     response = client.get(
@@ -483,4 +490,5 @@ def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client
     jobs = response.get_json()["jobs"]
     match = [job for job in jobs if job.get("profile_id") == profile_id]
     assert len(match) == 1
-    assert match[0]["crm_api_key"] == secret_key
+    assert match[0]["crm_api_key"] != secret_key
+    assert len(match[0]["crm_api_key"]) > 20

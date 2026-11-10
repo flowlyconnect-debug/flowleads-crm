@@ -2,7 +2,7 @@ from app.core.permissions import TWO_FA_SESSION_KEY
 from app.extensions import db
 from app.leads.models import PipelineStage
 from app.search.models import SearchJob, SearchProfile
-from app.users.models import AuditLog, User
+from app.users.models import AuditLog, Organization, User
 from app.users.services import create_user
 
 from app.admin.onboarding_services import create_customer
@@ -122,8 +122,13 @@ def test_n8n_jobs_include_onboarded_customer(app, client):
     )
     assert response.status_code == 200
     jobs = response.get_json()["jobs"]
-    match = [job for job in jobs if job.get("crm_api_key") == api_key]
+    # crm_api_key is now a short-lived job-scoped token, never the
+    # organization's permanent API key (api_key) — match by org instead.
+    with app.app_context():
+        org = Organization.query.filter_by(name="N8N Ready Oy").one()
+    match = [job for job in jobs if job.get("organization_id") == org.id]
     assert len(match) == 1
+    assert match[0]["crm_api_key"] != api_key
     assert match[0]["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
     assert match[0]["regions"] == ["Uusimaa"]
     assert match[0]["source"] == "oikotie"

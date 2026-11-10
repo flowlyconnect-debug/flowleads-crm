@@ -65,8 +65,18 @@ def test_list_pending_jobs(client, app):
     assert job["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
     assert job["regions"] == ["Uusimaa", "Pirkanmaa"]
     assert job["source"] == "oikotie"
-    assert job["crm_api_key"] == "fl_live_test"
+    # crm_api_key is now a short-lived job-scoped token, never the
+    # organization's permanent API key.
+    assert job["crm_api_key"] != "fl_live_test"
+    assert len(job["crm_api_key"]) > 20
     assert job["crm_endpoint"] == "http://localhost/api/v1/leads"
+
+    with app.app_context():
+        from app.core.security import hash_api_key
+
+        stored = db.session.get(SearchJob, ctx["job_id"])
+        assert stored.n8n_token_hash == hash_api_key(job["crm_api_key"])
+        assert stored.n8n_token_expires_at is not None
 
 
 def test_list_pending_jobs_atomically_claims_them(client, app):
@@ -96,8 +106,100 @@ def test_claim_pending_jobs_is_safe_against_concurrent_claims(app):
     with app.app_context():
         first = claim_pending_jobs_for_n8n(limit=10)
         second = claim_pending_jobs_for_n8n(limit=10)
-        assert [j.id for j in first] == [ctx["job_id"]]
+        assert [job.id for job, _token in first] == [ctx["job_id"]]
+        first_token = first[0][1]
+        assert len(first_token) > 20
         assert second == []
+
+
+def test_job_token_authenticates_lead_creation(client, app):
+    """The ephemeral job token n8n receives must actually work to post the
+    lead it found — this is the real point of minting it."""
+    ctx = _create_profile_and_job(app)
+    jobs = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers()
+    ).get_json()["jobs"]
+    token = jobs[0]["crm_api_key"]
+
+    resp = client.post(
+        "/api/v1/leads",
+        data=json.dumps({"email": "lead@test.com", "source_ref": "oikotie-1"}),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 201
+    created_lead_id = resp.get_json()["data"]["lead"]["id"]
+    with app.app_context():
+        from app.leads.models import Lead
+
+        lead = db.session.get(Lead, created_lead_id)
+        assert lead.organization_id == ctx["org_id"]
+
+
+def test_job_token_stops_working_once_job_completes(client, app):
+    ctx = _create_profile_and_job(app)
+    jobs = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers()
+    ).get_json()["jobs"]
+    token = jobs[0]["crm_api_key"]
+
+    client.patch(
+        f"/api/v1/n8n/jobs/{ctx['job_id']}",
+        data=json.dumps({"status": "completed", "leads_found": 0, "leads_sent": 0}),
+        headers=_n8n_headers(),
+    )
+
+    resp = client.post(
+        "/api/v1/leads",
+        data=json.dumps({"email": "late@test.com", "source_ref": "oikotie-2"}),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 401
+
+
+def test_expired_job_token_is_rejected(client, app):
+    from datetime import timedelta
+
+    ctx = _create_profile_and_job(app)
+    jobs = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers()
+    ).get_json()["jobs"]
+    token = jobs[0]["crm_api_key"]
+
+    with app.app_context():
+        job = db.session.get(SearchJob, ctx["job_id"])
+        job.n8n_token_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.session.commit()
+
+    resp = client.post(
+        "/api/v1/leads",
+        data=json.dumps({"email": "expired@test.com", "source_ref": "oikotie-3"}),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 401
+
+
+def test_job_token_cannot_be_used_for_other_api_routes(client, app):
+    """A leaked job token must only ever be able to post leads, not list/read
+    anything else for the organization."""
+    _create_profile_and_job(app)
+    jobs = client.get(
+        "/api/v1/n8n/jobs?status=pending&limit=10", headers=_n8n_headers()
+    ).get_json()["jobs"]
+    token = jobs[0]["crm_api_key"]
+
+    resp = client.get("/api/v1/leads", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def test_non_pending_job_listing_never_includes_a_usable_token(client, app):
+    ctx = _create_profile_and_job(app, status="completed")
+    response = client.get(
+        "/api/v1/n8n/jobs?status=completed&limit=10", headers=_n8n_headers()
+    )
+    jobs = response.get_json()["jobs"]
+    assert len(jobs) == 1
+    assert jobs[0]["job_id"] == ctx["job_id"]
+    assert jobs[0]["crm_api_key"] == ""
 
 
 def test_list_jobs_skips_inactive_profiles(client, app):
