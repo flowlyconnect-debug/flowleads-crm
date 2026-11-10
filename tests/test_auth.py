@@ -201,6 +201,49 @@ def test_audit_login_success_and_failed_and_logout(client, app):
         assert AuditLog.query.filter_by(action="logout").count() == 1
 
 
+def test_login_page_shows_form_and_public_product_intro(client):
+    response = client.get("/auth/login")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    # Sign-in form, field names and password reset stay available
+    assert 'name="email"' in html
+    assert 'name="password"' in html
+    assert 'autocomplete="username"' in html
+    assert 'autocomplete="current-password"' in html
+    assert 'value="Kirjaudu sisään"' in html
+    assert 'href="/auth/reset-password"' in html
+    assert 'id="kirjaudu"' in html
+
+    # Public product intro, example view and Flowly links
+    assert "Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla." in html
+    assert "Esimerkkinäkymä" in html
+    assert "Pyydä esittely" in html
+    assert 'href="https://flowlysolutions.net/yhteystiedot"' in html
+    assert 'href="https://flowlysolutions.net"' in html
+    assert "Flowly Solutions" in html
+
+
+def test_login_page_shows_finnish_error_inside_form_card(client, app):
+    _create_org_user(app, email="wrongpw@acme.com", slug="wrongpw")
+    response = client.post(
+        "/auth/login",
+        data={"email": "wrongpw@acme.com", "password": "not-the-password"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Sähköposti tai salasana on virheellinen." in html
+    assert "Invalid email or password." not in html
+    assert 'role="alert"' in html
+    assert 'aria-invalid="true"' in html
+    # Entered email is kept
+    assert 'value="wrongpw@acme.com"' in html
+    # Error is rendered inside the login card, not as a page-level flash
+    assert html.index('id="kirjaudu"') < html.index("Sähköposti tai salasana on virheellinen.")
+    assert 'class="flash-messages"' not in html
+
+
 # --- Password reset: single-use, expiring token, simulated Mailgun delivery ---
 
 
