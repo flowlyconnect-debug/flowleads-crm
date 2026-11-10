@@ -260,19 +260,24 @@
    -------------------------------------------------------------------------- */
 
 .pipeline-wrapper {
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: visible;
   margin: 0 calc(var(--space-8) * -1);
   padding: 0 var(--space-8) var(--space-4);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .pipeline-board {
   display: grid;
-  grid-template-columns: repeat(var(--pipeline-cols, 6), minmax(0, 1fr));
+  /* Each stage column keeps a usable minimum width (company names were
+     being crushed to a handful of characters on 6-stage boards); the
+     wrapper scrolls horizontally instead of squeezing columns further. */
+  grid-template-columns: repeat(var(--pipeline-cols, 6), minmax(224px, 1fr));
   align-items: flex-start;
   gap: 8px;
   width: 100%;
-  min-width: 0;
+  min-width: max-content;
 }
 
 /* --------------------------------------------------------------------------

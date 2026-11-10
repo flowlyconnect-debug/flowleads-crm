@@ -2497,7 +2497,7 @@ details.ai-insights summary {
 .leads-opp-row__aside {
   flex-shrink: 0;
   text-align: right;
-  min-width: 140px;
+  width: 150px;
 }
 
 .leads-opp-row__value {
