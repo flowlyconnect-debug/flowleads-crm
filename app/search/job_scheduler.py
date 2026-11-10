@@ -117,23 +117,3 @@ def reset_running_test_jobs() -> dict[str, int]:
             db.session.rollback()
             raise
     return {"reset": reset}
-
-
-_RESET_RUNNING_ERROR = "Reset from running during n8n dev testing"
-
-
-def reset_running_test_jobs() -> dict[str, int]:
-    """Mark stuck running jobs as failed so dev test jobs can be recreated."""
-    running_jobs = SearchJob.query.filter_by(status="running").all()
-    reset = 0
-    for job in running_jobs:
-        job.status = "failed"
-        job.error_message = _RESET_RUNNING_ERROR
-        reset += 1
-    if reset:
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            raise
-    return {"reset": reset}
