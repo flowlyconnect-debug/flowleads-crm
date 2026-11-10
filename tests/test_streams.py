@@ -140,6 +140,46 @@ def test_stream_health(app):
         assert "Never" not in names
 
 
+def test_stream_health_alert_not_resent_until_recovery(app):
+    from unittest.mock import patch
+
+    from app.users.services import create_user
+
+    with app.app_context():
+        org, stages = _org_with_stages("stream-health-cooldown")
+        admin = create_user("sa-stream-cd@test.com", "securepassword1", role="admin", organization_id=org.id)
+        stream = LeadStream(
+            organization_id=org.id,
+            name="Cooldown",
+            is_active=True,
+            last_lead_at=datetime.now(timezone.utc) - timedelta(days=4),
+        )
+        db.session.add(stream)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_stream_health_alert") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            StreamHealthService.check_all_orgs()
+            assert mock_send.call_count == 1
+
+            mock_send.reset_mock()
+            StreamHealthService.check_all_orgs()
+            mock_send.assert_not_called()
+
+        # A new lead on this stream recovers it (clears last_alert_sent_at);
+        # simulate it going stale again afterwards.
+        stream.last_lead_at = datetime.now(timezone.utc)
+        stream.last_alert_sent_at = None
+        db.session.commit()
+        stream.last_lead_at = datetime.now(timezone.utc) - timedelta(days=4)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_stream_health_alert") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            StreamHealthService.check_all_orgs()
+            assert mock_send.call_count == 1
+
+
 def test_stream_cross_tenant_matching(app):
     with app.app_context():
         org_a, _ = _org_with_stages("stream-org-a")

@@ -50,6 +50,7 @@ class LeadStreamService:
 
         stream.last_lead_at = datetime.now(timezone.utc)
         stream.lead_count = (stream.lead_count or 0) + 1
+        stream.last_alert_sent_at = None  # recovered — a future staleness gets a fresh alert
 
     @staticmethod
     def get_fallback_stage(organization_id: int) -> PipelineStage | None:
@@ -81,10 +82,14 @@ class StreamHealthService:
     def check_all_orgs() -> None:
         from app.email.services import EmailService
 
+        now = datetime.now(timezone.utc)
         orgs = Organization.query.filter_by(is_active=True).all()
         for org in orgs:
             stale = StreamHealthService.get_stale_streams(org.id)
-            if not stale:
+            # Only alert on streams that haven't already been alerted for this
+            # staleness episode (cleared back to None once a new lead arrives).
+            unalerted = [s for s in stale if s.last_alert_sent_at is None]
+            if not unalerted:
                 continue
             admins = User.query.filter_by(
                 organization_id=org.id, role="admin", is_active=True
@@ -94,9 +99,11 @@ class StreamHealthService:
                     to_email=admin.email,
                     org_name=org.name,
                     stale_streams=[
-                        {"name": s.name, "last_lead_at": s.last_lead_at} for s in stale
+                        {"name": s.name, "last_lead_at": s.last_lead_at} for s in unalerted
                     ],
                 )
+            for stream in unalerted:
+                stream.last_alert_sent_at = now
         db.session.commit()
 
 
@@ -133,6 +140,7 @@ class LeadRoutingService:
 
         settings.last_lead_at = datetime.now(timezone.utc)
         settings.total_lead_count = (settings.total_lead_count or 0) + 1
+        settings.last_alert_sent_at = None  # recovered — a future staleness gets a fresh alert
 
     @staticmethod
     def get_fallback_stage(organization_id: int) -> PipelineStage | None:
@@ -154,6 +162,7 @@ class LeadHealthService:
                 OrgLeadSettings.last_lead_at.isnot(None),
                 OrgLeadSettings.last_lead_at < cutoff,
                 OrgLeadSettings.total_lead_count > 0,
+                OrgLeadSettings.last_alert_sent_at.is_(None),
             )
             .order_by(OrgLeadSettings.last_lead_at.asc())
             .all()
@@ -163,6 +172,7 @@ class LeadHealthService:
     def check_all_orgs() -> None:
         from app.email.services import EmailService
 
+        now = datetime.now(timezone.utc)
         stale_orgs = LeadHealthService.get_stale_org_settings()
         for org_settings in stale_orgs:
             org = org_settings.organization
@@ -178,4 +188,61 @@ class LeadHealthService:
                     last_lead_at=org_settings.last_lead_at,
                     days=LeadHealthService.STALE_DAYS,
                 )
+            org_settings.last_alert_sent_at = now
         db.session.commit()
+
+
+def _lead_digest_label(lead) -> str:
+    name = f"{lead.first_name or ''} {lead.last_name or ''}".strip()
+    parts = [p for p in (name, lead.company) if p]
+    return " — ".join(parts) if parts else (lead.email or f"Liidi #{lead.id}")
+
+
+class LeadDigestService:
+    """Daily customer-facing digest of new leads, opt-out per organization."""
+
+    @staticmethod
+    def send_due_digests(*, now: datetime | None = None) -> int:
+        from app.email.services import EmailService
+        from app.leads.models import Lead
+
+        now = now or datetime.now(timezone.utc)
+        orgs_sent = 0
+        settings_list = OrgLeadSettings.query.filter_by(daily_digest_enabled=True).all()
+        for settings in settings_list:
+            org = settings.organization
+            if not org or not org.is_active:
+                continue
+
+            window_start = settings.last_digest_sent_at or (now - timedelta(days=1))
+            new_leads = (
+                Lead.query.filter(
+                    Lead.organization_id == org.id,
+                    Lead.created_at > window_start,
+                )
+                .order_by(Lead.created_at.desc())
+                .all()
+            )
+            settings.last_digest_sent_at = now
+            if not new_leads:
+                continue
+
+            admins = User.query.filter_by(
+                organization_id=org.id, role="admin", is_active=True
+            ).all()
+            for admin in admins:
+                EmailService.send_new_leads_digest(
+                    to_email=admin.email,
+                    org_name=org.name,
+                    leads=[
+                        {
+                            "label": _lead_digest_label(lead),
+                            "source": lead.source,
+                            "region": lead.region,
+                        }
+                        for lead in new_leads
+                    ],
+                )
+            orgs_sent += 1
+        db.session.commit()
+        return orgs_sent

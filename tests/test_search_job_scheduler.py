@@ -1,11 +1,17 @@
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
 from app.extensions import db
-from app.search.job_scheduler import create_daily_search_jobs, create_weekly_search_jobs
+from app.search.job_scheduler import (
+    create_daily_search_jobs,
+    create_weekly_search_jobs,
+    notify_failed_search_jobs,
+    reap_stuck_running_jobs,
+)
 from app.search.models import SearchJob, SearchProfile
-from app.users.services import create_organization
+from app.users.services import create_organization, create_user
 
 
 def _create_profile(app, *, is_active=True, schedule="daily", slug_suffix="", name=None):
@@ -179,3 +185,105 @@ def test_weekly_scheduler_spreads_scheduled_at_by_profile_id(app):
 
         if ctx_a["profile_id"] % 60 != ctx_b["profile_id"] % 60:
             assert job_a.scheduled_at != job_b.scheduled_at
+
+
+# --- Stuck-job reaper ---
+
+
+def _create_running_job(app, *, started_at, retry_count=0, slug_suffix=""):
+    ctx = _create_daily_profile(app, slug_suffix=slug_suffix or "running")
+    with app.app_context():
+        job = SearchJob(
+            search_profile_id=ctx["profile_id"],
+            organization_id=ctx["org_id"],
+            status="running",
+            scheduled_at=started_at,
+            started_at=started_at,
+            retry_count=retry_count,
+        )
+        db.session.add(job)
+        db.session.commit()
+        return {**ctx, "job_id": job.id}
+
+
+def test_reap_requeues_stuck_job_with_retries_left(app):
+    now = datetime.now(timezone.utc)
+    ctx = _create_running_job(app, started_at=now - timedelta(minutes=45), retry_count=0)
+
+    with app.app_context():
+        result = reap_stuck_running_jobs(now=now)
+        assert result == {"requeued": 1, "failed": 0}
+
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.status == "pending"
+        assert job.started_at is None
+        assert job.retry_count == 1
+
+
+def test_reap_fails_job_after_max_retries(app):
+    now = datetime.now(timezone.utc)
+    ctx = _create_running_job(app, started_at=now - timedelta(minutes=45), retry_count=2)
+
+    with app.app_context():
+        result = reap_stuck_running_jobs(now=now, max_retries=2)
+        assert result == {"requeued": 0, "failed": 1}
+
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.status == "failed"
+        assert job.completed_at is not None
+        assert "reaper" in job.error_message.lower()
+
+
+def test_reap_ignores_jobs_not_yet_stale(app):
+    now = datetime.now(timezone.utc)
+    ctx = _create_running_job(app, started_at=now - timedelta(minutes=5))
+
+    with app.app_context():
+        result = reap_stuck_running_jobs(now=now)
+        assert result == {"requeued": 0, "failed": 0}
+        job = db.session.get(SearchJob, ctx["job_id"])
+        assert job.status == "running"
+
+
+# --- Failed-job admin alert ---
+
+
+def _superadmin(app, email="sa-failjob@test.com"):
+    with app.app_context():
+        create_user(email, "securepassword1", role="superadmin")
+        db.session.commit()
+
+
+@patch("app.email.services.EmailService.send_search_job_failed_alert")
+def test_notify_failed_search_jobs_sends_once_per_job(mock_send, app):
+    mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+    _superadmin(app)
+    ctx = _create_daily_profile(app, slug_suffix="failalert")
+
+    with app.app_context():
+        job = SearchJob(
+            search_profile_id=ctx["profile_id"],
+            organization_id=ctx["org_id"],
+            status="failed",
+            scheduled_at=datetime.now(timezone.utc),
+            error_message="boom",
+        )
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+        count = notify_failed_search_jobs()
+        assert count == 1
+        mock_send.assert_called_once()
+        sent_jobs = mock_send.call_args.kwargs["failed_jobs"]
+        assert sent_jobs[0]["job_id"] == job_id
+        assert sent_jobs[0]["error_message"] == "boom"
+
+        job = db.session.get(SearchJob, job_id)
+        assert job.failure_notified_at is not None
+
+        # Running it again must not re-notify the same (already-notified) job.
+        mock_send.reset_mock()
+        count_again = notify_failed_search_jobs()
+        assert count_again == 0
+        mock_send.assert_not_called()

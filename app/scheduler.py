@@ -224,6 +224,19 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 logger.exception("Lead health check job failed")
 
+    def run_lead_digest():
+        with app.app_context():
+            from app.extensions import db
+            from app.streams.services import LeadDigestService
+
+            try:
+                sent = LeadDigestService.send_due_digests()
+                if sent:
+                    logger.info("Sent new-leads digest to %s organization(s)", sent)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Lead digest job failed")
+
     def run_create_daily_search_jobs():
         with app.app_context():
             from app.extensions import db
@@ -249,6 +262,36 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Weekly search job creation failed")
+
+    def run_reap_stuck_search_jobs():
+        with app.app_context():
+            from app.extensions import db
+            from app.search.job_scheduler import reap_stuck_running_jobs
+
+            try:
+                result = reap_stuck_running_jobs()
+                if result["requeued"] or result["failed"]:
+                    logger.info(
+                        "Stuck-job reaper: requeued %s, failed %s",
+                        result["requeued"],
+                        result["failed"],
+                    )
+            except Exception:
+                db.session.rollback()
+                logger.exception("Stuck search job reaper failed")
+
+    def run_notify_failed_search_jobs():
+        with app.app_context():
+            from app.extensions import db
+            from app.search.job_scheduler import notify_failed_search_jobs
+
+            try:
+                count = notify_failed_search_jobs()
+                if count:
+                    logger.info("Notified superadmins of %s failed search job(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Failed search job notification failed")
 
     scheduler.add_job(
         run_daily_backup,
@@ -353,6 +396,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         replace_existing=True,
     )
     scheduler.add_job(
+        run_lead_digest,
+        CronTrigger(hour=7, minute=0, timezone="UTC"),
+        id="lead_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         run_create_daily_search_jobs,
         CronTrigger(hour=6, minute=0, timezone="UTC"),
         id="create_search_jobs",
@@ -362,6 +411,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_create_weekly_search_jobs,
         CronTrigger(day_of_week="mon", hour=6, minute=0, timezone="UTC"),
         id="create_weekly_search_jobs",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_reap_stuck_search_jobs,
+        IntervalTrigger(minutes=10),
+        id="reap_stuck_search_jobs",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_notify_failed_search_jobs,
+        IntervalTrigger(minutes=15),
+        id="notify_failed_search_jobs",
         replace_existing=True,
     )
 

@@ -449,6 +449,98 @@ class EmailService:
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
+    @staticmethod
+    def send_new_leads_digest(*, to_email: str, org_name: str, leads: list[dict]) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        app_base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        leads_url = f"{app_base_url}/leads" if app_base_url else "/leads"
+        rows_html = "".join(
+            "<tr>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('label') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('source') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('region') or ''))}</td>"
+            "</tr>"
+            for item in leads
+        )
+        subject = f"{len(leads)} uutta liidiä — {org_name}"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            f"<h2>{len(leads)} uutta liidiä</h2>"
+            "<table style='border-collapse:collapse;width:100%;'>"
+            "<thead><tr>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Liidi</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Lähde</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Alue</th>"
+            "</tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            f"<p style='margin-top:16px;'><a href='{html.escape(leads_url)}'>Avaa liidit CRM:ssä</a></p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads — voit poistaa tämän koosteen "
+            "käytöstä liidiasetuksista.</p>"
+            "</div>"
+        )
+        body_text = f"{len(leads)} uutta liidiä. Avaa CRM:ssä: {leads_url}"
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
+    def send_search_job_failed_alert(*, to_email: str, failed_jobs: list[dict]) -> dict:
+        """Operational alert to a superadmin: one or more search jobs ended up
+        failed (incl. jobs the stuck-job reaper gave up on after max retries)."""
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        rows_html = "".join(
+            "<tr>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('organization_name') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('profile_name') or ''))}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{item.get('job_id')}</td>"
+            f"<td style='padding:8px;border:1px solid #E4E7EF;'>{html.escape(str(item.get('error_message') or '')[:200])}</td>"
+            "</tr>"
+            for item in failed_jobs
+        )
+        subject = f"⚠ {len(failed_jobs)} hakutyö epäonnistui"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2 style='color:#B45309;'>Hakutyöt epäonnistuivat</h2>"
+            "<table style='border-collapse:collapse;width:100%;'>"
+            "<thead><tr>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Organisaatio</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Hakuprofiili</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Job</th>"
+            "<th style='text-align:left;padding:8px;border:1px solid #E4E7EF;'>Virhe</th>"
+            "</tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = f"{len(failed_jobs)} hakutyö(t) epäonnistuivat. Tarkista admin-paneelista."
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
 
 class TemplateService:
     @staticmethod

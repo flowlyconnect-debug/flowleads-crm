@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from flask import current_app, url_for
+from sqlalchemy import update
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -37,24 +38,65 @@ def list_jobs_for_n8n(*, status: str, limit: int) -> list[dict]:
     if status not in SEARCH_JOB_STATUSES:
         raise ValueError(f"Invalid status: {status}")
 
-    now = datetime.now(timezone.utc)
-    query = (
-        SearchJob.query.options(joinedload(SearchJob.profile))
-        .join(SearchProfile, SearchJob.search_profile_id == SearchProfile.id)
-        .filter(
-            SearchJob.status == status,
-            SearchProfile.is_active.is_(True),
-        )
-    )
     if status == "pending":
-        query = query.filter(SearchJob.scheduled_at <= now)
+        jobs = claim_pending_jobs_for_n8n(limit=limit)
+        return [serialize_job_for_n8n(job) for job in jobs]
 
     jobs = (
-        query.order_by(SearchJob.scheduled_at.asc(), SearchJob.id.asc())
+        SearchJob.query.options(joinedload(SearchJob.profile))
+        .join(SearchProfile, SearchJob.search_profile_id == SearchProfile.id)
+        .filter(SearchJob.status == status, SearchProfile.is_active.is_(True))
+        .order_by(SearchJob.scheduled_at.asc(), SearchJob.id.asc())
         .limit(limit)
         .all()
     )
     return [serialize_job_for_n8n(job) for job in jobs]
+
+
+def claim_pending_jobs_for_n8n(*, limit: int) -> list[SearchJob]:
+    """Atomically hand out up to `limit` due pending jobs, marking each one
+    "running" as part of the same call that returns it.
+
+    Listing pending jobs used to be read-only: n8n would GET the list, then
+    separately PATCH each job to "running". Two overlapping n8n runs (e.g. a
+    scheduled trigger overlapping a manual one) could both GET the same
+    pending job and both start working it. Folding the claim into this read
+    closes that window: a conditional UPDATE (`WHERE status='pending'`) only
+    ever succeeds for the execution that gets there first, on any backend —
+    Postgres's row locking makes the second UPDATE affect zero rows once the
+    first commits, which is exactly what `rowcount` checks below.
+    """
+    now = datetime.now(timezone.utc)
+    candidates = (
+        SearchJob.query.options(joinedload(SearchJob.profile))
+        .join(SearchProfile, SearchJob.search_profile_id == SearchProfile.id)
+        .filter(
+            SearchJob.status == "pending",
+            SearchProfile.is_active.is_(True),
+            SearchJob.scheduled_at <= now,
+        )
+        .order_by(SearchJob.scheduled_at.asc(), SearchJob.id.asc())
+        .limit(max(limit * 2, limit))
+        .all()
+    )
+
+    claimed: list[SearchJob] = []
+    for job in candidates:
+        if len(claimed) >= limit:
+            break
+        result = db.session.execute(
+            update(SearchJob)
+            .where(SearchJob.id == job.id, SearchJob.status == "pending")
+            .values(status="running", started_at=now)
+        )
+        if result.rowcount == 1:
+            job.status = "running"
+            job.started_at = now
+            claimed.append(job)
+
+    if claimed:
+        db.session.commit()
+    return claimed
 
 
 def update_job_for_n8n(

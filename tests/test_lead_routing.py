@@ -257,6 +257,94 @@ def test_health_monitoring(app):
         assert zero_org.id not in org_ids
 
 
+def test_lead_health_alert_not_resent_until_recovery(app):
+    from unittest.mock import patch
+
+    with app.app_context():
+        org, stages, admin, _user = _setup_org("routing-health-cooldown")
+        settings = LeadRoutingService.get_settings(org.id)
+        settings.last_lead_at = datetime.now(timezone.utc) - timedelta(days=4)
+        settings.total_lead_count = 3
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_lead_stale_alert") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            LeadHealthService.check_all_orgs()
+            assert mock_send.call_count == 1
+
+            # Still stale on a second run — must NOT alert again (already_sent).
+            mock_send.reset_mock()
+            LeadHealthService.check_all_orgs()
+            mock_send.assert_not_called()
+
+        # A new lead recovers it: a later staleness episode alerts again.
+        lead = _make_lead(org.id, stages[0].id)
+        LeadRoutingService.apply_to_lead(lead, settings)
+        settings.last_lead_at = datetime.now(timezone.utc) - timedelta(days=4)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_lead_stale_alert") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            LeadHealthService.check_all_orgs()
+            assert mock_send.call_count == 1
+
+
+def test_lead_digest_sends_only_when_new_leads_exist(app):
+    from unittest.mock import patch
+
+    from app.streams.services import LeadDigestService
+
+    with app.app_context():
+        org, stages, admin, _user = _setup_org("routing-digest")
+        LeadRoutingService.get_settings(org.id)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_new_leads_digest") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            sent = LeadDigestService.send_due_digests()
+            assert sent == 0
+            mock_send.assert_not_called()
+
+        lead = _make_lead(org.id, stages[0].id)
+        db.session.add(lead)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_new_leads_digest") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            sent = LeadDigestService.send_due_digests()
+            assert sent == 1
+            mock_send.assert_called_once()
+            sent_leads = mock_send.call_args.kwargs["leads"]
+            assert len(sent_leads) == 1
+
+        # Running again right after must not resend the same lead (window moved).
+        with patch("app.email.services.EmailService.send_new_leads_digest") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            sent = LeadDigestService.send_due_digests()
+            assert sent == 0
+            mock_send.assert_not_called()
+
+
+def test_lead_digest_respects_opt_out(app):
+    from unittest.mock import patch
+
+    from app.streams.services import LeadDigestService
+
+    with app.app_context():
+        org, stages, admin, _user = _setup_org("routing-digest-optout")
+        settings = LeadRoutingService.get_settings(org.id)
+        settings.daily_digest_enabled = False
+        lead = _make_lead(org.id, stages[0].id)
+        db.session.add(lead)
+        db.session.commit()
+
+        with patch("app.email.services.EmailService.send_new_leads_digest") as mock_send:
+            mock_send.return_value = {"success": True, "message_id": "x", "error": None}
+            sent = LeadDigestService.send_due_digests()
+            assert sent == 0
+            mock_send.assert_not_called()
+
+
 def test_apply_routing_sets_industry_region(app):
     with app.app_context():
         org, stages, _admin, _user = _setup_org("routing-industry-region")

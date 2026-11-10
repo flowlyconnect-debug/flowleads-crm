@@ -35,6 +35,12 @@ class OrgLeadSettings(db.Model):
 
     last_lead_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_lead_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Set when a stale-leads alert is sent, cleared on the next lead — prevents
+    # re-sending the same alert every day the org stays stale.
+    last_alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Customer-facing daily digest of new leads (opt-out toggle on the settings page).
+    daily_digest_enabled: Mapped[bool] = mapped_column(sa.Boolean, default=True, nullable=False)
+    last_digest_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
