@@ -11,7 +11,7 @@ services:
     plan: starter
     region: frankfurt
     buildCommand: pip install -r requirements.txt
-    startCommand: flask db upgrade && gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
+    startCommand: flask db upgrade && (flask create-superadmin --email "$BOOTSTRAP_ADMIN_EMAIL" --password "$BOOTSTRAP_ADMIN_PASSWORD" || true) && gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
     envVars:
       - key: FLASK_APP
         value: run.py
