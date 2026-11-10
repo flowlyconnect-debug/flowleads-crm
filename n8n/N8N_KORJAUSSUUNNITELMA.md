@@ -1,3 +1,5 @@
+> **VANHENTUNUT (2026-11-10):** korvattu v2-pipelinella, ks. [README.md](README.md). Säilytetty historian vuoksi.
+
 # FlowLeads n8n-pipeline — korjaussuunnitelma (2026-07-02)
 
 Perustuu kolmen workflow-exportin analyysiin: Job Poller (`LNe2Z4KLA1eGAOCH`), Job Dispatcher (`UosPC00MN1s2uo4Q`), Lead Worker Enriched (`JOpQpAHw5adGoX4j`).

@@ -156,6 +156,7 @@ def _init_extensions(app):
         from app.forms import models as forms_models  # noqa: F401
         from app.streams import models as streams_models  # noqa: F401
         from app.search import models as search_models  # noqa: F401
+        from app.listings import models as listings_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -178,6 +179,7 @@ def _register_blueprints(app):
     from app.proposals import proposals_bp, proposals_public_bp
     from app.forms import forms_bp, forms_public_api_bp
     from app.search.n8n_routes import n8n_bp
+    from app.listings.routes import listings_n8n_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -202,12 +204,14 @@ def _register_blueprints(app):
     app.register_blueprint(forms_public_api_bp)
     app.register_blueprint(webhooks_bp)
     app.register_blueprint(n8n_bp)
+    app.register_blueprint(listings_n8n_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)
     csrf.exempt(proposals_public_bp)
     csrf.exempt(forms_public_api_bp)
     csrf.exempt(n8n_bp)
+    csrf.exempt(listings_n8n_bp)
 
 
 # Display labels shared by every lead view (dashboard, list, pipeline, detail)

@@ -1,3 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Unauthorized{% endblock %}
-{% block content %}<div class="card"><h1>Unauthorized</h1><p>Please sign in to continue.</p></div>{% endblock %}
+{% set code = "401" %}
+{% set heading = "Kirjaudu sisään jatkaaksesi" %}
+{% set text = "Tämä sivu vaatii kirjautumisen." %}
+{% set retry = false %}
+{% extends "errors/_error.html" %}

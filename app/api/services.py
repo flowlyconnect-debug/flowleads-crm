@@ -287,7 +287,12 @@ def _sync_contact_for_lead(lead: Lead, organization_id: int) -> None:
         lead.contacts.append(contact)
 
 
-def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
+def upsert_lead(
+    organization_id: int, payload: dict, *, match_by_email: bool = True
+) -> tuple[Lead, str]:
+    """Create or update a lead. `match_by_email=False` identifies the lead
+    only by (source, source_ref): used by the listing catalogue, where many
+    different leads legitimately share one property-manager email."""
     raw_payload = payload if isinstance(payload, dict) else {}
     data = validate_api_lead_payload(
         payload,
@@ -300,7 +305,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
 
     existing = find_lead_for_upsert(
         organization_id,
-        email=email,
+        email=email if match_by_email else None,
         source=source,
         source_ref=source_ref,
     )
@@ -409,7 +414,7 @@ def upsert_lead(organization_id: int, payload: dict) -> tuple[Lead, str]:
         db.session.rollback()
         dup = find_lead_for_upsert(
             organization_id,
-            email=email,
+            email=email if match_by_email else None,
             source=source,
             source_ref=source_ref,
         )

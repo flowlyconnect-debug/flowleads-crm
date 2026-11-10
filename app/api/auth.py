@@ -102,6 +102,7 @@ def authenticate_job_token(raw_key: str | None) -> tuple[int | None, str | None]
     if datetime.now(timezone.utc) >= expires_at:
         return None, "expired_api_key"
 
+    g.n8n_job_id = job.id
     return job.organization_id, None
 
 

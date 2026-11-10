@@ -280,7 +280,7 @@ def test_reset_password_request_handles_simulated_mailgun_failure(mock_send, cli
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert "you will receive reset instructions".encode() in response.data
+    assert "lähetimme siihen ohjeet".encode() in response.data
 
 
 def test_reset_token_is_single_use(app):
@@ -361,4 +361,4 @@ def test_reset_password_full_flow_via_routes(mock_send, client, app):
 
     # The link cannot be used a second time, even though it has not expired.
     second_attempt = client.get(f"/auth/reset-password/{token}", follow_redirects=True)
-    assert b"invalid or has expired" in second_attempt.data
+    assert "Linkki ei kelpaa".encode() in second_attempt.data

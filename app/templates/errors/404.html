@@ -1,3 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Not found{% endblock %}
-{% block content %}<div class="card"><h1>Page not found</h1><p>The requested page does not exist.</p></div>{% endblock %}
+{% set code = "404" %}
+{% set heading = "Sivua ei löytynyt" %}
+{% set text = "Etsimääsi sivua ei ole tai se on siirretty. Tarkista osoite tai palaa etusivulle." %}
+{% set retry = false %}
+{% extends "errors/_error.html" %}

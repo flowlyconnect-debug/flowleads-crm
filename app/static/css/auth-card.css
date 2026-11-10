@@ -1,0 +1,263 @@
+/* ==========================================================================
+   Standalone single-card pages (templates/auth/_card_layout.html):
+   2FA setup / verify / backup codes, password change and reset, invite
+   acceptance and the error pages. Builds on login.css (.login-page, .lp-*)
+   so these pages look like the login page, never like the signed-in app.
+   ========================================================================== */
+
+.lp-solo__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 48px var(--lp-gutter) 40px;
+}
+
+.lp-solo .lp-card {
+  max-width: 460px;
+  padding: 28px;
+}
+
+.lp-solo .lp-card--wide {
+  max-width: 620px;
+}
+
+.lp-solo .lp-card__title {
+  font-size: 24px;
+}
+
+.lp-solo__step {
+  margin: 0 0 4px;
+  color: var(--lp-violet);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lp-solo .lp-card input.lp-field__input {
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--lp-border-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--lp-ink);
+  font-size: 16px;
+  box-shadow: var(--lp-shadow-sm);
+}
+
+.lp-solo .lp-card input.lp-field__input:focus {
+  border-color: var(--lp-violet);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.lp-solo .lp-card input.lp-field__input--code {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-solo__hint {
+  margin: 0;
+  color: var(--lp-ink-3);
+  font-size: 14px;
+}
+
+.lp-solo__steps {
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+  counter-reset: solo-step;
+}
+
+.lp-solo__steps > li {
+  position: relative;
+  padding-left: 40px;
+  counter-increment: solo-step;
+  color: var(--lp-ink-2);
+  font-size: 15px;
+}
+
+.lp-solo__steps > li::before {
+  content: counter(solo-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--lp-violet-soft);
+  color: var(--lp-violet);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-solo__steps strong {
+  color: var(--lp-ink);
+}
+
+.lp-solo__qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.lp-solo__qr img {
+  width: 176px;
+  height: 176px;
+  padding: 8px;
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.lp-solo__secret {
+  flex: 1;
+  min-width: 180px;
+  font-size: 14px;
+  color: var(--lp-ink-3);
+}
+
+.lp-solo__secret code,
+.lp-solo__codes code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--lp-ink);
+}
+
+.lp-solo__secret code {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--lp-bg);
+  border: 1px solid var(--lp-border);
+  font-size: 14px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.lp-solo__codes {
+  margin: 0 0 16px;
+  padding: 16px;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  background: var(--lp-bg);
+}
+
+.lp-solo__codes code {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+
+.lp-solo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lp-solo .lp-btn--secondary,
+.lp-solo button.lp-btn--secondary {
+  background: #fff;
+  color: var(--lp-ink);
+  border: 1px solid var(--lp-border-strong);
+}
+
+.lp-solo .lp-btn--secondary:hover {
+  background: var(--lp-bg);
+}
+
+.lp-solo__below {
+  font-size: 14px;
+  color: var(--lp-ink-3);
+  text-align: center;
+}
+
+.lp-solo__below a {
+  color: var(--lp-violet);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lp-solo__below a:hover {
+  text-decoration: underline;
+}
+
+.lp-solo__section-title {
+  margin: 20px 0 8px;
+  color: var(--lp-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.lp-solo__checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+}
+
+.lp-solo__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--lp-ink-2);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.lp-solo__check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lp-violet);
+}
+
+.lp-solo__code-badge {
+  margin: 0 0 8px;
+  color: var(--lp-violet);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lp-solo__footer {
+  padding: 16px var(--lp-gutter) 24px;
+  color: var(--lp-ink-3);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .lp-solo__main {
+    padding-top: 24px;
+  }
+
+  .lp-solo .lp-card {
+    padding: 20px;
+  }
+
+  .lp-solo__codes {
+    grid-template-columns: 1fr;
+  }
+}

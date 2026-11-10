@@ -36,6 +36,65 @@ from app.users.services import (
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
+@auth_bp.before_app_request
+def _enforce_two_factor():
+    """Mandatory 2FA (admin, superadmin) applies to the WHOLE app, not just
+    to views that carry @require_2fa: a signed-in user who has not set up or
+    not passed the second factor can reach only the auth pages. Without this,
+    typing e.g. /leads/ after the password step skipped 2FA entirely.
+
+    Registered before the password hook on purpose: 2FA first, then the
+    temporary-password change."""
+    from flask import current_app, jsonify
+
+    if not current_app.config.get("TWO_FA_ENFORCE_ALL_PAGES", True):
+        return None
+    if not current_user.is_authenticated or not current_user.requires_mandatory_2fa():
+        return None
+    endpoint = request.endpoint or ""
+    if endpoint == "static" or endpoint.startswith("auth."):
+        return None
+    if current_user.totp_enabled and is_2fa_verified():
+        return None
+    wants_json = request.path.startswith("/api/") or request.is_json
+    if wants_json or request.method not in ("GET", "HEAD"):
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Kaksivaiheinen tunnistautuminen vaaditaan.",
+                    "code": "two_factor_required",
+                }
+            ),
+            403,
+        )
+    if not current_user.totp_enabled:
+        return redirect(url_for("auth.two_fa_setup"))
+    return redirect(url_for("auth.two_fa_verify"))
+
+
+@auth_bp.before_app_request
+def _force_password_change():
+    """A user created with a temporary password (User.must_change_password)
+    can do nothing in the app before choosing their own. The auth pages stay
+    reachable so login, 2FA and logout keep working."""
+    if not current_user.is_authenticated or not getattr(current_user, "must_change_password", False):
+        return None
+    endpoint = request.endpoint or ""
+    if endpoint == "static" or endpoint.startswith("auth."):
+        return None
+    if request.path.startswith("/api/"):
+        return None
+    return redirect(url_for("auth.change_password_route"))
+
+
+@auth_bp.app_context_processor
+def _inject_feature_helpers():
+    from app.core.features import current_user_has_feature
+
+    return {"has_feature": current_user_has_feature}
+
+
 def _login_rate_limit():
     from flask import current_app
 
@@ -71,12 +130,39 @@ def login():
                     return redirect(url_for("auth.two_fa_setup"))
                 if not is_2fa_verified():
                     return redirect(url_for("auth.two_fa_verify"))
+            if user.must_change_password:
+                return redirect(url_for("auth.change_password_route"))
             next_url = request.args.get("next")
             if next_url:
                 return redirect(next_url)
             return redirect(url_for("analytics.dashboard"))
 
     return render_template("auth/login.html", form=form)
+
+
+@auth_bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password_route():
+    form = ResetPasswordForm()
+    forced = bool(current_user.must_change_password)
+    if form.validate_on_submit():
+        if form.password.data != form.password_confirm.data:
+            flash("Salasanat eivät täsmää.", "danger")
+        else:
+            try:
+                change_password(current_user, form.password.data)
+                db.session.commit()
+                flash("Salasana vaihdettu.", "success")
+                return redirect(url_for("analytics.dashboard"))
+            except UserServiceError as exc:
+                db.session.rollback()
+                flash(exc.message, "danger")
+            except SQLAlchemyError:
+                db.session.rollback()
+                flash("Salasanan vaihto epäonnistui. Yritä uudelleen.", "danger")
+    elif request.method == "POST":
+        flash("Salasanan pitää olla vähintään 12 merkkiä.", "danger")
+    return render_template("auth/change_password.html", form=form, forced=forced)
 
 
 @auth_bp.route("/logout")
@@ -192,7 +278,6 @@ def two_fa_setup():
                 current_user, normalize_totp_code(form.token.data) or ""
             )
             complete_2fa_session(current_user)
-            flash("Two-factor authentication has been enabled.", "success")
             return render_template(
                 "auth/two_fa_backup_codes.html",
                 backup_codes=raw_codes,
@@ -201,7 +286,9 @@ def two_fa_setup():
             db.session.rollback()
             flash(exc.message, "danger")
 
-    return render_template("auth/two_fa_setup.html", form=form, qr_code=qr_b64)
+    return render_template(
+        "auth/two_fa_setup.html", form=form, qr_code=qr_b64, secret=current_user.totp_secret
+    )
 
 
 @auth_bp.route("/2fa/verify", methods=["GET", "POST"])
@@ -218,7 +305,14 @@ def two_fa_verify():
         token = normalize_totp_code(form.token.data)
         if verify_totp_login(current_user, token):
             complete_2fa_session(current_user)
-            flash("Verification successful.", "success")
+            if len(token or "") > 8:  # signed in with a backup code
+                from app.auth.services import remaining_backup_codes
+
+                left = remaining_backup_codes(current_user)
+                flash(
+                    f"Kirjauduit varakoodilla. Käyttämättömiä varakoodeja on jäljellä {left}.",
+                    "warning" if left <= 2 else "info",
+                )
             return redirect(url_for("analytics.dashboard"))
         flash("Invalid verification code.", "danger")
 

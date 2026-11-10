@@ -47,6 +47,29 @@ class SearchProfile(db.Model):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_runs: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_leads_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Listing catalogue matching (app/listings): a profile is a filter over the
+    # shared catalogue. min_confidence = minimum AI confidence (0-100) for the
+    # profile's remonttityyppi; daily_lead_limit caps leads created per UTC day
+    # (0 = unlimited); needs_rematch makes the scheduler rebuild matches after
+    # the filter changes.
+    min_confidence: Mapped[int] = mapped_column(Integer, default=60, server_default="60", nullable=False)
+    daily_lead_limit: Mapped[int] = mapped_column(Integer, default=50, server_default="50", nullable=False)
+    needs_rematch: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=sa.true(), nullable=False
+    )
+    # Optional extra filters, all "empty = no restriction":
+    # remonttityypit = every renovation type the profile wants (remonttityyppi
+    #   above stays the primary one, = remonttityypit[0]);
+    # cities = kaupungit inside the chosen regions;
+    # timing_within_years = renovation at most N years ahead;
+    # build_year_min/max + building_types = the building itself.
+    # A listing whose value is unknown (no year / type / timing) passes.
+    remonttityypit: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
+    cities: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
+    timing_within_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    build_year_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    build_year_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    building_types: Mapped[list] = mapped_column(json_type, default=list, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -61,6 +84,11 @@ class SearchProfile(db.Model):
         server_default=func.now(),
         nullable=False,
     )
+
+    @property
+    def wanted_types(self) -> list[str]:
+        types = [t for t in (self.remonttityypit or []) if t]
+        return types or [self.remonttityyppi]
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     jobs: Mapped[list["SearchJob"]] = relationship(
@@ -99,6 +127,14 @@ class SearchJob(db.Model):
     # scoped to this one job, not a standing key for the whole organization.
     n8n_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     n8n_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Progress reporting from the n8n dispatcher. A full-region run walks every
+    # Oikotie result page one at a time and can take hours, so the dispatcher
+    # PATCHes a heartbeat after each page. The stuck-job reaper keys off
+    # heartbeat_at (not started_at) so a long but healthy run is never requeued.
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pages_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    pages_failed: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    progress: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

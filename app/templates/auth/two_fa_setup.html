@@ -1,16 +1,41 @@
-{% extends "base.html" %}
-{% block title %}Set up 2FA — FlowLeads{% endblock %}
-{% block content %}
-<div class="card">
-  <h1>Two-factor authentication</h1>
-  <p>Scan this QR code with your authenticator app, then enter the verification code.</p>
-  {% if qr_code %}
-  <p><img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR code" width="200" height="200"></p>
-  {% endif %}
-  <form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <label>{{ form.token.label }}{{ form.token() }}</label>
-    {{ form.submit(class="btn") }}
-  </form>
-</div>
+{% extends "auth/_card_layout.html" %}
+{% block title %}Ota kaksivaiheinen tunnistautuminen käyttöön — FlowLeads{% endblock %}
+{% block card_class %}lp-card--wide{% endblock %}
+{% block step %}<p class="lp-solo__step">Tilin suojaus</p>{% endblock %}
+{% block card %}
+<h1 class="lp-card__title">Ota kaksivaiheinen tunnistautuminen käyttöön</h1>
+<p class="lp-card__lead">Tilisi suojataan kirjautumiskoodilla, jonka saat puhelimesi todennussovelluksesta. Käyttöönotto tehdään vain kerran.</p>
+
+<ol class="lp-solo__steps">
+  <li>
+    <strong>Asenna todennussovellus puhelimeesi</strong>, jos sinulla ei vielä ole sellaista. Esimerkiksi Google Authenticator, Microsoft Authenticator tai 1Password käy.
+  </li>
+  <li>
+    <strong>Skannaa QR-koodi sovelluksella.</strong>
+    {% if qr_code %}
+    <div class="lp-solo__qr">
+      <img src="data:image/png;base64,{{ qr_code }}" alt="QR-koodi todennussovellukselle" width="176" height="176">
+      {% if secret %}
+      <div class="lp-solo__secret">
+        Etkö voi skannata? Lisää tili sovellukseen käsin tällä avaimella:
+        <code>{{ secret }}</code>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </li>
+  <li>
+    <strong>Kirjoita sovelluksen näyttämä 6-numeroinen koodi</strong> alle ja vahvista.
+  </li>
+</ol>
+
+<form method="post" class="lp-form" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="lp-field">
+    <label for="{{ form.token.id }}" class="lp-field__label">Vahvistuskoodi</label>
+    {{ form.token(class="lp-field__input lp-field__input--code", inputmode="numeric", autocomplete="one-time-code", maxlength="8", placeholder="000000", autofocus=True) }}
+    {% if form.token.errors %}<p class="lp-field__error">Kirjoita sovelluksen näyttämä 6-numeroinen koodi.</p>{% endif %}
+  </div>
+  {{ form.submit(class="lp-btn lp-btn--primary lp-btn--block", value="Vahvista ja ota käyttöön") }}
+</form>
 {% endblock %}

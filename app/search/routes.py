@@ -17,7 +17,10 @@ from app.core.tenant import (
     resolve_organization_id_with_fallback,
 )
 from app.extensions import db
+from app.listings.services import catalogue_cities, catalogue_stats, preview_profile, profile_match_stats
 from app.search.constants import (
+    ALL_FINLAND_REGION,
+    BUILDING_TYPES,
     FINNISH_REGIONS,
     REMONTTITYYPIT,
     SEARCH_JOB_STATUS_LABELS,
@@ -26,6 +29,7 @@ from app.search.constants import (
 from app.search.models import SEARCH_SCHEDULES
 from app.search.profile_services import (
     SearchProfileServiceError,
+    build_profile,
     create_profile,
     create_test_search_job,
     delete_profile,
@@ -50,8 +54,13 @@ def _search_profiles_template_defaults(
         "profiles": [],
         "selected_profile": None,
         "latest_job": None,
+        "match_stats": None,
+        "catalogue": None,
         "remonttityypit": REMONTTITYYPIT,
         "finnish_regions": FINNISH_REGIONS,
+        "all_finland_region": ALL_FINLAND_REGION,
+        "building_types": BUILDING_TYPES,
+        "city_suggestions": [],
         "schedule_labels": SEARCH_SCHEDULE_LABELS,
         "job_status_labels": SEARCH_JOB_STATUS_LABELS,
         "org_query": org_query,
@@ -71,10 +80,12 @@ def _render_search_profiles(
     selected_id = _selected_profile_id(profiles)
     selected_profile = None
     latest_job = None
+    match_stats = None
     if selected_id is not None:
         selected_profile = get_profile(organization_id, selected_id)
         if selected_profile:
             latest_job = get_latest_job(selected_profile.id)
+            match_stats = profile_match_stats(selected_profile)
 
     now = datetime.now(timezone.utc)
     org_query = org_query_suffix(organization_id)
@@ -83,8 +94,13 @@ def _render_search_profiles(
         profiles=profiles,
         selected_profile=selected_profile,
         latest_job=latest_job,
+        match_stats=match_stats,
+        catalogue=catalogue_stats(),
         remonttityypit=REMONTTITYYPIT,
         finnish_regions=FINNISH_REGIONS,
+        all_finland_region=ALL_FINLAND_REGION,
+        building_types=BUILDING_TYPES,
+        city_suggestions=catalogue_cities(),
         schedule_labels=SEARCH_SCHEDULE_LABELS,
         job_status_labels=SEARCH_JOB_STATUS_LABELS,
         org_query=org_query,
@@ -113,18 +129,44 @@ def _relative_time_fi(value: datetime | None, now: datetime) -> str:
 
 
 def _profile_form_data() -> dict:
-    regions = [r for r in request.form.getlist("regions") if r in FINNISH_REGIONS]
+    if request.form.get("region_mode") == "all_finland" or ALL_FINLAND_REGION in request.form.getlist("regions"):
+        regions = [ALL_FINLAND_REGION]
+    else:
+        regions = [r for r in request.form.getlist("regions") if r in FINNISH_REGIONS]
     schedule = (request.form.get("schedule_description") or "").strip()
     if schedule not in SEARCH_SCHEDULES:
         schedule = "daily"
+    # several renovation types (checkboxes); a lone "remonttityyppi" still works
+    types = [t.strip() for t in request.form.getlist("remonttityypit") if t.strip()]
+    primary = (request.form.get("remonttityyppi") or "").strip()
+    if types and primary not in types:
+        primary = types[0]
     return {
         "name": (request.form.get("name") or "").strip(),
-        "remonttityyppi": (request.form.get("remonttityyppi") or "").strip(),
+        "remonttityyppi": primary,
+        "remonttityypit": types,
         "regions": regions,
         "schedule_description": schedule,
         "crm_api_key": (request.form.get("crm_api_key") or "").strip() or None,
         "is_active": request.form.get("is_active") == "y",
+        "min_confidence": _form_int("min_confidence", 60),
+        "daily_lead_limit": _form_int("daily_lead_limit", 50),
+        "cities": request.form.get("cities") or "",
+        "timing_within_years": (request.form.get("timing_within_years") or "").strip(),
+        "build_year_min": (request.form.get("build_year_min") or "").strip(),
+        "build_year_max": (request.form.get("build_year_max") or "").strip(),
+        "building_types": [t for t in request.form.getlist("building_types") if t.strip()],
     }
+
+
+def _form_int(name: str, default: int):
+    raw = (request.form.get(name) or "").strip()
+    if raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return raw  # rejected with a Finnish message by the service validation
 
 
 def _selected_profile_id(profiles: list) -> int | None:
@@ -225,6 +267,24 @@ def register_search_profile_settings_routes(settings_bp):
             db.session.rollback()
             flash(exc.message, "danger")
             return redirect(url_for("settings.search_profiles_list", **org_query))
+
+    @settings_bp.route("/search-profiles/preview", methods=["POST"])
+    @login_required
+    @require_role("admin", "superadmin")
+    def search_profiles_preview():
+        """How many catalogue listings the filter on the form matches right
+        now (nothing is saved)."""
+        organization_id = resolve_organization_id()
+        data = _profile_form_data()
+        data["name"] = data["name"] or "esikatselu"
+        data["is_active"] = True
+        try:
+            profile = build_profile(organization_id, **data)
+        except SearchProfileServiceError as exc:
+            return jsonify({"success": False, "error": exc.message}), 400
+        result = preview_profile(profile)
+        db.session.rollback()  # the transient profile must never be flushed
+        return jsonify({"success": True, **result})
 
     @settings_bp.route("/search-profiles/<int:profile_id>", methods=["POST"])
     @login_required

@@ -11,7 +11,8 @@ services:
     plan: starter
     region: frankfurt
     buildCommand: pip install -r requirements.txt
-    startCommand: flask db upgrade && gunicorn run:app --workers 4 --bind 0.0.0.0:$PORT
+    # 2 workers: the starter plan has 512 MB RAM; 4 workers risked OOM restarts.
+    startCommand: flask db upgrade && gunicorn run:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
       - key: FLASK_APP
         value: run.py
@@ -48,6 +49,26 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      # Optional: only needed when calendar sync is enabled.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_REDIRECT_URI
+        sync: false
+      # n8n job tokens (full-region Oikotie runs) get their own, higher limit.
+      - key: N8N_JOB_RATE_LIMIT
+        value: 2000/hour
       # Backups: S3-compatible object storage (required — Render's web/worker
       # dynos do not share a local disk). The web admin UI only needs a
       # READ-ONLY key to list/download backups; it must never hold the
@@ -136,6 +157,17 @@ services:
           name: flowleads-crm
           type: web
           envVarKey: REDIS_URL
+      # Weekly batch predictions run in the scheduler and call OpenAI.
+      - key: OPENAI_API_KEY
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: OPENAI_API_KEY
+      - key: SENTRY_DSN
+        fromService:
+          name: flowleads-crm
+          type: web
+          envVarKey: SENTRY_DSN
       - key: BACKUP_STORAGE_BACKEND
         value: s3
       - key: BACKUP_S3_BUCKET

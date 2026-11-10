@@ -79,21 +79,34 @@ def _format_last_search(dt: datetime | None) -> str:
 
 
 def list_customers_summary() -> list[dict]:
+    """One row per organization with ALL of its search profiles."""
+    from app.listings.models import ListingMatch
+
     customers = []
     for org in get_accessible_organizations():
         profiles = list_profiles(org.id)
-        profile = profiles[0] if profiles else None
+        last_run = max((p.last_run_at for p in profiles if p.last_run_at), default=None)
+        pending = (
+            ListingMatch.query.filter_by(organization_id=org.id, status="pending").count() if profiles else 0
+        )
+        admin = (
+            User.query.filter_by(organization_id=org.id, role="admin").order_by(User.id.asc()).first()
+        )
+        first = profiles[0] if profiles else None
         customers.append(
             {
                 "org": org,
-                "profile_name": profile.name if profile else None,
-                "profile_id": profile.id if profile else None,
-                "profile_is_active": profile.is_active if profile else None,
+                "profiles": profiles,
+                "profile_name": first.name if first else None,
+                "profile_id": first.id if first else None,
+                "profile_is_active": first.is_active if first else None,
                 "lead_count": Lead.query.filter_by(organization_id=org.id).count(),
-                "last_search_label": _format_last_search(
-                    profile.last_run_at if profile else None
-                ),
+                "pending_matches": pending,
+                "last_search_label": _format_last_search(last_run),
                 "is_active": org.is_active,
+                "admin_email": admin.email if admin else None,
+                "password_pending": bool(admin and admin.must_change_password),
+                "enabled_features": list(org.enabled_features or []),
             }
         )
     return customers

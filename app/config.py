@@ -24,6 +24,10 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get("FLASK_ENV") == "production"
 
     WTF_CSRF_ENABLED = True
+    # Mandatory 2FA is enforced on every page (auth.routes._enforce_two_factor).
+    # Deliberately NOT read from the environment: only the test config turns
+    # it off, so that the suite can sign in admins without a TOTP round trip.
+    TWO_FA_ENFORCE_ALL_PAGES = True
     WTF_CSRF_TIME_LIMIT = None
 
     MAIL_SERVER = "smtp.mailgun.org"
@@ -75,6 +79,23 @@ class Config:
 
     LOGIN_RATE_LIMIT = os.environ.get("LOGIN_RATE_LIMIT", "5/minute")
     API_RATE_LIMIT = os.environ.get("API_RATE_LIMIT", "100/hour")
+    # Separate, higher limit for n8n job tokens (full-region Oikotie runs).
+    N8N_JOB_RATE_LIMIT = os.environ.get("N8N_JOB_RATE_LIMIT", "2000/hour")
+    # Shared Oikotie listing catalogue (app/listings). The per-profile
+    # SearchJob pipeline is superseded; its scheduler jobs only run when
+    # SEARCH_JOBS_ENABLED is explicitly turned on.
+    SEARCH_JOBS_ENABLED = os.environ.get("SEARCH_JOBS_ENABLED", "false").lower() in ("1", "true", "yes")
+    LISTING_CRAWL_REGIONS = os.environ.get("LISTING_CRAWL_REGIONS", "all")
+    LISTING_INCREMENTAL_MAX_PAGES = int(os.environ.get("LISTING_INCREMENTAL_MAX_PAGES", "10"))
+    LISTING_FULL_PAGES_PER_RUN = int(os.environ.get("LISTING_FULL_PAGES_PER_RUN", "30"))
+    LISTING_FULL_REGIONS_PER_RUN = int(os.environ.get("LISTING_FULL_REGIONS_PER_RUN", "2"))
+    LISTING_FULL_REFRESH_DAYS = int(os.environ.get("LISTING_FULL_REFRESH_DAYS", "7"))
+    LISTING_MATCH_HISTORY_DAYS = int(os.environ.get("LISTING_MATCH_HISTORY_DAYS", "30"))
+    LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
+    LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
+    LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
+    LISTING_STALE_HOURS = int(os.environ.get("LISTING_STALE_HOURS", "6"))
+    LISTING_ALERT_INTERVAL_HOURS = int(os.environ.get("LISTING_ALERT_INTERVAL_HOURS", "24"))
     FORM_SUBMISSION_RATE_LIMIT = os.environ.get("FORM_SUBMISSION_RATE_LIMIT", "10/hour")
 
     PASSWORD_RESET_SALT = os.environ.get("PASSWORD_RESET_SALT", "password-reset-salt")
@@ -162,6 +183,8 @@ class TestingConfig(Config):
     SERVER_NAME = "localhost"
     PREFERRED_URL_SCHEME = "http"
     WTF_CSRF_ENABLED = False
+    # tests/test_auth_pages.py switches this back on to test the enforcement
+    TWO_FA_ENFORCE_ALL_PAGES = False
     SESSION_PROTECTION = None
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")

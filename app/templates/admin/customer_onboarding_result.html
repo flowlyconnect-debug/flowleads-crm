@@ -8,16 +8,14 @@
     <div class="settings-content">
       <div class="card settings-panel--wide">
         <h1>Asiakas valmis</h1>
-        <p class="text-muted">Tallenna alla olevat tiedot nyt — API-avainta ei näytetä uudelleen.</p>
+        <p class="text-muted">Toimita kirjautumistiedot asiakkaalle nyt{% if result.temporary_password %} — salasanaa ei näytetä uudelleen{% endif %}.</p>
 
         <div class="flash success" style="margin-top:1rem;">
           <strong>Status:</strong>
-          {% if result.is_active and result.initial_job_created %}
-          Valmis n8n-ajoon — ensimmäinen hakujobi on jonossa.
-          {% elif result.is_active %}
-          Valmis n8n-ajoon — päivittäinen haku käynnistyy aikataulun mukaan.
+          {% if result.is_active %}
+          Hakuprofiili on aktiivinen. Osumat kohdekatalogin viime viikoilta tulevat liideiksi noin 10 minuutin kuluessa, ja uudet kohteet sitä mukaa kuin niitä ilmestyy.
           {% else %}
-          Luotu passiivisena — aktivoi hakuprofiili ennen n8n-ajoa.
+          Luotu passiivisena — aktivoi hakuprofiili asiakaslistasta, kun asiakas saa aloittaa.
           {% endif %}
         </div>
 
@@ -30,6 +28,9 @@
           <dd>{{ result.admin_name }}</dd>
           {% endif %}
 
+          <dt>Kirjautumisosoite</dt>
+          <dd><code>{{ result.login_url }}</code></dd>
+
           <dt>Admin-sähköposti</dt>
           <dd><code>{{ result.admin_email }}</code></dd>
 
@@ -40,15 +41,13 @@
 
           <dt>Hakuprofiili</dt>
           <dd>{{ result.search_profile_name }}</dd>
-
-          <dt>API-avain (näytetään kerran)</dt>
-          <dd><code id="onboarding-api-key" style="word-break:break-all;">{{ result.api_key_full }}</code></dd>
         </dl>
+        <p class="form-helper">Asiakas joutuu vaihtamaan salasanan ensimmäisellä kirjautumisella ja ottamaan käyttöön kaksivaiheisen tunnistautumisen.</p>
 
         <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary btn-sm" id="copy-onboarding-secrets">Kopioi salaisuudet</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="copy-onboarding-secrets">Kopioi kirjautumistiedot</button>
           <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo toinen asiakas</a>
-          <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Hallintapaneeli</a>
+          <a href="{{ url_for('admin.customers_list') }}" class="btn btn-secondary">Asiakaslista</a>
         </div>
       </div>
     </div>
@@ -58,16 +57,12 @@
   (function () {
     const btn = document.getElementById("copy-onboarding-secrets");
     if (!btn) return;
+    const lines = {{ [
+      "Kirjautuminen: " ~ result.login_url,
+      "Sähköposti: " ~ result.admin_email,
+      ("Väliaikainen salasana: " ~ result.temporary_password) if result.temporary_password else "",
+    ] | select | list | tojson }};
     btn.addEventListener("click", async function () {
-      const lines = [
-        "Asiakas: {{ result.organization_name }}",
-        "Admin: {{ result.admin_email }}",
-        {% if result.temporary_password %}
-        "Salasana: {{ result.temporary_password }}",
-        {% endif %}
-        "Hakuprofiili: {{ result.search_profile_name }}",
-        "API-avain: {{ result.api_key_full }}",
-      ];
       try {
         await navigator.clipboard.writeText(lines.join("\n"));
         btn.textContent = "Kopioitu!";

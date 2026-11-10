@@ -1,3 +1,5 @@
+> **VANHENTUNUT (2026-11-10):** korvattu v2-pipelinella, ks. [README.md](README.md). Säilytetty historian vuoksi.
+
 # ChatGPT-prompti: FlowLeads n8n-pipelinen korjaus (kopioi tästä alaspäin)
 
 ---

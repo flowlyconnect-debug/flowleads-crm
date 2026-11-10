@@ -8,7 +8,7 @@
     <div class="settings-content">
       <div class="card settings-panel--wide">
         <h1>Luo uusi asiakas</h1>
-        <p class="text-muted">Luo organisaatio, admin-käyttäjä, API-avain ja hakuprofiili yhdellä toiminnolla. n8n voi aloittaa liidien haun heti.</p>
+        <p class="text-muted">Luo organisaatio, admin-käyttäjä ja hakuprofiili yhdellä toiminnolla. Profiili on suodatin yhteiseen kohdekatalogiin, joten liidit alkavat tulla noin 10 minuutin kuluessa.</p>
 
         <form method="post" action="{{ url_for('admin.create_customer_route') }}" class="form-group" style="margin-top:1.5rem;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -35,10 +35,10 @@
           <label class="form-label">Väliaikainen salasana
             <input type="text" name="temporary_password" class="form-input" minlength="12" autocomplete="new-password"
                    placeholder="Jätä tyhjäksi → luodaan automaattisesti">
-            <span class="form-helper">Kutsulinkkiä ei ole käytössä. Jätä tyhjäksi, niin järjestelmä luo turvallisen salasanan.</span>
+            <span class="form-helper">Jätä tyhjäksi, niin järjestelmä luo turvallisen salasanan. Asiakas joutuu vaihtamaan sen ensimmäisellä kirjautumisella. Jos haluat, että asiakas asettaa salasanan itse, käytä Kutsu asiakas -toimintoa.</span>
           </label>
 
-          <h2 style="margin-top:1.5rem;">Hakuprofiili (n8n)</h2>
+          <h2 style="margin-top:1.5rem;">Hakuprofiili</h2>
           <label class="form-label">Hakuprofiilin nimi
             <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
                    placeholder="esim. Lukkoremontti Uusimaa"
@@ -57,8 +57,17 @@
 
           <fieldset class="search-profiles-regions" style="margin-top:1rem;">
             <legend class="form-label">Alueet</legend>
-            <p class="form-helper mb-2">Valitse maakunnat (vähintään yksi)</p>
-            <div class="search-profiles-regions__grid">
+            <label class="form-check">
+              <input type="radio" name="region_mode" value="all_finland" id="region-mode-all"
+                {% if 'Koko Suomi' in form_data.get('regions', []) %}checked{% endif %}>
+              Koko Suomi
+            </label>
+            <label class="form-check">
+              <input type="radio" name="region_mode" value="specific" id="region-mode-specific"
+                {% if 'Koko Suomi' not in form_data.get('regions', []) %}checked{% endif %}>
+              Valitse maakunnat (vähintään yksi)
+            </label>
+            <div class="search-profiles-regions__grid" id="regions-grid">
               {% set selected_regions = form_data.get('regions', []) %}
               {% for region in finnish_regions %}
               <label class="form-check">
@@ -70,10 +79,8 @@
             </div>
           </fieldset>
 
-          <label class="form-label" style="margin-top:1rem;">Lähde
-            <input type="text" name="source" class="form-input" maxlength="50"
-                   value="{{ form_data.get('source', 'oikotie') }}">
-          </label>
+          <input type="hidden" name="source" value="oikotie">
+          <p class="form-helper">Muut suodattimet (useampi remonttityyppi, kaupungit, talotyyppi, rakennusvuosi, päiväraja) voi säätää luonnin jälkeen hakuprofiilin asetuksista.</p>
 
           <label class="form-check" style="margin-top:1rem;">
             <input type="checkbox" name="is_active" value="y"
@@ -90,4 +97,16 @@
     </div>
   </div>
 </div>
+<script>
+  (function () {
+    const allRadio = document.getElementById("region-mode-all");
+    const specificRadio = document.getElementById("region-mode-specific");
+    const grid = document.getElementById("regions-grid");
+    if (!allRadio || !specificRadio || !grid) return;
+    const sync = function () { grid.style.display = allRadio.checked ? "none" : ""; };
+    allRadio.addEventListener("change", sync);
+    specificRadio.addEventListener("change", sync);
+    sync();
+  })();
+</script>
 {% endblock %}

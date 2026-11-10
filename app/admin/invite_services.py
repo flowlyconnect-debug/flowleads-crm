@@ -6,12 +6,14 @@ Flow:
 2. The customer clicks the emailed link, GET /invite/<token> shows a form.
 3. accept_invite(): sets the admin's password, creates the SearchProfile with
    the regions/"Koko Suomi" they chose, and records which of the allowed
-   features they turned on. The profile is created INACTIVE — no search job
-   is scheduled yet.
-4. A superadmin later calls activate_source() to turn the profile on and
-   create the first search job — a deliberate separate step, not automatic,
-   since a brand-new source/customer pairing may still need confirming
-   (contract, API access) before any real scraping starts.
+   features they turned on.
+
+The profile is created ACTIVE. It is only a filter over the shared listing
+catalogue (docs/ARKKITEHTUURI_KOHDEKATALOGI.md), so nothing is scraped per
+customer and there is nothing to confirm before turning it on: the customer
+gets leads from the catalogue's recent history within the next scheduler run.
+activate_source() remains for profiles that were created or switched off as
+inactive.
 """
 
 from __future__ import annotations
@@ -25,12 +27,11 @@ from flask import current_app
 
 from app.admin.constants import FEATURE_CATALOG
 from app.admin.models import INVITE_DEFAULT_TTL_DAYS, CustomerInvite
-from app.api.services import APIKeyServiceError, create_api_key
 from app.core.audit import log_audit
 from app.core.security import validate_password
 from app.extensions import db
-from app.search.models import SearchJob, SearchProfile
-from app.search.profile_services import SearchProfileServiceError, create_profile, create_test_search_job
+from app.search.models import SearchProfile
+from app.search.profile_services import SearchProfileServiceError, activate_profile, create_profile
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_organization, create_user
 
@@ -54,7 +55,6 @@ class InviteAcceptanceResult:
     organization: Organization
     admin_user: User
     search_profile: SearchProfile
-    api_key_full: str
 
 
 def _hash_invite_token(token: str) -> str:
@@ -222,24 +222,12 @@ def accept_invite(
             is_active=True,
         )
 
-        _api_key, api_key_full = create_api_key(
-            organization.id,
-            "n8n",
-            created_by=admin_user.id,
-            test_mode=bool(current_app.config.get("TESTING")),
-        )
-
-        # Onboarding sets the regions/profile up but never auto-activates the
-        # source — a superadmin must explicitly activate it (see
-        # activate_source below) before any search job is scheduled.
         profile = create_profile(
             organization.id,
             name=invite.search_profile_name,
             remonttityyppi=invite.remonttityyppi,
             regions=regions,
-            schedule_description="daily",
-            crm_api_key=api_key_full,
-            is_active=False,
+            is_active=True,
             source=invite.source,
         )
 
@@ -261,8 +249,6 @@ def accept_invite(
         )
     except UserServiceError as exc:
         raise InviteServiceError(exc.message, exc.code) from exc
-    except APIKeyServiceError as exc:
-        raise InviteServiceError(exc.message, exc.code) from exc
     except SearchProfileServiceError as exc:
         raise InviteServiceError(exc.message, exc.code) from exc
 
@@ -280,19 +266,17 @@ def accept_invite(
         organization=organization,
         admin_user=admin_user,
         search_profile=profile,
-        api_key_full=api_key_full,
     )
 
 
-def activate_source(profile: SearchProfile, *, actor: User) -> SearchJob:
-    """Superadmin-only step: turn the (inactive) onboarded profile on and
-    create its first search job. Separate from accept_invite on purpose."""
+def activate_source(profile: SearchProfile, *, actor: User) -> SearchProfile:
+    """Turn an inactive profile on. The scheduler then rebuilds its matches
+    from the catalogue's recent history (no per-customer search job exists)."""
     if profile.is_active:
-        raise InviteServiceError("Lähde on jo aktivoitu.", "already_active")
+        raise InviteServiceError("Hakuprofiili on jo aktiivinen.", "already_active")
 
-    profile.is_active = True
+    activate_profile(profile)
     db.session.flush()
-    job = create_test_search_job(profile.organization_id, profile.id)
 
     log_audit(
         "source_activated",
@@ -302,4 +286,4 @@ def activate_source(profile: SearchProfile, *, actor: User) -> SearchJob:
         target_id=profile.id,
         metadata={"source": profile.source},
     )
-    return job
+    return profile

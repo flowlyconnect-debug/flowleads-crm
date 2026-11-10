@@ -1,12 +1,21 @@
-{% extends "base.html" %}
-{% block title %}Verify 2FA — FlowLeads{% endblock %}
-{% block content %}
-<div class="card">
-  <h1>Verify identity</h1>
-  <form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <label>{{ form.token.label }}{{ form.token() }}</label>
-    {{ form.submit(class="btn") }}
-  </form>
-</div>
+{% extends "auth/_card_layout.html" %}
+{% block title %}Vahvista kirjautuminen — FlowLeads{% endblock %}
+{% block step %}<p class="lp-solo__step">Kaksivaiheinen tunnistautuminen</p>{% endblock %}
+{% block card %}
+<h1 class="lp-card__title">Vahvista kirjautuminen</h1>
+<p class="lp-card__lead">Kirjoita todennussovelluksesi näyttämä 6-numeroinen koodi tai yksi varakoodeistasi.</p>
+
+<form method="post" class="lp-form" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="lp-field">
+    <label for="{{ form.token.id }}" class="lp-field__label">Kirjautumiskoodi</label>
+    {{ form.token(class="lp-field__input lp-field__input--code", autocomplete="one-time-code", maxlength="20", placeholder="000000", autocapitalize="characters", spellcheck="false", autofocus=True) }}
+    {% if form.token.errors %}<p class="lp-field__error">Kirjoita 6-numeroinen koodi tai varakoodi.</p>{% endif %}
+  </div>
+  {{ form.submit(class="lp-btn lp-btn--primary lp-btn--block", value="Vahvista") }}
+</form>
+<p class="lp-solo__hint" style="margin-top:16px;">Jos puhelin ei ole käytettävissä, kirjoita kenttään varakoodi (muotoa ABCD-EFGH-IJKL). Jokainen varakoodi toimii kerran.</p>
+{% endblock %}
+{% block below %}
+<p class="lp-solo__below">Väärä tili? <a href="{{ url_for('auth.logout') }}">Kirjaudu ulos</a></p>
 {% endblock %}

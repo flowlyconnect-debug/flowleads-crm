@@ -263,6 +263,51 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Weekly search job creation failed")
 
+    def run_listing_matching():
+        """Rebuild matches for changed profiles and turn pending matches into
+        leads (respects each profile's daily lead limit, so a backlog drains
+        over the following days)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.services import materialize_pending_matches, rematch_profiles
+
+            try:
+                matched = rematch_profiles()
+                created = materialize_pending_matches()
+                if matched or created:
+                    logger.info("Listing matching: %s new match(es), %s lead(s) created", matched, created)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Listing matching failed")
+
+    def run_listing_retention():
+        """Delete listings that left Oikotie long ago (LISTING_RETENTION_DAYS)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.services import purge_removed_listings
+
+            try:
+                removed = purge_removed_listings()
+                if removed:
+                    logger.info("Listing retention: deleted %s removed listing(s)", removed)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Listing retention failed")
+
+    def run_catalogue_health_check():
+        """Email superadmins when crawling or analysis has stopped."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.services import alert_catalogue_problems
+
+            try:
+                sent = alert_catalogue_problems()
+                if sent:
+                    logger.warning("Catalogue health alert sent to %s superadmin(s)", sent)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Catalogue health check failed")
+
     def run_reap_stuck_search_jobs():
         with app.app_context():
             from app.extensions import db
@@ -401,16 +446,37 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="lead_digest",
         replace_existing=True,
     )
+    if app.config.get("SEARCH_JOBS_ENABLED"):
+        # Legacy per-profile SearchJob pipeline (superseded by the listing
+        # catalogue below). Off by default.
+        scheduler.add_job(
+            run_create_daily_search_jobs,
+            CronTrigger(hour=6, minute=0, timezone="UTC"),
+            id="create_search_jobs",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            run_create_weekly_search_jobs,
+            CronTrigger(day_of_week="mon", hour=6, minute=0, timezone="UTC"),
+            id="create_weekly_search_jobs",
+            replace_existing=True,
+        )
     scheduler.add_job(
-        run_create_daily_search_jobs,
-        CronTrigger(hour=6, minute=0, timezone="UTC"),
-        id="create_search_jobs",
+        run_listing_matching,
+        IntervalTrigger(minutes=10),
+        id="listing_matching",
         replace_existing=True,
     )
     scheduler.add_job(
-        run_create_weekly_search_jobs,
-        CronTrigger(day_of_week="mon", hour=6, minute=0, timezone="UTC"),
-        id="create_weekly_search_jobs",
+        run_listing_retention,
+        CronTrigger(hour=3, minute=30, timezone="UTC"),
+        id="listing_retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_catalogue_health_check,
+        IntervalTrigger(hours=1),
+        id="catalogue_health_check",
         replace_existing=True,
     )
     scheduler.add_job(

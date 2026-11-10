@@ -8,7 +8,9 @@ from app.extensions import db
 from app.search.models import SearchJob, SearchProfile
 
 STUCK_JOB_MAX_RETRIES = 2
-STUCK_JOB_STALE_MINUTES = 30
+# Measured from the last dispatcher heartbeat (one per Oikotie page), so this
+# only needs to cover the slowest single page, not a whole multi-hour run.
+STUCK_JOB_STALE_MINUTES = 60
 STUCK_JOB_ERROR = "Stuck in running state — reset by the stuck-job reaper"
 
 
@@ -138,10 +140,11 @@ def reap_stuck_running_jobs(
     """
     when = now or datetime.now(timezone.utc)
     cutoff = when - timedelta(minutes=stale_after_minutes)
+    last_seen = db.func.coalesce(SearchJob.heartbeat_at, SearchJob.started_at)
     stuck_jobs = SearchJob.query.filter(
         SearchJob.status == "running",
         SearchJob.started_at.isnot(None),
-        SearchJob.started_at < cutoff,
+        last_seen < cutoff,
     ).all()
 
     requeued = 0
@@ -151,6 +154,9 @@ def reap_stuck_running_jobs(
         if job.retry_count <= max_retries:
             job.status = "pending"
             job.started_at = None
+            job.heartbeat_at = None
+            job.n8n_token_hash = None
+            job.n8n_token_expires_at = None
             job.scheduled_at = when
             requeued += 1
         else:

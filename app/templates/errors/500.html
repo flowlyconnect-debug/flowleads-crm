@@ -1,3 +1,7 @@
-{% extends "base.html" %}
-{% block title %}Server error{% endblock %}
-{% block content %}<div class="card"><h1>Something went wrong</h1><p>An unexpected error occurred. Please try again later.</p></div>{% endblock %}
+{% set code = "500" %}
+{% set heading = "Jotain meni vikaan" %}
+{% set text = "Sivun lataus epäonnistui meidän päässämme. Yritä hetken kuluttua uudelleen. Jos vika toistuu, ota yhteyttä FlowLeadsin tukeen." %}
+{% set retry = true %}
+{% extends "errors/_error.html" %}
+{# Marker for the page smoke tests, which look for this phrase to spot a server error. #}
+<!-- Something went wrong -->

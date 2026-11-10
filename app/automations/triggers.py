@@ -15,7 +15,10 @@ def fire_automation_trigger(
     """Never raises — failures are logged only."""
     try:
         from app.automations.services import AutomationEngine
+        from app.core.features import organization_has_feature
 
+        if not organization_has_feature(organization_id, "automations"):
+            return
         AutomationEngine.trigger(event_type, payload, organization_id)
     except Exception:
         logger.exception(

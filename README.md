@@ -104,6 +104,13 @@ flask backup-restore backup_2025_05_26_020000.tar.gz
 
 ## n8n integration
 
+**Oikotie lead acquisition** runs through the shared listing catalogue: n8n workflows Crawler,
+Analyzer and Enricher (`n8n/workflows/`) feed `/api/v1/n8n/listings/*`, and search profiles turn
+matching listings into leads. See [docs/ARKKITEHTUURI_KOHDEKATALOGI.md](docs/ARKKITEHTUURI_KOHDEKATALOGI.md)
+and [n8n/README.md](n8n/README.md).
+
+For other integrations, post leads directly with an API key:
+
 1. Create an API key in **Settings → API keys** (org admin) or **Admin → API keys** (superadmin).
 2. Copy the key immediately — it is **shown only once**.
 3. In n8n, add an HTTP Request node:

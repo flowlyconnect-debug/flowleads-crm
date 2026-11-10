@@ -18,10 +18,16 @@ def has_enrichment_fields(lead: Lead) -> bool:
     return False
 
 
+def _organization_allows_enrichment(lead: Lead) -> bool:
+    from app.core.features import organization_has_feature
+
+    return organization_has_feature(lead.organization_id, "ai_enrichment")
+
+
 def apply_enrichment_on_create(lead: Lead) -> None:
     """Set initial enrichment status and queue background job if applicable."""
     try:
-        if not current_app.config.get("AI_ENRICHMENT_ENABLED"):
+        if not current_app.config.get("AI_ENRICHMENT_ENABLED") or not _organization_allows_enrichment(lead):
             lead.ai_enrichment_status = "disabled"
             lead.ai_enrichment_error = None
             return
@@ -49,6 +55,8 @@ def apply_enrichment_on_update(lead: Lead, changed_fields: set[str] | None = Non
             return
         if not current_app.config.get("AI_AUTO_ENRICH_ON_CREATE"):
             return
+        if not _organization_allows_enrichment(lead):
+            return
         if lead.ai_enriched:
             return
         if lead.ai_enrichment_status == "processing":
@@ -70,7 +78,7 @@ def apply_enrichment_on_update(lead: Lead, changed_fields: set[str] | None = Non
 
 def queue_manual_enrichment(lead: Lead) -> None:
     """Queue enrichment from a manual UI/API request."""
-    if not current_app.config.get("AI_ENRICHMENT_ENABLED"):
+    if not current_app.config.get("AI_ENRICHMENT_ENABLED") or not _organization_allows_enrichment(lead):
         raise ValueError("ai_disabled")
 
     if not has_enrichment_fields(lead):

@@ -1,3 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Bad request{% endblock %}
-{% block content %}<div class="card"><h1>Bad request</h1><p>The request could not be understood.</p></div>{% endblock %}
+{% set code = "400" %}
+{% set heading = "Pyyntöä ei voitu käsitellä" %}
+{% set text = "Pyynnössä oli jotain vialla. Palaa takaisin ja yritä uudelleen." %}
+{% set retry = false %}
+{% extends "errors/_error.html" %}

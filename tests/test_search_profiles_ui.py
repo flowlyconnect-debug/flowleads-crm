@@ -96,7 +96,7 @@ def test_search_profiles_list_and_create(app, client):
 
     detail = client.get(f"/settings/search-profiles?id={profile_id}")
     assert detail.status_code == 200
-    assert "Viimeisin ajo" in detail.get_data(as_text=True)
+    assert "Osumat" in detail.get_data(as_text=True)
 
 
 def test_search_profiles_update(app, client):
@@ -311,7 +311,9 @@ def test_create_test_search_job_visible_in_n8n_pending_list(app, client):
     assert any(job["job_id"] == job_id for job in jobs)
 
 
-def test_search_profiles_sidepanel_shows_latest_job(app, client):
+def test_search_profiles_sidepanel_shows_catalogue_matches(app, client):
+    from app.listings.models import Listing, ListingMatch
+
     ctx = _setup_org(app, "job")
     with app.app_context():
         profile = SearchProfile(
@@ -319,32 +321,63 @@ def test_search_profiles_sidepanel_shows_latest_job(app, client):
             name="Stats profile",
             remonttityyppi="Putkiremontti",
             regions=["Uusimaa"],
-            total_runs=2,
-            total_leads_sent=12,
+            needs_rematch=False,
             last_run_at=datetime.now(timezone.utc) - timedelta(hours=2),
         )
         db.session.add(profile)
+        listing = Listing(
+            source="oikotie",
+            external_id="555",
+            maakunta="Uusimaa",
+            kaupunki="Espoo",
+            osoite="Testitie 5",
+            analysis_status="done",
+        )
+        db.session.add(listing)
         db.session.flush()
-        db.session.add(
-            SearchJob(
-                search_profile_id=profile.id,
-                organization_id=ctx["org_id"],
-                status="completed",
-                scheduled_at=datetime.now(timezone.utc) - timedelta(hours=2),
-                completed_at=datetime.now(timezone.utc) - timedelta(hours=1),
-                leads_found=20,
-                leads_sent=7,
-            )
+        db.session.add_all(
+            [
+                ListingMatch(
+                    organization_id=ctx["org_id"],
+                    profile_id=profile.id,
+                    listing_id=listing.id,
+                    status="pending",
+                    confidence=82,
+                )
+            ]
         )
         db.session.commit()
         profile_id = profile.id
 
     _login(client, ctx["admin_email"])
     response = client.get(f"/settings/search-profiles?id={profile_id}")
-    text = response.get_data(as_text=True)
+    text_body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "7 (viimeisin ajo)" in text
-    assert "Valmis" in text
+    assert "Odottaa päivärajaa" in text_body
+    assert "Testitie 5" in text_body
+    assert "82 %" in text_body
+    assert "Seuraa uusia kohteita" in text_body
+
+
+def test_search_profile_form_saves_matching_settings(app, client):
+    ctx = _setup_org(app, "matchset")
+    _login(client, ctx["admin_email"])
+    client.post(
+        "/settings/search-profiles",
+        data=_profile_form(min_confidence="75", daily_lead_limit="0"),
+    )
+    with app.app_context():
+        profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
+        assert profile.min_confidence == 75
+        assert profile.daily_lead_limit == 0
+        assert profile.needs_rematch is True
+
+    bad = client.post(
+        "/settings/search-profiles",
+        data=_profile_form(name="Toinen", min_confidence="150"),
+        follow_redirects=True,
+    )
+    assert "0–100" in bad.get_data(as_text=True)
 
 
 def _profile_with_key(app, key="fl_live_original_key_12345"):
@@ -449,7 +482,6 @@ def test_search_profiles_edit_page_does_not_render_full_api_key(app, client):
     page = response.get_data(as_text=True)
     assert response.status_code == 200
     assert secret_key not in page
-    assert "...****" in page
 
 
 def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client):
