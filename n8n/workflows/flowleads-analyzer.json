@@ -1,0 +1,599 @@
+{
+  "name": "FlowLeads – Kohdeanalyysi (Analyzer)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fe67141d-fe72-4239-990b-da596cdd766c",
+      "name": "Every 10 minutes"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "99fcc70a-56bf-4738-9eff-58b838fff9c4",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "12a60beb-6b68-43d4-ba56-b531f872ca96",
+              "name": "crm_base_url",
+              "value": "https://flowleads-crm.onrender.com",
+              "type": "string"
+            },
+            {
+              "id": "221ce67f-dec9-4143-9e10-11c940b058d6",
+              "name": "n8n_secret",
+              "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        100
+      ],
+      "id": "de770903-c832-4b42-b2f8-af368fba78de",
+      "name": "SET – Config",
+      "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $input.first().json;\nreturn [{ json: { started_at: Date.now(), crm_base_url: String(cfg.crm_base_url || '').replace(/\\/$/, ''), n8n_secret: cfg.n8n_secret } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "id": "0b503573-64f7-4b93-a341-d8208c52eba4",
+      "name": "CODE – Start"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CODE – Start').first().json.crm_base_url }}/api/v1/n8n/listings/analysis/claim",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $('CODE – Start').first().json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"limit\": 20}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        100
+      ],
+      "id": "141de4c6-3da5-4fc4-9160-1bbf3973cd18",
+      "name": "HTTP – Claim Listings",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const start = $('CODE – Start').first().json;\nconst r = $input.first().json || {};\nconst types = r.remonttityypit || [];\nreturn (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_base_url: start.crm_base_url, n8n_secret: start.n8n_secret } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "id": "5e119343-e53a-47c6-a826-6624f31004a5",
+      "name": "CODE – Split Listings"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ $prevNode.name === 'CODE – Split Listings' }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        100
+      ],
+      "id": "d03b9479-ba60-4531-9bf3-4b257709e33a",
+      "name": "LOOP – Listings"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        260
+      ],
+      "id": "9710888c-4193-41a6-bdd8-31015191c63a",
+      "name": "WAIT – Rate Limit",
+      "webhookId": "1b627399-faef-4793-a670-654af1b4a7ae"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('LOOP – Listings').first().json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "fi-FI,fi;q=0.9,en-US;q=0.8,en;q=0.7"
+            },
+            {
+              "name": "Referer",
+              "value": "https://asunnot.oikotie.fi/myytavat-asunnot"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache"
+            },
+            {
+              "name": "Pragma",
+              "value": "no-cache"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text",
+              "outputPropertyName": "pageHtml"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1540,
+        260
+      ],
+      "id": "d7700377-451c-4ad0-bc2f-008fc5e23db3",
+      "name": "HTTP – Fetch Listing Detail Page",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const listing = $('LOOP – Listings').first().json;\nconst h = $input.first()?.json || {};\nconst status = Number(h.statusCode || 0);\nconst html = String(h.pageHtml ?? h.body ?? h.data ?? '').slice(0, 200000);\n\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n  .replace(/<svg[\\s\\S]*?<\\/svg>/gi, ' ')\n  .replace(/<img[^>]*>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '\"').replace(/&#39;/gi, \"'\")\n  .replace(/\\s+/g, ' ')\n  .trim();\nfor (const marker of ['Taloyhtiö', 'Tulevat remontit', 'Asunnon lisätiedot', 'Perustiedot', 'Kohdenumero', 'Rakennuksen tiedot', 'Asunnon kuvaus']) {\n  const idx = text.indexOf(marker);\n  if (idx >= 0) { text = text.slice(idx); break; }\n}\ntext = text.slice(0, 12000);\n\nconst ok = !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;\nconst PROMPT = \"Olet kiinteistöalan analyytikko. Saat suomalaisen myytävän asunnon ilmoituksen tekstin.\\nTehtäväsi on poimia taloyhtiön tiedot ja kohteen TULEVAT remontit.\\n\\nRemonttityypit (käytä TÄSMÄLLEEN näitä nimiä):\\n__TYPES__\\n\\nSäännöt tuleville remonteille:\\n- Ota mukaan vain tuleva, suunniteltu, päätetty, budjetoitu, ehdotettu, kuntoarviossa tai PTS:ssä mainittu tai muuten vielä tekemätön työ.\\n- ÄLÄ ota mukaan jo tehtyjä, valmistuneita tai aiemmin toteutettuja remontteja.\\n- Luokittele jokainen tuleva remontti yhteen tyyppiin. Jos sopivaa tyyppiä ei ole, käytä \\\"Muu remontti\\\".\\n- \\\"Lukkoremontti / kulunvalvonta\\\": lukitus, lukkojen tai avainten uusiminen, sarjoitus, sähkölukitus, iLOQ, kulunvalvonta tai kulkuoikeudet oviin ja sisäänkäynteihin. EI kameravalvontaa, murtohälytintä, paloilmoitinta eikä pelkkää ovipuhelinta.\\n- \\\"Putkiremontti\\\": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus.\\n- \\\"Sähkö- ja tietoliikennejärjestelmät\\\": sähköverkon, sähköpääkeskuksen, nousujohtojen, antenni-, valokuitu- tai tietoliikenneverkon uusiminen.\\n- \\\"Lämmitysjärjestelmän remontti\\\": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.\\n- \\\"Julkisivuremontti\\\": julkisivu, ikkunat, parvekkeet.\\n- \\\"Katto- ja vesikattoremontti\\\": katto, vesikatto, yläpohja.\\n- \\\"Huoneistoremontit\\\": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.\\n- confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.\\n- evidence = lyhyt suora lainaus tekstistä. timing = esim. \\\"2027\\\", \\\"suunnitteilla\\\", \\\"PTS 2026–2028\\\" tai \\\"\\\".\\n- Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.\\n\\nYhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (henkilö tai isännöintiyritys), isännöitsijän puhelin ja sähköposti. Muuten \\\"\\\".\\n\\nPalauta VAIN validi JSON ilman markdownia:\\n{\\\"taloyhtio\\\":\\\"\\\",\\\"isannoitsija\\\":\\\"\\\",\\\"isannoitsija_puh\\\":\\\"\\\",\\\"isannoitsija_email\\\":\\\"\\\",\\\"tulevat_remontit\\\":\\\"lyhyt tiivistelmä tulevista remonteista\\\",\\\"renovations\\\":[{\\\"remonttityyppi\\\":\\\"\\\",\\\"confidence\\\":0,\\\"timing\\\":\\\"\\\",\\\"evidence\\\":\\\"\\\"}]}\";\nconst types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');\nreturn [{ json: {\n  ...listing,\n  ok,\n  error: ok ? '' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`,\n  ai_system_prompt: PROMPT.replace('__TYPES__', types),\n  ai_user_prompt: `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        260
+      ],
+      "id": "41a062d6-0461-4f7d-bafc-58c6cc2a5cd9",
+      "name": "CODE – Build Analysis Prompt"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b1135f9a-3c4f-4789-92f3-e828f224ea94",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        260
+      ],
+      "id": "23991b9d-d105-4d86-8c58-9c188c9ad93f",
+      "name": "IF – Page OK"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $json.ai_system_prompt }}"
+            },
+            {
+              "content": "={{ $json.ai_user_prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        180
+      ],
+      "id": "1d9e63d3-064e-4911-b045-d5871ed4dbd9",
+      "name": "AI – Analyze Listing",
+      "credentials": {
+        "openAiApi": {
+          "id": "pJYgTk36FgV9XSMi",
+          "name": "OpenAi account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('CODE – Build Analysis Prompt').first().json;\nconst base = { listing_id: p.listing_id, crm_base_url: p.crm_base_url, n8n_secret: p.n8n_secret };\nif (!p.ok) return [{ json: { ...base, body: { status: 'failed', error: p.error } } }];\n\nconst out = $input.first()?.json || {};\nif (out.error) {\n  const e = typeof out.error === 'string' ? out.error : (out.error.message || JSON.stringify(out.error));\n  return [{ json: { ...base, body: { status: 'failed', error: ('AI: ' + e).slice(0, 1000) } } }];\n}\nconst raw = String(out.output?.[0]?.content?.[0]?.text || out.output?.[0]?.text || out.text || '')\n  .trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\nlet a;\ntry { a = JSON.parse(raw); } catch (e) {\n  return [{ json: { ...base, body: { status: 'failed', error: 'AI JSON parse failed: ' + raw.slice(0, 300) } } }];\n}\nconst s = v => (typeof v === 'string' ? v.trim() : '');\nconst renovations = (Array.isArray(a.renovations) ? a.renovations : [])\n  .filter(r => r && typeof r === 'object')\n  .map(r => ({\n    remonttityyppi: s(r.remonttityyppi),\n    confidence: Number(r.confidence || 0),\n    timing: s(r.timing),\n    evidence: s(r.evidence),\n  }));\nreturn [{ json: { ...base, body: {\n  status: 'done',\n  taloyhtio: s(a.taloyhtio),\n  isannoitsija: s(a.isannoitsija),\n  isannoitsija_puh: s(a.isannoitsija_puh),\n  isannoitsija_email: s(a.isannoitsija_email),\n  tulevat_remontit: s(a.tulevat_remontit),\n  renovations,\n} } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        260
+      ],
+      "id": "3245045b-4c58-476b-b6ca-d0ce663b0730",
+      "name": "CODE – Parse Analysis"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_base_url }}/api/v1/n8n/listings/{{ $json.listing_id }}/analysis",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{ $json.n8n_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        260
+      ],
+      "id": "6ed3e0d7-76bd-4561-9f07-76d8e709d6a5",
+      "name": "HTTP – CRM Save Analysis",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const start = $('CODE – Start').first().json;\nconst claimed = ($('HTTP – Claim Listings').first().json.listings || []).length;\nconst elapsed = Date.now() - Number(start.started_at || Date.now());\n// Keep claiming while the queue is full and we are well inside the run budget\n// (next scheduled run starts in 10 min).\nreturn [{ json: { more: claimed >= 20 && elapsed < 7 * 60 * 1000 } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -80
+      ],
+      "id": "c71de50e-2a72-4464-8563-e7eb321f7422",
+      "name": "CODE – More To Claim"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "01467095-92a8-4826-9de6-a18057dd7445",
+              "leftValue": "={{ $json.more }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        -80
+      ],
+      "id": "7375d4e0-7ac4-4283-82f0-09eb217af0b4",
+      "name": "IF – Claim Again"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "SET – Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "SET – Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET – Config": {
+      "main": [
+        [
+          {
+            "node": "CODE – Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Start": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Claim Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Claim Listings": {
+      "main": [
+        [
+          {
+            "node": "CODE – Split Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Split Listings": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOP – Listings": {
+      "main": [
+        [
+          {
+            "node": "CODE – More To Claim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WAIT – Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAIT – Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Fetch Listing Detail Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – Fetch Listing Detail Page": {
+      "main": [
+        [
+          {
+            "node": "CODE – Build Analysis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Build Analysis Prompt": {
+      "main": [
+        [
+          {
+            "node": "IF – Page OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Page OK": {
+      "main": [
+        [
+          {
+            "node": "AI – Analyze Listing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CODE – Parse Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI – Analyze Listing": {
+      "main": [
+        [
+          {
+            "node": "CODE – Parse Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – Parse Analysis": {
+      "main": [
+        [
+          {
+            "node": "HTTP – CRM Save Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP – CRM Save Analysis": {
+      "main": [
+        [
+          {
+            "node": "LOOP – Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE – More To Claim": {
+      "main": [
+        [
+          {
+            "node": "IF – Claim Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF – Claim Again": {
+      "main": [
+        [
+          {
+            "node": "HTTP – Claim Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "description": "Every 10 min: claim unanalysed listings, one AI call each -> renovations by type -> CRM matches them to profiles."
+  }
+}

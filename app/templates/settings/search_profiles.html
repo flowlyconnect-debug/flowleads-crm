@@ -10,7 +10,7 @@
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Hakuprofiili</h1>
-          <p class="settings-panel__subtitle">Määritä automaattiset Oikotie-haut — n8n ajaa profiilit ja lähettää liidit CRM:ään.</p>
+          <p class="settings-panel__subtitle">Profiili on suodatin yhteiseen Oikotie-kohdekatalogiin: kun kohteessa on tulossa valitsemasi remontti valituilla alueilla, siitä syntyy liidi automaattisesti.</p>
           {% if page_error %}
           <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
           {% endif %}
@@ -86,36 +86,17 @@
                 </div>
               </fieldset>
 
-              <label class="form-label">CRM API-avain
-                {% if selected_profile and selected_profile.crm_api_key %}
-                <span class="form-input form-input--readonly" aria-hidden="true">{{ mask_crm_api_key(selected_profile.crm_api_key) }}</span>
-                {% elif selected_profile %}
-                <p class="form-helper" style="color:#991B1B;" role="alert">
-                  API-avain puuttuu — n8n ei voi lähettää liidejä tähän profiiliin.
-                </p>
-                {% endif %}
-                <input type="text" name="crm_api_key" class="form-input" maxlength="200" autocomplete="off"
-                       placeholder="{% if selected_profile %}Syötä uusi avain vaihtaaksesi{% else %}fl_live_…{% endif %}"
-                       value="">
+              <label class="form-label">AI-varmuus vähintään (0–100)
+                <input type="number" name="min_confidence" class="form-input" min="0" max="100" step="1"
+                       value="{{ selected_profile.min_confidence if selected_profile else 60 }}">
               </label>
-              <p class="form-helper">
-                {% if selected_profile %}
-                Jätä tyhjäksi säilyttääksesi nykyisen avaimen.
-                Uuden avaimen löydät
-                {% else %}
-                Kopioi avain
-                {% endif %}
-                <a href="{{ url_for('settings.api_keys', **org_query) }}">API-avaimet</a>-sivulta.
-              </p>
+              <p class="form-helper">Kuinka varma AI:n pitää olla siitä, että kohteessa on tulossa juuri tämä remontti. 60 on hyvä oletus; nosta, jos liidejä tulee liikaa.</p>
 
-              <label class="form-label">Aikataulu
-                <select name="schedule_description" class="form-select" required>
-                  {% for value, label in schedule_labels.items() %}
-                  <option value="{{ value }}"
-                    {% if (selected_profile and selected_profile.schedule_description == value) or (is_new and value == 'daily') %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
+              <label class="form-label">Uusia liidejä enintään / päivä
+                <input type="number" name="daily_lead_limit" class="form-input" min="0" max="1000" step="1"
+                       value="{{ selected_profile.daily_lead_limit if selected_profile else 50 }}">
               </label>
+              <p class="form-helper">0 = ei rajaa. Ylimenevät osumat odottavat ja tulevat liideiksi seuraavina päivinä (uusimmat ensin).</p>
 
               <label class="form-check search-profiles-active-toggle">
                 <input type="checkbox" name="is_active" value="y"
@@ -154,85 +135,57 @@
             {% endif %}
           </div>
 
-          <aside class="search-profiles-sidepanel" aria-label="Ajotilanne">
-            <h2 class="form-section-title">Viimeisin ajo</h2>
-            {% if selected_profile %}
+          <aside class="search-profiles-sidepanel" aria-label="Osumat">
+            <h2 class="form-section-title">Osumat</h2>
+            {% if selected_profile and match_stats %}
             <dl class="search-profiles-stats">
               <div>
-                <dt>Viimeisin ajo</dt>
-                <dd>{{ relative_last_run }}</dd>
+                <dt>Liidejä luotu</dt>
+                <dd>{{ match_stats.lead_created }}</dd>
               </div>
               <div>
-                <dt>Lähetetyt liidit</dt>
-                <dd>
-                  {% if latest_job and latest_job.status == 'completed' %}
-                  {{ latest_job.leads_sent }} (viimeisin ajo)
-                  {% else %}
-                  {{ selected_profile.total_leads_sent }} yhteensä
-                  {% endif %}
-                </dd>
+                <dt>Odottaa päivärajaa</dt>
+                <dd>{{ match_stats.pending }}</dd>
               </div>
               <div>
                 <dt>Status</dt>
                 <dd>
                   {% if not selected_profile.is_active %}
                   <span class="badge badge-inactive">Profiili pois käytöstä</span>
-                  {% elif latest_job %}
-                  {% set status_label = job_status_labels.get(latest_job.status, latest_job.status) %}
-                  {% if latest_job.status == 'completed' %}
-                  <span class="badge badge-active">{{ status_label }}</span>
-                  {% elif latest_job.status == 'failed' %}
-                  <span class="badge" style="background:#FEE2E2;color:#991B1B;">{{ status_label }}</span>
-                  {% elif latest_job.status == 'running' %}
-                  <span class="badge" style="background:#DBEAFE;color:#1E40AF;">{{ status_label }}</span>
+                  {% elif selected_profile.needs_rematch %}
+                  <span class="badge" style="background:#FEF3C7;color:#92400E;">Haetaan osumia…</span>
                   {% else %}
-                  <span class="badge" style="background:#FEF3C7;color:#92400E;">{{ status_label }}</span>
-                  {% endif %}
-                  {% else %}
-                  <span class="badge badge-inactive">Ei ajoja vielä</span>
+                  <span class="badge badge-active">Seuraa uusia kohteita</span>
                   {% endif %}
                 </dd>
               </div>
-              {% if latest_job and latest_job.progress %}
               <div>
-                <dt>Edistyminen</dt>
-                <dd class="text-sm">
-                  {{ latest_job.progress }}
-                  {% if latest_job.pages_done %} · {{ latest_job.pages_done }} sivua{% if latest_job.pages_failed %}, {{ latest_job.pages_failed }} epäonnistui{% endif %}{% endif %}
-                </dd>
-              </div>
-              {% endif %}
-              {% if latest_job and latest_job.leads_found %}
-              <div>
-                <dt>Löydetyt</dt>
-                <dd>{{ latest_job.leads_found }}</dd>
-              </div>
-              {% endif %}
-              {% if latest_job and latest_job.error_message %}
-              <div>
-                <dt>Virhe</dt>
-                <dd class="text-sm" style="color:#991B1B;">{{ latest_job.error_message }}</dd>
-              </div>
-              {% endif %}
-              <div>
-                <dt>Ajoja yhteensä</dt>
-                <dd>{{ selected_profile.total_runs }}</dd>
+                <dt>Viimeisin liidi</dt>
+                <dd>{{ relative_last_run }}</dd>
               </div>
             </dl>
+            {% if match_stats.recent %}
+            <h3 class="text-sm font-medium mt-3">Viimeisimmät osumat</h3>
+            <ul class="search-profiles-matches text-sm">
+              {% for match in match_stats.recent %}
+              <li>
+                {% if match.lead_id %}
+                <a href="{{ url_for('leads.detail', lead_id=match.lead_id) }}">{{ match.listing.osoite or match.listing.external_id }}</a>
+                {% else %}
+                {{ match.listing.osoite or match.listing.external_id }}
+                {% endif %}
+                <span class="text-muted">· {{ match.listing.kaupunki or match.listing.maakunta }} · {{ match.confidence }} %</span>
+              </li>
+              {% endfor %}
+            </ul>
             {% else %}
-            <p class="text-muted text-sm">Valitse profiili nähdäksesi ajotilanteen.</p>
+            <p class="text-muted text-sm mt-2">Ei osumia vielä. Uudet kohteet tarkistetaan jatkuvasti.</p>
             {% endif %}
-
-            {% if selected_profile and selected_profile.is_active %}
-            <div class="mt-3">
-              <button type="button"
-                      id="create-test-job-btn"
-                      class="btn btn-secondary btn-sm"
-                      data-url="{{ url_for('settings.search_profiles_create_test_job', profile_id=selected_profile.id, **org_query) }}">
-                Luo testijobi
-              </button>
-              <p id="create-test-job-result" class="text-sm mt-2" style="display:none;" role="status"></p>
-            </div>
+            {% else %}
+            <p class="text-muted text-sm">Valitse profiili nähdäksesi osumat.</p>
+            {% endif %}
+            {% if catalogue %}
+            <p class="text-muted text-sm mt-3">Kohdekatalogissa {{ catalogue.active }} aktiivista kohdetta, joista {{ catalogue.analysed }} analysoitu.</p>
             {% endif %}
           </aside>
         </div>
@@ -240,45 +193,4 @@
     </div>
   </div>
 </div>
-{% if selected_profile and selected_profile.is_active %}
-<script>
-  (function () {
-    const btn = document.getElementById("create-test-job-btn");
-    const result = document.getElementById("create-test-job-result");
-    if (!btn || !result) return;
-
-    btn.addEventListener("click", async function () {
-      const form = new FormData();
-      form.append("csrf_token", "{{ csrf_token() }}");
-      btn.disabled = true;
-      result.style.display = "none";
-      result.className = "text-sm mt-2";
-
-      try {
-        const resp = await fetch(btn.dataset.url, {
-          method: "POST",
-          body: form,
-          credentials: "same-origin",
-        });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          result.textContent = (data && data.error) || "Testijobin luonti epäonnistui.";
-          result.style.color = "#991B1B";
-          result.style.display = "block";
-          btn.disabled = false;
-          return;
-        }
-        result.textContent = "Testijobi luotu (ID: " + data.job_id + ", status: pending).";
-        result.style.color = "#166534";
-        result.style.display = "block";
-      } catch (err) {
-        result.textContent = "Testijobin luonti epäonnistui.";
-        result.style.color = "#991B1B";
-        result.style.display = "block";
-        btn.disabled = false;
-      }
-    });
-  })();
-</script>
-{% endif %}
 {% endblock %}

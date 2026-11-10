@@ -71,6 +71,26 @@ def _validate_profile_fields(
         raise SearchProfileServiceError("Valitse kelvollinen lähde.")
 
 
+def _validate_min_confidence(value) -> int:
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise SearchProfileServiceError("Vähimmäisvarmuus pitää olla luku 0–100.") from None
+    if not 0 <= value <= 100:
+        raise SearchProfileServiceError("Vähimmäisvarmuus pitää olla luku 0–100.")
+    return value
+
+
+def _validate_daily_lead_limit(value) -> int:
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise SearchProfileServiceError("Päiväraja pitää olla luku 0–1000.") from None
+    if not 0 <= value <= 1000:
+        raise SearchProfileServiceError("Päiväraja pitää olla luku 0–1000 (0 = ei rajaa).")
+    return value
+
+
 def mask_crm_api_key_display(key: str | None) -> str | None:
     if not key or not str(key).strip():
         return None
@@ -101,6 +121,8 @@ def create_profile(
     crm_api_key: str | None,
     is_active: bool,
     source: str = "oikotie",
+    min_confidence: int = 60,
+    daily_lead_limit: int = 50,
 ) -> SearchProfile:
     name = (name or "").strip()
     crm_api_key = (crm_api_key or "").strip() or None
@@ -122,6 +144,9 @@ def create_profile(
         schedule_description=schedule_description,
         crm_api_key=crm_api_key,
         is_active=is_active,
+        min_confidence=_validate_min_confidence(min_confidence),
+        daily_lead_limit=_validate_daily_lead_limit(daily_lead_limit),
+        needs_rematch=True,
     )
     db.session.add(profile)
     return profile
@@ -136,6 +161,8 @@ def update_profile(
     schedule_description: str,
     crm_api_key: str | None,
     is_active: bool,
+    min_confidence: int | None = None,
+    daily_lead_limit: int | None = None,
 ) -> SearchProfile:
     name = (name or "").strip()
     source = profile.source or "oikotie"
@@ -154,11 +181,20 @@ def update_profile(
     profile.schedule_description = schedule_description
     profile.crm_api_key = resolved_crm_api_key
     profile.is_active = is_active
+    if min_confidence is not None:
+        profile.min_confidence = _validate_min_confidence(min_confidence)
+    if daily_lead_limit is not None:
+        profile.daily_lead_limit = _validate_daily_lead_limit(daily_lead_limit)
+    # filter may have changed: the scheduler rebuilds this profile's matches
+    profile.needs_rematch = True
     profile.updated_at = datetime.now(timezone.utc)
     return profile
 
 
 def delete_profile(profile: SearchProfile) -> None:
+    from app.listings.models import ListingMatch
+
+    ListingMatch.query.filter_by(profile_id=profile.id).delete(synchronize_session=False)
     db.session.delete(profile)
 
 

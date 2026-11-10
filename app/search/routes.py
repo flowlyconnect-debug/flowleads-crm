@@ -17,6 +17,7 @@ from app.core.tenant import (
     resolve_organization_id_with_fallback,
 )
 from app.extensions import db
+from app.listings.services import catalogue_stats, profile_match_stats
 from app.search.constants import (
     FINNISH_REGIONS,
     REMONTTITYYPIT,
@@ -50,6 +51,8 @@ def _search_profiles_template_defaults(
         "profiles": [],
         "selected_profile": None,
         "latest_job": None,
+        "match_stats": None,
+        "catalogue": None,
         "remonttityypit": REMONTTITYYPIT,
         "finnish_regions": FINNISH_REGIONS,
         "schedule_labels": SEARCH_SCHEDULE_LABELS,
@@ -71,10 +74,12 @@ def _render_search_profiles(
     selected_id = _selected_profile_id(profiles)
     selected_profile = None
     latest_job = None
+    match_stats = None
     if selected_id is not None:
         selected_profile = get_profile(organization_id, selected_id)
         if selected_profile:
             latest_job = get_latest_job(selected_profile.id)
+            match_stats = profile_match_stats(selected_profile)
 
     now = datetime.now(timezone.utc)
     org_query = org_query_suffix(organization_id)
@@ -83,6 +88,8 @@ def _render_search_profiles(
         profiles=profiles,
         selected_profile=selected_profile,
         latest_job=latest_job,
+        match_stats=match_stats,
+        catalogue=catalogue_stats(),
         remonttityypit=REMONTTITYYPIT,
         finnish_regions=FINNISH_REGIONS,
         schedule_labels=SEARCH_SCHEDULE_LABELS,
@@ -124,7 +131,19 @@ def _profile_form_data() -> dict:
         "schedule_description": schedule,
         "crm_api_key": (request.form.get("crm_api_key") or "").strip() or None,
         "is_active": request.form.get("is_active") == "y",
+        "min_confidence": _form_int("min_confidence", 60),
+        "daily_lead_limit": _form_int("daily_lead_limit", 50),
     }
+
+
+def _form_int(name: str, default: int):
+    raw = (request.form.get(name) or "").strip()
+    if raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return raw  # rejected with a Finnish message by the service validation
 
 
 def _selected_profile_id(profiles: list) -> int | None:

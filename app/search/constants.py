@@ -32,6 +32,7 @@ FINNISH_REGIONS: tuple[str, ...] = (
     "Pohjanmaa",
     "Keski-Pohjanmaa",
     "Pohjois-Pohjanmaa",
+    "Kainuu",
     "Lappi",
 )
 

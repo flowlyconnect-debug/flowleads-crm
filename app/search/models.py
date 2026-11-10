@@ -47,6 +47,16 @@ class SearchProfile(db.Model):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_runs: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_leads_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Listing catalogue matching (app/listings): a profile is a filter over the
+    # shared catalogue. min_confidence = minimum AI confidence (0-100) for the
+    # profile's remonttityyppi; daily_lead_limit caps leads created per UTC day
+    # (0 = unlimited); needs_rematch makes the scheduler rebuild matches after
+    # the filter changes.
+    min_confidence: Mapped[int] = mapped_column(Integer, default=60, server_default="60", nullable=False)
+    daily_lead_limit: Mapped[int] = mapped_column(Integer, default=50, server_default="50", nullable=False)
+    needs_rematch: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=sa.true(), nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
