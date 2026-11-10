@@ -206,6 +206,19 @@
     return '';
   }
 
+  var cachedNewLeadsCount = null;
+
+  function leadsListUrl() {
+    var qs = getOrgQueryParams();
+    return '/leads' + qs;
+  }
+
+  function maybeRenderCompactHero() {
+    var hero = document.getElementById('dashboardHero');
+    if (!hero || !hero.classList.contains('dash-hero--idle')) return;
+    renderHeroEmpty();
+  }
+
   function renderHeroSideEmpty() {
     return (
       '<aside class="dash-hero__side dash-hero__side--summary" aria-label="Yhteenveto">' +
@@ -224,14 +237,35 @@
   function renderHeroEmpty() {
     var hero = document.getElementById('dashboardHero');
     if (!hero) return;
-    hero.className = 'dash-hero card dash-hero--idle';
+    hero.className = 'dash-hero card dash-hero--idle dash-hero--compact';
+
+    var leadsPart = '';
+    if (cachedNewLeadsCount != null && cachedNewLeadsCount > 0) {
+      leadsPart =
+        '<a class="dash-hero__compact-link" href="' + escapeHtml(leadsListUrl()) + '">' +
+        String(cachedNewLeadsCount) + (cachedNewLeadsCount === 1 ? ' uusi liidi odottaa' : ' uutta liidiä odottaa') +
+        ' tarkistusta →</a>';
+    }
+
     hero.innerHTML =
-      '<div class="dash-hero__main">' +
-      '<div class="dash-hero__eyebrow"><span class="dash-hero__dot" aria-hidden="true"></span>Aloita tästä</div>' +
-      '<h2 class="dash-hero__action">Ei kiireellisiä toimia juuri nyt.</h2>' +
-      '<p class="dash-hero__reason">Kaikki liidit ovat ajan tasalla — hyvää työtä!</p>' +
+      '<div class="dash-hero__compact-row">' +
+      '<span class="dash-hero__compact-icon" aria-hidden="true">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>' +
+      '</span>' +
+      '<span class="dash-hero__compact-text">Ei kiireellisiä toimia juuri nyt.</span>' +
+      leadsPart +
       '</div>' +
-      renderHeroSideEmpty();
+      '<span class="dash-hero__mark" aria-hidden="true">' + flowMarkSvg() + '</span>';
+  }
+
+  function flowMarkSvg() {
+    return (
+      '<svg viewBox="0 0 120 80" width="120" height="80" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M14 66C40 66 58 50 66 30" stroke="var(--color-highlight, #2F6FED)" stroke-width="2.5" stroke-linecap="round" opacity="0.35"/>' +
+      '<path d="M28 70C54 70 76 52 86 24" stroke="var(--color-accent, #623DD6)" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>' +
+      '<circle cx="88" cy="19" r="3.5" fill="var(--color-accent, #623DD6)" opacity="0.6"/>' +
+      '</svg>'
+    );
   }
 
   function renderHero(row) {
@@ -266,7 +300,8 @@
       '<span>' + escapeHtml(signalText) + '</span>' +
       '</div>' +
       (contactLine ? '<div class="dash-hero__side-contact">' + contactLine + '</div>' : '') +
-      '</aside>';
+      '</aside>' +
+      '<span class="dash-hero__mark" aria-hidden="true">' + flowMarkSvg() + '</span>';
 
     var skipBtn = hero.querySelector('.dash-hero__skip');
     if (skipBtn) {
@@ -326,6 +361,13 @@
       .join('');
   }
 
+  function toggleSecondaryList(show) {
+    var header = document.querySelector('.dash-list-header');
+    var list = document.getElementById('aiWorklistBody');
+    if (header) header.style.display = show ? '' : 'none';
+    if (list) list.style.display = show ? '' : 'none';
+  }
+
   function renderDashboardWorklist(items) {
     var metaMap = getLeadMetaMap();
     var available = filterSkipped(items || []);
@@ -334,10 +376,10 @@
     });
 
     updateActionCount(enriched.length);
+    toggleSecondaryList(enriched.length > 1);
 
     if (!enriched.length) {
       renderHeroEmpty();
-      renderLeadList([]);
       updateListMeta(0);
       var tasksEl = document.getElementById('metricTasksToday');
       if (tasksEl) tasksEl.textContent = '0';
@@ -396,6 +438,7 @@
     var trend = document.getElementById('metricNewLeadsTrend');
     var pipeline = document.getElementById('metricPipelineValue');
 
+    cachedNewLeadsCount = metrics.new_leads_7d != null ? Number(metrics.new_leads_7d) : 0;
     displayMetric(newLeads, metrics.new_leads_7d != null ? metrics.new_leads_7d : 0, '0');
     if (trend) {
       var delta = Number(metrics.new_leads_delta_pct);
@@ -412,6 +455,7 @@
           ? '—'
           : formatEuro(metrics.pipeline_value);
     }
+    maybeRenderCompactHero();
   }
 
   function refreshDashboardMetrics() {

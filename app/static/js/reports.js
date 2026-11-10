@@ -5,7 +5,7 @@
   'use strict';
 
   var CHART_COLORS = [
-    '#6948DC',
+    '#623DD6',
     '#38BDF8',
     '#10B981',
     '#F59E0B',
@@ -50,12 +50,12 @@
       scales: {
         x: {
           grid: { display: false },
-          ticks: { font: { size: 11 }, color: '#9CA3AF', maxRotation: 45 },
+          ticks: { font: { size: 11 }, color: '#526079', maxRotation: 45 },
         },
         y: {
           beginAtZero: true,
-          grid: { color: 'rgba(228, 231, 239, 0.6)' },
-          ticks: { font: { size: 11 }, color: '#9CA3AF' },
+          grid: { color: 'rgba(226, 231, 240, 0.8)' },
+          ticks: { font: { size: 11 }, color: '#526079', precision: 0 },
         },
       },
     };

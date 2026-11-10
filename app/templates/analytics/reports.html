@@ -106,7 +106,7 @@
         </div>
         <div class="report-metric">
           <span class="report-metric__label">Konversio</span>
-          <span class="report-metric__value">{{ report_data.conversion_rate }}%</span>
+          <span class="report-metric__value">{{ report_data.conversion_rate | fi_percent }}</span>
         </div>
         <div class="report-metric">
           <span class="report-metric__label">Liidejä kaudella</span>
@@ -170,7 +170,7 @@
               <td>{{ s.stage_name }}</td>
               <td>{{ s.lead_count }}</td>
               <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
-              <td>{% if s.conversion_from_previous is not none %}{{ s.conversion_from_previous }}%{% else %}—{% endif %}</td>
+              <td>{{ s.conversion_from_previous | fi_percent if s.conversion_from_previous is not none else '—' }}</td>
               <td>{{ s.avg_time_in_stage if s.avg_time_in_stage is not none else '—' }}</td>
             </tr>
             {% else %}
@@ -197,7 +197,7 @@
               <td>{{ s.total }}</td>
               <td>{{ s.won }}</td>
               <td>{{ s.lost }}</td>
-              <td>{{ s.conversion_rate }}%</td>
+              <td>{{ s.conversion_rate | fi_percent }}</td>
               <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
               <td>{{ s.no_score }}</td>
             </tr>

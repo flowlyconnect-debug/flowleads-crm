@@ -257,7 +257,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .companies-focus-row:hover {
-    background: var(--color-card-hover, #F4F6FB);
+    background: var(--color-card-hover, #F6F8FC);
   }
 
   .companies-focus-row:hover .companies-focus-row__next {
@@ -498,7 +498,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .contacts-focus-row:hover {
-    background: var(--color-card-hover, #F4F6FB);
+    background: var(--color-card-hover, #F6F8FC);
   }
 
   .contacts-focus-row:hover .contacts-focus-row__next {
