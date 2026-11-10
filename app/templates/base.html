@@ -95,6 +95,7 @@
       <div class="page-content">
   {% else %}
   <main class="app-main app-main--guest" role="main">
+    {% block guest_flashes %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
       <div class="flash-messages" role="status" aria-live="polite">
@@ -104,6 +105,7 @@
       </div>
       {% endif %}
     {% endwith %}
+    {% endblock %}
   {% endif %}
         {% block content %}{% endblock %}
   {% if current_user.is_authenticated %}

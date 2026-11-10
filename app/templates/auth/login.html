@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {#
-  Julkinen kirjautumissivu ja FlowLeads CRM -esittely.
+  Julkinen kirjautumis- ja esittelysivu (FlowLeads CRM).
 
   Flowly Solutionsin julkiset tiedot on koottu tähän yhteen paikkaan.
   Täytä puuttuvat arvot, kun ne on vahvistettu. Tyhjät kentät (None)
-  jätetään pois näkymästä, ja linkit putoavat takaisin Flowlyn etusivulle.
+  jätetään pois näkymästä.
+
+  Tuotenäkymän data on staattista ja kuvitteellista. Se noudattaa CRM:n
+  liidilistan rakennetta: yritys, yhteyshenkilö, alkuperä, myyntiputken
+  oletusvaihe (DEFAULT_PIPELINE_STAGES) ja liidiin liitetty tehtävä.
 #}
 {% set flowly = {
   "name": "Flowly Solutions",
@@ -20,132 +24,223 @@
 } %}
 {% set demo_href = ("mailto:" ~ flowly.email ~ "?subject=FlowLeads%20CRM%20-esittely") if flowly.email else (flowly.contact_page_url or flowly.website_url) %}
 {% set help_href = ("mailto:" ~ flowly.email ~ "?subject=Apua%20FlowLeads-kirjautumiseen") if flowly.email else (flowly.contact_page_url or flowly.website_url) %}
-{% set demo_external = not flowly.email %}
+{% set ext = ' target="_blank" rel="noopener"' %}
 
-{% block title %}Kirjaudu — FlowLeads CRM{% endblock %}
+{# Palvelimen englanninkieliset ilmoitukset suomeksi tällä sivulla. #}
+{% set fi_messages = {
+  "Invalid email or password.": "Sähköposti tai salasana on virheellinen.",
+  "This account is inactive.": "Käyttäjätili ei ole käytössä. Ota yhteyttä ylläpitoon.",
+  "Account is temporarily locked. Try again later.": "Tili on tilapäisesti lukittu. Yritä myöhemmin uudelleen.",
+  "API accounts cannot sign in to the web interface.": "API-tunnuksilla ei voi kirjautua verkkokäyttöliittymään.",
+  "You have been signed out.": "Olet kirjautunut ulos.",
+  "Your password has been updated.": "Salasanasi on vaihdettu. Kirjaudu uudella salasanalla.",
+  "Registration is not available.": "Rekisteröityminen ei ole käytössä.",
+  "Please log in to access this page.": "Kirjaudu sisään jatkaaksesi.",
+  "This field is required.": "Täytä tämä kenttä.",
+  "Invalid email address.": "Tarkista sähköpostiosoite.",
+} %}
+
+{# Esimerkkinäkymän kuvitteellinen data #}
+{% set demo_rows = [
+  {"company": "Kuusiranta Logistiikka Oy", "contact": "Laura Mäkinen, toimitusjohtaja", "origin": "new", "stage": "Uusi liidi", "color": "#3B82F6", "task_type": "Soitto", "task": "Ensikontakti", "due": "Tänään", "due_mod": "today"},
+  {"company": "Valoisa Kiinteistöt Oy", "contact": "Jari Lehto, myyntipäällikkö", "origin": "existing", "stage": "Kontaktoitu", "color": "#8B5CF6", "task_type": "Seuranta", "task": "Palaa asiaan sovitusti", "due": "2 viikon päästä", "due_mod": ""},
+  {"company": "Pohjanmaan Kone Oy", "contact": "Sanna Virta, hankintapäällikkö", "origin": "new", "stage": "Kvalifioitu", "color": "#F59E0B", "task_type": "Tapaaminen", "task": "Tarpeiden kartoitus", "due": "Huomenna", "due_mod": ""},
+  {"company": "Lumikko Design Oy", "contact": "Mikko Aalto, yrittäjä", "origin": "existing", "stage": "Tarjous lähetetty", "color": "#06B6D4", "task_type": "Sähköposti", "task": "Kysy tarjouksen tilanne", "due": "Pe", "due_mod": ""},
+] %}
+
+{% block title %}Kirjaudu — FlowLeads CRM | Flowly Solutions{% endblock %}
 {% block body_class %} login-page{% endblock %}
 {% block head %}
-<meta name="description" content="FlowLeads CRM auttaa pitämään myyntikohteet, käydyt keskustelut ja seuraavat yhteydenotot ajan tasalla. Palvelun tarjoaa Flowly Solutions.">
+<meta name="description" content="Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla FlowLeads CRM:ssä. Kirjaudu sisään tai pyydä esittely.">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 {% endblock %}
 
+{# Ilmoitukset näytetään kirjautumiskortissa, ei sivun yläreunassa. #}
+{% block guest_flashes %}{% endblock %}
+
 {% block content %}
-<div class="login-landing">
-  <header class="login-header">
-    <div class="login-header__inner">
-      <a href="{{ url_for('auth.login') }}" class="login-brand" aria-label="FlowLeads CRM — kirjautuminen">
-        <img src="{{ url_for('static', filename='img/flowleads-mark.png') }}" alt="" class="login-brand__mark" width="32" height="35">
-        <span class="login-brand__text">
-          <span class="login-brand__name">FlowLeads <span class="login-brand__crm">CRM</span></span>
-          <span class="login-brand__by">{{ flowly.name }}</span>
-        </span>
+{% set messages = get_flashed_messages(with_categories=true) %}
+{% set has_error = messages | selectattr(0, 'in', ['danger', 'error', 'warning']) | list | length > 0 %}
+{% set email_invalid = has_error or form.email.errors %}
+{% set password_invalid = has_error or form.password.errors %}
+
+<div class="lp">
+  <a class="lp-skip" href="#kirjaudu">Siirry kirjautumiseen</a>
+
+  <header class="lp-header">
+    <div class="lp-container lp-header__inner">
+      <a href="{{ url_for('auth.login') }}" class="lp-logo">
+        <img src="{{ url_for('static', filename='img/flowleads-logo.png') }}" alt="Flowly Leads – FlowLeads CRM" width="1335" height="340" class="lp-logo__img">
       </a>
-      <a href="{{ flowly.website_url }}" class="login-header__link" target="_blank" rel="noopener">
-        Flowlyn nettisivuille
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" width="14" height="14"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Zm7.25-.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V6.56l-5.22 5.22a.75.75 0 1 1-1.06-1.06l5.22-5.22h-1.69a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>
-        <span class="sr-only">(avautuu uuteen välilehteen)</span>
-      </a>
+      <nav class="lp-header__nav" aria-label="Sivun linkit">
+        <a href="{{ flowly.website_url }}" class="lp-header__site"{{ ext | safe }}>
+          Flowlyn verkkosivut<span class="sr-only"> (avautuu uuteen välilehteen)</span>
+          <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5H3.5v9h9V10M9 3h4v4M13 3 7.5 8.5"/></svg>
+        </a>
+        <a href="#kirjaudu" class="lp-header__login">Kirjaudu</a>
+      </nav>
     </div>
   </header>
 
-  <section class="login-hero" aria-labelledby="login-hero-title">
-    <div class="login-hero__inner">
-      <div class="login-panel">
-        <div class="card login-card">
-          <h1 class="login-card__title">Kirjaudu FlowLeadsiin</h1>
-          <p class="login-card__lead">Jatka siitä, mihin viimeksi jäit.</p>
-          <form method="post" novalidate>
-            {{ form.hidden_tag() }}
-            <label for="{{ form.email.id }}">Sähköposti
-              {{ form.email(autocomplete="username", inputmode="email") }}
-              {% for e in form.email.errors %}<div class="errors">{{ e }}</div>{% endfor %}
-            </label>
-            <label for="{{ form.password.id }}">Salasana
-              {{ form.password(autocomplete="current-password") }}
-              {% for e in form.password.errors %}<div class="errors">{{ e }}</div>{% endfor %}
-            </label>
-            {{ form.submit(class="btn btn-primary login-card__submit", value="Kirjaudu sisään") }}
-          </form>
-          <div class="login-card__help">
-            <a href="{{ url_for('auth.reset_password_request') }}">Unohditko salasanan?</a>
-            <a href="{{ help_href }}"{% if not flowly.email %} target="_blank" rel="noopener"{% endif %}>Tarvitsetko apua kirjautumisessa?</a>
-          </div>
+  <section class="lp-hero" aria-labelledby="lp-title">
+    <div class="lp-container lp-hero__grid">
+      <div class="lp-hero__copy">
+        <p class="lp-eyebrow">FlowLeads CRM</p>
+        <h1 class="lp-hero__title" id="lp-title">Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla.</h1>
+        <p class="lp-hero__lead">Etsimme yrityksellesi uusia liidejä ja kokoamme nykyiset kohteesi valmiiksi FlowLeadsiin yrityksesi saatavilla olevista tiedoista. Huolehdimme tietojen päivittymisestä, jotta näet samasta paikasta uudet mahdollisuudet, käynnissä olevat keskustelut ja seuraavat yhteydenotot.</p>
+        <div class="lp-hero__actions">
+          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä esittely<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
         </div>
       </div>
 
-      <div class="login-intro">
-        <p class="login-intro__eyebrow">FlowLeads CRM</p>
-        <h2 class="login-intro__title" id="login-hero-title">Tiedä, keneen kannattaa olla seuraavaksi yhteydessä.</h2>
-        <p class="login-intro__text">
-          FlowLeads auttaa sinua pitämään myyntikohteet, käydyt keskustelut ja seuraavat yhteydenotot
-          ajan tasalla. Näet, missä vaiheessa kunkin kohteen kanssa mennään, mitä on sovittu ja mitä
-          tehdään seuraavaksi. Voit jatkaa myyntiä siitä, mihin viimeksi jäit.
-        </p>
+      <div class="lp-card" id="kirjaudu" tabindex="-1" aria-labelledby="lp-login-title">
+        <h2 class="lp-card__title" id="lp-login-title">Kirjaudu FlowLeadsiin</h2>
+        <p class="lp-card__lead">Jatka siitä, mihin viimeksi jäit.</p>
+
+        {% if messages %}
+        <div class="lp-alerts" id="lp-login-alerts">
+          {% for category, message in messages %}
+          {% set is_error = category in ['danger', 'error', 'warning'] %}
+          <div class="lp-alert lp-alert--{{ 'error' if is_error else ('success' if category == 'success' else 'info') }}" role="{{ 'alert' if is_error else 'status' }}">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="currentColor" class="lp-alert__icon">
+              {% if is_error %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>{% else %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.25v3.25a.75.75 0 0 0 1.5 0V9.75A.75.75 0 0 0 10 9H9Z" clip-rule="evenodd"/>{% endif %}
+            </svg>
+            <span>{{ fi_messages.get(message, message) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" class="lp-form" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="lp-field">
+            <label for="{{ form.email.id }}" class="lp-field__label">Sähköposti</label>
+            {% set email_desc = ' '.join([('lp-login-alerts' if has_error else ''), ('email-error' if form.email.errors else '')]).strip() %}
+            {{ form.email(class="lp-field__input", autocomplete="username", inputmode="email", spellcheck="false", autocapitalize="none", **({'aria-invalid': 'true', 'aria-describedby': email_desc} if email_invalid else {})) }}
+            {% if form.email.errors %}<p class="lp-field__error" id="email-error">{{ fi_messages.get(form.email.errors[0], form.email.errors[0]) }}</p>{% endif %}
+          </div>
+          <div class="lp-field">
+            <label for="{{ form.password.id }}" class="lp-field__label">Salasana</label>
+            {% set password_desc = ' '.join([('lp-login-alerts' if has_error else ''), ('password-error' if form.password.errors else '')]).strip() %}
+            {{ form.password(class="lp-field__input", autocomplete="current-password", **({'aria-invalid': 'true', 'aria-describedby': password_desc} if password_invalid else {})) }}
+            {% if form.password.errors %}<p class="lp-field__error" id="password-error">{{ fi_messages.get(form.password.errors[0], form.password.errors[0]) }}</p>{% endif %}
+          </div>
+          {{ form.submit(class="lp-btn lp-btn--primary lp-btn--block", value="Kirjaudu sisään") }}
+        </form>
+
+        <div class="lp-card__links">
+          <a href="{{ url_for('auth.reset_password_request') }}">Unohditko salasanan?</a>
+          <a href="{{ help_href }}"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Tarvitsetko apua?<span class="sr-only"> Ota yhteyttä Flowlyyn (avautuu uuteen välilehteen)</span></a>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="login-section" aria-labelledby="login-how-title">
-    <div class="login-section__inner">
-      <h2 class="login-section__title" id="login-how-title">Miten FlowLeads auttaa myynnissä</h2>
-      <p class="login-section__lead">Sopii myyntitiimille ja yrittäjälle, joka hoitaa myynnin itse.</p>
-      <ol class="login-steps">
-        <li class="login-step">
-          <span class="login-step__num" aria-hidden="true">1</span>
-          <h3 class="login-step__title">Kohteet ajan tasalla</h3>
-          <p>Jokaisella kohteella on oma kortti, jossa ovat yhteystiedot, muistiinpanot ja tapahtumahistoria. Kaikki löytyy yhdestä paikasta.</p>
-        </li>
-        <li class="login-step">
-          <span class="login-step__num" aria-hidden="true">2</span>
-          <h3 class="login-step__title">Seuraava askel näkyvissä</h3>
-          <p>Kirjaa sovittu yhteydenotto tehtäväksi päivämäärän kanssa. Näet tehtävälistalta, keneen pitää olla yhteydessä ja milloin.</p>
-        </li>
-        <li class="login-step">
-          <span class="login-step__num" aria-hidden="true">3</span>
-          <h3 class="login-step__title">Myynti etenee vaiheittain</h3>
-          <p>Siirrä kohde myyntiputkessa seuraavaan vaiheeseen. Näet yhdellä silmäyksellä, mitkä keskustelut ovat käynnissä ja mitkä odottavat sinua.</p>
-        </li>
-      </ol>
+  <section class="lp-section lp-product" aria-labelledby="lp-product-title">
+    <div class="lp-container">
+      <div class="lp-section__head">
+        <h2 class="lp-section__title" id="lp-product-title">Uudet liidit ja nykyiset kohteet samassa näkymässä</h2>
+        <p class="lp-section__lead">Flowlyn löytämät uudet liidit ja jo tuntemasi kohteet ovat samassa listassa. Jokaisesta näet myyntivaiheen ja seuraavan tehtävän.</p>
+      </div>
 
-      <figure class="login-example">
-        <figcaption class="login-example__label">Esimerkki arjesta</figcaption>
-        <blockquote class="login-example__text">
-          Asiakas pyysi palaamaan asiaan kahden viikon päästä. Kirjaat puhelun muistiinpanon ja tehtävän
-          kahden viikon päähän. Kun palaat asiaan, näet edellisen keskustelun ja sen, mitä sovittiin.
-        </blockquote>
+      <figure class="lp-demo">
+        <div class="lp-demo__bar">
+          <span class="lp-demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="lp-demo__badge">Esimerkkinäkymä</span>
+          <span class="lp-demo__note">Kuvitteellinen data</span>
+        </div>
+        <div class="lp-demo__body">
+          <div class="lp-demo__toolbar">
+            <p class="lp-demo__heading">Myyntimahdollisuudet</p>
+            <ul class="lp-demo__chips" aria-label="Suodattimet">
+              <li class="is-active">Kaikki <span>4</span></li>
+              <li><span class="lp-dot lp-dot--new" aria-hidden="true"></span>Uudet Flowlyltä <span>2</span></li>
+              <li><span class="lp-dot lp-dot--existing" aria-hidden="true"></span>Nykyiset kohteet <span>2</span></li>
+            </ul>
+          </div>
+          <div class="lp-demo__table" role="table" aria-label="Esimerkkinäkymä: myyntimahdollisuudet">
+            <div class="lp-demo__row lp-demo__row--head" role="row">
+              <span role="columnheader">Kohde</span>
+              <span role="columnheader">Alkuperä</span>
+              <span role="columnheader">Vaihe</span>
+              <span role="columnheader">Seuraava tehtävä</span>
+            </div>
+            {% for r in demo_rows %}
+            <div class="lp-demo__row" role="row">
+              <span class="lp-demo__cell lp-demo__cell--lead" role="cell">
+                <span class="lp-demo__company">{{ r.company }}</span>
+                <span class="lp-demo__contact">{{ r.contact }}</span>
+              </span>
+              <span class="lp-demo__cell lp-demo__cell--origin" role="cell">
+                {% if r.origin == 'new' %}
+                <span class="lp-tag lp-tag--new">Uusi · Flowly</span>
+                {% else %}
+                <span class="lp-tag lp-tag--existing">Nykyinen kohde</span>
+                {% endif %}
+              </span>
+              <span class="lp-demo__cell lp-demo__cell--stage" role="cell">
+                <span class="lp-stage"><span class="lp-stage__dot" style="background: {{ r.color }}" aria-hidden="true"></span>{{ r.stage }}</span>
+              </span>
+              <span class="lp-demo__cell lp-demo__cell--task" role="cell">
+                <span class="lp-task">
+                  <span class="lp-task__title"><span class="lp-task__type">{{ r.task_type }}:</span> {{ r.task }}</span>
+                  <span class="lp-task__due{% if r.due_mod %} lp-task__due--{{ r.due_mod }}{% endif %}">{{ r.due }}</span>
+                </span>
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <figcaption class="sr-only">Esimerkkinäkymä FlowLeads CRM:n myyntimahdollisuuksista kuvitteellisella datalla.</figcaption>
       </figure>
     </div>
   </section>
 
-  <section class="login-section login-section--cta" aria-labelledby="login-cta-title">
-    <div class="login-section__inner login-cta">
-      <div>
-        <h2 class="login-section__title" id="login-cta-title">Tutustu FlowLeads CRM:ään</h2>
-        <p class="login-section__lead">Haluatko nähdä, miten FlowLeads sopii omaan myyntiisi? Pyydä esittely, niin käydään se läpi yhdessä.</p>
-      </div>
-      <div class="login-cta__actions">
-        <a href="{{ demo_href }}" class="btn btn-primary"{% if demo_external %} target="_blank" rel="noopener"{% endif %}>Pyydä esittely</a>
-        {% if flowly.flowleads_page_url %}
-        <a href="{{ flowly.flowleads_page_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Tutustu FlowLeads CRM:ään</a>
-        {% else %}
-        <a href="{{ flowly.website_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Flowlyn nettisivuille</a>
-        {% endif %}
+  <section class="lp-section lp-benefits" aria-labelledby="lp-benefits-title">
+    <div class="lp-container">
+      <h2 class="lp-section__title" id="lp-benefits-title">Mitä saat FlowLeadsin kanssa</h2>
+      <ul class="lp-benefits__list">
+        <li class="lp-benefit">
+          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M11 8.5v5M8.5 11h5"/></svg></span>
+          <h3 class="lp-benefit__title">Uudet liidit Flowlyltä</h3>
+          <p>Etsimme yrityksellesi sopivia uusia liidejä ja tuomme ne valmiiksi FlowLeadsiin.</p>
+        </li>
+        <li class="lp-benefit">
+          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3.5v3.6h-3.6M5.5 20.5v-3.6h3.6"/></svg></span>
+          <h3 class="lp-benefit__title">Nykyiset kohteet ajan tasalla</h3>
+          <p>Kokoamme nykyiset kohteesi saatavilla olevista tiedoista ja huolehdimme niiden päivittymisestä.</p>
+        </li>
+        <li class="lp-benefit">
+          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="m15 17 2 2 4-4"/></svg></span>
+          <h3 class="lp-benefit__title">Myynnin seuranta yhdessä paikassa</h3>
+          <p>Sinä hoidat yhteydenotot. Näet jokaisen kohteen vaiheen, muistiinpanot ja seuraavan tehtävän.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="lp-section lp-cta-wrap" aria-labelledby="lp-cta-title">
+    <div class="lp-container">
+      <div class="lp-cta">
+        <div>
+          <h2 class="lp-cta__title" id="lp-cta-title">Katsotaan yhdessä, miten FlowLeads sopii myyntiinne.</h2>
+          <p class="lp-cta__text">Esittelyssä käymme läpi, millaisia liidejä etsimme ja miten nykyiset kohteenne tuodaan järjestelmään.</p>
+        </div>
+        <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä esittely<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
       </div>
     </div>
   </section>
 
-  <footer class="login-footer">
-    <div class="login-footer__inner">
-      <div class="login-footer__company">
-        <p class="login-footer__name">{{ flowly.name }}</p>
-        <p class="login-footer__product">FlowLeads CRM on {{ flowly.name }} -palvelu.</p>
-      </div>
-      <ul class="login-footer__links">
-        <li><a href="{{ flowly.website_url }}" target="_blank" rel="noopener">{{ flowly.website_label }}</a></li>
+  <footer class="lp-footer">
+    <div class="lp-container lp-footer__inner">
+      <p class="lp-footer__company"><strong>{{ flowly.name }}</strong><span>FlowLeads CRM on {{ flowly.name }} -palvelu.</span></p>
+      <ul class="lp-footer__links">
+        <li><a href="{{ flowly.website_url }}"{{ ext | safe }}>{{ flowly.website_label }}</a></li>
+        {% if flowly.contact_page_url %}<li><a href="{{ flowly.contact_page_url }}"{{ ext | safe }}>Yhteystiedot</a></li>{% endif %}
         {% if flowly.email %}<li><a href="mailto:{{ flowly.email }}">{{ flowly.email }}</a></li>{% endif %}
         {% if flowly.phone %}<li><a href="tel:{{ flowly.phone_href or flowly.phone | replace(' ', '') }}">{{ flowly.phone }}</a></li>{% endif %}
-        {% if flowly.privacy_url %}<li><a href="{{ flowly.privacy_url }}" target="_blank" rel="noopener">Tietosuojaseloste</a></li>{% endif %}
-        {% if flowly.terms_url %}<li><a href="{{ flowly.terms_url }}" target="_blank" rel="noopener">Käyttöehdot</a></li>{% endif %}
+        {% if flowly.privacy_url %}<li><a href="{{ flowly.privacy_url }}"{{ ext | safe }}>Tietosuojaseloste</a></li>{% endif %}
+        {% if flowly.terms_url %}<li><a href="{{ flowly.terms_url }}"{{ ext | safe }}>Käyttöehdot</a></li>{% endif %}
       </ul>
     </div>
   </footer>
