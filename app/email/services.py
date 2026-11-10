@@ -331,6 +331,43 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    def send_password_reset_email(*, to_email: str, reset_url: str) -> dict:
+        if not email_sending_enabled():
+            return {"success": False, "error": "sending_disabled"}
+        if not to_email or not validate_email(to_email):
+            return {"success": False, "error": "invalid_email"}
+
+        max_age_minutes = max(1, current_app.config.get("PASSWORD_RESET_MAX_AGE", 3600) // 60)
+        subject = "FlowLeads – salasanan palautus"
+        body_html = (
+            "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+            "<h2>Salasanan palautus</h2>"
+            "<p>Pyysit salasanan palautusta FlowLeads-tilillesi. Aseta uusi salasana alla olevasta linkistä:</p>"
+            f"<p style='margin:20px 0;'><a href='{html.escape(reset_url)}' "
+            "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
+            "Aseta uusi salasana</a></p>"
+            f"<p style='color:#6B7280;font-size:13px;'>Linkki vanhenee {max_age_minutes} minuutin kuluttua. "
+            "Jos et pyytänyt palautusta, voit jättää tämän viestin huomiotta.</p>"
+            "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
+            "</div>"
+        )
+        body_text = (
+            f"Pyysit salasanan palautusta. Aseta uusi salasana: {reset_url} "
+            f"(linkki vanhenee {max_age_minutes} minuutin kuluttua)"
+        )
+        from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+        from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+        ok, message_id, error = _mailgun_send(
+            to_email=to_email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        return {"success": ok, "message_id": message_id, "error": error}
+
+    @staticmethod
     def send_lead_stale_alert(
         *, to_email: str, org_name: str, last_lead_at: datetime, days: int
     ) -> dict:

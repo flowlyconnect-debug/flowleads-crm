@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import redirect, request, session, url_for
+from flask import current_app, redirect, request, session, url_for
 from flask_login import current_user
 
 TWO_FA_SESSION_KEY = "two_fa_verified"
@@ -44,7 +44,7 @@ def require_2fa(view):
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login", next=request.url))
 
-        if current_user.is_superadmin():
+        if current_user.is_superadmin() and not current_app.config.get("DEV_AUTO_LOGIN"):
             if not current_user.totp_enabled:
                 return redirect(url_for("auth.two_fa_setup"))
             if not is_2fa_verified():

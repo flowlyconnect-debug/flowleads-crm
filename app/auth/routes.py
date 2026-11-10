@@ -25,6 +25,7 @@ from app.core.security import (
     generate_password_reset_token,
     verify_password_reset_token,
 )
+from app.email.services import EmailService
 from app.extensions import db, limiter
 from app.users.services import (
     UserServiceError,
@@ -115,13 +116,15 @@ def reset_password_request():
         user = get_user_by_email(form.email.data)
         if user and user.can_login_ui():
             token = generate_password_reset_token(user.email)
+            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            EmailService.send_password_reset_email(to_email=user.email, reset_url=reset_url)
             flash(
                 "If an account exists for that email, you will receive reset instructions.",
                 "info",
             )
+
             from flask import current_app
 
-            reset_url = url_for("auth.reset_password", token=token, _external=True)
             if current_app.debug:
                 flash(f"Reset link (dev only): {reset_url}", "secondary")
         else:
