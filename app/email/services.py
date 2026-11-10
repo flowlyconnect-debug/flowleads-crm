@@ -42,6 +42,28 @@ def email_sending_enabled() -> bool:
     return bool(current_app.config.get("EMAIL_SENDING_ENABLED"))
 
 
+def _check_daily_send_limit(organization_id: int) -> None:
+    """Guard against a misbehaving automation/sequence flooding one
+    organization's recipients (and Mailgun reputation) with mail."""
+    limit = current_app.config.get("EMAIL_DAILY_LIMIT_PER_ORG") or 0
+    if limit <= 0:
+        return
+    from datetime import timedelta
+
+    day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = EmailLog.query.filter(
+        EmailLog.organization_id == organization_id,
+        EmailLog.status == "sent",
+        EmailLog.sent_at >= day_start,
+        EmailLog.sent_at < day_start + timedelta(days=1),
+    ).count()
+    if sent_today >= limit:
+        raise EmailServiceError(
+            "Daily email sending limit reached for this organization.",
+            "rate_limited",
+        )
+
+
 def sanitize_html_body(html_body: str | None) -> str:
     if not html_body:
         return ""
@@ -207,6 +229,8 @@ class EmailService:
             )
         if not lead.email:
             raise EmailServiceError("Lead has no email address.", "no_email")
+
+        _check_daily_send_limit(organization_id)
 
         if actor and actor.organization_id is not None:
             if actor.organization_id != lead.organization_id and not actor.is_superadmin():
