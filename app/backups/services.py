@@ -388,7 +388,9 @@ def _notify_superadmins(subject: str, body: str) -> None:
             recipients=recipients,
             body=body,
         )
-        mail.send(msg)
+        from app.email.services import send_system_message
+
+        send_system_message(msg)
     except Exception:
         logger.exception("Failed to send backup notification email")
 

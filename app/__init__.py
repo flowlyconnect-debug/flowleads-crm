@@ -272,6 +272,41 @@ SOURCE_LABELS_FI = {
 }
 
 
+ACTIVITY_LABELS_FI = {
+    "note": "Muistiinpano",
+    "email_sent": "Sähköposti lähetetty",
+    "email_opened": "Sähköposti avattu",
+    "email_clicked": "Sähköpostin linkkiä klikattu",
+    "email_reply_received": "Vastaus saatu",
+    "call": "Puhelu",
+    "stage_changed": "Vaihe vaihdettu",
+    "ai_enriched": "AI-rikastus",
+    "created": "Liidi luotu",
+    "updated": "Tiedot päivitetty",
+    "archived": "Arkistoitu",
+    "assigned": "Vastuuhenkilö vaihdettu",
+    "task_created": "Tehtävä luotu",
+    "task_completed": "Tehtävä tehty",
+    "task_reminder_sent": "Tehtävämuistutus lähetetty",
+    "sequence_enrolled": "Lisätty sekvenssiin",
+    "sequence_email_sent": "Sekvenssiviesti lähetetty",
+    "sequence_unenrolled": "Poistettu sekvenssistä",
+    "meeting_scheduled": "Tapaaminen sovittu",
+    "meeting_cancelled": "Tapaaminen peruttu",
+    "proposal_sent": "Tarjous lähetetty",
+    "proposal_viewed": "Tarjous avattu",
+    "proposal_accepted": "Tarjous hyväksytty",
+    "proposal_declined": "Tarjous hylätty",
+}
+
+LEAD_STATUS_LABELS_FI = {
+    "active": "Avoin",
+    "won": "Voitettu",
+    "lost": "Hävitty",
+    "archived": "Arkistoitu",
+}
+
+
 def stage_label_fi(name) -> str:
     if not name:
         return "—"
@@ -394,6 +429,8 @@ def _register_root_routes(app):
             "stage_label": stage_label_fi,
             "source_label": source_label_fi,
             "STAGE_LABELS_FI": STAGE_LABELS_FI,
+            "ACTIVITY_LABELS_FI": ACTIVITY_LABELS_FI,
+            "LEAD_STATUS_LABELS_FI": LEAD_STATUS_LABELS_FI,
             "SOURCE_LABELS_FI": SOURCE_LABELS_FI,
         }
 

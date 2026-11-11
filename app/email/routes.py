@@ -67,9 +67,9 @@ def compose(lead_id):
         flash(exc.message, "danger")
         return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
 
-    templates = TemplateService.list_for_organization(organization_id)
+    templates = TemplateService.list_sales_templates(organization_id)
     form = ComposeEmailForm()
-    form.template_id.choices = [(0, "— No template —")] + [(t.id, t.name) for t in templates]
+    form.template_id.choices = [(0, "— Ei mallia —")] + [(t.id, t.name) for t in templates]
 
     selected_id = request.args.get("template_id", type=int) or 0
     preview_subject = ""
@@ -102,8 +102,8 @@ def compose(lead_id):
 def send(lead_id):
     organization_id = resolve_organization_id()
     form = ComposeEmailForm()
-    templates = TemplateService.list_for_organization(organization_id)
-    form.template_id.choices = [(0, "— No template —")] + [(t.id, t.name) for t in templates]
+    templates = TemplateService.list_sales_templates(organization_id)
+    form.template_id.choices = [(0, "— Ei mallia —")] + [(t.id, t.name) for t in templates]
     try:
         lead = get_lead_for_org(lead_id, organization_id)
         _check_lead_email_access(lead)

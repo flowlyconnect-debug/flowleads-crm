@@ -169,7 +169,7 @@ def _populate_lead_form_choices(form: LeadForm, organization_id: int):
     ).all()
     form.stage_id.choices = [(s.id, s.name) for s in stages]
     users = _org_users(organization_id)
-    form.assigned_to.choices = [(0, "Unassigned")] + [(u.id, u.email) for u in users]
+    form.assigned_to.choices = [(0, "Ei vastuuhenkilöä")] + [(u.id, u.email) for u in users]
 
 
 def _lead_to_form_data(form: LeadForm, lead: Lead):
@@ -436,13 +436,30 @@ def create_lead():
     if not can_assign_to_others() and not data.get("assigned_to"):
         data["assigned_to"] = current_user.id
 
+    duplicate = _find_duplicate_lead(organization_id, data)
+    if duplicate is not None:
+        from app.analytics.currency import get_default_currency
+
+        flash(
+            "Sama liidi on jo olemassa (sama sähköposti ja yritys). Avaa se Liidit-listalta haulla.",
+            "warning",
+        )
+        return render_template(
+            "leads/form.html",
+            form=form,
+            lead=None,
+            organization_id=organization_id,
+            org_currency=get_default_currency(organization_id),
+            duplicate_lead=duplicate,
+        ), 400
+
     try:
         lead = LeadService.create(
             data, organization_id, current_user.id, actor_role=current_user.role
         )
         db.session.commit()
-        flash("Lead created successfully.", "success")
-        return redirect(url_for("leads.detail", lead_id=lead.id, organization_id=organization_id))
+        flash("Liidi luotu.", "success")
+        return redirect(url_for("leads.detail", lead_id=lead.id, **_org_kwargs(organization_id)))
     except LeadServiceError as exc:
         db.session.rollback()
         _handle_service_error(exc)
@@ -455,6 +472,23 @@ def create_lead():
             organization_id=organization_id,
             org_currency=get_default_currency(organization_id),
         ), 400
+
+
+def _find_duplicate_lead(organization_id: int, data: dict):
+    """An open lead with the same email AND the same company. Email alone is
+    not enough: one property manager is the contact of many housing companies."""
+    from sqlalchemy import func
+
+    email = (data.get("email") or "").strip().lower()
+    company = (data.get("company") or "").strip().lower()
+    if not email or not company:
+        return None
+    return Lead.query.filter(
+        Lead.organization_id == organization_id,
+        Lead.status != "archived",
+        func.lower(Lead.email) == email,
+        func.lower(func.trim(Lead.company)) == company,
+    ).first()
 
 
 @leads_bp.route("/new")
@@ -525,7 +559,7 @@ def update_lead(lead_id):
             db.session.commit()
             if request.is_json or request.method == "PUT":
                 return json_success({"lead_id": lead.id})
-            flash("Lead updated.", "success")
+            flash("Liidi tallennettu.", "success")
             return redirect(url_for("leads.detail", lead_id=lead.id))
         except LeadServiceError as exc:
             db.session.rollback()
@@ -552,8 +586,8 @@ def update_lead(lead_id):
             lead_id, data, organization_id, current_user.id, actor_role=current_user.role
         )
         db.session.commit()
-        flash("Lead updated.", "success")
-        return redirect(url_for("leads.detail", lead_id=lead.id, organization_id=organization_id))
+        flash("Liidi tallennettu.", "success")
+        return redirect(url_for("leads.detail", lead_id=lead.id, **_org_kwargs(organization_id)))
     except LeadServiceError as exc:
         db.session.rollback()
         _handle_service_error(exc)
@@ -615,13 +649,13 @@ def move_stage(lead_id):
                 "status": lead.status,
             })
         flash("Vaihe päivitetty.", "success")
-        return redirect(url_for("leads.detail", lead_id=lead.id, organization_id=organization_id))
+        return redirect(url_for("leads.detail", lead_id=lead.id, **_org_kwargs(organization_id)))
     except LeadServiceError as exc:
         db.session.rollback()
         if wants_json_response() or request.is_json:
             return json_error(exc.code, exc.message, 400)
         flash(exc.message, "danger")
-        return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
+        return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
 
 
 @leads_bp.route("/<int:lead_id>/predict", methods=["POST"])
@@ -647,7 +681,7 @@ def predict_lead_route(lead_id):
         flash("Ennusteen päivitys epäonnistui.", "danger")
 
     return redirect(
-        url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
+        url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id))
         if current_user.is_superadmin()
         else url_for("leads.detail", lead_id=lead_id)
     )
@@ -664,7 +698,7 @@ def enrich_lead(lead_id):
     if lead.status == "archived" and not can_archive_leads():
         flash("Cannot enrich archived leads.", "danger")
         return redirect(
-            url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
+            url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id))
             if current_user.is_superadmin()
             else url_for("leads.detail", lead_id=lead_id)
         )
@@ -672,7 +706,7 @@ def enrich_lead(lead_id):
     if not current_app.config.get("AI_ENRICHMENT_ENABLED"):
         flash("AI enrichment is disabled.", "danger")
         return redirect(
-            url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
+            url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id))
             if current_user.is_superadmin()
             else url_for("leads.detail", lead_id=lead_id)
         )
@@ -692,7 +726,7 @@ def enrich_lead(lead_id):
         else:
             flash("Could not queue enrichment.", "danger")
     return redirect(
-        url_for("leads.detail", lead_id=lead_id, organization_id=organization_id)
+        url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id))
         if current_user.is_superadmin()
         else url_for("leads.detail", lead_id=lead_id)
     )
@@ -806,14 +840,14 @@ def add_note(lead_id):
         db.session.commit()
         if request.is_json:
             return json_success({"lead_id": lead_id})
-        flash("Note added.", "success")
-        return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
+        flash("Muistiinpano lisätty.", "success")
+        return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
     except LeadServiceError as exc:
         db.session.rollback()
         if request.is_json:
             return json_error(exc.code, exc.message, 400)
         flash(exc.message, "danger")
-        return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
+        return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
 
 
 @leads_bp.route("/export")

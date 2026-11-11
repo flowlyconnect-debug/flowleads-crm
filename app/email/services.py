@@ -422,7 +422,7 @@ class EmailService:
             f"<p style='margin:20px 0;'><a href='{html.escape(set_password_url)}' "
             "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
             "Aseta salasana</a></p>"
-            "<p style='color:#6B7280;font-size:13px;'>Linkki on kertakäyttöinen ja vanhenee pian.</p>"
+            "<p style='color:#6B7280;font-size:13px;'>Linkki on kertakäyttöinen ja voimassa 7 päivää.</p>"
             "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
             "</div>"
         )
@@ -684,6 +684,36 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
 
+def send_system_message(message) -> bool:
+    """Send a Flask-Mail `Message` built by a system notification (proposal
+    accepted, GDPR export ready, backup alert, ...) through the Mailgun HTTP
+    API, like every other email of the app.
+
+    These used to go out with Flask-Mail over SMTP, using the Mailgun API key
+    as the SMTP password. Mailgun does not accept that, so they never arrived.
+    Returns True when every recipient was accepted."""
+    if not email_sending_enabled():
+        return False
+    from_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
+    from_email = current_app.config.get("MAILGUN_FROM_EMAIL", "")
+    body_text = message.body or ""
+    body_html = message.html or plaintext_to_html(body_text)
+    all_ok = True
+    for recipient in message.recipients or []:
+        ok, _message_id, error = _mailgun_send(
+            to_email=recipient,
+            subject=message.subject or "",
+            body_html=body_html,
+            body_text=body_text,
+            from_name=from_name,
+            from_email=from_email,
+        )
+        if not ok:
+            all_ok = False
+            current_app.logger.warning("System email to %s failed: %s", recipient, error)
+    return all_ok
+
+
 class TemplateService:
     @staticmethod
     def list_for_organization(organization_id: int) -> list[EmailTemplate]:
@@ -696,6 +726,17 @@ class TemplateService:
             .order_by(EmailTemplate.organization_id.asc().nullsfirst(), EmailTemplate.name.asc())
             .all()
         )
+
+    @staticmethod
+    def list_sales_templates(organization_id: int) -> list[EmailTemplate]:
+        """Templates a salesperson can pick for an email to a lead."""
+        from app.email.seed import INTERNAL_TEMPLATE_NAMES
+
+        return [
+            template
+            for template in TemplateService.list_for_organization(organization_id)
+            if not (template.organization_id is None and template.name in INTERNAL_TEMPLATE_NAMES)
+        ]
 
     @staticmethod
     def get_template(template_id: int, organization_id: int | None) -> EmailTemplate:
@@ -731,9 +772,13 @@ class TemplateService:
         )
         if not ok:
             raise EmailServiceError(err, "validation_error")
+        clean_name = name.strip()[:120]
+        if EmailTemplate.query.filter_by(organization_id=organization_id, name=clean_name).first():
+            # the unique constraint would otherwise surface as a 500
+            raise EmailServiceError("Samanniminen sähköpostimalli on jo olemassa.", "duplicate_name")
         template = EmailTemplate(
             organization_id=organization_id,
-            name=name.strip()[:120],
+            name=clean_name,
             subject_template=subject_template.strip()[:255],
             body_html_template=body_html_template,
             body_text_template=body_text_template,

@@ -2,9 +2,16 @@
 {% block title %}{{ proposal.reference_number }} — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<style>
+  /* line items: the description gets the room, numbers stay readable */
+  #line-items-table .li-desc { width: 100%; min-width: 180px; }
+  #line-items-table .li-qty, #line-items-table .li-disc { width: 84px; }
+  #line-items-table .li-price { width: 110px; }
+  #line-items-table td { padding-left: 6px; padding-right: 6px; }
+</style>
 <div class="toolbar">
   <h1 style="margin:0;">{{ proposal.reference_number }}</h1>
-  <span class="badge" style="background:{{ status_colors.get(proposal.status, '#64748b') }};">{{ proposal.status }}</span>
+  <span class="badge" style="background:{{ status_colors.get(proposal.status, '#64748b') }};">{{ {'draft': 'Luonnos', 'sent': 'Lähetetty', 'viewed': 'Avattu', 'accepted': 'Hyväksytty', 'declined': 'Hylätty', 'expired': 'Vanhentunut'}.get(proposal.status, proposal.status) }}</span>
   <a class="btn secondary" href="{{ url_for('proposals.list_proposals', **org_query) }}">Takaisin</a>
   {% if not proposal.is_editable %}
   <form method="post" action="{{ url_for('proposals.duplicate_proposal', proposal_id=proposal.id, **org_query) }}" style="display:inline;">
@@ -44,7 +51,7 @@
           {% for li in proposal.line_items %}
           <tr class="line-row" draggable="true">
             <td><input type="text" class="li-desc" value="{{ li.description }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
-            <td><input type="number" step="0.0001" class="li-qty" value="{{ li.quantity }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
+            <td><input type="number" step="0.0001" class="li-qty" value="{{ '%g'|format(li.quantity|float) }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
             <td><input type="number" step="0.01" class="li-price" value="{{ li.unit_price }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
             <td><input type="number" step="0.01" class="li-disc" value="{{ li.discount_percent }}" {% if not proposal.is_editable %}readonly{% endif %}></td>
             <td class="li-total">{{ li.total }}</td>
@@ -130,7 +137,7 @@
   document.getElementById('add-line').addEventListener('click', () => {
     const tr = document.createElement('tr');
     tr.className = 'line-row';
-    tr.innerHTML = '<td><input class="li-desc" value=""></td><td><input class="li-qty" type="number" value="1"></td><td><input class="li-price" type="number" value="0"></td><td><input class="li-disc" type="number" value="0"></td><td class="li-total">0</td><td><button type="button" class="btn secondary li-remove">×</button></td>';
+    tr.innerHTML = '<td><input type="text" class="li-desc" value=""></td><td><input class="li-qty" type="number" step="0.0001" min="0" value="1"></td><td><input class="li-price" type="number" step="0.01" min="0" value="0"></td><td><input class="li-disc" type="number" step="0.01" min="0" max="100" value="0"></td><td class="li-total">0</td><td><button type="button" class="btn secondary li-remove">×</button></td>';
     table.appendChild(tr);
     bindRow(tr);
     recalcAll();

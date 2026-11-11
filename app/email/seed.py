@@ -157,6 +157,19 @@ _LEGACY_ENGLISH_NAMES = {
 }
 
 
+# System templates that the app itself sends (reminders, notifications). They
+# are not sales emails, so they stay out of the compose and sequence pickers.
+INTERNAL_TEMPLATE_NAMES = frozenset(
+    {
+        "task_reminder",
+        "proposal_sent",
+        "proposal_accepted_notification",
+        "proposal_declined_notification",
+        "lead_stale_alert",
+    }
+)
+
+
 def seed_system_email_templates(commit: bool = False) -> list[EmailTemplate]:
     """Create the missing system templates. Flushes only, unless `commit` is
     set: a caller that renders ids into links (the template list page) must

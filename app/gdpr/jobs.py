@@ -59,7 +59,9 @@ def _notify_retention_report(organization_id: int, lead_ids: list[int]) -> None:
                 + ("..." if len(lead_ids) > 50 else "")
             ),
         )
-        mail.send(msg)
+        from app.email.services import send_system_message
+
+        send_system_message(msg)
     except Exception:
         logger.exception("Failed to send GDPR retention report")
 

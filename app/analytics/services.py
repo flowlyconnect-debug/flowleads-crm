@@ -570,8 +570,10 @@ class AnalyticsService:
             .order_by(func.count(Lead.id).desc(), Lead.lost_reason.asc())
             .all()
         )
+        from app.leads.services import LOST_REASON_LABELS
+
         return [
-            {"reason": str(reason), "count": int(count)}
+            {"reason": LOST_REASON_LABELS.get(str(reason), str(reason)), "count": int(count)}
             for reason, count in rows
             if reason
         ]

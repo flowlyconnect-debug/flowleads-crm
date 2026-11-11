@@ -129,7 +129,9 @@ class GDPRService:
                     f"Syy: {reason or '—'}\n"
                 ),
             )
-            mail.send(msg)
+            from app.email.services import send_system_message
+
+            send_system_message(msg)
         except Exception:
             logger.exception("Failed to send GDPR anonymization confirmation email")
 

@@ -28,7 +28,7 @@ def _hash_reset_token(token: str) -> str:
     return hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
 
 
-def issue_password_reset_token(user: User) -> str:
+def issue_password_reset_token(user: User, max_age_seconds: int | None = None) -> str:
     """Issue a fresh single-use, expiring reset token.
 
     Any previous outstanding (unused) tokens for this user are deleted first,
@@ -37,7 +37,8 @@ def issue_password_reset_token(user: User) -> str:
     now = datetime.now(timezone.utc)
     PasswordResetToken.query.filter_by(user_id=user.id, used_at=None).delete()
 
-    max_age_seconds = current_app.config.get("PASSWORD_RESET_MAX_AGE", 3600)
+    if max_age_seconds is None:
+        max_age_seconds = current_app.config.get("PASSWORD_RESET_MAX_AGE", 3600)
     token = secrets.token_urlsafe(32)
     db.session.add(
         PasswordResetToken(

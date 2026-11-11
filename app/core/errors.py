@@ -3,7 +3,7 @@ import logging
 from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import current_user
-from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError, ProgrammingError
 
 from app.core.diagnostics import capture_server_error
 from app.extensions import db
@@ -82,6 +82,23 @@ def register_error_handlers(app):
         )
         if wants_json_response():
             return json_error("database_error", "A database error occurred.", 500)
+        return render_template("errors/500.html"), 500
+
+    @app.errorhandler(IntegrityError)
+    def handle_integrity_error(error):
+        """A uniqueness or foreign-key conflict that a view did not catch
+        (duplicate name, row still referenced). The user gets a message on the
+        page they came from instead of a bare 500."""
+        db.session.rollback()
+        _log_server_error(error, hint="Unhandled IntegrityError", status_code=409)
+        if wants_json_response():
+            return json_error("conflict", "The change conflicts with existing data.", 409)
+        if request.method != "GET":
+            flash(
+                "Tallennus ei onnistunut: sama tieto on jo olemassa tai kohde on vielä käytössä muualla.",
+                "danger",
+            )
+            return redirect(request.referrer or url_for("analytics.dashboard"))
         return render_template("errors/500.html"), 500
 
     @app.errorhandler(RateLimitExceeded)

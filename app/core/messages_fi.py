@@ -46,6 +46,8 @@ _MESSAGES: dict[str, str] = {
     "API key revoked.": "API-avain poistettu käytöstä.",
     "API key not found.": "API-avainta ei löytynyt.",
     # --- leads ---
+    "At least one identifier is required (email, phone, company, name, or source ref).": "Anna vähintään yksi tunnistetieto: nimi, yritys, sähköposti tai puhelin.",
+    "At least one identifier is required.": "Anna vähintään yksi tunnistetieto: nimi, yritys, sähköposti tai puhelin.",
     "Lead created successfully.": "Liidi luotu.",
     "Lead updated.": "Liidi tallennettu.",
     "Lead archived.": "Liidi arkistoitu.",

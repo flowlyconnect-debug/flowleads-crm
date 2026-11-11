@@ -473,3 +473,45 @@ def _sent_proposal(ctx, lead_id):
         ProposalService.send(p.id, ctx["admin_id"], ctx["org_id"])
     db.session.commit()
     return db.session.get(Proposal, p.id)
+
+
+def test_saving_the_editor_form_recalculates_totals(client, app):
+    """The editor posts the rows as JSON; the totals must follow the new rows
+    (they used to stay at the old value: the rows were replaced behind the
+    already-loaded relationship)."""
+    import json
+
+    ctx = _setup_org(app, slug="prop-save")
+    lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"])
+    with app.app_context():
+        proposal = ProposalService.create(
+            lead_id,
+            _proposal_data(
+                tax_percent=0, line_items=[{"description": "Palvelu", "quantity": 1, "unit_price": 0}]
+            ),
+            ctx["admin_id"],
+            ctx["org_id"],
+        )
+        db.session.commit()
+        proposal_id = proposal.id
+
+    _login(client, ctx["admin_email"])
+    response = client.post(
+        f"/proposals/{proposal_id}",
+        data={
+            "title": "Putkiremontti",
+            "valid_until": "31.12.2026",
+            "tax_percent": "25,5",
+            "discount_percent": "0",
+            "line_items": json.dumps(
+                [{"description": "Hankesuunnittelu", "quantity": "1", "unit_price": "1000.00", "discount_percent": "0"}]
+            ),
+        },
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        saved = db.session.get(Proposal, proposal_id)
+        assert saved.subtotal == money(1000)
+        assert saved.tax_percent == Decimal("25.5")
+        assert saved.total == money(1255)
+        assert saved.valid_until == date(2026, 12, 31)

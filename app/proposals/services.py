@@ -307,6 +307,10 @@ class ProposalService:
                 line.total = line_item_total(line.quantity, line.unit_price, line.discount_percent)
                 db.session.add(line)
             db.session.flush()
+            # The rows were replaced behind the relationship's back: without
+            # this, the totals below were summed over the old (deleted) rows
+            # and a saved proposal kept its previous total.
+            db.session.expire(proposal, ["line_items"])
 
         proposal.updated_at = _utc_now()
         ProposalService.calculate_totals(proposal)
@@ -572,11 +576,12 @@ class ProposalService:
     @staticmethod
     def _notify_assignee_accepted(proposal: Proposal) -> None:
         lead = proposal.lead or get_lead_for_org(proposal.lead_id, proposal.organization_id)
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
         link = f"/leads/{lead.id}"
         NotificationService.create(
-            user_id=lead.assigned_to,
+            user_id=recipient_id,
             organization_id=proposal.organization_id,
             type="proposal_accepted",
             title=f"Tarjous hyväksytty: {proposal.reference_number}",
@@ -587,9 +592,10 @@ class ProposalService:
 
     @staticmethod
     def _send_accept_notification_email(proposal: Proposal, lead: Lead) -> None:
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
-        assignee = db.session.get(User, lead.assigned_to)
+        assignee = db.session.get(User, recipient_id)
         if not assignee or not assignee.email:
             return
         from app.email.templates import render_template_text
@@ -625,7 +631,10 @@ class ProposalService:
             msg = Message(subject=subject, recipients=[assignee.email], html=body_html, body=body_text)
             from app.extensions import mail
 
-            mail.send(msg)
+            from app.email.services import send_system_message
+
+
+            send_system_message(msg)
         except Exception:
             logger.exception("Failed to send proposal accepted notification email")
 
@@ -678,17 +687,18 @@ class ProposalService:
     @staticmethod
     def _notify_assignee_declined(proposal: Proposal, reason: str) -> None:
         lead = proposal.lead or get_lead_for_org(proposal.lead_id, proposal.organization_id)
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
         NotificationService.create(
-            user_id=lead.assigned_to,
+            user_id=recipient_id,
             organization_id=proposal.organization_id,
             type="proposal_declined",
             title=f"Tarjous hylätty: {proposal.reference_number}",
             message=reason[:500],
             link=f"/leads/{lead.id}",
         )
-        assignee = db.session.get(User, lead.assigned_to)
+        assignee = db.session.get(User, recipient_id)
         if assignee and assignee.email:
             from flask import current_app
             from flask_mail import Message
@@ -702,7 +712,10 @@ class ProposalService:
                     )
                     from app.extensions import mail
 
-                    mail.send(msg)
+                    from app.email.services import send_system_message
+
+
+                    send_system_message(msg)
                 except Exception:
                     logger.exception("Failed to send proposal declined notification email")
 

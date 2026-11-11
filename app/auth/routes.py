@@ -204,6 +204,7 @@ def register():
 
 
 @auth_bp.route("/reset-password", methods=["GET", "POST"])
+@limiter.limit(_login_rate_limit, methods=["POST"])
 def reset_password_request():
     form = ResetPasswordRequestForm()
     if form.validate_on_submit():
@@ -301,6 +302,7 @@ def two_fa_setup():
 
 @auth_bp.route("/2fa/verify", methods=["GET", "POST"])
 @login_required
+@limiter.limit(_login_rate_limit, methods=["POST"])
 def two_fa_verify():
     if not current_user.requires_mandatory_2fa() or not current_user.totp_enabled:
         return redirect(url_for("analytics.dashboard"))

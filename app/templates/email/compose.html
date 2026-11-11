@@ -51,7 +51,7 @@
         <div class="compose-actions">
           <button type="submit" class="btn btn-primary" id="send-btn" {% if not email_enabled %}disabled title="Sähköpostin lähetys on pois käytöstä"{% endif %}>Lähetä sähköposti</button>
           {% if not email_enabled %}
-          <p class="compose-error mb-0">Sähköpostin lähetys on pois käytöstä (EMAIL_SENDING_ENABLED=false).</p>
+          <p class="compose-error mb-0">Sähköpostin lähetys ei ole käytössä tässä ympäristössä. Ota yhteyttä ylläpitoon.</p>
           {% endif %}
         </div>
       </div>

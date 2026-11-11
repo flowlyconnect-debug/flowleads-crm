@@ -7,7 +7,7 @@
     {{ settings_nav('admin') }}
     <div class="settings-content">
 <div class="card settings-panel--wide">
-  <h1>Admin dashboard</h1>
+  <h1>Hallintapaneeli</h1>
   <p>Organizations: {{ stats.organization_count }}</p>
   <p>Users: {{ stats.user_count }}</p>
 
@@ -38,7 +38,7 @@
   </form>
   {% endif %}
   {% if stats.ai_usage %}
-  <h2 style="margin-top:1.5rem;">AI enrichment usage</h2>
+  <h2 style="margin-top:1.5rem;">AI-rikastuksen käyttö</h2>
   <p>Total enrichments: {{ stats.ai_usage.total_enrichments }}</p>
   <p>Estimated tokens used: {{ stats.ai_usage.total_tokens }}</p>
   <p>Failed enrichments: {{ stats.ai_usage.failed_count }}</p>

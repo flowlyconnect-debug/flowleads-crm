@@ -134,6 +134,14 @@ def email_templates_list():
     org_id = _settings_org_id()
     seed_system_email_templates(commit=True)
     templates = TemplateService.list_for_organization(org_id)
+    if not current_user.is_superadmin():
+        # customers see the templates they can use; the app's own notification
+        # templates are maintained by the platform
+        from app.email.seed import INTERNAL_TEMPLATE_NAMES
+
+        templates = [
+            t for t in templates if not (t.organization_id is None and t.name in INTERNAL_TEMPLATE_NAMES)
+        ]
     can_edit = current_user.role in ("admin", "superadmin")
     return render_template(
         "settings/email_templates.html",
