@@ -151,11 +151,17 @@
               </label>
               <p class="form-helper">Kuinka varma AI:n pitää olla siitä, että kohteessa on tulossa juuri tämä remontti. 60 on hyvä oletus; nosta, jos liidejä tulee liikaa.</p>
 
+              {% if config.LISTING_AUTO_CREATE_LEADS %}
               <label class="form-label">Uusia liidejä enintään / päivä
                 <input type="number" name="daily_lead_limit" class="form-input" min="0" max="1000" step="1"
                        value="{{ selected_profile.daily_lead_limit if selected_profile else 50 }}">
               </label>
               <p class="form-helper">0 = ei rajaa. Ylimenevät osumat odottavat ja tulevat liideiksi seuraavina päivinä (uusimmat ensin).</p>
+              {% else %}
+              {# No daily limit when leads are moved by hand; keep the stored value. #}
+              <input type="hidden" name="daily_lead_limit" value="{{ selected_profile.daily_lead_limit if selected_profile else 50 }}">
+              <p class="form-helper">Osumat näkyvät <a href="{{ url_for('targets.index', **org_query) }}">Kohteet-sivulla</a>, josta ne siirretään liideiksi.</p>
+              {% endif %}
 
               <label class="form-check search-profiles-active-toggle">
                 <input type="checkbox" name="is_active" value="y"
@@ -206,8 +212,13 @@
                 <dd>{{ match_stats.lead_created }}</dd>
               </div>
               <div>
+                {% if config.LISTING_AUTO_CREATE_LEADS %}
                 <dt>Odottaa päivärajaa</dt>
                 <dd>{{ match_stats.pending }}</dd>
+                {% else %}
+                <dt>Saatavilla Kohteet-sivulla</dt>
+                <dd><a href="{{ url_for('targets.index', profile_id=selected_profile.id, **org_query) }}">{{ match_stats.pending }}</a></dd>
+                {% endif %}
               </div>
               {% if match_stats.merged %}
               <div>

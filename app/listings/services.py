@@ -87,6 +87,15 @@ def _cfg(name: str):
     return value
 
 
+def auto_create_leads() -> bool:
+    """False (default): matches wait on the Kohteet page until a user moves
+    them to leads. True: the old automatic match -> lead conversion."""
+    try:
+        return bool(current_app.config.get("LISTING_AUTO_CREATE_LEADS", False))
+    except RuntimeError:
+        return False
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -575,7 +584,7 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
     new_matches = match_listing(listing, now=now)
     db.session.commit()
     created = 0
-    if new_matches:
+    if new_matches and auto_create_leads():
         created = materialize_pending_matches(profile_ids={m.profile_id for m in new_matches}, now=now)
     return {"status": "done", "renovations": len(best), "matches": len(new_matches), "leads_created": created}
 
@@ -901,13 +910,71 @@ def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime)
         logger.exception("Could not log merged listing %s on lead %s", listing.id, lead.id)
 
 
+def merge_into_existing_leads(
+    *, profile_ids: set[int] | None = None, now: datetime | None = None
+) -> int:
+    """Another apartment of a housing company that already has a lead joins
+    that lead instead of waiting as a separate target. Creates no leads."""
+    now = now or _now()
+    query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
+        ListingMatch.status == "pending",
+        Listing.is_active.is_(True),
+        Listing.taloyhtio.isnot(None),
+    )
+    if profile_ids:
+        query = query.filter(ListingMatch.profile_id.in_(profile_ids))
+    merged = 0
+    for match in query.all():
+        same = _same_housing_company_lead(match, match.listing)
+        if same is not None:
+            _merge_into_lead(match, match.listing, same, now)
+            merged += 1
+    if merged:
+        db.session.commit()
+    return merged
+
+
+def materialize_match(match: ListingMatch, *, now: datetime | None = None) -> tuple[str, object | None]:
+    """Move one match to a lead and commit. Returns (outcome, lead):
+    "created" / "updated" (the lead already existed), "merged" (joined the
+    housing company's existing lead) or "failed" (the CRM rejected it)."""
+    from app.api.services import ApiServiceError
+
+    now = now or _now()
+    match_id, listing, profile = match.id, match.listing, match.profile
+    same = _same_housing_company_lead(match, listing)
+    if same is not None:
+        _merge_into_lead(match, listing, same, now)
+        db.session.commit()
+        return "merged", same
+    try:
+        lead, action = _create_lead(listing, profile)
+        db.session.flush()
+    except ApiServiceError as exc:
+        db.session.rollback()
+        logger.warning("Listing match %s -> lead failed: %s", match_id, exc.message)
+        match = db.session.get(ListingMatch, match_id)
+        match.status = "lead_created"  # do not retry a payload the CRM rejects
+        match.lead_created_at = now
+        db.session.commit()
+        return "failed", None
+    match.status = "lead_created"
+    match.lead_id = lead.id
+    match.lead_created_at = now
+    if action == "created":
+        profile.total_leads_sent = (profile.total_leads_sent or 0) + 1
+    profile.last_run_at = now
+    db.session.commit()
+    return action, lead
+
+
 def materialize_pending_matches(
     *, profile_ids: set[int] | None = None, now: datetime | None = None
 ) -> int:
     """Turn pending matches into leads, newest listings first, never more than
-    a profile's daily_lead_limit per UTC day (0 = unlimited)."""
-    from app.api.services import ApiServiceError
-
+    a profile's daily_lead_limit per UTC day (0 = unlimited). Only runs
+    automatically when LISTING_AUTO_CREATE_LEADS is on; by default users move
+    matches to leads themselves on the Kohteet page."""
     now = now or _now()
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     query = (
@@ -927,22 +994,7 @@ def materialize_pending_matches(
         # Another apartment of a housing company that already has a lead joins
         # that lead. This creates nothing, so it runs before (and regardless
         # of) the daily limit.
-        waiting = (
-            ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id)
-            .filter(
-                ListingMatch.profile_id == profile_id,
-                ListingMatch.status == "pending",
-                Listing.is_active.is_(True),
-                Listing.taloyhtio.isnot(None),
-            )
-            .all()
-        )
-        for match in waiting:
-            same = _same_housing_company_lead(match, match.listing)
-            if same is not None:
-                _merge_into_lead(match, match.listing, same, now)
-        if waiting:
-            db.session.commit()
+        merge_into_existing_leads(profile_ids={profile_id}, now=now)
 
         limit = profile.daily_lead_limit or 0
         if limit > 0:
@@ -969,33 +1021,11 @@ def materialize_pending_matches(
         if quota is not None:
             pending = pending.limit(quota)
 
-        for match in pending.all():
-            listing = match.listing
-            same = _same_housing_company_lead(match, listing)
-            if same is not None:
-                # no new lead and no daily quota used
-                _merge_into_lead(match, listing, same, now)
-                db.session.commit()
-                continue
-            try:
-                lead, action = _create_lead(listing, profile)
-                db.session.flush()
-            except ApiServiceError as exc:
-                db.session.rollback()
-                logger.warning("Listing %s -> lead failed for profile %s: %s", listing.id, profile_id, exc.message)
-                match = db.session.get(ListingMatch, match.id)
-                match.status = "lead_created"  # do not retry a payload the CRM rejects
-                match.lead_created_at = now
-                db.session.commit()
-                continue
-            match.status = "lead_created"
-            match.lead_id = lead.id
-            match.lead_created_at = now
-            if action == "created":
-                profile.total_leads_sent = (profile.total_leads_sent or 0) + 1
+        for match_id in [m.id for m in pending.all()]:
+            # a merge creates no new lead and uses no daily quota
+            outcome, _lead = materialize_match(db.session.get(ListingMatch, match_id), now=now)
+            if outcome == "created":
                 created_total += 1
-            profile.last_run_at = now
-            db.session.commit()
     return created_total
 
 

@@ -78,6 +78,19 @@
   </div>
   {% endif %}
 
+  {% set targets_available = targets_available|default(0) %}
+  <a class="dash-targets{% if not targets_available %} dash-targets--empty{% endif %}" href="{{ url_for('targets.index', **org_q) }}">
+    <span class="dash-targets__count">{{ targets_available }}</span>
+    <span class="dash-targets__text">
+      <span class="dash-targets__title">{{ 'kohde saatavilla' if targets_available == 1 else 'kohdetta saatavilla' }}</span>
+      <span class="dash-targets__sub">
+        {% if targets_available %}Hakuprofiiliisi osuvia taloyhtiöitä, joita ei ole vielä siirretty liideiksi.
+        {% else %}Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät Kohteet-sivulle.{% endif %}
+      </span>
+    </span>
+    <span class="dash-targets__cta">{{ 'Avaa kohteet' if targets_available else 'Kohteet' }}<span aria-hidden="true"> →</span></span>
+  </a>
+
   {# The one dark surface in the app: the item the user should handle first. #}
   <section class="dash-focus" id="dashboardHero" aria-label="Käsittele ensin" aria-live="polite">
     <div class="dash-focus__main">

@@ -353,7 +353,8 @@ def test_search_profiles_sidepanel_shows_catalogue_matches(app, client):
     response = client.get(f"/settings/search-profiles?id={profile_id}")
     text_body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Odottaa päivärajaa" in text_body
+    assert "Saatavilla Kohteet-sivulla" in text_body
+    assert "Odottaa päivärajaa" not in text_body
     assert "Testitie 5" in text_body
     assert "82 %" in text_body
     assert "Seuraa uusia kohteita" in text_body

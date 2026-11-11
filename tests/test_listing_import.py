@@ -12,6 +12,9 @@ from app.users.services import create_organization, create_user
 
 import pytest
 
+# Automatic match -> lead pipeline; the default manual flow is in test_targets.py.
+pytestmark = pytest.mark.usefixtures("auto_create_leads")
+
 N8N_HEADERS = {"X-N8N-Secret": "test-n8n-secret"}
 
 

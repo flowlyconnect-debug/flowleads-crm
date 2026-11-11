@@ -11,9 +11,16 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   listing **once** with AI into renovation types, and enriches contacts only for listings some
   profile matched.
 - A `SearchProfile` (`app/search/models.py`) is just a **filter** (regions + renovation type(s) +
-  `min_confidence`, optional cities / timing / build year / building type, with `daily_lead_limit`).
-  Matches (`ListingMatch`) become leads in that org via `materialize_pending_matches` (scheduler job
-  `listing_matching`, every 10 min). Unknown listing values never exclude a listing.
+  `min_confidence`, optional cities / timing / build year / building type). Unknown listing values
+  never exclude a listing.
+- Matches (`ListingMatch`, status `pending`) do **not** become leads on their own. They wait on the
+  customer's **Kohteet** page (`/targets`: `app/listings/target_routes.py`, `target_services.py`), where a
+  user moves them to leads (`transfer_targets`) or hides them (`dismissed`). The available count is shown
+  on the dashboard, in the sidebar and on `/admin/customers`. The scheduler job `listing_matching` (every
+  10 min) only rematches profiles and joins same-taloyhtiö matches to existing leads. The old automatic
+  conversion (`materialize_pending_matches`, `daily_lead_limit`) runs only with
+  `LISTING_AUTO_CREATE_LEADS=true` (off by default; the older catalogue tests turn it on with the
+  `auto_create_leads` fixture).
 - A catalogue lead is **one housing company's renovation**, not a property manager: leads are never
   merged by email (`match_by_email=False`); another apartment of the same taloyhtiö joins the existing
   lead (`ListingMatch.status == "merged"`).
@@ -23,7 +30,7 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 - **Oikotie blocks n8n Cloud since 11/2026** (DataDome 403 + captcha, the old Lead Worker too). The Crawler stops
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
-  Rows with a renovation type become leads at once; text-only rows go to the Analyzer (`fetch_detail: false`).
+  Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run
@@ -42,7 +49,7 @@ and there is no n8n workflow for it any more. Profile fields `schedule_descripti
 ## Working on this repo
 
 - Tests: `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` (≈6 min, all must pass).
-  Catalogue tests: `tests/test_listings_catalogue.py`, `tests/test_catalogue_filters_and_onboarding.py`. n8n workflow e2e (needs Node.js):
+  Catalogue tests: `tests/test_listings_catalogue.py`, `tests/test_catalogue_filters_and_onboarding.py`, `tests/test_targets.py` (Kohteet). n8n workflow e2e (needs Node.js):
   `tests/test_n8n_catalogue_e2e.py`, which runs the generated workflows with the mini n8n emulator in
   `tests/n8n_sim/` against a live local CRM. Re-run it after regenerating workflows.
 - Migrations: Alembic in `migrations/versions/`. Check with

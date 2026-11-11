@@ -152,6 +152,69 @@
 
 .crm-notice-link:hover { color: var(--color-text-primary); }
 
+/* ── Available targets (Kohteet): how many matches wait to be moved to leads ── */
+
+.dash-targets {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.dash-targets:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.dash-targets--empty {
+  background: var(--color-card);
+  border-color: var(--color-border);
+}
+
+.dash-targets__count {
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: -0.5px;
+  color: var(--color-accent-emphasis);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-targets--empty .dash-targets__count { color: var(--color-text-muted); }
+
+.dash-targets__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dash-targets__title { font-size: 14px; font-weight: var(--font-weight-semibold); }
+.dash-targets__sub { font-size: 13px; color: var(--color-text-secondary); }
+
+.dash-targets__cta {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-emphasis);
+  white-space: nowrap;
+}
+
+.dash-targets--empty .dash-targets__cta { color: var(--color-text-secondary); }
+
+@media (max-width: 560px) {
+  .dash-targets { flex-wrap: wrap; }
+  .dash-targets__cta { margin-left: auto; }
+}
+
 /* ── Focus panel: the single dark surface ── */
 
 .dash-focus {

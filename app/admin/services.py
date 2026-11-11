@@ -80,15 +80,14 @@ def _format_last_search(dt: datetime | None) -> str:
 
 def list_customers_summary() -> list[dict]:
     """One row per organization with ALL of its search profiles."""
-    from app.listings.models import ListingMatch
+    from app.listings.target_services import count_targets
 
     customers = []
     for org in get_accessible_organizations():
         profiles = list_profiles(org.id)
         last_run = max((p.last_run_at for p in profiles if p.last_run_at), default=None)
-        pending = (
-            ListingMatch.query.filter_by(organization_id=org.id, status="pending").count() if profiles else 0
-        )
+        # targets waiting on the customer's Kohteet page
+        pending = count_targets(org.id) if profiles else 0
         admin = (
             User.query.filter_by(organization_id=org.id, role="admin").order_by(User.id.asc()).first()
         )

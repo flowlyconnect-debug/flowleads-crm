@@ -30,7 +30,9 @@ from app.extensions import db
 ANALYSIS_STATUSES = ("pending", "processing", "done", "failed")
 # none = contacts not needed (yet) / already known from the listing itself.
 CONTACT_STATUSES = ("none", "pending", "processing", "done", "not_found")
-MATCH_STATUSES = ("pending", "lead_created")
+# pending = available on the customer's Kohteet page; dismissed = hidden there
+# by the customer; lead_created / merged = moved to a lead.
+MATCH_STATUSES = ("pending", "dismissed", "lead_created", "merged")
 CRAWL_MODES = ("incremental", "full")
 
 
@@ -129,10 +131,11 @@ class ListingRenovation(db.Model):
 
 
 class ListingMatch(db.Model):
-    """A listing that satisfies a search profile. Created as "pending" and
-    turned into a lead by materialize_pending_matches (respecting the
-    profile's daily lead limit). Status stays "lead_created" even if the lead
-    is later deleted, so a deleted lead is never silently recreated."""
+    """A listing that satisfies a search profile. Created as "pending": it is
+    shown on the organization's Kohteet page until a user moves it to a lead
+    (app/listings/target_services.py) or hides it. Status stays
+    "lead_created" even if the lead is later deleted, so a deleted lead is
+    never silently recreated."""
 
     __tablename__ = "listing_matches"
     __table_args__ = (
