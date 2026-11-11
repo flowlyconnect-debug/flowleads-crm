@@ -31,6 +31,8 @@ from app.tasks.forms import TaskForm
 from app.tasks.services import TaskService, TaskServiceError
 from app.users.models import User
 
+from app import stage_label_fi  # noqa: E402
+
 leads_bp = Blueprint("leads", __name__, url_prefix="/leads")
 
 UI_ROLES = ("superadmin", "admin", "user")
@@ -53,8 +55,8 @@ def _filters_from_request() -> dict:
         "source": request.args.get("source") or None,
         "assigned_to": request.args.get("assigned_to", type=int) or None,
         "status": request.args.get("status") or None,
-        "score_min": request.args.get("score_min"),
-        "score_max": request.args.get("score_max"),
+        "score_min": request.args.get("score_min", type=int),
+        "score_max": request.args.get("score_max", type=int),
         "created_from": _parse_date(request.args.get("created_from")),
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
         "sort": request.args.get("sort", "created_at"),
@@ -254,10 +256,10 @@ def list_leads():
     stages = PipelineStage.query.filter_by(organization_id=organization_id).order_by(
         PipelineStage.order_index
     ).all()
-    filter_form.stage_id.choices = [(0, "All stages")] + [(s.id, s.name) for s in stages]
+    filter_form.stage_id.choices = [(0, "Kaikki vaiheet")] + [(s.id, stage_label_fi(s.name)) for s in stages]
     filter_form.stage_id.coerce = lambda v: int(v) if v not in (None, "", 0) else 0
     users = _org_users(organization_id)
-    filter_form.assigned_to.choices = [(0, "Anyone")] + [(u.id, u.email) for u in users]
+    filter_form.assigned_to.choices = [(0, "Kuka tahansa")] + [(u.id, u.email) for u in users]
     filter_form.assigned_to.coerce = lambda v: int(v) if v not in (None, "", 0) else 0
 
     bulk_form = BulkActionForm()
@@ -286,26 +288,15 @@ def list_leads():
 def pipeline():
     organization_id = resolve_organization_id()
     filters = {
-        "assigned_to": request.args.get("assigned_to"),
+        "assigned_to": request.args.get("assigned_to", type=int),
         "source": request.args.get("source"),
-        "score_min": request.args.get("score_min"),
-        "score_max": request.args.get("score_max"),
+        "score_min": request.args.get("score_min", type=int),
+        "score_max": request.args.get("score_max", type=int),
         "created_from": _parse_date(request.args.get("created_from")),
         "created_to": _parse_date(request.args.get("created_to"), end_of_day=True),
     }
-    cache_key = (
-        f"pipeline_data:{organization_id}:"
-        f"{filters.get('assigned_to') or ''}:"
-        f"{filters.get('source') or ''}:"
-        f"{filters.get('score_min') or ''}:"
-        f"{filters.get('score_max') or ''}:"
-        f"{filters.get('created_from') or ''}:"
-        f"{filters.get('created_to') or ''}"
-    )
-    data = cache.get(cache_key)
-    if data is None:
-        data = LeadService.get_pipeline_data(organization_id, filters)
-        cache.set(cache_key, data, timeout=30)
+    # Not cached: a cached board showed a moved card in its old column on reload.
+    data = LeadService.get_pipeline_data(organization_id, filters)
     users = _org_users(organization_id)
     from app.analytics.currency import currency_symbol, get_default_currency
 
@@ -510,8 +501,17 @@ def edit_lead(lead_id):
     )
 
 
+def _org_kwargs(organization_id) -> dict:
+    """organization_id belongs in the URL only for a superadmin."""
+    return {"organization_id": organization_id} if current_user.is_superadmin() else {}
+
+
 @leads_bp.route("/<int:lead_id>", methods=["PUT", "POST"])
 def update_lead(lead_id):
+    # The "Arkistoi" form posts here with _method=DELETE (HTML forms cannot
+    # send DELETE, and this rule wins over delete_lead's POST).
+    if request.method == "POST" and request.form.get("_method") == "DELETE":
+        return delete_lead(lead_id)
     organization_id = resolve_organization_id()
     if request.method == "PUT" or request.is_json:
         payload = request.get_json(silent=True) or {}
@@ -561,10 +561,8 @@ def update_lead(lead_id):
         return render_template("leads/form.html", form=form, lead=lead, organization_id=organization_id), 400
 
 
-@leads_bp.route("/<int:lead_id>", methods=["DELETE", "POST"])
+@leads_bp.route("/<int:lead_id>", methods=["DELETE"])
 def delete_lead(lead_id):
-    if request.method == "POST" and request.form.get("_method") != "DELETE":
-        abort(405)
     if not can_archive_leads():
         return json_error("forbidden", "Insufficient permissions.", 403)
 
@@ -574,11 +572,14 @@ def delete_lead(lead_id):
         db.session.commit()
         if request.is_json or request.method == "DELETE":
             return json_success({"lead_id": lead_id, "status": "archived"})
-        flash("Lead archived.", "success")
-        return redirect(url_for("leads.list_leads", organization_id=organization_id))
+        flash("Liidi arkistoitu.", "success")
+        return redirect(url_for("leads.list_leads", **_org_kwargs(organization_id)))
     except LeadServiceError as exc:
         db.session.rollback()
-        return json_error(exc.code, exc.message, 400)
+        if request.is_json or request.method == "DELETE":
+            return json_error(exc.code, exc.message, 400)
+        flash(exc.message, "danger")
+        return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
 
 
 @leads_bp.route("/<int:lead_id>/stage", methods=["POST", "PATCH"])
@@ -586,6 +587,10 @@ def move_stage(lead_id):
     organization_id = resolve_organization_id()
     payload = request.get_json(silent=True) or {}
     stage_id = payload.get("stage_id") or request.form.get("stage_id", type=int)
+    try:
+        stage_id = int(stage_id) if stage_id else None
+    except (TypeError, ValueError):
+        stage_id = None
     if not stage_id:
         return json_error("validation_error", "stage_id is required.", 400)
 
@@ -609,7 +614,7 @@ def move_stage(lead_id):
                 "stage_id": lead.stage_id,
                 "status": lead.status,
             })
-        flash("Stage updated.", "success")
+        flash("Vaihe päivitetty.", "success")
         return redirect(url_for("leads.detail", lead_id=lead.id, organization_id=organization_id))
     except LeadServiceError as exc:
         db.session.rollback()
@@ -835,7 +840,10 @@ def bulk_action():
         except (json.JSONDecodeError, ValueError):
             return json_error("validation_error", "Invalid lead IDs.", 400)
     elif isinstance(lead_ids_raw, list):
-        lead_ids = [int(x) for x in lead_ids_raw]
+        try:
+            lead_ids = [int(x) for x in lead_ids_raw]
+        except (TypeError, ValueError):
+            return json_error("validation_error", "Invalid lead IDs.", 400)
     else:
         lead_ids = request.form.getlist("lead_ids", type=int)
 
@@ -851,6 +859,10 @@ def bulk_action():
         )
     if action == "change_stage":
         payload["stage_id"] = request.form.get("stage_id", type=int) or (request.get_json(silent=True) or {}).get("stage_id")
+        # moving to Hävitty needs a reason; the bulk bar has no picker for it
+        payload["lost_reason"] = (
+            request.form.get("lost_reason") or (request.get_json(silent=True) or {}).get("lost_reason") or "other"
+        )
 
     try:
         result = LeadService.bulk_action(action, lead_ids, organization_id, current_user.id, payload)
@@ -864,11 +876,15 @@ def bulk_action():
         db.session.commit()
         if request.is_json:
             return json_success(result)
-        flash("Bulk action completed.", "success")
-        return redirect(url_for("leads.list_leads", organization_id=organization_id))
-    except LeadServiceError as exc:
+        flash("Massatoiminto suoritettu.", "success")
+        return redirect(url_for("leads.list_leads", **_org_kwargs(organization_id)))
+    except (LeadServiceError, ValueError, TypeError) as exc:
         db.session.rollback()
-        return json_error(exc.code, exc.message, 400)
+        message = getattr(exc, "message", None) or "Virheellinen pyyntö."
+        if request.is_json:
+            return json_error(getattr(exc, "code", "validation_error"), message, 400)
+        flash(message, "danger")
+        return redirect(url_for("leads.list_leads", **_org_kwargs(organization_id)))
 
 
 from app.gdpr.routes import register_lead_gdpr_routes  # noqa: E402

@@ -14,10 +14,14 @@
 {% endmacro %}
 
 {% macro settings_nav(active) %}
-{% set org_id_param = request.args.get('organization_id') %}
+{% set org_id_param = active_org_id if current_user.is_superadmin() else none %}
 {% set use_org = current_user.is_superadmin() and org_id_param %}
 <nav class="settings-nav" aria-label="Asetukset">
   <span class="settings-nav__label">Asetukset</span>
+
+  {% macro org_link(endpoint, key, label) -%}
+  <a href="{% if use_org %}{{ url_for(endpoint, organization_id=org_id_param) }}{% else %}{{ url_for(endpoint) }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == key %} is-active{% endif %}">{{ label }}</a>
+  {%- endmacro %}
 
   {% if current_user.is_superadmin() %}
 
@@ -25,39 +29,52 @@
   <a href="{{ url_for('admin.customers_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customers' %} is-active{% endif %}">Asiakaslista</a>
   <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
   <a href="{{ url_for('admin.create_invite_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_invite' %} is-active{% endif %}">Kutsu asiakas</a>
+  <a href="{{ url_for('admin.catalogue_status') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'catalogue' %} is-active{% endif %}">Kohdekatalogi</a>
 
-  <span class="settings-nav__group-label">Hakujärjestelmä</span>
-  <a href="{% if use_org %}{{ url_for('settings.search_profiles_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.search_profiles_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiili</a>
-  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'api_keys' %} is-active{% endif %}">API-avaimet</a>
-
-  <span class="settings-nav__group-label">Tiimi</span>
-  <a href="{% if use_org %}{{ url_for('settings.team_members', organization_id=org_id_param) }}{% else %}{{ url_for('settings.team_members') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'team' %} is-active{% endif %}">Käyttäjät</a>
-
-  <span class="settings-nav__group-label">Integraatiot</span>
-  <a href="{% if use_org %}{{ url_for('settings.api_keys', organization_id=org_id_param) }}{% else %}{{ url_for('settings.api_keys') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
-  <a href="{% if use_org %}{{ url_for('settings.webhooks_list', organization_id=org_id_param) }}{% else %}{{ url_for('settings.webhooks_list') }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == 'webhooks' %} is-active{% endif %}">Webhooks</a>
+  {# Organization-scoped settings need a chosen organization. #}
+  {% if use_org %}
+  <span class="settings-nav__group-label">Valittu organisaatio</span>
+  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Hakuprofiili') }}
+  {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
+  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidiasetukset') }}
+  {{ org_link('settings.email_settings', 'email', 'Sähköpostiasetukset') }}
+  {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
+  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
+  {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
+  {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+  {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
+  {% endif %}
 
   <span class="settings-nav__group-label">Järjestelmä</span>
-  <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Backups</a>
-  <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin_reports' %} is-active{% endif %}">System Reports</a>
   <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
+  <a href="{{ url_for('email.admin_email_logs') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_logs' %} is-active{% endif %}">Sähköpostiloki</a>
+  <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Varmuuskopiot</a>
+  <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin_reports' %} is-active{% endif %}">Järjestelmäraportit</a>
 
   {% elif current_user.role == 'admin' %}
 
-  <span class="settings-nav__item settings-nav__item--disabled" aria-disabled="true">Organisaatio</span>
-  <a href="{{ url_for('settings.search_profiles_list') }}" class="settings-nav__item{% if active == 'search_profiles' %} is-active{% endif %}">Hakuprofiili</a>
-  <a href="{{ url_for('settings.api_keys') }}" class="settings-nav__item{% if active == 'api_keys' %} is-active{% endif %}">API-avain</a>
+  <span class="settings-nav__group-label">Liidit</span>
+  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Hakuprofiili') }}
+  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidiasetukset') }}
+
+  <span class="settings-nav__group-label">Organisaatio</span>
+  {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
+  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
+  {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
 
   <span class="settings-nav__group-label">Sähköposti</span>
-  <a href="{{ url_for('settings.email_settings') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email' %} is-active{% endif %}">Sähköpostiasetukset</a>
-  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
+  {{ org_link('settings.email_settings', 'email', 'Sähköpostiasetukset') }}
+  {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
 
-  <a href="{{ url_for('settings.api_keys') }}" class="settings-nav__item{% if active == 'integrations' %} is-active{% endif %}">Integraatiot</a>
-  <a href="{{ url_for('settings.privacy_settings') }}" class="settings-nav__item{% if active == 'privacy' %} is-active{% endif %}">Tietosuoja</a>
+  <span class="settings-nav__group-label">Integraatiot</span>
+  {{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}
+  {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
+  {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
 
   {% else %}
 
   <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
+  <a href="{{ url_for('settings.calendar_settings') }}" class="settings-nav__item{% if active == 'calendar' %} is-active{% endif %}">Kalenteri</a>
 
   {% endif %}
 </nav>
@@ -65,7 +82,7 @@
 
 {% macro score_badge(score) %}
 {% if score is none %}
-<span class="badge score-none">No score</span>
+<span class="badge score-none">Ei pisteitä</span>
 {% elif score <= 40 %}
 <span class="badge score-low">{{ score }}</span>
 {% elif score <= 70 %}
@@ -92,18 +109,18 @@
 
 {% macro ai_status_badge(lead) %}
 {% if lead.ai_enrichment_status == 'completed' and lead.ai_enriched %}
-<span class="badge ai-ok">AI Enriched ✓</span>
+<span class="badge ai-ok">AI-rikastettu ✓</span>
 {% if lead.ai_enriched_at %}
-<span class="ai-meta">({{ lead.ai_enriched_at.strftime('%Y-%m-%d %H:%M') }} UTC)</span>
+<span class="ai-meta">({{ (lead.ai_enriched_at|helsinki).strftime('%Y-%m-%d %H:%M') }})</span>
 {% endif %}
 {% elif lead.ai_enrichment_status in ('pending', 'processing') %}
-<span class="badge ai-pending">Enriching…</span>
+<span class="badge ai-pending">Rikastetaan…</span>
 {% elif lead.ai_enrichment_status == 'failed' %}
-<span class="badge ai-failed">AI failed</span>
+<span class="badge ai-failed">AI-rikastus epäonnistui</span>
 {% if lead.ai_enrichment_error %}<p class="ai-error">{{ lead.ai_enrichment_error }}</p>{% endif %}
 {% elif lead.ai_enrichment_status == 'disabled' %}
-<span class="badge ai-disabled">AI disabled</span>
+<span class="badge ai-disabled">AI ei käytössä</span>
 {% else %}
-<span class="badge ai-disabled">Not enriched</span>
+<span class="badge ai-disabled">Ei rikastettu</span>
 {% endif %}
 {% endmacro %}

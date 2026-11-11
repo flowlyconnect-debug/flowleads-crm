@@ -53,7 +53,7 @@ def _check_daily_send_limit(organization_id: int) -> None:
     day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     sent_today = EmailLog.query.filter(
         EmailLog.organization_id == organization_id,
-        EmailLog.status == "sent",
+        EmailLog.sent_at.isnot(None),
         EmailLog.sent_at >= day_start,
         EmailLog.sent_at < day_start + timedelta(days=1),
     ).count()
@@ -100,9 +100,9 @@ def _append_privacy_footer(
         f'<a href="{html.escape(url)}">Tietosuojaseloste</a></p>'
     )
     text_footer = f"\n\nTietosuojaseloste: {url}"
-    html = (body_html or "").strip()
+    html_body = (body_html or "").strip()
     text = (body_text or "").strip()
-    return html + html_footer, (text + text_footer) if text else text_footer.strip()
+    return html_body + html_footer, (text + text_footer) if text else text_footer.strip()
 
 
 def plaintext_to_html(text: str | None) -> str:
@@ -914,7 +914,11 @@ def handle_mailgun_webhook(event_data: dict) -> bool:
     if not message_id:
         return False
 
-    log = EmailLog.query.filter_by(mailgun_message_id=message_id).first()
+    # Events carry the bare id; the send API returned (and we stored) "<id>".
+    variants = _message_id_variants(str(message_id))
+    if not variants:
+        return False
+    log = EmailLog.query.filter(EmailLog.mailgun_message_id.in_(variants)).first()
     if not log:
         return False
 

@@ -121,7 +121,7 @@
                   <span class="badge badge-inactive">Ei aktiivinen</span>
                   {% endif %}
                 </td>
-                <td>{{ endpoint.last_triggered_at.strftime('%Y-%m-%d %H:%M') if endpoint.last_triggered_at else '—' }}</td>
+                <td>{{ (endpoint.last_triggered_at|helsinki).strftime('%Y-%m-%d %H:%M') if endpoint.last_triggered_at else '—' }}</td>
                 <td>{{ endpoint.success_count }}</td>
                 <td>{{ endpoint.failure_count }}</td>
                 <td>

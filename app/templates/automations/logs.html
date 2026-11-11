@@ -19,10 +19,10 @@
     <tbody>
       {% for log in logs %}
       <tr>
-        <td>{{ log.created_at.strftime('%d.%m.%Y %H:%M:%S') if log.created_at else '' }}</td>
+        <td>{{ (log.created_at|helsinki).strftime('%d.%m.%Y %H:%M:%S') if log.created_at else '' }}</td>
         <td>
           {% if log.lead_id %}
-          <a href="{{ url_for('leads.lead_detail', lead_id=log.lead_id, **org_query) }}">#{{ log.lead_id }}</a>
+          <a href="{{ url_for('leads.detail', lead_id=log.lead_id, **org_query) }}">#{{ log.lead_id }}</a>
           {% else %}—{% endif %}
         </td>
         <td>

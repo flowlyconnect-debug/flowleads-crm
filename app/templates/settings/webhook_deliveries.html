@@ -40,7 +40,7 @@
           {% endif %}
         </td>
         <td>{{ delivery.response_status or '—' }}</td>
-        <td>{{ delivery.created_at.strftime('%Y-%m-%d %H:%M:%S') if delivery.created_at else '—' }}</td>
+        <td>{{ (delivery.created_at|helsinki).strftime('%Y-%m-%d %H:%M:%S') if delivery.created_at else '—' }}</td>
         <td>{{ delivery.duration_ms if delivery.duration_ms is not none else '—' }}</td>
         <td>{{ delivery.retry_count }}</td>
         <td>

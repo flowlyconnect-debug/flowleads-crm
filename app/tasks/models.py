@@ -50,7 +50,7 @@ class OrganizationSettings(db.Model):
     )
     proposal_default_valid_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     proposal_default_tax_percent: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2), nullable=False, default=Decimal("24")
+        Numeric(5, 2), nullable=False, default=Decimal("25.5")
     )
     proposal_default_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

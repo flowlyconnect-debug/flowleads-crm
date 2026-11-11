@@ -327,7 +327,7 @@ def upsert_lead(
                 existing.id,
                 None,
                 "updated",
-                content="Updated via API",
+                content="Tiedot päivitetty",
             )
             apply_enrichment_on_update(existing, set(data.keys()))
         _apply_custom_fields_from_payload(
@@ -376,6 +376,13 @@ def upsert_lead(
         source_ref=source_ref,
         tags=normalize_tags(data.get("tags", [])),
     )
+    # score sent on create used to be dropped silently
+    score = raw_payload.get("score") if isinstance(raw_payload, dict) else None
+    if isinstance(score, (int, float)) and not isinstance(score, bool) and 0 <= score <= 100:
+        lead.score = int(score)
+        reason = raw_payload.get("score_reason")
+        if isinstance(reason, str) and reason.strip():
+            lead.score_reason = reason.strip()[:2000]
     if data.get("metadata"):
         _apply_metadata(lead, data["metadata"])
 
@@ -424,7 +431,7 @@ def upsert_lead(
             db.session.flush()
             if changed:
                 LeadService.log_activity(
-                    dup.id, None, "updated", content="Updated via API"
+                    dup.id, None, "updated", content="Tiedot päivitetty"
                 )
                 apply_enrichment_on_update(dup, set(data.keys()))
             _apply_custom_fields_from_payload(
@@ -437,7 +444,7 @@ def upsert_lead(
             "validation_error",
         ) from None
 
-    LeadService.log_activity(lead.id, None, "created", content="Created via API")
+    LeadService.log_activity(lead.id, None, "created", content="Liidi luotu")
     apply_enrichment_on_create(lead)
     from app.tasks.services import TaskService
 
@@ -583,7 +590,7 @@ def patch_lead(organization_id: int, lead_id: int, payload: dict) -> Lead:
             raise ApiServiceError(exc.message, exc.code) from None
     if changed:
         lead.updated_at = datetime.now(timezone.utc)
-        LeadService.log_activity(lead.id, None, "updated", content="Updated via API")
+        LeadService.log_activity(lead.id, None, "updated", content="Tiedot päivitetty")
         db.session.flush()
         apply_enrichment_on_update(lead, set(data.keys()))
 

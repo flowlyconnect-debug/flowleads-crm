@@ -3,26 +3,26 @@
 {% block content %}
 <div class="toolbar">
   <h1 style="margin:0;">{{ log.subject }}</h1>
-  <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Back to history</a>
+  <a class="btn secondary" href="{{ url_for('email.history', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.history', lead_id=lead.id) }}">Takaisin historiaan</a>
 </div>
 
 <div class="card">
-  <p><strong>Status:</strong> <span class="badge">{{ log.status }}</span></p>
-  <p><strong>Sent by:</strong> {{ sender.email if sender else '—' }}</p>
-  <p><strong>Sent at:</strong> {{ log.sent_at or log.created_at }}</p>
+  <p><strong>Tila:</strong> <span class="badge">{{ {'sent': 'Lähetetty', 'delivered': 'Toimitettu', 'opened': 'Avattu', 'clicked': 'Klikattu', 'bounced': 'Palautunut', 'failed': 'Epäonnistui', 'queued': 'Jonossa'}.get(log.status, log.status) }}</span></p>
+  <p><strong>Lähettäjä:</strong> {{ sender.email if sender else '—' }}</p>
+  <p><strong>Lähetetty:</strong> {{ ((log.sent_at or log.created_at)|helsinki).strftime('%d.%m.%Y %H:%M') }}</p>
   {% if log.error_message %}
-  <p style="color:#f87171;"><strong>Error:</strong> {{ log.error_message }}</p>
+  <p style="color:#f87171;"><strong>Virhe:</strong> {{ log.error_message }}</p>
   {% endif %}
 </div>
 
 <div class="card" style="margin-top:1rem;">
-  <h2>Content</h2>
+  <h2>Viestin sisältö</h2>
   {% if log.body_html %}
   <iframe
     sandbox=""
     srcdoc="{{ log.body_html|e }}"
     style="width:100%; min-height:320px; border:1px solid #475569; border-radius:4px; background:#fff;"
-    title="Email content"
+    title="Viestin sisältö"
   ></iframe>
   {% elif log.body_text %}
   <pre style="white-space:pre-wrap;">{{ log.body_text }}</pre>

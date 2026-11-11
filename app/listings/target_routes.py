@@ -72,6 +72,11 @@ def index():
         search=search,
         page=request.args.get("page", 1, type=int) or 1,
     )
+    if not pagination.items and pagination.total and pagination.page > 1:
+        # the last page emptied out (everything on it was moved or hidden)
+        args = request.args.to_dict()
+        args["page"] = pagination.pages or 1
+        return redirect(url_for("targets.index", **args))
     return render_template(
         "targets/index.html",
         rows=[target_row(match) for match in pagination.items],

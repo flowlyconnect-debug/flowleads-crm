@@ -229,6 +229,21 @@ def mailgun_webhook():
     if not current_app.config.get("MAILGUN_WEBHOOK_SIGNING_KEY"):
         abort(503)
 
+    # Mailgun's current webhooks POST JSON: {"signature": {...}, "event-data": {...}}.
+    # The legacy format (form fields) is still accepted.
+    body = request.get_json(silent=True) if request.is_json else None
+    if isinstance(body, dict):
+        sig = body.get("signature") if isinstance(body.get("signature"), dict) else {}
+        timestamp, token, signature = sig.get("timestamp"), sig.get("token"), sig.get("signature")
+        if not timestamp or not token or not signature:
+            abort(403)
+        if not verify_mailgun_webhook_signature(str(timestamp), str(token), str(signature)):
+            abort(403)
+        event_data = body.get("event-data")
+        handle_mailgun_webhook(event_data if isinstance(event_data, dict) else {})
+        db.session.commit()
+        return "", 200
+
     timestamp = request.form.get("timestamp")
     token = request.form.get("token")
     signature = request.form.get("signature")

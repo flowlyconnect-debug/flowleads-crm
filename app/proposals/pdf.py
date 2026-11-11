@@ -6,6 +6,19 @@ from decimal import Decimal
 from app.proposals.models import Proposal
 
 
+def _safe_url_fetcher(url: str, *args, **kwargs):
+    """The header and footer come from the organization's settings as HTML.
+    WeasyPrint's default fetcher would follow file:// (and internal http)
+    references in them and embed server files in the PDF, so only inline
+    data: URIs and public https resources are fetched."""
+    scheme = (url or "").split(":", 1)[0].lower()
+    if scheme not in ("data", "https"):
+        raise ValueError(f"Blocked resource in proposal PDF: {scheme}")
+    from weasyprint import default_url_fetcher
+
+    return default_url_fetcher(url, *args, **kwargs)
+
+
 class ProposalPDFService:
     @staticmethod
     def _format_money(value: Decimal | str, currency: str) -> str:
@@ -99,7 +112,7 @@ class ProposalPDFService:
         try:
             from weasyprint import HTML
 
-            return HTML(string=html_content).write_pdf()
+            return HTML(string=html_content, url_fetcher=_safe_url_fetcher).write_pdf()
         except (ImportError, OSError):
             # WeasyPrint can fail to load on some environments due to missing native libs.
             # Fallback to returning the rendered HTML bytes so callers/tests still get content.

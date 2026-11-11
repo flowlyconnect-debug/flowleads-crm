@@ -20,12 +20,9 @@ from app.users.models import Organization
 
 def _settings_org_id(require_admin: bool = False) -> int:
     if current_user.is_superadmin():
-        org_id = request.args.get("organization_id") or request.form.get("organization_id")
-        if org_id:
-            return int(org_id)
-        if require_admin and current_user.organization_id:
-            return current_user.organization_id
-        abort(400, description="organization_id is required for superadmin.")
+        from app.core.tenant import resolve_organization_id
+
+        return resolve_organization_id()
     if current_user.organization_id is None:
         abort(403)
     return current_user.organization_id
@@ -35,16 +32,7 @@ def _settings_org_id(require_admin: bool = False) -> int:
 @login_required
 @require_role("admin", "superadmin")
 def email_settings():
-    org_id = current_user.organization_id
-    if current_user.is_superadmin():
-        org_id_param = request.args.get("organization_id") or request.form.get("organization_id")
-        if org_id_param:
-            try:
-                org_id = int(org_id_param)
-            except (TypeError, ValueError):
-                org_id = None
-    if not org_id:
-        abort(403)
+    org_id = _settings_org_id()
 
     org = db.session.get(Organization, org_id)
     if org is None:
@@ -144,7 +132,7 @@ def email_domain_verify():
 @require_role("admin", "superadmin", "user")
 def email_templates_list():
     org_id = _settings_org_id()
-    seed_system_email_templates()
+    seed_system_email_templates(commit=True)
     templates = TemplateService.list_for_organization(org_id)
     can_edit = current_user.role in ("admin", "superadmin")
     return render_template(
@@ -266,10 +254,10 @@ def email_templates_preview(template_id):
         abort(404)
 
     sample_lead = Lead(
-        first_name="Alex",
-        last_name="Sample",
-        company="Acme Corp",
-        ai_summary="Sample AI summary for preview.",
+        first_name="Matti",
+        last_name="Meikäläinen",
+        company="As Oy Esimerkkitalo",
+        ai_summary="Taloyhtiössä on suunnitteilla putkiremontti vuodelle 2027.",
     )
     rendered = TemplateService.render_for_lead(template, sample_lead, sender_display_name())
     return render_template(

@@ -81,31 +81,35 @@ def validate_submission_payload(
             elif str(raw).lower() in ("false", "0", "off", "no"):
                 value = False
             else:
-                errors[key] = "Invalid checkbox value."
+                errors[key] = "Virheellinen valinta."
+                continue
+            if required and not value:
+                # e.g. a consent box that must be ticked
+                errors[key] = "Tämä kenttä on pakollinen."
                 continue
         else:
             if raw is None or (isinstance(raw, str) and not raw.strip()):
                 if required:
-                    errors[key] = "This field is required."
+                    errors[key] = "Tämä kenttä on pakollinen."
                 continue
             value = str(raw).strip() if not isinstance(raw, (int, float)) else raw
 
         if field_type == "email" and value:
             if not validate_email(str(value)):
-                errors[key] = "Invalid email address."
+                errors[key] = "Virheellinen sähköpostiosoite."
                 continue
 
         if field_type == "select" and value:
             options = field.get("options") or []
             if str(value) not in options:
-                errors[key] = "Invalid selection."
+                errors[key] = "Virheellinen valinta."
                 continue
 
         if field_type == "number" and value != "":
             try:
                 float(value)
             except (TypeError, ValueError):
-                errors[key] = "Must be a number."
+                errors[key] = "Anna numero."
                 continue
 
         normalized[key] = value
@@ -113,7 +117,7 @@ def validate_submission_payload(
     if errors:
         return None, {
             "code": "validation_error",
-            "message": "Please correct the highlighted fields.",
+            "message": "Tarkista merkityt kentät.",
             "fields": errors,
         }
 

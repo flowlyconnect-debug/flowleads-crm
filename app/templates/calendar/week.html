@@ -32,7 +32,8 @@
            role="tab"
            aria-selected="{{ 'true' if active_view == 'week' else 'false' }}">Viikko</a>
       </nav>
-      <a href="/calendar/new" class="btn btn-primary btn-sm calendar-toolbar__create">+ Luo tapaaminen</a>
+      {# Meetings are scheduled from a lead's page (Tapaamiset), so this opens the lead list. #}
+      <a href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}" class="btn btn-primary btn-sm calendar-toolbar__create" title="Tapaaminen sovitaan liidin sivulta">+ Sovi tapaaminen liidille</a>
       </div>
 
       {% if active_view == 'day' %}
@@ -43,7 +44,7 @@
             {% for event in today_events %}
             <li class="calendar-day-item">
               <div class="calendar-day-item__time">
-                {{ event.start_at.strftime('%H:%M') }}–{{ event.end_at.strftime('%H:%M') }}
+                {{ (event.start_at|helsinki).strftime('%H:%M') }}–{{ (event.end_at|helsinki).strftime('%H:%M') }}
               </div>
               <div class="calendar-day-item__body">
                 <div class="calendar-day-item__title">{{ event.title }}</div>
@@ -87,7 +88,7 @@
               <div class="calendar-week-col__events">
                 {% for event in day.events %}
                 <div class="calendar-event-block" title="{{ event.title }}">
-                  <div class="calendar-event-block__time">{{ event.start_at.strftime('%H:%M') }}</div>
+                  <div class="calendar-event-block__time">{{ (event.start_at|helsinki).strftime('%H:%M') }}</div>
                   <div class="calendar-event-block__title">{{ event.title }}</div>
                 </div>
                 {% endfor %}
@@ -118,7 +119,7 @@
           {% for event in upcoming_events %}
           <li class="calendar-upcoming-item">
             <div class="calendar-upcoming-item__when">
-              {{ event.start_at.strftime('%d.%m.') }} {{ event.start_at.strftime('%H:%M') }}
+              {{ (event.start_at|helsinki).strftime('%d.%m.') }} {{ (event.start_at|helsinki).strftime('%H:%M') }}
             </div>
             <div class="calendar-upcoming-item__title">{{ event.title }}</div>
             {% if event.lead %}

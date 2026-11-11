@@ -6,31 +6,34 @@ from wtforms.validators import DataRequired, Length, Optional
 
 from app.tasks.models import TASK_PRIORITIES, TASK_TYPES
 
+TASK_TYPE_LABELS_FI = {
+    "call": "Soitto",
+    "email": "Sähköposti",
+    "follow_up": "Seuranta",
+    "meeting": "Tapaaminen",
+    "other": "Muu",
+}
+TASK_PRIORITY_LABELS_FI = {"low": "Matala", "normal": "Normaali", "high": "Korkea", "urgent": "Kiireellinen"}
+
 
 class TaskForm(FlaskForm):
-    title = StringField("Title", validators=[DataRequired(), Length(max=200)])
-    description = TextAreaField("Description", validators=[Optional(), Length(max=5000)])
+    title = StringField("Otsikko", validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField("Kuvaus", validators=[Optional(), Length(max=5000)])
     type = SelectField(
-        "Type",
-        choices=[
-            ("call", "Call"),
-            ("email", "Email"),
-            ("follow_up", "Follow-up"),
-            ("meeting", "Meeting"),
-            ("other", "Other"),
-        ],
+        "Tyyppi",
+        choices=[(t, TASK_TYPE_LABELS_FI.get(t, t)) for t in ("call", "email", "follow_up", "meeting", "other")],
         default="follow_up",
     )
     priority = SelectField(
-        "Priority",
-        choices=[(p, p.capitalize()) for p in TASK_PRIORITIES],
+        "Prioriteetti",
+        choices=[(p, TASK_PRIORITY_LABELS_FI.get(p, p)) for p in TASK_PRIORITIES],
         default="normal",
     )
-    due_date = DateTimeLocalField("Due date", format="%Y-%m-%dT%H:%M", validators=[DataRequired()])
-    assigned_to = SelectField("Assign to", coerce=int, validators=[DataRequired()])
-    enable_reminder = BooleanField("Reminder", default=False)
+    due_date = DateTimeLocalField("Eräpäivä", format="%Y-%m-%dT%H:%M", validators=[DataRequired()])
+    assigned_to = SelectField("Vastuuhenkilö", coerce=int, validators=[DataRequired()])
+    enable_reminder = BooleanField("Muistutus", default=False)
     reminder_at = DateTimeLocalField(
-        "Reminder at",
+        "Muistutuksen aika",
         format="%Y-%m-%dT%H:%M",
         validators=[Optional()],
     )
@@ -56,18 +59,18 @@ class TaskForm(FlaskForm):
 
 
 class QuickTaskForm(FlaskForm):
-    title = StringField("Title", validators=[DataRequired(), Length(max=200)])
+    title = StringField("Otsikko", validators=[DataRequired(), Length(max=200)])
     type = SelectField(
-        "Type",
-        choices=[(t, t.replace("_", " ").title()) for t in TASK_TYPES],
+        "Tyyppi",
+        choices=[(t, TASK_TYPE_LABELS_FI.get(t, t)) for t in TASK_TYPES],
         default="follow_up",
     )
     priority = SelectField(
-        "Priority",
-        choices=[(p, p.capitalize()) for p in TASK_PRIORITIES],
+        "Prioriteetti",
+        choices=[(p, TASK_PRIORITY_LABELS_FI.get(p, p)) for p in TASK_PRIORITIES],
         default="normal",
     )
-    due_date = DateTimeLocalField("Due date", format="%Y-%m-%dT%H:%M", validators=[DataRequired()])
+    due_date = DateTimeLocalField("Eräpäivä", format="%Y-%m-%dT%H:%M", validators=[DataRequired()])
 
     def to_service_data(self) -> dict:
         due = self.due_date.data

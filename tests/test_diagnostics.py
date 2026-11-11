@@ -48,6 +48,15 @@ def test_debug_last_error_disabled_in_production(client, prod_app):
     assert response.status_code == 404
 
 
+def test_debug_last_error_disabled_by_production_environment(client, app, monkeypatch):
+    """Production sets FLASK_ENV in the environment, not in app.config: the
+    endpoint used to stay open there."""
+    monkeypatch.setenv("FLASK_ENV", "production")
+    app.config.pop("FLASK_ENV", None)
+    app.config["DEBUG_DIAGNOSTICS"] = False
+    assert client.get("/api/v1/debug/last-error").status_code == 404
+
+
 def test_debug_last_error_enabled_with_flag(client, prod_diagnostics_app):
     response = client.get("/api/v1/debug/last-error")
     assert response.status_code == 200

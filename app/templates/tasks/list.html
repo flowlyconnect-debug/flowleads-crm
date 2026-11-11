@@ -6,12 +6,27 @@
 <div class="tasks-page">
   <header class="tasks-header">
     <h1>Tehtävät</h1>
-    <button type="button" class="btn btn-primary" id="toggle-task-form">+ Uusi tehtävä</button>
+    <div class="page-header__actions" style="display:flex;gap:8px;align-items:center;">
+      {% if can_assign_others and users|length > 1 %}
+      <form method="get" action="{{ url_for('tasks.list_tasks') }}">
+        {% if org_query.organization_id %}<input type="hidden" name="organization_id" value="{{ org_query.organization_id }}">{% endif %}
+        <label class="sr-only" for="task-assignee-filter">Näytä tehtävät</label>
+        <select name="assigned_to" id="task-assignee-filter" class="form-select" onchange="this.form.submit()">
+          <option value="{{ current_user.id }}"{% if assigned_filter == current_user.id %} selected{% endif %}>Omat tehtäväni</option>
+          <option value="all"{% if assigned_filter is none %} selected{% endif %}>Koko tiimin tehtävät</option>
+          {% for u in users if u.id != current_user.id %}
+          <option value="{{ u.id }}"{% if assigned_filter == u.id %} selected{% endif %}>{{ u.email }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      <button type="button" class="btn btn-primary" id="toggle-task-form">+ Uusi tehtävä</button>
+    </div>
   </header>
 
   <section class="tasks-inline-form is-hidden" id="task-create-wrapper">
     <form id="task-create-form" action="{{ url_for('tasks.create_task', **org_query) }}">
-      <label class="form-label">Title
+      <label class="form-label">Otsikko
         <input type="text" name="title" class="form-input" placeholder="Tehtävän otsikko" required>
       </label>
 
@@ -31,9 +46,9 @@
 
       <label class="form-label">Prioriteetti
         <select name="priority" class="form-select">
-          <option value="low">Low</option>
-          <option value="normal" selected>Normal</option>
-          <option value="high">High</option>
+          <option value="low">Matala</option>
+          <option value="normal" selected>Normaali</option>
+          <option value="high">Korkea</option>
         </select>
       </label>
 
@@ -205,8 +220,15 @@
     });
   }
 
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function buildTaskRow(task) {
-    var leadHtml = task.lead_url ? '<a href="' + task.lead_url + '">' + (task.lead_name || 'Liidi') + '</a>' : '';
+    // titles and company names are user/catalogue text: never raw into innerHTML
+    var leadHtml = task.lead_url ? '<a href="' + esc(task.lead_url) + '">' + esc(task.lead_name || 'Liidi') + '</a>' : '';
     var dueDate = task.due_date ? new Date(task.due_date) : null;
     var weekday = dueDate ? dueDate.toLocaleDateString('fi-FI', { weekday: 'short' }) : '';
     var dayMonth = dueDate ? (dueDate.getDate() + '.' + (dueDate.getMonth() + 1) + '.') : '';
@@ -215,11 +237,11 @@
     if (task.section === 'today' && task.due_time) dueText = task.due_time;
     if (task.section === 'week') dueText = weekday + ' ' + dayMonth;
     if (task.section === 'later') dueText = dayMonth;
-    var action = task.lead_url ? '<a href="' + task.lead_url + '">Avaa liidi →</a>' : '';
+    var action = task.lead_url ? '<a href="' + esc(task.lead_url) + '">Avaa liidi →</a>' : '';
     var priorityDot = (task.priority === 'high' || task.priority === 'urgent') ? '<span class="priority-dot" title="Korkea prioriteetti"></span>' : '';
-    var html = '<article class="task-row priority-' + task.priority + '" data-task-id="' + task.id + '">' +
-      '<button class="task-check" type="button" data-complete-url="' + task.complete_url + '">○</button>' +
-      '<div class="task-row__main"><div class="task-row__title">' + task.title + '</div><div class="task-row__meta">' + leadHtml + '</div></div>' +
+    var html = '<article class="task-row priority-' + esc(task.priority) + '" data-task-id="' + esc(task.id) + '">' +
+      '<button class="task-check" type="button" data-complete-url="' + esc(task.complete_url) + '">○</button>' +
+      '<div class="task-row__main"><div class="task-row__title">' + esc(task.title) + '</div><div class="task-row__meta">' + leadHtml + '</div></div>' +
       '<div class="task-row__due' + (task.section === 'overdue' ? ' task-row__due--danger' : '') + '">' + dueText + '</div>' +
       '<div class="task-row__action">' + (task.section === 'today' ? priorityDot : action) + '</div>' +
       '</article>';

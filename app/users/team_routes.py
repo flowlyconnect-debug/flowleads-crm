@@ -14,14 +14,11 @@ from app.users.team_services import (
 
 
 def _resolve_organization_id():
-    organization_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_id_param = request.args.get("organization_id") or request.form.get("organization_id")
-        try:
-            organization_id = int(org_id_param) if org_id_param else None
-        except (TypeError, ValueError):
-            organization_id = None
-    return organization_id
+        from app.core.tenant import resolve_organization_id
+
+        return resolve_organization_id()
+    return current_user.organization_id
 
 
 def _redirect_to_team(organization_id):

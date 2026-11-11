@@ -147,8 +147,9 @@ class ListingMatch(db.Model):
     organization_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("organizations.id"), nullable=False, index=True
     )
-    profile_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("search_profiles.id", ondelete="CASCADE"), nullable=False, index=True
+    # NULL once the profile is deleted: handled matches outlive their profile.
+    profile_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("search_profiles.id", ondelete="CASCADE"), nullable=True, index=True
     )
     listing_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False, index=True
@@ -162,7 +163,7 @@ class ListingMatch(db.Model):
     lead_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing")
-    profile: Mapped["SearchProfile"] = relationship("SearchProfile")  # noqa: F821
+    profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821
 
 
 class CrawlState(db.Model):

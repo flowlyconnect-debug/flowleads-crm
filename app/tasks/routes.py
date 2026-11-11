@@ -52,24 +52,6 @@ def block_api_client():
     _require_ui_role()
 
 
-@tasks_bp.context_processor
-def inject_overdue_count():
-    if not current_user.is_authenticated or current_user.role not in UI_ROLES:
-        return {}
-    try:
-        org_id = current_user.organization_id
-        if current_user.is_superadmin():
-            org_param = request.args.get("organization_id")
-            if org_param:
-                org_id = int(org_param)
-        if org_id is None:
-            return {"nav_overdue_count": 0}
-        count = TaskService.count_overdue(org_id, current_user.id)
-        return {"nav_overdue_count": count}
-    except Exception:
-        return {"nav_overdue_count": 0}
-
-
 @tasks_bp.route("")
 def list_tasks():
     organization_id = resolve_organization_id()

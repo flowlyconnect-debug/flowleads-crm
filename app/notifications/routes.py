@@ -14,6 +14,8 @@ from app.tasks.models import Task
 
 from flask import request as flask_request
 
+from app.core.tenant import parse_organization_id_param
+
 notifications_bp = Blueprint("notifications_api", __name__, url_prefix="/api")
 
 
@@ -100,11 +102,10 @@ def list_notifications():
         return json_error("forbidden", "Access denied.", 403)
     org_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_param = request.args.get("organization_id")
-        if org_param:
-            org_id = int(org_param)
+        org_id = parse_organization_id_param()
     if org_id is None:
-        return json_error("validation_error", "organization_id required.", 400)
+        # superadmin with no organization chosen: nothing to show, not an error
+        return json_success({"unread_count": 0, "notifications": []})
     data = NotificationService.get_for_user(current_user.id, org_id)
     return json_success(data)
 
@@ -114,11 +115,7 @@ def list_notifications():
 def mark_notification_read(notification_id: int):
     org_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_param = request.args.get("organization_id")
-        if request.is_json and request.json:
-            org_param = org_param or request.json.get("organization_id")
-        if org_param:
-            org_id = int(org_param)
+        org_id = parse_organization_id_param()
     if org_id is None:
         return json_error("validation_error", "organization_id required.", 400)
     try:
@@ -135,11 +132,7 @@ def mark_notification_read(notification_id: int):
 def mark_all_notifications_read():
     org_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_param = request.args.get("organization_id")
-        if request.is_json and request.json:
-            org_param = org_param or request.json.get("organization_id")
-        if org_param:
-            org_id = int(org_param)
+        org_id = parse_organization_id_param()
     if org_id is None:
         return json_error("validation_error", "organization_id required.", 400)
     count = NotificationService.mark_all_read(current_user.id, org_id)

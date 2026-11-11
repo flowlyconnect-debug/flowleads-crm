@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import traceback
 from typing import Any
@@ -16,9 +17,15 @@ _last_error: dict[str, Any] | None = None
 
 def diagnostics_enabled(app: Flask | None = None) -> bool:
     app = app or current_app
-    if app.config.get("FLASK_ENV") != "production":
+    # FLASK_ENV is an environment variable, not a config key: reading it from
+    # app.config made this always true and left /api/v1/debug/last-error open
+    # in production.
+    if app.config.get("DEBUG_DIAGNOSTICS"):
         return True
-    return bool(app.config.get("DEBUG_DIAGNOSTICS"))
+    env = app.config.get("FLASK_ENV") or os.environ.get("FLASK_ENV")
+    if env == "production":
+        return False
+    return bool(app.debug or app.config.get("TESTING"))
 
 
 def get_last_error() -> dict[str, Any] | None:

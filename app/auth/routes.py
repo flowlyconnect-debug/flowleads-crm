@@ -95,6 +95,14 @@ def _inject_feature_helpers():
     return {"has_feature": current_user_has_feature}
 
 
+def _is_safe_next(target: str | None) -> bool:
+    """Only same-site relative paths: /leads/3 yes, //evil.example or
+    https://evil.example no."""
+    if not target or not target.startswith("/"):
+        return False
+    return not (target.startswith("//") or target.startswith("/\\") or "\n" in target or "\r" in target)
+
+
 def _login_rate_limit():
     from flask import current_app
 
@@ -133,7 +141,7 @@ def login():
             if user.must_change_password:
                 return redirect(url_for("auth.change_password_route"))
             next_url = request.args.get("next")
-            if next_url:
+            if _is_safe_next(next_url):
                 return redirect(next_url)
             return redirect(url_for("analytics.dashboard"))
 

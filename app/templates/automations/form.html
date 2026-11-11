@@ -156,7 +156,7 @@ function actionFieldsHtml(type, cfg) {
   if (type === 'send_webhook') {
     return `<label>URL<input name="url" value="${cfg.url||''}" required></label>
       <label>Metodi<select name="method"><option ${cfg.method==='GET'?'selected':''}>GET</option><option ${!cfg.method||cfg.method==='POST'?'selected':''}>POST</option></select></label>
-      <label>Body-malli<textarea name="body_template" rows="3">${cfg.body_template||'{"lead_id":"{{lead.id}}"}'}</textarea></label>
+      <label>Body-malli<textarea name="body_template" rows="3">${cfg.body_template||'{"lead_id":"{{ "{{lead.id}}" }}"}'}</textarea></label>
       <label>Salainen header (nimi=arvo, salataan)<input name="secret_header" placeholder="X-Secret=abc123"></label>`;
   }
   if (type === 'notify_user') {

@@ -387,4 +387,6 @@ def test_lead_settings_404_for_nonexistent_organization(client, app):
 
     client.post("/auth/login", data={"email": "sa-leads-404@test.com", "password": "securepassword1"})
     response = client.get("/settings/leads?organization_id=999999")
-    assert response.status_code == 404
+    # an unknown organization sends the superadmin back to the organization picker
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/dashboard")

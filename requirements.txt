@@ -30,3 +30,4 @@ msal==1.39.0
 weasyprint==63.1
 boto3==1.43.127
 sentry-sdk[flask]==2.74.0
+tzdata==2025.2

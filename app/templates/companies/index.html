@@ -203,7 +203,7 @@
               {% endif %}
               {% if c.updated_at %}
               {% if ns.sep %}<span class="crm-registry-row__meta-sep" aria-hidden="true">·</span>{% endif %}
-              <span class="crm-registry-row__meta-time--{{ activity_time_mod(updated_days) }}">Viimeisin aktiviteetti {{ c.updated_at.strftime('%d.%m.%Y') }}</span>
+              <span class="crm-registry-row__meta-time--{{ activity_time_mod(updated_days) }}">Viimeisin aktiviteetti {{ (c.updated_at|helsinki).strftime('%d.%m.%Y') }}</span>
               {% endif %}
             </p>
           </div>

@@ -5103,3 +5103,15 @@ tr:hover .action-destructive,
   padding-top: 0;
   padding-bottom: 0;
 }
+
+.sidebar-org__switch {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-primary, #6846DC);
+  text-decoration: none;
+}
+
+.sidebar-org__switch:hover {
+  text-decoration: underline;
+}

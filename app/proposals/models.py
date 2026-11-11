@@ -149,7 +149,7 @@ class ProposalTemplate(db.Model):
     default_valid_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     default_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     default_tax_percent: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2), nullable=False, default=Decimal("24")
+        Numeric(5, 2), nullable=False, default=Decimal("25.5")
     )
     header_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     footer_html: Mapped[str | None] = mapped_column(Text, nullable=True)

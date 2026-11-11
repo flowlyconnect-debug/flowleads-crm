@@ -40,13 +40,10 @@ def _require_ui_role():
 
 def _optional_organization_id():
     if current_user.role == "superadmin":
-        org_id = request.args.get("organization_id") or request.form.get("organization_id")
-        if not org_id:
-            return None
-        try:
-            return int(org_id)
-        except (TypeError, ValueError):
-            abort(400, description="Invalid organization_id.")
+        from app.core.tenant import organization_exists, parse_organization_id_param
+
+        org_id = parse_organization_id_param()
+        return org_id if org_id and organization_exists(org_id) else None
     if current_user.organization_id is None:
         abort(403)
     return current_user.organization_id
@@ -706,6 +703,12 @@ def dashboard_pipeline_distribution():
 def dashboard():
     from flask import current_app
 
+    if current_user.is_superadmin() and not request.args.get("organization_id"):
+        # /dashboard without an organization is the superadmin's organization
+        # picker: opening it leaves the previously chosen organization
+        from app.core.tenant import forget_remembered_organization
+
+        forget_remembered_organization()
     organization_id = _optional_organization_id()
     organizations = get_accessible_organizations() if current_user.is_superadmin() else []
 

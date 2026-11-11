@@ -122,7 +122,7 @@
               {% if listing.building_type or listing.build_year %}
               <span class="target-row__fact">{{ [listing.building_type, listing.build_year]|select|join(', ') }}</span>
               {% endif %}
-              {% if row.seen_at %}<span class="target-row__fact">Löydetty {{ row.seen_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+              {% if row.seen_at %}<span class="target-row__fact">Löydetty {{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
             </div>
             <div class="target-row__contact">
               {% if listing.isannoitsija %}Isännöinti: {{ listing.isannoitsija }}{% endif %}

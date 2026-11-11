@@ -11,9 +11,9 @@
         <p class="text-muted">Toimita kirjautumistiedot asiakkaalle nyt{% if result.temporary_password %} — salasanaa ei näytetä uudelleen{% endif %}.</p>
 
         <div class="flash success" style="margin-top:1rem;">
-          <strong>Status:</strong>
+          <strong>Tila:</strong>
           {% if result.is_active %}
-          Hakuprofiili on aktiivinen. Osumat kohdekatalogin viime viikoilta tulevat liideiksi noin 10 minuutin kuluessa, ja uudet kohteet sitä mukaa kuin niitä ilmestyy.
+          Hakuprofiili on aktiivinen. Osumat kohdekatalogin viime viikoilta ilmestyvät asiakkaan Kohteet-sivulle noin 10 minuutin kuluessa, ja uudet kohteet sitä mukaa kuin niitä tulee katalogiin. Asiakas siirtää kiinnostavat kohteet itse liideiksi.
           {% else %}
           Luotu passiivisena — aktivoi hakuprofiili asiakaslistasta, kun asiakas saa aloittaa.
           {% endif %}

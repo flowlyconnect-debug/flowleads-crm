@@ -188,7 +188,9 @@ def update_form(form_id: int):
             "notify_users": request.form.getlist("notify_users"),
             "is_active": request.form.get("is_active") == "1",
         }
-        data = {k: v for k, v in data.items() if v is not None}
+        # "—" in these selects means "clear it", so their None must reach the service
+        clearable = ("default_stage_id", "default_assigned_to", "auto_enroll_sequence_id")
+        data = {k: v for k, v in data.items() if v is not None or k in clearable}
 
     try:
         form = WebFormService.update_form(form_id, data, organization_id)

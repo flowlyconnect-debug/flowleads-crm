@@ -491,18 +491,21 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="catalogue_health_check",
         replace_existing=True,
     )
-    scheduler.add_job(
-        run_reap_stuck_search_jobs,
-        IntervalTrigger(minutes=10),
-        id="reap_stuck_search_jobs",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_notify_failed_search_jobs,
-        IntervalTrigger(minutes=15),
-        id="notify_failed_search_jobs",
-        replace_existing=True,
-    )
+    if app.config.get("SEARCH_JOBS_ENABLED"):
+        # housekeeping of the legacy SearchJob pipeline: pointless (two extra
+        # queries every 10-15 minutes) while that pipeline is off
+        scheduler.add_job(
+            run_reap_stuck_search_jobs,
+            IntervalTrigger(minutes=10),
+            id="reap_stuck_search_jobs",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            run_notify_failed_search_jobs,
+            IntervalTrigger(minutes=15),
+            id="notify_failed_search_jobs",
+            replace_existing=True,
+        )
 
 
 def create_scheduler(app=None) -> BlockingScheduler:

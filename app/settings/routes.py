@@ -67,14 +67,9 @@ def _consume_pending_api_key(org_id: int) -> str | None:
 def api_keys():
     org_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_id_param = request.args.get("organization_id")
-        if org_id_param:
-            try:
-                org_id = int(org_id_param)
-            except (TypeError, ValueError):
-                org_id = None
-        else:
-            org_id = None
+        from app.core.tenant import parse_organization_id_param
+
+        org_id = parse_organization_id_param()
 
     if org_id is None and not current_user.is_superadmin():
         abort(403)
@@ -131,10 +126,9 @@ def create_api_key_route():
 def reveal_latest_api_key():
     org_id = current_user.organization_id
     if current_user.is_superadmin():
-        try:
-            org_id = int(request.form.get("organization_id") or request.args.get("organization_id") or 0)
-        except (TypeError, ValueError):
-            org_id = 0
+        from app.core.tenant import parse_organization_id_param
+
+        org_id = parse_organization_id_param() or 0
     if not org_id:
         return jsonify({"success": False, "error": "Organization is required."}), 400
     full_key = _consume_pending_api_key(org_id)

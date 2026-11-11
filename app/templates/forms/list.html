@@ -42,7 +42,7 @@
               <span class="badge badge-inactive">Ei aktiivinen</span>
               {% endif %}
             </td>
-            <td>{{ f.created_at.strftime('%d.%m.%Y %H:%M') if f.created_at else '—' }}</td>
+            <td>{{ (f.created_at|helsinki).strftime('%d.%m.%Y %H:%M') if f.created_at else '—' }}</td>
             <td class="webhook-actions">
               <a class="btn btn-ghost btn-sm" href="{{ url_for('forms.edit_form', form_id=f.id, **org_query) }}">Muokkaa</a>
               <a class="btn btn-ghost btn-sm" href="{{ url_for('forms.form_submissions', form_id=f.id, **org_query) }}">Lähetykset</a>
@@ -58,9 +58,7 @@
             {{ empty_state(
               "ti-forms",
               "Ei verkkolomakkeita vielä",
-              "Luo lomake, jonka voit upottaa verkkosivuillesi — liidit tulevat suoraan CRM:ään.",
-              "Luo lomake",
-              "/forms/new"
+              "Luo lomake Uusi lomake -painikkeesta ja upota se verkkosivuillesi — liidit tulevat suoraan CRM:ään."
             ) }}
           </td></tr>
           {% endfor %}

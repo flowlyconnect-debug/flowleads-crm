@@ -161,7 +161,17 @@ def _evaluate_step_condition(lead: Lead, condition: dict | None) -> bool:
         return False
     if "status" in condition and lead.status != condition["status"]:
         return False
+    if condition.get("skip_if_replied") and _lead_has_replied(lead):
+        return False
     return True
+
+
+def _lead_has_replied(lead: Lead) -> bool:
+    from app.leads.models import Activity
+
+    return (
+        Activity.query.filter_by(lead_id=lead.id, type="email_reply_received").first() is not None
+    )
 
 
 def _trigger_config_matches(
@@ -224,11 +234,16 @@ def _unsubscribe_url(lead_id: int, sequence_id: int) -> str:
     if has_request_context():
         return url_for("sequences.unsubscribe", token=token, _external=True)
 
-    server_name = current_app.config.get("SERVER_NAME", "localhost")
-    scheme = current_app.config.get("PREFERRED_URL_SCHEME", "http")
+    # The scheduler sends sequence mail outside a request: SERVER_NAME is not
+    # set in production, so the public address comes from APP_BASE_URL.
     with current_app.test_request_context():
         path = url_for("sequences.unsubscribe", token=token)
-    return f"{scheme}://{server_name}{path}"
+    base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+    if not base_url:
+        server_name = current_app.config.get("SERVER_NAME") or "localhost"
+        scheme = current_app.config.get("PREFERRED_URL_SCHEME", "http")
+        base_url = f"{scheme}://{server_name}"
+    return f"{base_url}{path}"
 
 
 def append_unsubscribe_footer(
@@ -240,21 +255,12 @@ def append_unsubscribe_footer(
     organization_id: int | None = None,
 ) -> tuple[str, str]:
     link = _unsubscribe_url(lead_id, sequence_id)
-    privacy_line = ""
-    if organization_id:
-        from app.gdpr.settings import get_privacy_settings
-
-        settings = get_privacy_settings(organization_id)
-        if settings.privacy_policy_url:
-            privacy_line = f" | Privacy: {settings.privacy_policy_url}"
-    text_footer = f"\n\n---\nUnsubscribe: {link}{privacy_line}"
-    privacy_html = ""
-    if privacy_line:
-        url = privacy_line.split("Privacy: ", 1)[-1]
-        privacy_html = f' | <a href="{url}">Privacy policy</a>'
+    # The privacy-policy link is added once by EmailService.send_to_lead; this
+    # footer used to add a second one.
+    text_footer = f"\n\n---\nPeru viestien tilaus: {link}"
     html_footer = (
         f'<p style="font-size:12px;color:#666;margin-top:24px;">'
-        f'<a href="{link}">Unsubscribe</a> from this email sequence.{privacy_html}</p>'
+        f'Etkö halua näitä viestejä? <a href="{link}">Peru viestien tilaus</a>.</p>'
     )
     html = (body_html or "").strip()
     text = (body_text or "").strip()
@@ -322,6 +328,19 @@ class SequenceService:
     @staticmethod
     def delete_sequence(sequence_id: int, organization_id: int) -> None:
         sequence = get_sequence_for_org(sequence_id, organization_id)
+        # enrolments and their send history go with the sequence (deleting a
+        # sequence that had ever been used failed on the NOT NULL foreign key)
+        enrollment_ids = [
+            row.id
+            for row in EmailSequenceEnrollment.query.filter_by(sequence_id=sequence.id).all()
+        ]
+        if enrollment_ids:
+            EmailSequenceSent.query.filter(
+                EmailSequenceSent.enrollment_id.in_(enrollment_ids)
+            ).delete(synchronize_session=False)
+            EmailSequenceEnrollment.query.filter(
+                EmailSequenceEnrollment.id.in_(enrollment_ids)
+            ).delete(synchronize_session=False)
         db.session.delete(sequence)
 
     @staticmethod
@@ -575,6 +594,13 @@ class SequenceService:
         return processed
 
     @staticmethod
+    def _back_off(enrollment: EmailSequenceEnrollment) -> None:
+        """A failed send is retried in six hours, not on every 10-minute run
+        (which wrote a failed email log each time for as long as it failed)."""
+        enrollment.next_send_at = _utc_now() + timedelta(hours=6)
+        enrollment.updated_at = _utc_now()
+
+    @staticmethod
     def _process_single_enrollment(enrollment: EmailSequenceEnrollment) -> bool:
         sequence = (
             EmailSequence.query.filter_by(id=enrollment.sequence_id)
@@ -638,9 +664,11 @@ class SequenceService:
             logger.warning(
                 "Sequence email failed for enrollment %s: %s", enrollment.id, exc.message
             )
+            SequenceService._back_off(enrollment)
             return False
 
         if not result.get("success"):
+            SequenceService._back_off(enrollment)
             return False
 
         sent = EmailSequenceSent(
@@ -709,6 +737,12 @@ class SequenceService:
                 continue
             for lead in leads:
                 if lead.unsubscribed or lead.is_anonymized:
+                    continue
+                # once per lead: a finished or cancelled enrolment must not
+                # start the sequence again on the next hourly run
+                if EmailSequenceEnrollment.query.filter_by(
+                    sequence_id=sequence.id, lead_id=lead.id
+                ).first():
                     continue
                 try:
                     SequenceService.enroll_lead(

@@ -441,6 +441,26 @@ def test_profile_delete_removes_its_matches(app):
         _analyse(_listing(1), [{"remonttityyppi": LOCK, "confidence": 90}])
         delete_profile(db.session.get(SearchProfile, profile.id))
         db.session.commit()
+        # with automatic conversion the match is already a lead: it outlives the
+        # profile so the same housing company is not offered again
+        kept = ListingMatch.query.all()
+        assert [m.status for m in kept] == ["lead_created"]
+        assert kept[0].profile_id is None
+
+
+def test_profile_delete_removes_waiting_targets(app):
+    from app.search.profile_services import delete_profile
+
+    with app.app_context():
+        app.config["LISTING_AUTO_CREATE_LEADS"] = False
+        org = _org("delprof2")
+        profile = _profile(org, limit=0)
+        db.session.commit()
+        _ingest("Uusimaa", [1])
+        _analyse(_listing(1), [{"remonttityyppi": LOCK, "confidence": 90}])
+        assert [m.status for m in ListingMatch.query.all()] == ["pending"]
+        delete_profile(db.session.get(SearchProfile, profile.id))
+        db.session.commit()
         assert ListingMatch.query.count() == 0
 
 
