@@ -47,8 +47,9 @@ def test_dry_run_changes_nothing(app):
     with app.app_context():
         _seed()
         counts = purge_all_leads(with_listings=True, dry_run=True)
-        db.session.rollback()
         assert counts["leads"] == 2 and counts["listings"] == 2 and counts["tasks"] == 2
+        # each match once, although it hangs off both a lead and a listing
+        assert counts["listing_matches"] == ListingMatch.query.count() == 4
         assert Lead.query.count() == 2
         assert Listing.query.count() == 2
         assert Task.query.count() == 2

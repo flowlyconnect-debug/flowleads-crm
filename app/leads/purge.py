@@ -26,7 +26,6 @@ def _purge_table(
     table: Table,
     condition,
     counts: dict,
-    dry_run: bool,
     stack: tuple = (),
     delete_columns: frozenset = frozenset(),
 ) -> None:
@@ -51,36 +50,37 @@ def _purge_table(
                 if keep_row or child is table or child.name in stack:
                     key = f"{child.name}.{column.name} (viittaus tyhjennetty)"
                     counts[key] = counts.get(key, 0) + _count(child, child_condition)
-                    if not dry_run:
-                        db.session.execute(
-                            update(child).where(child_condition).values({column.name: None}),
-                            execution_options={"synchronize_session": False},
-                        )
+                    db.session.execute(
+                        update(child).where(child_condition).values({column.name: None}),
+                        execution_options={"synchronize_session": False},
+                    )
                 else:
-                    _purge_table(child, child_condition, counts, dry_run, stack + (table.name,), delete_columns)
+                    _purge_table(child, child_condition, counts, stack + (table.name,), delete_columns)
 
     counts[table.name] = counts.get(table.name, 0) + _count(table, condition)
-    if not dry_run:
-        db.session.execute(delete(table).where(condition), execution_options={"synchronize_session": False})
+    db.session.execute(delete(table).where(condition), execution_options={"synchronize_session": False})
 
 
 def purge_all_leads(*, with_listings: bool = False, dry_run: bool = True) -> dict:
-    """Returns {table: affected rows}. Does not commit; with dry_run nothing changes."""
+    """Returns {table: affected rows}. Does not commit. A dry run does the
+    deletes and rolls the transaction back, so its counts are the real ones
+    (counting without deleting saw rows reachable by two paths twice)."""
     tables = db.metadata.tables
     counts: dict[str, int] = {}
 
     custom_values = tables["custom_field_values"]
     lead_values = custom_values.c.entity_type == "lead"
     counts["custom_field_values"] = _count(custom_values, lead_values)
-    if not dry_run:
-        db.session.execute(delete(custom_values).where(lead_values), execution_options={"synchronize_session": False})
+    db.session.execute(delete(custom_values).where(lead_values), execution_options={"synchronize_session": False})
 
-    _purge_table(tables["leads"], true(), counts, dry_run)
+    _purge_table(tables["leads"], true(), counts)
 
     if with_listings:
-        _purge_table(tables["listings"], true(), counts, dry_run)
+        _purge_table(tables["listings"], true(), counts)
 
-    if not dry_run:
+    if dry_run:
+        db.session.rollback()
+    else:
         # Running totals shown in the UI would otherwise still count the deleted leads.
         db.session.execute(update(tables["lead_streams"]).values(lead_count=0, last_lead_at=None))
         db.session.execute(update(tables["org_lead_settings"]).values(total_lead_count=0, last_lead_at=None))
@@ -104,7 +104,6 @@ def delete_organizations(organization_ids: list[int]) -> dict:
         organizations,
         organizations.c.id.in_(organization_ids),
         counts,
-        dry_run=False,
         delete_columns=frozenset({"organization_id"}),
     )
     db.session.expire_all()
