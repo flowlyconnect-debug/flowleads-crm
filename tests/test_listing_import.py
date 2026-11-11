@@ -256,3 +256,24 @@ def test_superadmin_csv_upload(app, client):
     assert "Tuotu 2 uutta" in response.get_data(as_text=True)
     with app.app_context():
         assert Lead.query.filter_by(organization_id=org_id).count() == 1
+
+
+def test_search_brief_matches_the_importer(app):
+    """docs/HAKUOHJE_CSV.md is handed to whoever searches for targets: its
+    toimiala list, regions and example must stay importable."""
+    import re
+    from pathlib import Path
+
+    from app.search.constants import FINNISH_REGIONS, REMONTTITYYPIT
+
+    brief = (Path(__file__).resolve().parents[1] / "docs" / "HAKUOHJE_CSV.md").read_text(encoding="utf-8")
+    for name in (*REMONTTITYYPIT, *FINNISH_REGIONS):
+        assert name in brief, name
+    example = re.search(r"```csv\n(.*?)```", brief, re.S).group(1)
+    with app.app_context():
+        rows = parse_listing_csv(example.encode("utf-8"))
+        result = import_listings(rows)
+        assert result["errors"] == [] and result["analysed"] == 2
+        both = Listing.query.filter_by(taloyhtio="As Oy Mallitie 5").one()
+        assert {r.remonttityyppi for r in both.renovations} == {"Kattourakointi", "Julkisivu- ja parvekeurakointi"}
+        assert both.isannoitsija == "Mallin Isännöinti Oy" and both.build_year == 1988
