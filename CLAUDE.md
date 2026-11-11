@@ -46,6 +46,12 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 and there is no n8n workflow for it any more. Profile fields `schedule_description` and
 `crm_api_key` are unused.
 
+## Production rollout handoff
+
+When the user says **"Jatka FlowLeadsin tuotantoon vientiä"**, read `docs/TUOTANTOON_VIENTI_TILANNE.md`
+(state of the Render deployment, what is done, what is next) and continue from its "Seuraavaksi" list.
+Keep that file up to date as items are finished.
+
 ## Working on this repo
 
 - Tests: `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` (≈6 min, all must pass).
