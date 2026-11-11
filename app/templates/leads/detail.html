@@ -262,6 +262,12 @@
       <section class="card mt-4">
         <header class="card-header">
           <h2 class="card-title">Kohteen tiedot</h2>
+          {% if target_listing_id or manager_name %}
+          <span class="lead-target-links">
+            {% if target_listing_id %}<a class="btn btn-secondary btn-sm" href="{{ url_for('insights.company_card', listing_id=target_listing_id, organization_id=organization_id) if current_user.is_superadmin() else url_for('insights.company_card', listing_id=target_listing_id) }}">Taloyhtiön tiedot</a>{% endif %}
+            {% if manager_name %}<a class="btn btn-secondary btn-sm" href="{{ url_for('insights.manager_detail', name=manager_name, organization_id=organization_id) if current_user.is_superadmin() else url_for('insights.manager_detail', name=manager_name) }}">Isännöitsijän kohteet</a>{% endif %}
+          </span>
+          {% endif %}
         </header>
         <div class="card-body">
           <dl class="contact-info-grid">

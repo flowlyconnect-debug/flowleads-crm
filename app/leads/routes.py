@@ -390,11 +390,28 @@ def detail(lead_id):
 
     playbook = get_playbook_data(lead, organization_id, current_user)
     property_info_rows = get_property_info_rows(lead.ai_contact_info)
+    # links from the lead to its housing-company card and property manager
+    meta = lead.ai_contact_info if isinstance(lead.ai_contact_info, dict) else {}
+    target_listing_id = None
+    try:
+        listing_id = int(meta.get("listing_id")) if meta.get("listing_id") else None
+    except (TypeError, ValueError):
+        listing_id = None
+    if listing_id:
+        from app.listings.models import ListingMatch
+
+        if ListingMatch.query.filter_by(
+            organization_id=organization_id, listing_id=listing_id, lead_id=lead.id
+        ).first():
+            target_listing_id = listing_id
+    manager_name = str(meta.get("isannoitsija_yritys") or "").strip()
     return render_template(
         "leads/detail.html",
         lead=lead,
         playbook=playbook,
         property_info_rows=property_info_rows,
+        target_listing_id=target_listing_id,
+        manager_name=manager_name,
         activities=activities,
         stages=stages,
         users=users,

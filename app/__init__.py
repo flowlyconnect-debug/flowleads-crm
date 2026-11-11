@@ -205,6 +205,7 @@ def _register_blueprints(app):
     from app.search.n8n_routes import n8n_bp
     from app.listings.routes import listings_n8n_bp
     from app.listings.target_routes import targets_bp
+    from app.listings.insight_routes import insights_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -231,6 +232,7 @@ def _register_blueprints(app):
     app.register_blueprint(n8n_bp)
     app.register_blueprint(listings_n8n_bp)
     app.register_blueprint(targets_bp)
+    app.register_blueprint(insights_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)

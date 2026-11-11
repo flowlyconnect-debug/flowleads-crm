@@ -39,6 +39,11 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 - Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
   `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner.
+- Read models over what an organization already sees (`app/listings/insight_services.py`,
+  `insight_routes.py`, never the reserve): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
+  (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).
+  **Saved searches** on Kohteet (`SavedTargetSearch`, per user) are notified by `notify_saved_searches()` in the
+  `listing_matching` job. Tests: `tests/test_insights.py`.
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run

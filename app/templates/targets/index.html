@@ -93,6 +93,38 @@
       </form>
     </div>
 
+    {# Saved searches: one click applies a stored filter combination; the bell turns its notifications on or off. #}
+    {% if (saved_searches or current_params) and not is_hidden_tab %}
+    <div class="targets-saved">
+      {% if saved_searches %}<span class="targets-saved__label">Tallennetut haut</span>{% endif %}
+      {% for saved in saved_searches %}
+      <span class="targets-saved__chip{% if saved.id == active_saved_id %} is-active{% endif %}">
+        <a href="{{ url_for('targets.index', **dict(org_query, **saved.params)) }}">{{ saved.name }}</a>
+        <form method="post" action="{{ url_for('targets.toggle_search_notify_route', search_id=saved.id, **org_query) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+          <button type="submit" class="targets-saved__icon{% if saved.notify %} is-on{% endif %}"
+                  title="{{ 'Ilmoitukset päällä: paina kytkeäksesi pois' if saved.notify else 'Ilmoitukset pois: paina kytkeäksesi päälle' }}"
+                  aria-label="Ilmoitukset haulle {{ saved.name }}: {{ 'päällä' if saved.notify else 'pois' }}">{{ '🔔' if saved.notify else '🔕' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('targets.delete_search_route', search_id=saved.id, **org_query) }}"
+              data-confirm="Poistetaanko tallennettu haku {{ saved.name }}?" onsubmit="return confirm(this.dataset.confirm);">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="targets-saved__icon" title="Poista tallennettu haku" aria-label="Poista haku {{ saved.name }}">✕</button>
+        </form>
+      </span>
+      {% endfor %}
+      {% if current_params and not active_saved_id %}
+      <form method="post" class="targets-save-form" action="{{ url_for('targets.save_search_route', **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+        <input type="text" name="name" class="form-input" maxlength="80" placeholder="Nimi tälle haulle" aria-label="Tallennettavan haun nimi" required>
+        <button type="submit" class="btn btn-secondary btn-sm">Tallenna haku</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {# Filter bar: every choice applies at once; only values that occur among the targets are offered. #}
     {% macro filter_select(name, label, options, all_label) -%}
     {% if options|length > 1 or filters.get(name) %}
@@ -201,7 +233,7 @@
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
             <div class="target-row__title">
-              <span class="target-row__name">{{ row.title }}</span>
+              <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a></span>
               {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
             </div>
@@ -217,7 +249,7 @@
               {% if row.seen_at %}<span class="target-row__fact">Löydetty {{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
             </div>
             <div class="target-row__contact">
-              {% if listing.isannoitsija %}Isännöinti: {{ listing.isannoitsija }}{% endif %}
+              {% if listing.isannoitsija %}Isännöinti: <a href="{{ url_for('insights.manager_detail', name=listing.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ listing.isannoitsija }}</a>{% endif %}
               {% if listing.has_contact %}
               <span class="target-row__contact-ok">{{ '· yhteystiedot saatavilla' if listing.isannoitsija else 'Yhteystiedot saatavilla' }}</span>
               {% elif listing.contact_status in ('pending', 'processing') %}
