@@ -128,7 +128,9 @@ def configure_stdout_logging(app: Flask) -> None:
     app.logger.propagate = False
     app.logger.addHandler(handler)
 
-    for logger_name in ("werkzeug",):
+    # apscheduler: without a handler a job that crashes or is missed leaves no
+    # trace in the scheduler worker's log.
+    for logger_name in ("werkzeug", "apscheduler"):
         logger = logging.getLogger(logger_name)
         logger.handlers.clear()
         logger.setLevel(logging.INFO)
