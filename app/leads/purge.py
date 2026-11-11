@@ -1,5 +1,6 @@
 """Hard-delete every lead (all organizations), and optionally the whole listing
 catalogue. Operator tool behind `flask purge-leads`; the UI only archives.
+`flask delete-organizations` uses the same walk to remove whole customers.
 
 Rows that cannot exist without a lead (activities, emails, proposals, sequence
 enrollments, tasks, ...) are deleted with it. Rows that merely point at a lead
@@ -21,8 +22,19 @@ def _count(table: Table, condition) -> int:
     return db.session.execute(select(func.count()).select_from(table).where(condition)).scalar() or 0
 
 
-def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tuple = ()) -> None:
-    """Delete `table` rows matching `condition`, children first."""
+def _purge_table(
+    table: Table,
+    condition,
+    counts: dict,
+    dry_run: bool,
+    stack: tuple = (),
+    delete_columns: frozenset = frozenset(),
+) -> None:
+    """Delete `table` rows matching `condition`, children first.
+
+    A nullable reference is normally cleared and its row kept; references whose
+    column name is in `delete_columns` take their rows with them instead.
+    """
     if "id" in table.c:
         parent_ids = select(table.c.id).where(condition)
         for child in db.metadata.tables.values():
@@ -31,7 +43,11 @@ def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tu
                     continue
                 column = fk.parent
                 child_condition = column.in_(parent_ids)
-                keep_row = column.nullable and (child.name, column.name) not in _DELETE_WITH_PARENT
+                keep_row = (
+                    column.nullable
+                    and (child.name, column.name) not in _DELETE_WITH_PARENT
+                    and column.name not in delete_columns
+                )
                 if keep_row or child is table or child.name in stack:
                     key = f"{child.name}.{column.name} (viittaus tyhjennetty)"
                     counts[key] = counts.get(key, 0) + _count(child, child_condition)
@@ -41,7 +57,7 @@ def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tu
                             execution_options={"synchronize_session": False},
                         )
                 else:
-                    _purge_table(child, child_condition, counts, dry_run, stack + (table.name,))
+                    _purge_table(child, child_condition, counts, dry_run, stack + (table.name,), delete_columns)
 
     counts[table.name] = counts.get(table.name, 0) + _count(table, condition)
     if not dry_run:
@@ -70,4 +86,26 @@ def purge_all_leads(*, with_listings: bool = False, dry_run: bool = True) -> dic
         db.session.execute(update(tables["org_lead_settings"]).values(total_lead_count=0, last_lead_at=None))
         db.session.expire_all()
 
+    return {name: n for name, n in counts.items() if n}
+
+
+def delete_organizations(organization_ids: list[int]) -> dict:
+    """Hard-delete whole organizations: users, profiles, leads, settings, audit
+    rows, everything carrying their organization_id. The shared listing
+    catalogue stays; only the organizations' own matches go.
+
+    Returns {table: deleted rows}. Does not commit: the caller rolls back for a
+    dry run, which is what makes the counts exact.
+    """
+    tables = db.metadata.tables
+    counts: dict[str, int] = {}
+    organizations = tables["organizations"]
+    _purge_table(
+        organizations,
+        organizations.c.id.in_(organization_ids),
+        counts,
+        dry_run=False,
+        delete_columns=frozenset({"organization_id"}),
+    )
+    db.session.expire_all()
     return {name: n for name, n in counts.items() if n}

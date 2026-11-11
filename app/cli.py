@@ -185,6 +185,46 @@ def register_cli(app):
         if not yes:
             click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
 
+    @app.cli.command("delete-organizations")
+    @click.option("--id", "ids", type=int, multiple=True, required=True, help="Organization id; repeat for several.")
+    @click.option("--yes", is_flag=True, help="Actually delete. Without it only the counts are shown.")
+    @with_appcontext
+    def delete_organizations_cmd(ids, yes):
+        """Permanently delete organizations with all their data (dry run by default)."""
+        from app.core.audit import log_audit
+        from app.leads.purge import delete_organizations
+        from app.users.models import Organization
+
+        ids = sorted(set(ids))
+        found = {org.id: org.name for org in Organization.query.filter(Organization.id.in_(ids)).all()}
+        missing = [i for i in ids if i not in found]
+        if missing:
+            click.echo(f"Organisaatiota ei löydy: {', '.join(map(str, missing))}", err=True)
+            sys.exit(1)
+
+        try:
+            counts = delete_organizations(ids)
+            if yes:
+                log_audit(
+                    "organizations_deleted",
+                    target_type="organization",
+                    metadata={"organizations": found, "rows": counts},
+                )
+                db.session.commit()
+            else:
+                db.session.rollback()
+        except Exception:
+            db.session.rollback()
+            raise
+
+        for org_id, name in found.items():
+            click.echo(f"Organisaatio {org_id}: {name}")
+        click.echo("Poistettu:" if yes else "Kuiva-ajo, mitään ei poistettu. Poistettaisiin:")
+        for name, n in sorted(counts.items()):
+            click.echo(f"  {name}: {n}")
+        if not yes:
+            click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
+
     @app.cli.command("run-scheduler")
     @with_appcontext
     def run_scheduler_cmd():
