@@ -211,13 +211,29 @@ def admin_email_logs():
 @require_role("superadmin")
 @require_2fa
 def admin_email_test():
+    # The recipient can be typed in: the superadmin's login address is often
+    # not a real mailbox, and a test sent there looks like "nothing happened".
+    from app.core.security import normalize_email, validate_email
+    from app.email.services import send_test_email_to_address
+
+    recipient = normalize_email(request.form.get("to") or "") or current_user.email
+    if not validate_email(recipient):
+        flash("Anna kelvollinen sähköpostiosoite.", "danger")
+        return redirect(url_for("email.admin_email_logs"))
     try:
-        result = send_test_email_to_user(current_user)
+        result = send_test_email_to_address(recipient, user_id=current_user.id)
         db.session.commit()
         if result.get("success"):
-            flash("Test email sent.", "success")
+            flash(
+                f"Testiviesti lähetetty osoitteeseen {recipient}. Jos viestiä ei näy muutamassa "
+                "minuutissa, tarkista roskaposti.",
+                "success",
+            )
         else:
-            flash(result.get("error") or "Test email failed.", "danger")
+            flash(
+                "Testiviestin lähetys epäonnistui: " + (result.get("error") or "tuntematon virhe"),
+                "danger",
+            )
     except EmailServiceError as exc:
         db.session.rollback()
         flash(exc.message, "danger")

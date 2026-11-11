@@ -664,3 +664,24 @@ def test_email_settings_404_for_nonexistent_organization(client, app):
     # an unknown organization sends the superadmin back to the organization picker
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/dashboard")
+
+
+@patch("app.email.services._mailgun_send")
+def test_superadmin_test_email_goes_to_the_typed_address(mock_send, client, app):
+    mock_send.return_value = (True, "<test@x>", None)
+    with app.app_context():
+        sa = create_user("sa-test-to@test.com", "securepassword1", role="superadmin")
+        sa.totp_enabled = True
+        db.session.commit()
+
+    client.post("/auth/login", data={"email": "sa-test-to@test.com", "password": "securepassword1"})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+    response = client.post("/admin/email/test", data={"to": "Oma.Posti@Example.fi"}, follow_redirects=True)
+    assert mock_send.call_args.kwargs["to_email"] == "oma.posti@example.fi"
+    assert "Testiviesti lähetetty osoitteeseen oma.posti@example.fi" in response.get_data(as_text=True)
+
+    mock_send.reset_mock()
+    response = client.post("/admin/email/test", data={"to": "ei-osoite"}, follow_redirects=True)
+    assert not mock_send.called
+    assert "Anna kelvollinen sähköpostiosoite" in response.get_data(as_text=True)

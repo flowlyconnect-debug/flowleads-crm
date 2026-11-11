@@ -1,19 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Email logs — Admin{% endblock %}
+{% block title %}Sähköpostiloki — Hallinta{% endblock %}
 {% block content %}
 <div class="card">
   <div class="toolbar">
     <h1 style="margin:0;">Sähköpostiloki</h1>
     <form method="post" action="{{ url_for('email.admin_email_test') }}" style="display:inline;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn secondary">Lähetä testiviesti minulle</button>
+      <input type="email" name="to" class="form-input form-input--compact" value="{{ current_user.email }}" required
+             aria-label="Testiviestin vastaanottaja" style="min-width:240px;">
+      <button type="submit" class="btn secondary">Lähetä testiviesti</button>
     </form>
   </div>
 
+  <p class="text-sm text-muted">Testiviesti ei näy alla olevassa lokissa: loki kattaa liideille lähetetyt viestit.</p>
+
   <form method="get" class="filters" style="margin-bottom:1rem;">
-    <label>Organization
+    <label>Organisaatio
       <select name="organization_id" onchange="this.form.submit()">
-        <option value="">All</option>
+        <option value="">Kaikki</option>
         {% for org in organizations %}
         <option value="{{ org.id }}" {% if org_filter == org.id %}selected{% endif %}>{{ org.name }}</option>
         {% endfor %}
