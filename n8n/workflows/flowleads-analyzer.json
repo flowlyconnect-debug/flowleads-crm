@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "31dc3315-01e8-455b-bd85-f173b7ddee97",
+      "id": "dc167252-6474-4d6f-a4c4-21ac9767b341",
       "name": "Every 10 minutes"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "774e3957-d32f-4dd1-96e2-ce0db1362f98",
+      "id": "8872aa12-806a-4663-9b82-7944867be50c",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "e60009a1-5f74-4973-b173-b930b51e0b3b",
+              "id": "b35e7108-5e4f-426f-9de6-dede4fc3e666",
               "name": "crm_base_url",
               "value": "https://flowleads-crm-zv0a.onrender.com",
               "type": "string"
             },
             {
-              "id": "4799513d-fe40-4416-8610-a5ca405ded40",
+              "id": "ddacc1d8-8ab6-4956-9c4a-60656df4bf9b",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "b8233497-afa1-40cc-9b7a-8a12ea561000",
+      "id": "afe05d45-6ac4-4373-9560-15329bc271c4",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -72,7 +72,7 @@
         440,
         100
       ],
-      "id": "b6d5c7f6-5f74-4250-b4c3-b8df5c5a28e5",
+      "id": "5abb53bc-2c34-4bdc-879b-82be3452b234",
       "name": "CODE – Start"
     },
     {
@@ -103,7 +103,7 @@
         660,
         100
       ],
-      "id": "452b2531-9168-4606-b3a8-4b297f407ea6",
+      "id": "4e7671b1-0906-45f9-bedf-961b66fbd227",
       "name": "HTTP – Claim Listings",
       "retryOnFail": true,
       "maxTries": 3,
@@ -119,7 +119,7 @@
         880,
         100
       ],
-      "id": "8d0484fb-d65c-4f39-bf01-12c485c5359d",
+      "id": "99d515c0-8e69-4638-a0ce-250162932e22",
       "name": "CODE – Split Listings"
     },
     {
@@ -134,7 +134,7 @@
         1100,
         100
       ],
-      "id": "083d25a0-2ab9-4a94-94e2-acb831ae77ad",
+      "id": "5860fa49-8cb6-45a1-b97c-7a7a48d4cedc",
       "name": "LOOP – Listings"
     },
     {
@@ -148,9 +148,9 @@
         1320,
         260
       ],
-      "id": "0edd0027-462e-42d9-a81c-8c710c0c1867",
+      "id": "f5b94d04-0b3d-436d-87cb-449bbca15698",
       "name": "WAIT – Rate Limit",
-      "webhookId": "6a5b5558-ab0f-4caa-bbf5-31755e969d81"
+      "webhookId": "8fc4cd4c-e822-463d-aad5-657ededdde94"
     },
     {
       "parameters": {
@@ -202,7 +202,7 @@
         1540,
         260
       ],
-      "id": "aea94304-7713-4a79-8d8b-7f1d222597e4",
+      "id": "0d6fb5e6-7fb7-43c7-9f75-228d10ffa14f",
       "name": "HTTP – Fetch Listing Detail Page",
       "onError": "continueRegularOutput"
     },
@@ -216,7 +216,7 @@
         1760,
         260
       ],
-      "id": "2e59853d-a66d-4af5-becd-fd31fe800e65",
+      "id": "95a3b213-282e-436f-88af-408bbd1f7130",
       "name": "CODE – Build Analysis Prompt"
     },
     {
@@ -230,7 +230,7 @@
           },
           "conditions": [
             {
-              "id": "9f791a7b-e47a-4c7e-b342-9df359e79778",
+              "id": "35c0c234-151f-45f7-87d4-63ea1bc23c96",
               "leftValue": "={{ $json.ok }}",
               "rightValue": "",
               "operator": {
@@ -251,7 +251,7 @@
         1980,
         260
       ],
-      "id": "ea7a867a-2355-4448-8d5c-7652fc5d9caf",
+      "id": "8c9a8e01-7746-4dd7-b9f6-32011e555070",
       "name": "IF – Page OK"
     },
     {
@@ -282,7 +282,7 @@
         2200,
         180
       ],
-      "id": "7599ac4e-894f-4e8b-9003-3be92f4ee585",
+      "id": "6d2b1ad8-76fe-4279-9671-2fdf6a70f910",
       "name": "AI – Analyze Listing",
       "credentials": {
         "openAiApi": {
@@ -305,7 +305,7 @@
         2420,
         260
       ],
-      "id": "a1b573e8-cf32-42ff-971a-0d52854d2656",
+      "id": "186e7311-a93c-480b-b0a3-6c881b6819d1",
       "name": "CODE – Parse Analysis"
     },
     {
@@ -336,7 +336,7 @@
         2640,
         260
       ],
-      "id": "1d8196fa-89dd-4feb-85bb-0f6d9b1ae6e9",
+      "id": "b5398174-0920-45e0-acb5-df5901a0f387",
       "name": "HTTP – CRM Save Analysis",
       "retryOnFail": true,
       "maxTries": 3,
@@ -353,7 +353,7 @@
         1320,
         -80
       ],
-      "id": "257b2e7e-3f5f-4fb4-9006-610cd1b90093",
+      "id": "3eb239c4-1104-40e4-bfac-6b7aff2a87f7",
       "name": "CODE – More To Claim"
     },
     {
@@ -367,7 +367,7 @@
           },
           "conditions": [
             {
-              "id": "8adad900-423e-4a9e-9fcc-5f82d850bdb8",
+              "id": "6144f813-91b9-4502-9d74-7121bf981272",
               "leftValue": "={{ $json.more }}",
               "rightValue": "",
               "operator": {
@@ -388,7 +388,7 @@
         1540,
         -80
       ],
-      "id": "58ebd70d-6c08-455d-ade1-0bed25e19643",
+      "id": "9ba38c57-fd4b-4e3e-a394-c6e63270ae4b",
       "name": "IF – Claim Again"
     }
   ],

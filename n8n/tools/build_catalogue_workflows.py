@@ -197,6 +197,12 @@ return [{ json: { ...task, locations } }];
         )
     )
     boot = take(lib, "HTTP – Fetch Oikotie API Bootstrap", [1540, 200], onError="continueRegularOutput")
+    # The production Lead Worker never sent a cookie here: its expression read
+    # headers from an item that has none, which n8n resolves to "no header".
+    # Sending an empty `cookie:` header instead is a wire-level difference no
+    # browser makes, so the header is left out to match production exactly.
+    boot_headers = boot["parameters"]["headerParameters"]["parameters"]
+    boot["parameters"]["headerParameters"]["parameters"] = [h for h in boot_headers if h["name"].lower() != "cookie"]
     nodes.append(boot)
     nodes.append(
         code(
