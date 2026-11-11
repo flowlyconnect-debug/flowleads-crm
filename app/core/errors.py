@@ -99,6 +99,12 @@ def register_error_handlers(app):
             return response, status
         return render_template("errors/429.html"), 429
 
+    @app.errorhandler(413)
+    def payload_too_large(error):
+        if wants_json_response():
+            return json_error("payload_too_large", "The request body is too large.", 413)
+        return render_template("errors/400.html"), 413
+
     @app.errorhandler(400)
     def bad_request(error):
         if wants_json_response():
