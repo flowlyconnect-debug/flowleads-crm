@@ -54,6 +54,28 @@ asiakkaan API-avainta. CRM luo liidit itse.
    **kahdesta peräkkäisestä** full passista (`prev_full_started_at`). Yksi pass voi ohittaa kohteen, koska
    offsetit siirtyvät kesken passin. Jos kohde ilmestyy uudelleen, se aktivoituu.
 
+### 1b. Tuonti muusta lähteestä (`app/listings/import_services.py`)
+
+> **Tilanne 11.11.2026:** Oikotien bottisuojaus (DataDome) estää n8n Cloudin pyynnöt, myös vanhan Lead Workerin
+> (403 + captcha jo hakusivulla). Crawler pysähtyy ensimmäiseen estoon eikä kierrä suojausta. Kohteita saadaan
+> katalogiin toistaiseksi vain tuonnilla.
+
+Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä, johon on käyttöoikeus
+(lisensoitu datasyöte, kumppanin vienti, oma selvitys). Tuodulla kohteella `listings.source` on jokin muu kuin
+`oikotie` (oletus `import`), ja siitä syntyvän liidin `source` on `import`.
+
+- **CSV** (superadmin): `/admin/catalogue` → *Tuo kohteita tiedostosta*. Mallitiedosto:
+  `/admin/catalogue/import-template.csv`. Erotin `;`, `,` tai sarkain; UTF-8 tai Windows-1252.
+- **API** (automaattinen syöte): `POST /api/v1/n8n/listings/import` `{source, listings:[…]}`, sama rivimuoto.
+- **Rivi, jolla on `remonttityyppi`** (yksi tai useampi, erotin `;`): tallennetaan analysoituna (varmuus 100, ellei
+  `varmuus` anneta), täsmäytetään heti ja liidit syntyvät samassa kutsussa. Ei AI:ta eikä n8n:ää.
+- **Rivi, jolla on vain `teksti`** (≥ 30 merkkiä): menee Analyzerin jonoon. `/analysis/claim` palauttaa sille
+  `fetch_detail: false`, jolloin Analyzer analysoi tuodun tekstin eikä hae sivua.
+- Pakolliset: `maakunta` sekä `taloyhtio` tai `osoite`. Tunniste (`tunniste`) on vapaaehtoinen: ilman sitä se
+  lasketaan taloyhtiöstä, osoitteesta ja kaupungista, joten sama rivi päivittää eikä tuplaa.
+- Virheelliset rivit raportoidaan (`errors`), muut tuodaan. Enintään 2000 riviä per tuonti.
+- Tuodut kohteet eivät vanhene Oikotien "poistunut"-logiikalla; profiilin historiaikkuna (30 pv) koskee niitäkin.
+
 ### 2. Analyysi – Analyzer (`flowleads-analyzer.json`)
 
 1. `POST /analysis/claim {limit: 20}` lukitsee kohteet (`analysis_status=processing`). Uusimmat tulevat ensin,
@@ -149,7 +171,8 @@ Migraatiot: `e3f4a5b6c7d8_add_listing_catalogue.py` ja `f4a5b6c7d8e9_add_profile
 |---|---|---|
 | `GET /api/v1/n8n/listings/crawl-plan` | Crawler | `{tasks:[{maakunta, slug, mode, offset, max_pages}]}` |
 | `POST /api/v1/n8n/listings/ingest` | Crawler | `{maakunta, mode, offset, page_in_run, listings:[{external_id,url,kaupunki,osoite,hinta,alue,description,published_at,build_year?,building_type?}], error?}` → `{created, updated, removed, continue, next_offset}` |
-| `POST /api/v1/n8n/listings/analysis/claim` | Analyzer | `{limit}` → `{listings:[…], remonttityypit:[…], talotyypit:[…]}` |
+| `POST /api/v1/n8n/listings/import` | muu syöte | `{source?, listings:[{taloyhtio, osoite, kaupunki, maakunta, remonttityyppi? \| renovations?, timing?, description?, isannoitsija?, isannoitsija_puh?, isannoitsija_email?, build_year?, building_type?, url?, external_id?}]}` → `{created, updated, analysed, queued, matches, leads_created, errors}` |
+| `POST /api/v1/n8n/listings/analysis/claim` | Analyzer | `{limit}` → `{listings:[…, source, fetch_detail], remonttityypit:[…], talotyypit:[…]}` |
 | `POST /api/v1/n8n/listings/<id>/analysis` | Analyzer | `{status:"done", taloyhtio, isannoitsija, isannoitsija_puh, isannoitsija_email, rakennusvuosi, talotyyppi, tulevat_remontit, renovations:[{remonttityyppi, confidence, timing, evidence}]}` tai `{status:"failed", error}` |
 | `POST /api/v1/n8n/listings/contacts/claim` | Enricher | `{limit}` → `{listings:[…]}` |
 | `POST /api/v1/n8n/listings/<id>/contacts` | Enricher | `{status:"done", isannoitsija, phone, email, website, source}`, `{status:"not_found"}` tai `{status:"failed"}` |
@@ -184,6 +207,7 @@ Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 - `tests/test_listings_catalogue.py`: keruu, poistot, jonot, täsmäytys, päiväraja, historiaikkuna, yhteystiedot ja API.
 - `tests/test_catalogue_filters_and_onboarding.py`: lisäsuodattimet, esikatselu, liidi per taloyhtiö, säilytys,
   hälytys, salasanan vaihtopakko ja valinnaiset toiminnot.
+- `tests/test_listing_import.py`: CSV- ja API-tuonti, liidit tuoduista kohteista, virherivit.
 - `tests/test_n8n_catalogue_e2e.py`: ajaa kolme generoitua n8n-workflowta node kerrallaan
   (`tests/n8n_sim/executor.js`, mini-n8n) oikeaa paikallista CRM-palvelinta vasten. Oikotie, Finder,
   Asiakastieto ja OpenAI on mockattu (`tests/n8n_sim/mocks.js`). Testi ohitetaan, jos Node.js puuttuu.

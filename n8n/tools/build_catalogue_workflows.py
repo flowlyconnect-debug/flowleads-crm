@@ -312,7 +312,7 @@ const page = Number(ctx.page_in_run || 1);
 // Oikotie's bot protection answers 403 (captcha) or 429 when we go too fast.
 // Then the whole run stops: no more pages and no further regions this hour.
 const err = String($('CODE – Normalize Cards').first().json.body.error || '');
-const blocked = /(403|429)|captcha/i.test(err);
+const blocked = /(?<!\\d)(403|429)(?!\\d)|captcha/i.test(err);
 const more = !blocked && r.continue === true && page < Number(ctx.max_pages || 1);
 return [{ json: { ...ctx, more, blocked, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];
 """,
@@ -436,6 +436,9 @@ return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_b
             3,
         ),
         wait_node("WAIT – Rate Limit", 1, [1320, 260]),
+        # Imported listings (fetch_detail === false) carry their full text in
+        # `description`; only Oikotie listings have a detail page to fetch.
+        bool_if("IF – Fetch Detail Page", "={{ $json.fetch_detail !== false }}", [1430, 260]),
     ]
     detail = take(lib, "HTTP – Fetch Listing Detail Page", [1540, 260], onError="continueRegularOutput")
     detail["parameters"]["url"] = "={{ $('LOOP – Listings').first().json.url }}"
@@ -449,7 +452,8 @@ return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_b
             "CODE – Build Analysis Prompt",
             """
 const listing = $('LOOP – Listings').first().json;
-const h = $input.first()?.json || {};
+const useOwnText = listing.fetch_detail === false;
+const h = useOwnText ? {} : ($input.first()?.json || {});
 const status = Number(h.statusCode || 0);
 const html = String(h.pageHtml ?? h.body ?? h.data ?? '').slice(0, 200000);
 
@@ -468,16 +472,21 @@ for (const marker of ['Taloyhtiö', 'Tulevat remontit', 'Asunnon lisätiedot', '
   if (idx >= 0) { text = text.slice(idx); break; }
 }
 text = text.slice(0, 12000);
+if (useOwnText) text = String(listing.description || '').replace(/\\s+/g, ' ').trim().slice(0, 12000);
 
-const ok = !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;
+const ok = useOwnText
+  ? text.length >= 30
+  : !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;
 const PROMPT = %s;
 const types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');
 return [{ json: {
   ...listing,
   ok,
-  error: ok ? '' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`,
+  error: ok ? '' : (useOwnText ? 'Imported listing has no text to analyse' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`),
   ai_system_prompt: PROMPT.replace('__TYPES__', types),
-  ai_user_prompt: `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,
+  ai_user_prompt: useOwnText
+    ? `Taloyhtiö: ${listing.taloyhtio || ''}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\n\\nKohteen teksti:\\n${text}`
+    : `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,
 } }];
 """
             % json.dumps(ANALYSIS_PROMPT, ensure_ascii=False),
@@ -569,7 +578,9 @@ return [{ json: { more: claimed >= 20 && elapsed < 7 * 60 * 1000 } }];
     connect(c, "CODE – Split Listings", "LOOP – Listings")
     connect(c, "LOOP – Listings", "CODE – More To Claim", out_index=0)
     connect(c, "LOOP – Listings", "WAIT – Rate Limit", out_index=1)
-    connect(c, "WAIT – Rate Limit", "HTTP – Fetch Listing Detail Page")
+    connect(c, "WAIT – Rate Limit", "IF – Fetch Detail Page")
+    connect(c, "IF – Fetch Detail Page", "HTTP – Fetch Listing Detail Page", out_index=0)
+    connect(c, "IF – Fetch Detail Page", "CODE – Build Analysis Prompt", out_index=1)
     connect(c, "HTTP – Fetch Listing Detail Page", "CODE – Build Analysis Prompt")
     connect(c, "CODE – Build Analysis Prompt", "IF – Page OK")
     connect(c, "IF – Page OK", "AI – Analyze Listing", out_index=0)

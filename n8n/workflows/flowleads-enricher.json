@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "4d6a6509-d308-4074-a4ea-0249da857add",
+      "id": "e4fc2135-beee-4a74-9d40-a6366e67e2c1",
       "name": "Every 30 minutes"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "306e5641-f1b3-4772-a302-033c95b47141",
+      "id": "5619e473-2c60-46b6-a37c-14f294922a3e",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "a1756c16-d5e5-4a48-86bb-fc191693380b",
+              "id": "a48635b0-0141-48bf-8d22-f731f6aa6263",
               "name": "crm_base_url",
               "value": "https://flowleads-crm-zv0a.onrender.com",
               "type": "string"
             },
             {
-              "id": "1998a913-c1bf-4926-ad2d-9ccfaa2cc61f",
+              "id": "9a72f1df-a07b-4070-926e-16189364bf42",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "42ef799b-b7be-40ee-be13-df4e3fa47c5c",
+      "id": "0885f3d8-2d2f-46ee-bd40-72735b002bb3",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -90,7 +90,7 @@
         440,
         100
       ],
-      "id": "3ebc14bf-70e3-436c-961e-10a6b8e17024",
+      "id": "c3e37ed5-983a-449e-ad8f-773f00754f2b",
       "name": "HTTP – Claim Contacts",
       "retryOnFail": true,
       "maxTries": 3,
@@ -106,7 +106,7 @@
         660,
         100
       ],
-      "id": "aa48efeb-1330-404f-a1ad-00b6dc17fdc4",
+      "id": "b8c2e3eb-565b-45ea-8ada-c2b1eb399b0c",
       "name": "CODE – Split Listings"
     },
     {
@@ -119,7 +119,7 @@
         880,
         100
       ],
-      "id": "48787d69-219b-4d0e-b925-01cd3f8f3890",
+      "id": "061176d1-6a2e-4316-b4b2-384e31513764",
       "name": "LOOP – Listings"
     },
     {
@@ -133,7 +133,7 @@
         1100,
         200
       ],
-      "id": "7e05a429-80bb-45fb-a743-e420fbfdff9b",
+      "id": "e8cdca3a-dc99-46e5-abc1-ff02b55f357b",
       "name": "CODE – Map Listing"
     },
     {
@@ -147,7 +147,7 @@
         1320,
         200
       ],
-      "id": "39daf7f4-f9a3-425e-afdd-50029c77b9b8",
+      "id": "4b0e8c80-f3c9-4fde-8d86-b25e94c16dbb",
       "name": "TRANSFORM – Build Company Search Query"
     },
     {
@@ -161,7 +161,7 @@
         1540,
         200
       ],
-      "id": "ab92faab-0be5-4ccd-aa23-c2b96f28a79a",
+      "id": "35ff9acb-fe40-4490-8c20-2a7f624e9445",
       "name": "TRANSFORM – Build URLs"
     },
     {
@@ -196,7 +196,7 @@
         1760,
         200
       ],
-      "id": "aa971cce-4949-42e3-8a21-f618bb3f69d2",
+      "id": "3640b529-c50d-43ec-aa46-1564d3498894",
       "name": "IF – Finder Search Enabled"
     },
     {
@@ -217,7 +217,7 @@
         1980,
         200
       ],
-      "id": "f0f3912d-0028-49c8-b3e5-8ba5663f53c3",
+      "id": "2a7bf260-2c1e-4885-b1b5-3122fe198f20",
       "name": "HTTP – Search Finder.fi",
       "onError": "continueRegularOutput"
     },
@@ -232,7 +232,7 @@
         2200,
         200
       ],
-      "id": "e65a1a95-b35c-4306-8bea-08297bd13fb0",
+      "id": "93293bfb-f3b5-4063-ad35-64091d31a9b7",
       "name": "PARSE – Extract Finder Company URL"
     },
     {
@@ -267,7 +267,7 @@
         2420,
         200
       ],
-      "id": "93494b55-08e0-462c-945b-ce8cec2840cf",
+      "id": "a15b2d3c-0118-479e-a09f-0cd6a728a460",
       "name": "IF – Finder Company URL Found"
     },
     {
@@ -288,7 +288,7 @@
         2640,
         200
       ],
-      "id": "948a2093-0b22-4f1c-bf1d-235012357f66",
+      "id": "5d323c45-230b-4a5a-9002-f4e32536a52a",
       "name": "HTTP – Fetch Finder Company Page",
       "onError": "continueRegularOutput"
     },
@@ -303,7 +303,7 @@
         2860,
         200
       ],
-      "id": "0a00ab9d-7f66-4a48-80a5-e0c177ba9ce9",
+      "id": "5c46e089-d01a-4abb-bbef-ca1faa790639",
       "name": "STORE – Save Finder Response"
     },
     {
@@ -324,7 +324,7 @@
         3080,
         200
       ],
-      "id": "d2f9d762-6844-4887-a308-fb1783eac9e1",
+      "id": "09b72efe-54bc-426e-a6f0-148c26d0dc1e",
       "name": "HTTP – Search Asiakastieto",
       "onError": "continueRegularOutput"
     },
@@ -339,7 +339,7 @@
         3300,
         200
       ],
-      "id": "5fd5e830-79b1-48c9-99f6-5e71fb336591",
+      "id": "88af8eca-c891-42a7-a82d-06c195fd9e36",
       "name": "PARSE – Extract Asiakastieto Company URL"
     },
     {
@@ -360,7 +360,7 @@
         3520,
         200
       ],
-      "id": "19369b5b-fdf4-4449-8eae-2ec5e33503c7",
+      "id": "cfb2c048-c3d4-4b58-80ba-52fb547c436c",
       "name": "HTTP – Fetch Asiakastieto Company Page",
       "onError": "continueRegularOutput"
     },
@@ -375,7 +375,7 @@
         3740,
         200
       ],
-      "id": "fd74edac-0d2c-4de4-83f0-5ed9dd667e0b",
+      "id": "06232e71-0714-4695-8f2d-a63984a2b83a",
       "name": "PARSE – Combine Company Search Responses"
     },
     {
@@ -389,7 +389,7 @@
         3960,
         200
       ],
-      "id": "0489fb22-5482-412e-aef2-5847df8745a1",
+      "id": "0b36c997-329b-45bd-911b-7ba18949715c",
       "name": "TRANSFORM – Normalize Fallback Candidates"
     },
     {
@@ -416,7 +416,7 @@
         4180,
         200
       ],
-      "id": "420c7be0-1b29-4301-b490-8914b48287b7",
+      "id": "e96c4dcd-6e9b-4863-8e24-563eafc17d31",
       "name": "AI – Extract Fallback Contact Info",
       "credentials": {
         "openAiApi": {
@@ -440,7 +440,7 @@
         4400,
         200
       ],
-      "id": "74977aaa-289b-4197-8873-91f568796757",
+      "id": "24e56b81-342a-420a-8c25-fdc349cbfac2",
       "name": "PARSE – Normalize Fallback Contact Data"
     },
     {
@@ -453,7 +453,7 @@
         4620,
         200
       ],
-      "id": "4b637ab9-c99f-4644-be0d-12323b70ed93",
+      "id": "f844bb4b-c41d-4d68-967d-481cf35e0d6c",
       "name": "CODE – Build Contacts Body"
     },
     {
@@ -484,7 +484,7 @@
         4840,
         200
       ],
-      "id": "47f64533-5930-4707-b61c-f8af92105564",
+      "id": "a483b393-14b9-43ff-9783-4dcc89bcdead",
       "name": "HTTP – CRM Save Contacts",
       "retryOnFail": true,
       "maxTries": 3,

@@ -186,3 +186,48 @@ def test_crawler_stops_the_whole_run_when_oikotie_blocks_it(live_crm, tmp_path):
         errors = [s.last_error for s in CrawlState.query.all() if s.last_error]
         assert len(errors) == 1
         assert "403" in errors[0]
+
+
+def test_analyzer_analyses_imported_text_without_fetching_a_page(live_crm, tmp_path):
+    """An imported listing has no Oikotie page: the Analyzer classifies the
+    text it was imported with and the lead appears, with no detail-page request."""
+    app, base = live_crm
+    from app.extensions import db
+    from app.leads.models import Lead
+    from app.listings.import_services import import_listings
+    from app.listings.models import Listing
+    from app.search.models import SearchProfile
+    from app.users.services import create_organization
+
+    with app.app_context():
+        org = create_organization("Import Org", "import-org")
+        db.session.flush()
+        db.session.add(
+            SearchProfile(organization_id=org.id, name="Lukot", remonttityyppi="Lukkoremontti / kulunvalvonta",
+                          regions=["Uusimaa"], source="oikotie", is_active=True, needs_rematch=False,
+                          daily_lead_limit=0)
+        )
+        db.session.commit()
+        org_id = org.id
+        result = import_listings(
+            [
+                {
+                    "taloyhtio": "As Oy Tuonti",
+                    "osoite": "Tuontitie 1",
+                    "kaupunki": "Espoo",
+                    "maakunta": "Uusimaa",
+                    "description": "Taloyhtiö As Oy Tuonti. Hallitus valmistelee lukituksen uusimista (iLOQ) vuodelle 2027.",
+                }
+            ]
+        )
+        assert result["queued"] == 1
+
+    run = _run("flowleads-analyzer.json", base, tmp_path)
+    assert run["runs"].get("HTTP – Fetch Listing Detail Page", 0) == 0
+    assert run["runs"]["AI – Analyze Listing"] == 1
+    with app.app_context():
+        listing = Listing.query.one()
+        assert listing.analysis_status == "done"
+        assert [r.remonttityyppi for r in listing.renovations] == ["Lukkoremontti / kulunvalvonta"]
+        lead = Lead.query.filter_by(organization_id=org_id).one()
+        assert lead.source == "import"
