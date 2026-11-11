@@ -52,10 +52,17 @@
                 <td>{{ member.email }}</td>
                 <td>{{ 'Ylläpitäjä' if member.role == 'admin' else ('Superadmin' if member.role == 'superadmin' else 'Käyttäjä') }}</td>
                 <td>{{ 'Aktiivinen' if member.is_active else 'Ei käytössä' }}</td>
-                <td>{{ member.created_at }}</td>
+                <td>{{ (member.created_at|helsinki).strftime('%d.%m.%Y') if member.created_at else '—' }}</td>
                 <td>
                   {% if member.id != current_user.id %}
                   <div class="form-row-inline">
+                    {% if current_user.is_superadmin() and member.totp_enabled %}
+                    <form method="post" action="{{ url_for('admin.reset_user_two_factor_route', user_id=member.id) }}"
+                          onsubmit="return confirm('Nollataanko käyttäjän kaksivaiheinen tunnistautuminen? Hän ottaa sen uudelleen käyttöön seuraavalla kirjautumisella.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">Nollaa 2FA</button>
+                    </form>
+                    {% endif %}
                     <form method="post" action="{{ url_for('settings.resend_team_invite', user_id=member.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <button type="submit" class="btn btn-secondary btn-sm">Lähetä kutsu uudelleen</button>

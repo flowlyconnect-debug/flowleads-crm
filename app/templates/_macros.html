@@ -47,6 +47,7 @@
 
   <span class="settings-nav__group-label">Järjestelmä</span>
   <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
+  <a href="{{ url_for('admin.audit_log') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'audit_log' %} is-active{% endif %}">Audit-loki</a>
   <a href="{{ url_for('email.admin_email_logs') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_logs' %} is-active{% endif %}">Sähköpostiloki</a>
   <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Varmuuskopiot</a>
   <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin_reports' %} is-active{% endif %}">Järjestelmäraportit</a>

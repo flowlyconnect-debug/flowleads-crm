@@ -54,6 +54,14 @@ class OrganizationSettings(db.Model):
     )
     proposal_default_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Daily summary of new targets on the Kohteet page (in-app + email).
+    targets_digest_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    targets_digest_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
 
     created_at: Mapped[datetime] = mapped_column(

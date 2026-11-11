@@ -422,6 +422,21 @@ class ProposalService:
                 raise ProposalServiceError(exc.message, exc.code) from exc
 
     @staticmethod
+    def _display_totals(proposal: Proposal) -> dict:
+        from app.proposals.pdf import fi_money, fi_number, vat_breakdown
+
+        vat = vat_breakdown(proposal)
+        currency = proposal.currency or "EUR"
+        return {
+            "subtotal": fi_money(vat["subtotal"], currency),
+            "discount": fi_money(vat["discount"], currency) if vat["discount"] > 0 else None,
+            "net": fi_money(vat["net"], currency),
+            "tax_percent": fi_number(vat["tax_percent"]),
+            "tax_amount": fi_money(vat["tax_amount"], currency),
+            "gross": fi_money(vat["gross"], currency),
+        }
+
+    @staticmethod
     def record_view(view_token: str, request_meta: dict) -> dict:
         proposal = get_proposal_by_token(view_token)
         if not proposal:
@@ -817,6 +832,13 @@ class ProposalService:
         template.default_tax_percent = _dec(data.get("default_tax_percent") or DEFAULT_TAX_PERCENT)
         template.header_html = (data.get("header_html") or "").strip() or None
         template.footer_html = (data.get("footer_html") or "").strip() or None
+        if "logo_url" in data:
+            logo_url = (data.get("logo_url") or "").strip()
+            if logo_url and not logo_url.lower().startswith("https://"):
+                raise ProposalServiceError(
+                    "Logon osoitteen pitää alkaa https://", "validation_error"
+                )
+            template.logo_url = logo_url[:500] or None
         if "name" in data and data.get("name"):
             template.name = data["name"].strip()[:200]
         db.session.flush()
@@ -861,6 +883,8 @@ class ProposalService:
             "discount_amount": str(proposal.discount_amount),
             "tax_percent": str(proposal.tax_percent),
             "total": str(proposal.total),
+            # Finnish display values with the VAT breakdown
+            "display": ProposalService._display_totals(proposal),
             "notes": proposal.notes,
             "lead_name": proposal.lead_name_snapshot,
             "lead_company": proposal.lead_company_snapshot,

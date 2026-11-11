@@ -82,7 +82,37 @@ Tiedossa olevat, vielä avoimet (ei korjattu tässä):
   Slack/Teams-webhookin viestiteksti on aina "Uusi liidi"; automaation muokkaus pudottaa salatun
   webhook-otsakkeen; webhook-URLeissa ei ole SSRF-suodatusta.
 - Väliaikainen salasana ja uusi API-avain kulkevat allekirjoitetussa istuntoevästeessä yhden sivulatauksen.
-- Ulkoiset kirjastot (Chart.js, Sortable, Quill, Inter-fontti) ladataan CDN:stä; CSP puuttuu.
+- Content-Security-Policy puuttuu (kirjastot ovat nyt omalla palvelimella, joten sen voi ottaa käyttöön, kun
+  inline-skriptit on käyty läpi).
+
+## Tehty 11.11.2026 (3): uudet toiminnot
+
+Migraatio `b6c7d8e9f0a1` (päiväkoosteen asetus, tarjouksen logo). Testit: `tests/test_feature_round.py`.
+
+- **Suodatus.** Kohteet-sivulla remontti, maakunta, kaupunki, talotyyppi, "vain yhteystiedolliset" ja järjestys
+  (`app/listings/target_services.py::_apply_target_filters`); Liidit-sivulla pikasuodattimet vaihe, remontti,
+  kaupunki, maakunta ja vastuuhenkilö (`LeadService.quick_filter_options`). Valinnat tulevat voimaan heti ja
+  säilyvät sivutuksen ja siirtojen yli. Tarjolla on vain arvoja, joita aineistossa oikeasti on.
+- **Kohteen siirto.** Vastuuhenkilön valinta massasiirrossa ja linkit syntyneisiin liideihin.
+- **Päiväkooste uusista kohteista.** Ajastintyö `target_digest` klo 7.30 Suomen aikaa: sovelluksen ilmoitus
+  ja sähköposti organisaation käyttäjille, jos uusia kohteita on tullut edellisen koosteen jälkeen. Kytkin
+  Kohteet-sivun alareunassa.
+- **Liidisivu.** "Kirjaa soitto" / "Kirjaa sähköposti" yhdellä klikkauksella (päivittää viimeisimmän
+  yhteydenoton), "Palauta arkistosta" ja "Avaa uudelleen" (hävitty liidi).
+- **Tehtävät.** Muokkaus, siirto (+1 pv / +3 pv / +1 vko) ja poisto (`/tasks/<id>/edit`).
+- **Liidien CSV-tuonti asiakkaalle** (`/leads/import`, `app/leads/import_services.py`): mallitiedosto,
+  kaksoiskappaleiden ohitus, rivikohtaiset virheet.
+- **Superadmin.** Organisaation poisto käytöstä / käyttöönotto asiakaslistalta (estää kirjautumisen,
+  katkaisee istunnot ja API-avaimet; tiedot säilyvät), käyttäjän 2FA:n nollaus (Käyttäjät-sivu), audit-lokin
+  selain (`/admin/audit-log`).
+- **Tarjous-PDF.** Logo (asetus, vain https), suomalainen rahamuoto ja ALV-erittely (veroton, ALV €,
+  verollinen); sama erittely asiakkaan tarjoussivulla.
+- **Ei ulkoisia CDN-latauksia.** Chart.js, Sortable, Quill ja Inter-fontti ovat hakemistossa
+  `app/static/vendor/` (ks. sen README).
+- **CI.** `.github/workflows/tests.yml` ajaa migraatiot ja testit jokaiselle PR:lle ja mainille.
+
+Huom. organisaation `is_active`-lippu on nyt oikeasti voimassa: jos jokin tuotannon organisaatio on jäänyt
+passiiviseksi, sen käyttäjät eivät pääse kirjautumaan ennen kuin se otetaan käyttöön asiakaslistalta.
 
 ## Seuraavaksi
 
@@ -107,7 +137,7 @@ Claude voi tehdä:
 7. Selvittää `pg_dump`-version Renderin Python-ympäristössä. Kanta on Postgres 18; vanhempi `pg_dump`
    epäonnistuu, jolloin varmuuskopiointi vaatii Docker-ajoympäristön tai muun ratkaisun.
 8. Korjata `purge-leads`-kuiva-ajon tuloste: se laskee osumat kahteen kertaan, kun `--with-listings` on mukana.
-9. Lisätä GitHub Actions -työn, joka ajaa testit ennen mainin deployta (CI puuttuu kokonaan).
+9. (Tehty) CI: `.github/workflows/tests.yml`. Halutessa mainin suojaus GitHubissa niin, että punainen ajo estää yhdistämisen.
 10. Content-Security-Policy (vaatii inline-skriptien läpikäynnin).
 
 Suositeltavat, ei kiireelliset: oma domain (päivitä `APP_BASE_URL`), Postgresin IP-sallintalistan rajaus

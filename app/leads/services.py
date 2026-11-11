@@ -49,6 +49,14 @@ LAST_ACTIVITY_TYPES = (
     "ai_score",
     "ai_enriched",
 )
+# Quick filters on the lead list -> key in Lead.ai_contact_info (set when a
+# target from the catalogue becomes a lead).
+LEAD_TARGET_FILTERS = {
+    "renovation": "remonttityyppi",
+    "city": "kaupunki",
+    "region": "maakunta",
+}
+
 LOST_REASON_LABELS = {
     "no_response": "Ei vastannut",
     "wrong_target": "Väärä kohderyhmä",
@@ -744,6 +752,64 @@ class LeadService:
         return lead
 
     @staticmethod
+    def restore(lead_id: int, organization_id: int, user_id: int | None) -> Lead:
+        """Bring a lead back to the open pipeline: an archived lead returns to
+        the stage it was archived in, a lost lead to the first stage."""
+        lead = get_lead_for_org(lead_id, organization_id)
+        now = datetime.now(timezone.utc)
+        if lead.status == "archived":
+            stage_status = _status_from_stage_name(lead.stage.name) if lead.stage else "active"
+            lead.status = stage_status
+            lead.updated_at = now
+            LeadService.log_activity(lead.id, user_id, "updated", content="Palautettu arkistosta")
+            log_audit(
+                "lead_restored",
+                user_id=user_id,
+                organization_id=organization_id,
+                target_type="lead",
+                target_id=lead.id,
+            )
+        if lead.status == "lost":
+            first_stage = get_default_stage(organization_id)
+            lead.stage_id = first_stage.id
+            lead.status = "active"
+            lead.lost_reason = None
+            lead.lost_reason_note = None
+            lead.stage_changed_at = now
+            lead.updated_at = now
+            LeadService.log_activity(
+                lead.id, user_id, "stage_changed", content="Avattu uudelleen hävitystä"
+            )
+        db.session.flush()
+        return lead
+
+    @staticmethod
+    def log_contact(
+        lead_id: int,
+        organization_id: int,
+        user_id: int | None,
+        kind: str,
+        note: str | None = None,
+    ) -> Activity:
+        """One-click log of a call or of an email sent outside the CRM. Counts
+        as a contact: the lead stops being "not contacted yet"."""
+        lead = get_lead_for_org(lead_id, organization_id)
+        if lead.status == "archived":
+            raise LeadServiceError("Cannot update archived lead.", "archived")
+        labels = {"call": ("call", "Soitto kirjattu"), "email": ("email_sent", "Sähköposti kirjattu")}
+        if kind not in labels:
+            raise LeadServiceError("Invalid activity type.", "invalid_activity")
+        activity_type, default_text = labels[kind]
+        text = (note or "").strip()[:2000] or default_text
+        activity = LeadService.log_activity(
+            lead.id, user_id, activity_type, content=text, metadata={"manual": True}
+        )
+        lead.last_contacted_at = datetime.now(timezone.utc)
+        lead.updated_at = lead.last_contacted_at
+        db.session.flush()
+        return activity
+
+    @staticmethod
     def add_note(lead_id: int, content: str, organization_id: int, user_id: int | None) -> Activity:
         lead = get_lead_for_org(lead_id, organization_id)
         if not content or not content.strip():
@@ -787,6 +853,13 @@ class LeadService:
             query = query.filter(Lead.unsubscribed.is_(True))
         if filters.get("is_anonymized"):
             query = query.filter(Lead.is_anonymized.is_(True))
+        # target details stored on catalogue leads (Lead.ai_contact_info)
+        for key, meta_key in LEAD_TARGET_FILTERS.items():
+            value = (filters.get(key) or "").strip() if isinstance(filters.get(key), str) else None
+            if value:
+                query = query.filter(
+                    func.lower(Lead.ai_contact_info[meta_key].as_string()) == value.lower()
+                )
         if filters.get("no_contact_7"):
             if latest_activity is None:
                 seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
@@ -1175,6 +1248,30 @@ class LeadService:
                 created.strftime("%d.%m.%Y %H:%M") if created else "",
             ])
         return output.getvalue()
+
+    @staticmethod
+    def quick_filter_options(organization_id: int) -> dict:
+        """Renovation types, cities and regions that occur on the
+        organization's open leads, for the quick filter bar."""
+        options: dict[str, set] = {key: set() for key in LEAD_TARGET_FILTERS}
+        rows = (
+            db.session.query(Lead.ai_contact_info)
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.status != "archived",
+                Lead.ai_contact_info.isnot(None),
+            )
+            .limit(5000)
+            .all()
+        )
+        for (meta,) in rows:
+            if not isinstance(meta, dict):
+                continue
+            for key, meta_key in LEAD_TARGET_FILTERS.items():
+                value = str(meta.get(meta_key) or "").strip()
+                if value:
+                    options[key].add(value)
+        return {key: sorted(values, key=str.lower) for key, values in options.items()}
 
     @staticmethod
     def bulk_action(action: str, lead_ids: list[int], organization_id: int, user_id: int | None, payload: dict | None = None):

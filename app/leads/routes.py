@@ -66,6 +66,10 @@ def _filters_from_request() -> dict:
         "marketing_opt_in": request.args.get("marketing_opt_in") == "1",
         "unsubscribed": request.args.get("unsubscribed") == "1",
         "is_anonymized": request.args.get("is_anonymized") == "1",
+        # target details of catalogue leads (quick filter bar)
+        "renovation": (request.args.get("renovation") or "").strip() or None,
+        "city": (request.args.get("city") or "").strip() or None,
+        "region": (request.args.get("region") or "").strip() or None,
     }
 
 
@@ -273,6 +277,7 @@ def list_leads():
         leads=pagination.items,
         filter_form=filter_form,
         filters=filters,
+        quick_filter_options=LeadService.quick_filter_options(organization_id),
         bulk_form=bulk_form,
         organization_id=organization_id,
         can_archive=can_archive_leads(),
@@ -616,6 +621,44 @@ def delete_lead(lead_id):
         return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
 
 
+@leads_bp.route("/<int:lead_id>/restore", methods=["POST"])
+def restore_lead(lead_id):
+    """Un-archive, or reopen a lost lead."""
+    organization_id = resolve_organization_id()
+    try:
+        LeadService.restore(lead_id, organization_id, current_user.id)
+        db.session.commit()
+        flash("Liidi palautettu avoimeksi.", "success")
+    except LeadServiceError as exc:
+        db.session.rollback()
+        if exc.code == "not_found":
+            abort(404)
+        flash(exc.message, "danger")
+    return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
+
+
+@leads_bp.route("/<int:lead_id>/log-contact", methods=["POST"])
+def log_contact(lead_id):
+    """"Kirjaa soitto" / "Kirjaa sähköposti" on the lead page."""
+    organization_id = resolve_organization_id()
+    try:
+        LeadService.log_contact(
+            lead_id,
+            organization_id,
+            current_user.id,
+            request.form.get("kind") or "",
+            request.form.get("note"),
+        )
+        db.session.commit()
+        flash("Yhteydenotto kirjattu.", "success")
+    except LeadServiceError as exc:
+        db.session.rollback()
+        if exc.code == "not_found":
+            abort(404)
+        flash(exc.message, "danger")
+    return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
+
+
 @leads_bp.route("/<int:lead_id>/stage", methods=["POST", "PATCH"])
 def move_stage(lead_id):
     organization_id = resolve_organization_id()
@@ -848,6 +891,65 @@ def add_note(lead_id):
             return json_error(exc.code, exc.message, 400)
         flash(exc.message, "danger")
         return redirect(url_for("leads.detail", lead_id=lead_id, **_org_kwargs(organization_id)))
+
+
+@leads_bp.route("/import", methods=["GET", "POST"])
+def import_leads_route():
+    """The customer's own lead list (CSV) into the CRM."""
+    from app.leads.import_services import LeadImportError, import_leads, parse_lead_csv
+
+    organization_id = resolve_organization_id()
+    org_kwargs = _org_kwargs(organization_id)
+    result = None
+    if request.method == "POST":
+        upload = request.files.get("file")
+        if upload is None or not (upload.filename or "").strip():
+            flash("Valitse CSV-tiedosto.", "warning")
+            return redirect(url_for("leads.import_leads_route", **org_kwargs))
+        try:
+            rows = parse_lead_csv(upload.read())
+            result = import_leads(
+                rows,
+                organization_id,
+                current_user.id,
+                actor_role=current_user.role,
+                assigned_to=current_user.id if current_user.role == "user" else None,
+            )
+            from app.core.audit import log_audit
+
+            log_audit(
+                "leads_imported",
+                user_id=current_user.id,
+                organization_id=organization_id,
+                target_type="lead",
+                target_id=None,
+                metadata={"created": result["created"], "skipped": result["skipped"], "errors": len(result["errors"])},
+            )
+            db.session.commit()
+        except LeadImportError as exc:
+            db.session.rollback()
+            flash(exc.message, "danger")
+            return redirect(url_for("leads.import_leads_route", **org_kwargs))
+    from app.leads.import_services import CSV_TEMPLATE_COLUMNS
+
+    return render_template(
+        "leads/import.html",
+        result=result,
+        columns=CSV_TEMPLATE_COLUMNS,
+        organization_id=organization_id,
+        org_query=org_kwargs,
+    )
+
+
+@leads_bp.route("/import-template.csv")
+def import_leads_template():
+    from app.leads.import_services import csv_template
+
+    return Response(
+        csv_template(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=flowleads-liidit-malli.csv"},
+    )
 
 
 @leads_bp.route("/export")

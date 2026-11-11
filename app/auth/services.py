@@ -181,6 +181,10 @@ def authenticate_user(email: str, password: str) -> tuple[User | None, str | Non
             return None, "API accounts cannot sign in to the web interface."
         return None, "This account is inactive."
 
+    if user.organization is not None and not user.organization.is_active:
+        # the whole customer has been switched off by the platform
+        return None, "Organisaatiosi tili ei ole käytössä. Ota yhteyttä FlowLeadsin ylläpitoon."
+
     if is_account_locked(user):
         return None, "Account is temporarily locked. Try again later."
 

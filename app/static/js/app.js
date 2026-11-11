@@ -116,3 +116,12 @@
     initReportsFilters();
   }
 })();
+
+
+// Filter bars (Kohteet, Liidit): submit on change, without empty parameters in the URL.
+window.flSubmitFilters = function (form) {
+  Array.prototype.forEach.call(form.elements, function (field) {
+    if (field.name && field.value === '' && field.type !== 'hidden') field.disabled = true;
+  });
+  form.submit();
+};

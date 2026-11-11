@@ -6,12 +6,14 @@
 {% endblock %}
 {% block content %}
 {% set is_hidden_tab = tab == 'hidden' %}
-{% set filtered = search or profile_id %}
+{% set filtered = search or profile_id or filters %}
+{% set filter_args = {} %}
+{% for key, value in filters.items() %}{% set _ = filter_args.update({key: value}) %}{% endfor %}
 {% macro tab_url(name) -%}
   {{- url_for('targets.index', tab=(name if name != 'available' else none), **org_query) -}}
 {%- endmacro %}
 {% macro page_url(number) -%}
-  {{- url_for('targets.index', tab=(tab if is_hidden_tab else none), search=search or none, profile_id=profile_id, page=number, **org_query) -}}
+  {{- url_for('targets.index', tab=(tab if is_hidden_tab else none), search=search or none, profile_id=profile_id, page=number, **dict(org_query, **filter_args)) -}}
 {%- endmacro %}
 
 <section class="leads-page targets-page">
@@ -61,13 +63,62 @@
           </span>
           <input type="search" name="search" value="{{ search }}" class="leads-opp-search__input" placeholder="Hae taloyhtiötä tai kaupunkia…" aria-label="Hae taloyhtiötä tai kaupunkia">
         </label>
+        {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
       </form>
     </div>
+
+    {# Filter bar: every choice applies at once; only values that occur among the targets are offered. #}
+    {% macro filter_select(name, label, options, all_label) -%}
+    {% if options|length > 1 or filters.get(name) %}
+    <label class="targets-filter">
+      <span class="targets-filter__label">{{ label }}</span>
+      <select name="{{ name }}" class="form-input targets-filter__select" onchange="this.form.submit()">
+        <option value="">{{ all_label }}</option>
+        {% for option in options %}
+        <option value="{{ option }}"{% if filters.get(name) == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {%- endmacro %}
+    <form method="get" class="targets-filters" aria-label="Rajaa kohteita">
+      {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+      {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+      {{ filter_select('renovation', 'Remontti', filter_options.renovations, 'Kaikki remontit') }}
+      {{ filter_select('region', 'Maakunta', filter_options.regions, 'Kaikki maakunnat') }}
+      {{ filter_select('city', 'Kaupunki', filter_options.cities, 'Kaikki kaupungit') }}
+      {{ filter_select('building', 'Talotyyppi', filter_options.buildings, 'Kaikki talotyypit') }}
+      <label class="targets-filter targets-filter--check">
+        <input type="checkbox" name="contact" value="1"{% if filters.get('contact') == '1' %} checked{% endif %} onchange="flSubmitFilters(this.form)">
+        <span>Vain yhteystiedolliset</span>
+      </label>
+      <label class="targets-filter targets-filter--sort">
+        <span class="targets-filter__label">Järjestys</span>
+        <select name="sort" class="form-input targets-filter__select" onchange="flSubmitFilters(this.form)">
+          {% for value, label in sort_options %}
+          <option value="{{ value }}"{% if filters.get('sort', '') == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if filtered %}<a class="targets-filters__clear" href="{{ tab_url(tab) }}">Tyhjennä rajaukset</a>{% endif %}
+      <noscript><button type="submit" class="btn btn-secondary btn-sm">Rajaa</button></noscript>
+    </form>
+
+    {% if transferred_leads %}
+    <div class="targets-transferred" role="status">
+      <strong>{{ 'Liidi luotu:' if transferred_leads|length == 1 else 'Liidit luotu:' }}</strong>
+      {% for lead in transferred_leads %}
+      <a href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ lead.company or lead.display_name }}</a>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
 
     {% if not rows %}
     <div class="targets-empty">
       {% if filtered %}
-        {{ empty_state(none, "Ei osumia näillä rajauksilla", "Kokeile toista hakusanaa tai hakuprofiilia.", "Tyhjennä rajaukset", tab_url(tab)) }}
+        {{ empty_state(none, "Ei osumia näillä rajauksilla", "Kokeile toista hakusanaa tai väljempiä rajauksia.", "Tyhjennä rajaukset", tab_url(tab)) }}
       {% elif is_hidden_tab %}
         {{ empty_state(none, "Ei piilotettuja kohteita", "Kohteet, jotka piilotat Saatavilla-listalta, löytyvät täältä.") }}
       {% elif not profiles %}
@@ -82,6 +133,7 @@
       {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
       {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+      {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
       {% if pagination.page > 1 %}<input type="hidden" name="page" value="{{ pagination.page }}">{% endif %}
 
       <div class="targets-bulk">
@@ -96,6 +148,15 @@
           {% else %}
           <button type="submit" class="btn btn-secondary btn-sm" data-bulk disabled
                   formaction="{{ url_for('targets.dismiss', **org_query) }}">Piilota valitut</button>
+          {% if assignees|length > 1 %}
+          <label class="targets-assignee__label" for="targets-assignee">Vastuuhenkilö</label>
+          <select name="assigned_to" id="targets-assignee" class="form-input targets-assignee" title="Kenelle siirrettävät liidit osoitetaan">
+            <option value="">Ei vastuuhenkilöä</option>
+            {% for user in assignees %}
+            <option value="{{ user.id }}"{% if user.id == current_user.id %} selected{% endif %}>{{ user.email }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
           <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled>Siirrä valitut liideiksi</button>
           {% endif %}
         </span>
@@ -171,6 +232,14 @@
       </nav>
       {% endif %}
     </footer>
+    {% endif %}
+    {% if can_edit_profiles and not is_hidden_tab %}
+    <form method="post" class="targets-digest" action="{{ url_for('targets.digest_setting', **org_query) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="enabled" value="{{ '0' if digest_enabled else '1' }}">
+      <span>Päiväkooste uusista kohteista (ilmoitus ja sähköposti aamuisin): <strong>{{ 'päällä' if digest_enabled else 'pois päältä' }}</strong></span>
+      <button type="submit" class="btn btn-ghost btn-sm">{{ 'Kytke pois' if digest_enabled else 'Kytke päälle' }}</button>
+    </form>
     {% endif %}
   </div>
 </section>

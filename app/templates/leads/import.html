@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Tuo liidejä — FlowLeads{% endblock %}
+{% block content %}
+<section class="leads-page">
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">Tuo liidejä tiedostosta</h1>
+      <p class="leads-header__sub">Tuo oma asiakas- tai kontaktilistasi CSV-tiedostona (esim. Excelistä: Tallenna nimellä → CSV).</p>
+    </div>
+    <div class="leads-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Takaisin liideihin</a>
+    </div>
+  </header>
+
+  {% if result %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <h2 class="card-title">Tuonnin tulos</h2>
+      <p><strong>{{ result.created }}</strong> {{ 'liidi luotu' if result.created == 1 else 'liidiä luotu' }}{% if result.skipped %}, <strong>{{ result.skipped }}</strong> ohitettu, koska sama liidi (sama sähköposti ja yritys) on jo olemassa{% endif %}.</p>
+      {% if result.errors %}
+      <p>Näitä rivejä ei voitu tuoda:</p>
+      <ul class="text-sm">
+        {% for error in result.errors %}<li>{{ error }}</li>{% endfor %}
+        {% if result.more_errors %}<li>…ja {{ result.more_errors }} muuta riviä.</li>{% endif %}
+      </ul>
+      {% endif %}
+      {% if result.created %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.list_leads', source='import', sort='created_at', dir='desc', **org_query) }}">Näytä tuodut liidit</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card" style="max-width:760px;">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('leads.import_leads_route', **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label" for="lead-import-file">CSV-tiedosto</label>
+          <input type="file" id="lead-import-file" name="file" accept=".csv,text/csv" required>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary">Tuo liidit</button>
+          <a class="btn btn-secondary" href="{{ url_for('leads.import_leads_template', **org_query) }}">Lataa mallitiedosto</a>
+        </div>
+      </form>
+
+      <h2 class="card-title" style="margin-top:1.5rem;">Näin tuonti toimii</h2>
+      <ul class="text-sm" style="line-height:1.7;">
+        <li>Ensimmäinen rivi on otsikkorivi. Tunnistetut sarakkeet: {% for column in columns %}<code>{{ column }}</code>{% if not loop.last %}, {% endif %}{% endfor %}. Myös <code>nimi</code> (koko nimi) käy.</li>
+        <li>Jokaisella rivillä pitää olla vähintään yritys, nimi, sähköposti tai puhelin.</li>
+        <li>Rivi ohitetaan, jos samalla sähköpostilla ja yrityksellä on jo liidi. Mitään ei korvata.</li>
+        <li>Tuodut liidit tulevat vaiheeseen Uusi liidi ja lähteeksi merkitään Tuonti. Enintään 2000 riviä kerralla.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

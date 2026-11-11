@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Audit-loki — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('audit_log') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Audit-loki</h1>
+          <p class="settings-panel__subtitle">Kuka teki mitä ja milloin: kirjautumiset, siirrot, poistot ja asetusmuutokset.</p>
+        </header>
+
+        <form method="get" class="form-row-inline" style="gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <label class="form-label">Organisaatio
+            <select name="org" class="form-input" onchange="this.form.submit()">
+              <option value="">Kaikki</option>
+              {% for organization in organizations %}
+              <option value="{{ organization.id }}"{% if selected_org == organization.id %} selected{% endif %}>{{ organization.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-label">Tapahtuma
+            <select name="action" class="form-input" onchange="this.form.submit()">
+              <option value="">Kaikki</option>
+              {% for value in actions %}
+              <option value="{{ value }}"{% if selected_action == value %} selected{% endif %}>{{ action_labels.get(value, value) }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% if selected_org or selected_action %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.audit_log') }}">Tyhjennä</a>{% endif %}
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Aika</th><th>Tapahtuma</th><th>Käyttäjä</th><th>Organisaatio</th><th>Kohde</th><th>Lisätiedot</th></tr>
+            </thead>
+            <tbody>
+              {% for entry in entries %}
+              <tr>
+                <td style="white-space:nowrap;">{{ (entry.created_at|helsinki).strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                <td>{{ action_labels.get(entry.action, entry.action) }}</td>
+                <td>{{ entry.user.email if entry.user else '—' }}</td>
+                <td>{{ organization_names.get(entry.organization_id, '—') }}</td>
+                <td>{% if entry.target_type %}{{ entry.target_type }}{% if entry.target_id %} #{{ entry.target_id }}{% endif %}{% else %}—{% endif %}</td>
+                <td class="text-sm text-muted" style="max-width:320px;word-break:break-word;">
+                  {% if entry.metadata_json %}{% for key, value in entry.metadata_json.items() %}{{ key }}: {{ value|string|truncate(80, True, '…') }}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6">Ei tapahtumia näillä rajauksilla.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if pagination.pages > 1 %}
+        <p style="margin-top:12px;display:flex;gap:10px;align-items:center;">
+          <span>Sivu {{ pagination.page }} / {{ pagination.pages }}</span>
+          {% if pagination.has_prev %}<a class="btn btn-secondary btn-sm" href="{{ url_for('admin.audit_log', page=pagination.prev_num, org=selected_org or none, action=selected_action or none) }}">Edellinen</a>{% endif %}
+          {% if pagination.has_next %}<a class="btn btn-secondary btn-sm" href="{{ url_for('admin.audit_log', page=pagination.next_num, org=selected_org or none, action=selected_action or none) }}">Seuraava</a>{% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

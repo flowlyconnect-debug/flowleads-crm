@@ -239,6 +239,77 @@ def create_task():
     return redirect(url_for("tasks.list_tasks", tab="today", **_org_query_suffix(organization_id)))
 
 
+@tasks_bp.route("/<int:task_id>/edit", methods=["GET", "POST"])
+def edit_task(task_id: int):
+    """Edit or reschedule a task."""
+    from app.tasks.services import get_task_for_org
+
+    organization_id = resolve_organization_id()
+    org_query = _org_query_suffix(organization_id)
+    try:
+        task = get_task_for_org(task_id, organization_id)
+    except TaskServiceError:
+        abort(404)
+
+    if request.method == "POST":
+        data = {
+            "title": request.form.get("title"),
+            "description": request.form.get("description"),
+            "priority": request.form.get("priority") or task.priority,
+            "type": request.form.get("type") or task.type,
+            "due_date": request.form.get("due_date") or None,
+        }
+        if can_assign_to_others() and request.form.get("assigned_to"):
+            data["assigned_to"] = request.form.get("assigned_to", type=int)
+        try:
+            TaskService.update(task_id, data, organization_id, current_user)
+            db.session.commit()
+            flash("Tehtävä tallennettu.", "success")
+            return redirect(url_for("tasks.list_tasks", **org_query))
+        except TaskServiceError as exc:
+            db.session.rollback()
+            if exc.code == "forbidden":
+                abort(403)
+            flash(exc.message, "danger")
+
+    users = (
+        User.query.filter_by(organization_id=organization_id, is_active=True)
+        .order_by(User.email.asc())
+        .all()
+    )
+    from app.tasks.forms import TASK_PRIORITY_LABELS_FI, TASK_TYPE_LABELS_FI
+
+    return render_template(
+        "tasks/edit.html",
+        task=task,
+        users=users,
+        can_assign_others=can_assign_to_others(),
+        priority_labels=TASK_PRIORITY_LABELS_FI,
+        type_labels=TASK_TYPE_LABELS_FI,
+        priorities=TASK_PRIORITIES,
+        task_types=TASK_TYPES,
+        org_query=org_query,
+        organization_id=organization_id,
+    )
+
+
+@tasks_bp.route("/<int:task_id>/delete", methods=["POST"])
+def delete_task(task_id: int):
+    organization_id = resolve_organization_id()
+    try:
+        TaskService.delete(task_id, organization_id, current_user)
+        db.session.commit()
+        flash("Tehtävä poistettu.", "success")
+    except TaskServiceError as exc:
+        db.session.rollback()
+        if exc.code == "not_found":
+            abort(404)
+        if exc.code == "forbidden":
+            abort(403)
+        flash(exc.message, "danger")
+    return redirect(url_for("tasks.list_tasks", **_org_query_suffix(organization_id)))
+
+
 @tasks_bp.route("/<int:task_id>/complete", methods=["POST", "PATCH"])
 def complete_task(task_id: int):
     organization_id = resolve_organization_id()

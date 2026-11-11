@@ -14,7 +14,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import contains_eager, joinedload
 
 from app.extensions import db
-from app.listings.models import Listing, ListingMatch
+from app.listings.models import Listing, ListingMatch, ListingRenovation
 from app.listings.services import _best_renovation, _now, materialize_match
 
 PER_PAGE = 25
@@ -66,6 +66,7 @@ def list_targets(
     status: str = "pending",
     profile_id: int | None = None,
     search: str | None = None,
+    filters: dict | None = None,
     page: int = 1,
     per_page: int = PER_PAGE,
 ):
@@ -90,10 +91,88 @@ def list_targets(
                 Listing.isannoitsija.ilike(like),
             )
         )
-    query = query.order_by(
-        func.coalesce(Listing.published_at, Listing.first_seen_at).desc(), Listing.id.desc()
-    )
+    query = _apply_target_filters(query, filters or {})
+    newest = func.coalesce(Listing.published_at, Listing.first_seen_at)
+    sort = (filters or {}).get("sort")
+    if sort == "oldest":
+        query = query.order_by(newest.asc(), Listing.id.asc())
+    elif sort == "city":
+        query = query.order_by(func.lower(func.coalesce(Listing.kaupunki, "")).asc(), newest.desc())
+    elif sort == "confidence":
+        query = query.order_by(ListingMatch.confidence.desc(), newest.desc())
+    else:
+        query = query.order_by(newest.desc(), Listing.id.desc())
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
+
+
+# Query-string keys of the Kohteet filter bar (kept across actions and pages).
+FILTER_KEYS = ("renovation", "city", "region", "building", "contact", "sort")
+SORT_OPTIONS = (
+    ("", "Uusimmat ensin"),
+    ("oldest", "Vanhimmat ensin"),
+    ("confidence", "Varmimmat ensin"),
+    ("city", "Kaupungin mukaan"),
+)
+
+
+def _apply_target_filters(query, filters: dict):
+    """Narrow the target list. Every filter is optional; unknown values simply
+    match nothing, they never raise."""
+    renovation = (filters.get("renovation") or "").strip()
+    if renovation:
+        query = query.filter(
+            Listing.id.in_(
+                db.session.query(ListingRenovation.listing_id).filter(
+                    ListingRenovation.remonttityyppi == renovation
+                )
+            )
+        )
+    city = (filters.get("city") or "").strip()
+    if city:
+        query = query.filter(func.lower(func.trim(Listing.kaupunki)) == city.lower())
+    region = (filters.get("region") or "").strip()
+    if region:
+        query = query.filter(Listing.maakunta == region)
+    building = (filters.get("building") or "").strip()
+    if building:
+        query = query.filter(Listing.building_type == building)
+    if filters.get("contact") == "1":
+        query = query.filter(
+            or_(
+                func.length(func.trim(func.coalesce(Listing.isannoitsija_email, ""))) > 0,
+                func.length(func.trim(func.coalesce(Listing.isannoitsija_puh, ""))) > 0,
+            )
+        )
+    return query
+
+
+def target_filter_options(organization_id: int, status: str = "pending") -> dict:
+    """The values that actually occur among the organization's targets, so the
+    filter bar offers only choices that lead somewhere."""
+    visible = _visible_match_ids(organization_id, status)
+    listing_ids = db.session.query(ListingMatch.listing_id).filter(ListingMatch.id.in_(visible))
+
+    def distinct(column):
+        rows = (
+            db.session.query(column)
+            .filter(Listing.id.in_(listing_ids), column.isnot(None), column != "")
+            .distinct()
+            .all()
+        )
+        return sorted({str(value).strip() for (value,) in rows if str(value).strip()}, key=str.lower)
+
+    renovations = (
+        db.session.query(ListingRenovation.remonttityyppi)
+        .filter(ListingRenovation.listing_id.in_(listing_ids))
+        .distinct()
+        .all()
+    )
+    return {
+        "renovations": sorted({r for (r,) in renovations if r}),
+        "cities": distinct(Listing.kaupunki),
+        "regions": distinct(Listing.maakunta),
+        "buildings": distinct(Listing.building_type),
+    }
 
 
 def target_row(match: ListingMatch) -> dict:
@@ -146,7 +225,13 @@ def _siblings(match: ListingMatch) -> list[ListingMatch]:
     ).all()
 
 
-def transfer_targets(organization_id: int, match_ids, *, now: datetime | None = None) -> dict:
+def transfer_targets(
+    organization_id: int,
+    match_ids,
+    *,
+    now: datetime | None = None,
+    assigned_to: int | None = None,
+) -> dict:
     """Move the given targets to leads. Another apartment of a housing company
     that already has a lead joins that lead. Returns counts and the lead ids."""
     now = now or _now()
@@ -164,6 +249,8 @@ def transfer_targets(organization_id: int, match_ids, *, now: datetime | None = 
             result["failed"] += 1
             continue
         result["created" if outcome == "created" else "merged"] += 1
+        if outcome == "created" and assigned_to:
+            lead.assigned_to = assigned_to  # the owner picked in the transfer bar
         if lead.id not in result["lead_ids"]:
             result["lead_ids"].append(lead.id)
         match = db.session.get(ListingMatch, match_id)
@@ -195,3 +282,106 @@ def dismiss_targets(organization_id: int, match_ids) -> int:
 
 def restore_targets(organization_id: int, match_ids) -> int:
     return _set_status(organization_id, match_ids, from_status="dismissed", to_status="pending")
+
+
+# --- daily digest of new targets ---------------------------------------------
+
+
+def count_new_targets(organization_id: int, since: datetime) -> int:
+    """Available targets whose match appeared after `since`."""
+    return (
+        db.session.query(func.count(ListingMatch.id))
+        .filter(
+            ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")),
+            ListingMatch.created_at > since,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def send_target_digests(*, now: datetime | None = None) -> int:
+    """Tell each organization's users how many new targets arrived since the
+    last digest: an in-app notification for everyone and one email per user.
+    Organizations with nothing new, or with the digest switched off, get
+    nothing. Returns the number of organizations notified."""
+    from datetime import timedelta
+
+    from flask import current_app
+
+    from app.notifications.services import NotificationService
+    from app.tasks.settings import get_organization_settings
+    from app.users.models import Organization, User
+
+    now = now or _now()
+    notified = 0
+    for organization in Organization.query.filter_by(is_active=True).all():
+        settings = get_organization_settings(organization.id)
+        if not settings.targets_digest_enabled:
+            continue
+        since = settings.targets_digest_sent_at or (now - timedelta(days=1))
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=now.tzinfo)
+        new_count = count_new_targets(organization.id, since)
+        if not new_count:
+            continue
+        total = count_targets(organization.id)
+        users = User.query.filter(
+            User.organization_id == organization.id,
+            User.is_active.is_(True),
+            User.role.in_(("admin", "user")),
+        ).all()
+        if not users:
+            continue
+        title = "1 uusi kohde" if new_count == 1 else f"{new_count} uutta kohdetta"
+        message = (
+            f"Hakuprofiiliisi osui {title.lower()}. Kohteet-sivulla odottaa yhteensä "
+            f"{total} {'kohde' if total == 1 else 'kohdetta'}."
+        )
+        for user in users:
+            NotificationService.create(
+                user_id=user.id,
+                organization_id=organization.id,
+                type="targets_new",
+                title=title,
+                message=message,
+                link="/targets",
+            )
+        settings.targets_digest_sent_at = now
+        db.session.commit()
+        notified += 1
+        try:
+            _email_target_digest(current_app, organization, users, title, message)
+        except Exception:  # an email problem must not stop the other organizations
+            current_app.logger.exception("Target digest email failed for org %s", organization.id)
+    return notified
+
+
+def _email_target_digest(app, organization, users, title: str, message: str) -> None:
+    from flask_mail import Message
+
+    from app.email.services import send_system_message
+
+    base_url = (app.config.get("APP_BASE_URL") or "").rstrip("/")
+    link = f"{base_url}/targets" if base_url else "/targets"
+    recipients = [user.email for user in users if user.email]
+    if not recipients:
+        return
+    html = (
+        "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
+        f"<h2 style='margin:0 0 8px;'>{title}</h2>"
+        f"<p>{message}</p>"
+        f"<p style='margin:20px 0;'><a href='{link}' style='background:#6846DC;color:#fff;"
+        "padding:10px 18px;border-radius:6px;text-decoration:none;'>Avaa Kohteet</a></p>"
+        "<p style='color:#6B7280;font-size:12px;'>Saat tämän viestin, koska organisaatiollasi on "
+        "FlowLeadsin päiväkooste päällä. Koosteen voi kytkeä pois Kohteet-sivulta.</p>"
+        "</div>"
+    )
+    send_system_message(
+        Message(
+            subject=f"FlowLeads: {title} ({organization.name})",
+            recipients=recipients,
+            html=html,
+            body=f"{message}\n\nAvaa Kohteet: {link}",
+        )
+    )

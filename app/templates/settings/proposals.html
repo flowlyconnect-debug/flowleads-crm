@@ -32,6 +32,10 @@
           </div>
           <h2 class="form-section-title">PDF-malli</h2>
           <div class="form-group">
+            <label class="form-label">{{ form.logo_url.label.text }}
+              {{ form.logo_url(class='form-input', placeholder='https://yritys.fi/logo.png') }}
+            </label>
+            <p class="form-helper">Logo näkyy tarjous-PDF:n yläreunassa. Käytä julkista https-osoitetta (PNG tai JPG).</p>
             <label class="form-label">{{ form.header_html.label.text }}
               {{ form.header_html(rows=3, class='form-input') }}
             </label>
