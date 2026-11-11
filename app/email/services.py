@@ -1092,9 +1092,9 @@ def send_test_email_to_address(email: str, *, user_id: int | None = None) -> dic
     from_email = current_app.config.get("MAILGUN_FROM_EMAIL")
     ok, message_id, error = _mailgun_send(
         to_email=email,
-        subject="FlowLeads test email",
-        body_html="<p>This is a test email from FlowLeads.</p>",
-        body_text="This is a test email from FlowLeads.",
+        subject="FlowLeads-testiviesti",
+        body_html="<p>Tämä on FlowLeadsin testiviesti. Sähköpostin lähetys toimii.</p>",
+        body_text="Tämä on FlowLeadsin testiviesti. Sähköpostin lähetys toimii.",
         from_name=from_name,
         from_email=from_email or "",
     )
