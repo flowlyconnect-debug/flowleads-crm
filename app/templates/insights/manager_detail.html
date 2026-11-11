@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ manager.name }} — Isännöitsijät{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+{% endblock %}
+{% block content %}
+<section class="leads-page insights-page">
+  <nav class="insights-crumbs" aria-label="Murupolku">
+    <a href="{{ url_for('insights.managers', **org_query) }}">Isännöitsijät</a> <span aria-hidden="true">/</span> <span>{{ manager.name }}</span>
+  </nav>
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">{{ manager.name }}</h1>
+      <p class="leads-header__sub">
+        {% if manager.phone %}<a href="tel:{{ manager.phone|replace(' ', '') }}">{{ manager.phone }}</a>{% endif %}
+        {% if manager.phone and manager.email %} · {% endif %}
+        {% if manager.email %}<a href="mailto:{{ manager.email }}">{{ manager.email }}</a>{% endif %}
+        {% if manager.website and manager.website.startswith('http') %} · <a href="{{ manager.website }}" target="_blank" rel="noopener noreferrer">Verkkosivu</a>{% endif %}
+        {% if not manager.phone and not manager.email %}Yhteystietoja ei ole tiedossa.{% endif %}
+      </p>
+    </div>
+    <div class="leads-header__actions">
+      {% if manager.available_count %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('targets.index', search=manager.name, **org_query) }}">Näytä saatavilla olevat kohteet ({{ manager.available_count }})</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="insights-stats">
+    <div class="insights-stat"><span class="insights-stat__value">{{ manager.company_count }}</span><span class="insights-stat__label">taloyhtiötä</span></div>
+    <div class="insights-stat"><span class="insights-stat__value">{{ manager.available_count }}</span><span class="insights-stat__label">kohdetta saatavilla</span></div>
+    <div class="insights-stat"><span class="insights-stat__value">{{ manager.open_lead_count }}</span><span class="insights-stat__label">avointa liidiä</span></div>
+    <div class="insights-stat"><span class="insights-stat__value">{{ manager.won_count }}</span><span class="insights-stat__label">voitettua kauppaa</span></div>
+    <div class="insights-stat"><span class="insights-stat__value insights-stat__value--text">{{ (manager.last_contacted_at|helsinki).strftime('%d.%m.%Y') if manager.last_contacted_at else 'Ei vielä' }}</span><span class="insights-stat__label">viimeksi yhteydessä</span></div>
+  </div>
+
+  <div class="card">
+    <header class="card-header"><h2 class="card-title">Taloyhtiöt</h2></header>
+    {% if manager.company_list %}
+    <div class="table-wrap">
+      <table class="insights-table">
+        <thead><tr><th>Taloyhtiö</th><th>Tulevat remontit</th><th>Tila</th><th></th></tr></thead>
+        <tbody>
+          {% for company in manager.company_list %}
+          <tr>
+            <td>
+              <a class="insights-name" href="{{ url_for('insights.company_card', listing_id=company.listing_id, **org_query) }}">{{ company.name }}</a>
+              <div class="insights-contact">{{ company.city }}</div>
+            </td>
+            <td>
+              {% for renovation in company.renovations %}
+              <span class="badge badge-accent">{{ renovation.type }}</span>{% if renovation.timing %} <span class="text-sm text-secondary">{{ renovation.timing }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}
+              {% else %}—{% endfor %}
+            </td>
+            <td><span class="insights-state insights-state--{{ company.state }}">{{ state_labels[company.state] }}</span></td>
+            <td class="insights-actions">
+              {% if company.leads %}
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.detail', lead_id=company.leads[0].id, **org_query) }}">Avaa liidi</a>
+              {% elif company.state == 'available' %}
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('insights.company_card', listing_id=company.listing_id, **org_query) }}">Avaa kohde</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body"><p class="text-secondary">Tämän isännöitsijän kohteita ei ole listalla. Tiedot ovat peräisin liideiltäsi.</p></div>
+    {% endif %}
+  </div>
+
+  {% if manager.leads %}
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Liidit</h2></header>
+    <div class="table-wrap">
+      <table class="insights-table">
+        <thead><tr><th>Liidi</th><th>Vaihe</th><th>Viimeksi yhteydessä</th></tr></thead>
+        <tbody>
+          {% for lead in manager.leads %}
+          <tr>
+            <td><a class="insights-name" href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ (lead.ai_contact_info or {}).get('taloyhtio') or lead.company or lead.display_name }}</a></td>
+            <td>{{ stage_label(lead.stage.name) if lead.stage else '—' }}</td>
+            <td>{{ (lead.last_contacted_at|helsinki).strftime('%d.%m.%Y') if lead.last_contacted_at else 'Ei vielä' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

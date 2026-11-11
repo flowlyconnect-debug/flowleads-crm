@@ -132,6 +132,25 @@ passiiviseksi, sen käyttäjät eivät pääse kirjautumaan ennen kuin se otetaa
 - Tämän repon pilviympäristö `flowleads-crm` sallii tuotanto-osoitteen, joten tuotantoa voi testata
   Claude-istunnosta.
 
+## Tehty 11.11.2026 (5): isännöitsijät, taloyhtiökortti ja tallennetut haut
+
+Kolme toimintoa, jotka rakentuvat jo olemassa olevasta tiedosta (migraatio `d8e9f0a1b2c3`, testit
+`tests/test_insights.py`). Mikään niistä ei näytä varastossa olevia kohteita.
+
+- **Isännöitsijät** (`/managers`, sivupalkissa Myyntiputken alla): isännöintitoimistot, niiden taloyhtiöt,
+  saatavilla olevat kohteet, avoimet liidit, voitetut kaupat ja viimeisin yhteydenotto. Yhdellä soitolla voi
+  käydä läpi saman isännöitsijän kaikki kohteet.
+- **Taloyhtiökortti** (`/housing-companies/<listing_id>`): perustiedot, tulevat remontit aikajanana,
+  isännöinti, liidit ja avoimet tehtävät sekä lähdeilmoitukset. Ei omaa valikkokohtaa: avautuu kohteen
+  nimestä Kohteet-sivulla, isännöitsijän sivulta ja liidin sivulta ("Taloyhtiön tiedot").
+- **Tallennetut haut** (Kohteet-sivun rajausten yläpuolella): rajausyhdistelmän voi tallentaa nimellä, ottaa
+  käyttöön yhdellä painalluksella ja saada ilmoituksen (kellokuvake) uusista osumista. Ilmoitukset lähettää
+  ajastimen `listing_matching` (10 min välein, `notify_saved_searches()`); enintään 15 hakua käyttäjää kohden.
+- Sivupalkin järjestys noudattaa työnkulkua: Kojelauta, Kohteet, Liidit, Myyntiputki, Isännöitsijät.
+
+Seuraava askel tästä: karttanäkymä (vaatii osoitteiden geokoodauksen) ja uudet tietolähteet (rakennusluvat,
+hankintailmoitukset).
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

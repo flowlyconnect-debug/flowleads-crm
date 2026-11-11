@@ -14,7 +14,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import contains_eager, joinedload
 
 from app.extensions import db
-from app.listings.models import Listing, ListingMatch, ListingRenovation
+from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.services import _best_renovation, _now, materialize_match
 
 PER_PAGE = 25
@@ -539,3 +539,136 @@ def fetch_targets(
         "wait_seconds": wait_seconds,
         "next_fetch_at": now + timedelta(minutes=config.get("TARGET_FETCH_COOLDOWN_MINUTES", 60)),
     }
+
+
+# --- saved searches ---------------------------------------------------------------
+
+SAVED_SEARCH_KEYS = ("search", "profile_id", *[key for key in FILTER_KEYS])
+MAX_SAVED_SEARCHES = 15
+
+
+class SavedSearchError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+def clean_search_params(raw: dict) -> dict:
+    """Only the known /targets parameters, non-empty, as short strings."""
+    params = {}
+    for key in SAVED_SEARCH_KEYS:
+        value = str(raw.get(key) or "").strip()
+        if value:
+            params[key] = value[:120]
+    return params
+
+
+def list_saved_searches(organization_id: int, user_id: int) -> list[SavedTargetSearch]:
+    return (
+        SavedTargetSearch.query.filter_by(organization_id=organization_id, user_id=user_id)
+        .order_by(SavedTargetSearch.name.asc())
+        .all()
+    )
+
+
+def save_search(organization_id: int, user_id: int, name: str, raw_params: dict, *, now: datetime | None = None):
+    name = " ".join((name or "").split())[:80]
+    params = clean_search_params(raw_params)
+    if not name:
+        raise SavedSearchError("Anna haulle nimi.")
+    if not {k for k in params if k != "sort"}:
+        raise SavedSearchError("Valitse ensin vähintään yksi rajaus, jonka haluat tallentaa.")
+    existing = SavedTargetSearch.query.filter_by(
+        organization_id=organization_id, user_id=user_id, name=name
+    ).first()
+    if existing is not None:  # same name = update the saved filters
+        existing.params = params
+        db.session.flush()
+        return existing
+    if SavedTargetSearch.query.filter_by(organization_id=organization_id, user_id=user_id).count() >= MAX_SAVED_SEARCHES:
+        raise SavedSearchError(f"Tallennettuja hakuja voi olla enintään {MAX_SAVED_SEARCHES}. Poista jokin vanha.")
+    saved = SavedTargetSearch(
+        organization_id=organization_id,
+        user_id=user_id,
+        name=name,
+        params=params,
+        notify=True,
+        last_notified_at=now or _now(),  # only targets that arrive from now on are "new"
+    )
+    db.session.add(saved)
+    db.session.flush()
+    return saved
+
+
+def get_saved_search(organization_id: int, user_id: int, search_id: int) -> SavedTargetSearch | None:
+    return SavedTargetSearch.query.filter_by(
+        id=search_id, organization_id=organization_id, user_id=user_id
+    ).first()
+
+
+def _matches_for_search(saved: SavedTargetSearch, since: datetime) -> int:
+    """New targets for a saved search since `since`: released ones and, with
+    the reserve on, ones that can be fetched."""
+    params = saved.params or {}
+    try:
+        profile_id = int(params["profile_id"]) if params.get("profile_id") else None
+    except (TypeError, ValueError):
+        profile_id = None
+    query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
+        ListingMatch.id.in_(
+            _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id, include_reserve=True)
+        ),
+        ListingMatch.created_at > since,
+    )
+    term = " ".join((params.get("search") or "").split())
+    if term:
+        like = f"%{term}%"
+        query = query.filter(
+            or_(
+                Listing.taloyhtio.ilike(like),
+                Listing.osoite.ilike(like),
+                Listing.kaupunki.ilike(like),
+                Listing.isannoitsija.ilike(like),
+            )
+        )
+    return _apply_target_filters(query, params).count()
+
+
+def notify_saved_searches(*, now: datetime | None = None) -> int:
+    """In-app notification to the owner of each saved search that new targets
+    match. Runs right after matching, so it is as immediate as the data."""
+    from app.notifications.services import NotificationService
+    from app.users.models import User
+
+    now = now or _now()
+    sent = 0
+    for saved in SavedTargetSearch.query.filter_by(notify=True).all():
+        since = _aware(saved.last_notified_at) or _aware(saved.created_at) or now
+        count = _matches_for_search(saved, since)
+        if not count:
+            continue
+        user = db.session.get(User, saved.user_id)
+        if user is None or not user.is_active:
+            continue
+        query = "&".join(f"{key}={value}" for key, value in (saved.params or {}).items())
+        if fetch_enabled():
+            message = "Tallennettua hakuasi vastaavia uusia kohteita on haettavissa. Avaa Kohteet ja paina Hae kohteita."
+        else:
+            message = (
+                "1 uusi kohde vastaa tallennettua hakuasi."
+                if count == 1
+                else f"{count} uutta kohdetta vastaa tallennettua hakuasi."
+            )
+        NotificationService.create(
+            user_id=user.id,
+            organization_id=saved.organization_id,
+            type="saved_search_match",
+            title=f"Uusia kohteita: {saved.name}",
+            message=message,
+            link="/targets" + (f"?{query}" if query else ""),
+        )
+        saved.last_notified_at = now
+        sent += 1
+    if sent:
+        db.session.commit()
+    return sent

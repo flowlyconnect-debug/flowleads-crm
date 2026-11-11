@@ -385,3 +385,50 @@
 @media (prefers-reduced-motion: reduce) {
   .targets-fetch-spinner { animation-duration: 2.4s; }
 }
+
+/* Isännöitsijät and the housing-company card */
+.insights-count { font-size: 13px; color: var(--color-text-muted, #6B7280); padding-left: 4px; }
+.insights-crumbs { font-size: 13px; color: var(--color-text-muted, #6B7280); margin-bottom: 6px; }
+.insights-crumbs a { color: var(--color-primary, #6846DC); text-decoration: none; }
+.insights-table { width: 100%; }
+.insights-table th.num, .insights-table td.num { text-align: right; white-space: nowrap; }
+.insights-name { font-weight: 600; color: var(--color-text-primary, #172033); text-decoration: none; }
+.insights-name:hover { color: var(--color-primary, #6846DC); text-decoration: underline; }
+.insights-contact { margin-top: 2px; font-size: 12px; color: var(--color-text-muted, #6B7280); display: flex; gap: 6px; flex-wrap: wrap; }
+.insights-contact a { color: inherit; }
+.insights-actions { text-align: right; white-space: nowrap; }
+.insights-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.insights-stat { background: #fff; border: 1px solid var(--color-border, #E2E7F0); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.insights-stat__value { font-size: 24px; font-weight: 700; color: var(--color-text-primary, #172033); }
+.insights-stat__value--text { font-size: 16px; padding: 6px 0 2px; }
+.insights-stat__label { font-size: 12px; color: var(--color-text-muted, #6B7280); }
+.insights-state { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.insights-state--lead { background: #ECFDF5; color: #065F46; }
+.insights-state--available { background: #F1EDFC; color: #4C2FB8; }
+.insights-state--hidden { background: #F3F4F6; color: #6B7280; }
+.insights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.insights-facts { display: grid; grid-template-columns: 130px 1fr; gap: 8px 12px; margin: 0; font-size: 14px; }
+.insights-facts dt { color: var(--color-text-muted, #6B7280); }
+.insights-facts dd { margin: 0; }
+.insights-manager { margin: 0 0 12px; font-size: 14px; line-height: 1.6; }
+.insights-timeline { list-style: none; margin: 0 0 12px; padding: 0 0 0 16px; border-left: 2px solid #E9E3FB; }
+.insights-timeline li { position: relative; padding: 0 0 14px 12px; }
+.insights-timeline li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #6846DC; }
+.insights-timeline__when { display: inline-block; min-width: 96px; font-weight: 600; }
+.insights-timeline__evidence { margin: 4px 0 0; font-size: 13px; color: #4B5563; }
+.insights-sources { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.8; }
+
+/* Saved searches on Kohteet */
+.targets-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--color-border, #E2E7F0); font-size: 13px; }
+.targets-saved__label { color: var(--color-text-muted, #6B7280); font-weight: 600; }
+.targets-saved__chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #DDD3F7; border-radius: 999px; background: #fff; padding: 0 4px 0 0; }
+.targets-saved__chip.is-active { background: #F1EDFC; border-color: #6846DC; }
+.targets-saved__chip a { padding: 4px 4px 4px 12px; color: #172033; text-decoration: none; font-weight: 500; }
+.targets-saved__chip form { display: inline; }
+.targets-saved__icon { border: none; background: none; cursor: pointer; padding: 2px 5px; font-size: 13px; color: #8A94A6; border-radius: 50%; line-height: 1; }
+.targets-saved__icon:hover { background: #EEF0F6; color: #172033; }
+.targets-saved__icon.is-on { color: #6846DC; }
+.targets-save-form { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.targets-save-form input[type=text] { height: 30px; width: 190px; font-size: 13px; padding: 0 10px; }
+.target-row__name a, .target-row__contact a { color: inherit; text-decoration: none; }
+.target-row__name a:hover, .target-row__contact a:hover { color: var(--color-primary, #6846DC); text-decoration: underline; }

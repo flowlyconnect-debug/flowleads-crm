@@ -10,6 +10,10 @@ from app.core.audit import log_audit
 from app.core.tenant import org_query_suffix, resolve_organization_id
 from app.extensions import db
 from app.listings.target_services import (
+    SavedSearchError,
+    get_saved_search,
+    list_saved_searches,
+    save_search,
     TargetFetchCooldown,
     count_reserve,
     fetch_enabled,
@@ -152,8 +156,19 @@ def index():
                     released = released.replace(tzinfo=now.tzinfo)
                 if now - released < timedelta(minutes=5):
                     new_ids.add(match.id)
+    current_params = dict(filters)
+    if search:
+        current_params["search"] = search
+    if profile_id:
+        current_params["profile_id"] = str(profile_id)
+    saved_searches = list_saved_searches(organization_id, current_user.id)
     return render_template(
         "targets/index.html",
+        saved_searches=saved_searches,
+        current_params=current_params,
+        active_saved_id=next(
+            (s.id for s in saved_searches if (s.params or {}) == current_params and current_params), None
+        ),
         fetch_enabled=fetch_enabled() and bool(profiles),
         next_fetch_label=to_helsinki(next_fetch).strftime("%H.%M") if next_fetch else None,
         next_fetch_seconds=max(0, int((next_fetch - now).total_seconds())) if next_fetch else 0,
@@ -218,6 +233,51 @@ def transfer():
         flash(f"{result['failed']} kohteen siirto epäonnistui.", "danger")
     if not parts and not result["failed"]:
         flash("Kohteet oli jo käsitelty.", "info")
+    return _back(organization_id)
+
+
+@targets_bp.route("/searches", methods=["POST"])
+def save_search_route():
+    """Save the filters now in use under a name."""
+    organization_id = resolve_organization_id()
+    try:
+        saved = save_search(organization_id, current_user.id, request.form.get("name"), request.form)
+        db.session.commit()
+        flash(f"Haku tallennettu: {saved.name}. Saat ilmoituksen, kun siihen osuu uusia kohteita.", "success")
+    except SavedSearchError as exc:
+        db.session.rollback()
+        flash(exc.message, "warning")
+    return _back(organization_id)
+
+
+@targets_bp.route("/searches/<int:search_id>/delete", methods=["POST"])
+def delete_search_route(search_id: int):
+    organization_id = resolve_organization_id()
+    saved = get_saved_search(organization_id, current_user.id, search_id)
+    if saved is None:
+        abort(404)
+    db.session.delete(saved)
+    db.session.commit()
+    flash("Tallennettu haku poistettu.", "success")
+    return redirect(url_for("targets.index", **org_query_suffix(organization_id)))
+
+
+@targets_bp.route("/searches/<int:search_id>/notify", methods=["POST"])
+def toggle_search_notify_route(search_id: int):
+    organization_id = resolve_organization_id()
+    saved = get_saved_search(organization_id, current_user.id, search_id)
+    if saved is None:
+        abort(404)
+    saved.notify = not saved.notify
+    if saved.notify:
+        from app.listings.services import _now
+
+        saved.last_notified_at = _now()
+    db.session.commit()
+    flash(
+        f"Ilmoitukset haulle {saved.name}: " + ("päällä." if saved.notify else "pois päältä."),
+        "success",
+    )
     return _back(organization_id)
 
 

@@ -18,6 +18,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    JSON,
     Integer,
     String,
     Text,
@@ -168,6 +169,26 @@ class ListingMatch(db.Model):
 
     listing: Mapped[Listing] = relationship("Listing")
     profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821
+
+
+class SavedTargetSearch(db.Model):
+    """A filter combination on the Kohteet page that a user saved under a
+    name: one click applies it, and (optionally) the user is notified when new
+    targets match it."""
+
+    __tablename__ = "saved_target_searches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # query-string parameters of /targets: search, profile_id and the filter keys
+    params: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    notify: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
 
 class CrawlState(db.Model):

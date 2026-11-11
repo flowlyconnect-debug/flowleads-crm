@@ -5194,3 +5194,9 @@ select.form-input--compact {
   color: var(--color-primary, #6846DC);
   text-decoration: underline;
 }
+
+.lead-target-links {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}

@@ -285,6 +285,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             try:
                 matched = rematch_profiles()
                 merge_into_existing_leads()
+                from app.listings.target_services import notify_saved_searches
+
+                notify_saved_searches()
                 created = materialize_pending_matches() if auto_create_leads() else 0
                 if matched or created:
                     logger.info("Listing matching: %s new match(es), %s lead(s) created", matched, created)

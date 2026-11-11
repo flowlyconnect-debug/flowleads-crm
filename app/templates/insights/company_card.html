@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ card.name }} — Taloyhtiö{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+{% endblock %}
+{% block content %}
+<section class="leads-page insights-page">
+  <nav class="insights-crumbs" aria-label="Murupolku">
+    <a href="{{ url_for('targets.index', **org_query) }}">Kohteet</a> <span aria-hidden="true">/</span> <span>{{ card.name }}</span>
+  </nav>
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">{{ card.name }}</h1>
+      <p class="leads-header__sub">
+        {{ [card.addresses[0] if card.addresses else none, card.city, card.region]|select|join(', ') }}
+        <span class="insights-state insights-state--{{ card.state }}">{{ card.state_label }}</span>
+      </p>
+    </div>
+    <div class="leads-header__actions">
+      {% if card.leads %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('leads.detail', lead_id=card.leads[0].id, **org_query) }}">Avaa liidi</a>
+      {% elif card.pending_match_ids %}
+      <form method="post" action="{{ url_for('targets.transfer', **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="single_id" value="{{ card.pending_match_ids[0] }}">
+        <button type="submit" class="btn btn-primary btn-sm">Siirrä liidiksi</button>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="insights-grid">
+    <div class="card">
+      <header class="card-header"><h2 class="card-title">Perustiedot</h2></header>
+      <div class="card-body">
+        <dl class="insights-facts">
+          <dt>Osoite</dt><dd>{{ card.addresses|join('; ') or '—' }}</dd>
+          <dt>Kaupunki</dt><dd>{{ card.city or '—' }}</dd>
+          <dt>Rakennusvuosi</dt><dd>{{ card.build_year or 'Ei tiedossa' }}</dd>
+          <dt>Talotyyppi</dt><dd>{{ card.building_type or 'Ei tiedossa' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <header class="card-header"><h2 class="card-title">Isännöinti</h2></header>
+      <div class="card-body">
+        {% for manager in card.manager_contacts %}
+        <p class="insights-manager">
+          <a class="insights-name" href="{{ url_for('insights.manager_detail', name=manager.name, **org_query) }}">{{ manager.name }}</a><br>
+          {% if manager.phone %}<a href="tel:{{ manager.phone|replace(' ', '') }}">{{ manager.phone }}</a>{% endif %}
+          {% if manager.phone and manager.email %} · {% endif %}
+          {% if manager.email %}<a href="mailto:{{ manager.email }}">{{ manager.email }}</a>{% endif %}
+          {% if not manager.phone and not manager.email %}<span class="text-secondary">Ei yhteystietoja</span>{% endif %}
+        </p>
+        {% else %}
+        <p class="text-secondary">Isännöitsijä ei ole tiedossa.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Tulevat remontit</h2></header>
+    <div class="card-body">
+      {% if card.renovations %}
+      <ol class="insights-timeline">
+        {% for renovation in card.renovations %}
+        <li>
+          <span class="insights-timeline__when">{{ renovation.timing or 'Ajankohta ei tiedossa' }}</span>
+          <span class="badge badge-accent">{{ renovation.type }}</span>
+          <span class="text-sm text-secondary" title="Kuinka varma tieto on">Varmuus {{ renovation.confidence }} %</span>
+          {% if renovation.evidence %}<p class="insights-timeline__evidence">{{ renovation.evidence }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-secondary">Tulevia remontteja ei ole tiedossa.</p>
+      {% endif %}
+      {% for note in card.renovation_notes %}
+      <p class="text-sm"><strong>Ilmoituksen mukaan:</strong> {{ note }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if card.leads %}
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Myynnin tilanne</h2></header>
+    <div class="table-wrap">
+      <table class="insights-table">
+        <thead><tr><th>Liidi</th><th>Vaihe</th><th>Vastuuhenkilö</th><th>Viimeksi yhteydessä</th></tr></thead>
+        <tbody>
+          {% for lead in card.leads %}
+          <tr>
+            <td><a class="insights-name" href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ lead.company or lead.display_name }}</a></td>
+            <td>{{ stage_label(lead.stage.name) if lead.stage else '—' }}</td>
+            <td>{{ lead.assignee.email.split('@')[0] if lead.assignee else '—' }}</td>
+            <td>{{ (lead.last_contacted_at|helsinki).strftime('%d.%m.%Y') if lead.last_contacted_at else 'Ei vielä' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if open_tasks %}
+    <div class="card-body">
+      <h3 class="text-sm font-semibold">Avoimet tehtävät</h3>
+      <ul class="text-sm">
+        {% for task in open_tasks %}
+        <li>{{ task.title }} — {{ task.due_date.strftime('%d.%m.%Y') }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Lähteet ({{ card.listing_list|length }})</h2></header>
+    <div class="card-body">
+      <ul class="insights-sources">
+        {% for listing in card.listing_list %}
+        <li>
+          {{ listing.osoite or card.name }}
+          {% set seen = listing.published_at or listing.first_seen_at %}
+          {% if seen %}<span class="text-sm text-secondary">· löydetty {{ (seen|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
+          {% if listing.url and listing.url.startswith('http') %} · <a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">Avaa lähde</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

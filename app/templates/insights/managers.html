@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{% block title %}Isännöitsijät — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+{% endblock %}
+{% block content %}
+<section class="leads-page insights-page">
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">Isännöitsijät</h1>
+      <p class="leads-header__sub">Yksi isännöitsijä päättää monesta taloyhtiöstä. Tästä näet, kenen kohteita sinulla on työn alla ja keneen kannattaa olla yhteydessä.</p>
+    </div>
+  </header>
+
+  <div class="leads-work">
+    <div class="leads-toolbar" role="toolbar">
+      <span class="insights-count">{{ managers|length }} {{ 'isännöitsijä' if managers|length == 1 else 'isännöitsijää' }}</span>
+      <form method="get" class="leads-toolbar__tools" role="search">
+        {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+        <label class="leads-opp-search">
+          <span class="leads-opp-search__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <input type="search" name="search" value="{{ search }}" class="leads-opp-search__input" placeholder="Hae isännöitsijää…" aria-label="Hae isännöitsijää">
+        </label>
+      </form>
+    </div>
+
+    {% if not managers %}
+    <div class="targets-empty">
+      {% if search %}
+        {{ empty_state(none, "Ei osumia", "Kokeile toista hakusanaa.", "Näytä kaikki", url_for('insights.managers', **org_query)) }}
+      {% else %}
+        {{ empty_state(none, "Ei isännöitsijöitä vielä", "Isännöitsijät kootaan tänne Kohteet-sivun kohteista ja liideistäsi.", "Avaa Kohteet", url_for('targets.index', **org_query)) }}
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="table-wrap">
+      <table class="insights-table">
+        <thead>
+          <tr>
+            <th>Isännöitsijä</th>
+            <th class="num">Taloyhtiöitä</th>
+            <th class="num">Kohteita saatavilla</th>
+            <th class="num">Avoimia liidejä</th>
+            <th class="num">Voitettuja</th>
+            <th>Viimeksi yhteydessä</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for manager in managers %}
+          <tr>
+            <td>
+              <a class="insights-name" href="{{ url_for('insights.manager_detail', name=manager.name, **org_query) }}">{{ manager.name }}</a>
+              <div class="insights-contact">
+                {% if manager.phone %}<a href="tel:{{ manager.phone|replace(' ', '') }}">{{ manager.phone }}</a>{% endif %}
+                {% if manager.phone and manager.email %}<span aria-hidden="true">·</span>{% endif %}
+                {% if manager.email %}<a href="mailto:{{ manager.email }}">{{ manager.email }}</a>{% endif %}
+                {% if not manager.phone and not manager.email %}<span>Ei yhteystietoja</span>{% endif %}
+              </div>
+            </td>
+            <td class="num">{{ manager.company_count }}</td>
+            <td class="num">{% if manager.available_count %}<span class="badge badge-accent">{{ manager.available_count }}</span>{% else %}0{% endif %}</td>
+            <td class="num">{{ manager.open_lead_count }}</td>
+            <td class="num">{{ manager.won_count }}</td>
+            <td>{{ (manager.last_contacted_at|helsinki).strftime('%d.%m.%Y') if manager.last_contacted_at else 'Ei vielä' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
