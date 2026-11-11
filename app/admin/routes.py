@@ -1,7 +1,7 @@
 import secrets
 import time
 
-from flask import Blueprint, abort, jsonify, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.admin.constants import FEATURE_CATALOG
@@ -186,6 +186,7 @@ AUDIT_ACTION_LABELS_FI = {
     "customer_invited": "Asiakas kutsuttu",
     "customer_created": "Asiakas luotu",
     "targets_transferred": "Kohteita siirretty liideiksi",
+    "targets_fetched": "Kohteita haettu (Hae kohteita)",
     "leads_imported": "Liidejä tuotu tiedostosta",
     "leads_purged": "Liidit poistettu",
     "lead_archived": "Liidi arkistoitu",
@@ -551,7 +552,12 @@ def catalogue_import():
     db.session.commit()
     flash(
         f"Tuotu {result['created']} uutta ja päivitetty {result['updated']} kohdetta. "
-        f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
+        + (
+            f"Asiakkaiden haettavaksi (Hae kohteita) tuli {result['matches']} osumaa, "
+            if current_app.config.get("TARGET_FETCH_ENABLED")
+            else f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
+        )
+        + 
         f"AI-analyysiin jonossa {result['queued']}.",
         "success",
     )

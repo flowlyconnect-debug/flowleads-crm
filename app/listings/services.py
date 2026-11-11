@@ -677,6 +677,7 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
             status="pending",
             confidence=renovation.confidence,
             created_at=now,
+            released_at=_release_time(now),
         )
         db.session.add(match)
         created.append(match)
@@ -754,6 +755,7 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 status="pending",
                 confidence=conf,
                 created_at=now,
+                released_at=_release_time(now),
             )
         )
         _ensure_contact_queued(listing)
@@ -897,6 +899,14 @@ def _valid_email_or_none(value) -> str | None:
 
     email = normalize_email(value or "")
     return email if email and validate_email(email) else None
+
+
+def _release_time(now: datetime) -> datetime | None:
+    """released_at for a new match: at once, or None (reserve) when customers
+    release targets themselves with "Hae kohteita"."""
+    from flask import current_app
+
+    return None if current_app.config.get("TARGET_FETCH_ENABLED") else now
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:

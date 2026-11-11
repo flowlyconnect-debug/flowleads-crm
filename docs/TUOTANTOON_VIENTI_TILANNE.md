@@ -114,6 +114,24 @@ Migraatio `b6c7d8e9f0a1` (päiväkoosteen asetus, tarjouksen logo). Testit: `tes
 Huom. organisaation `is_active`-lippu on nyt oikeasti voimassa: jos jokin tuotannon organisaatio on jäänyt
 passiiviseksi, sen käyttäjät eivät pääse kirjautumaan ennen kuin se otetaan käyttöön asiakaslistalta.
 
+## Tehty 11.11.2026 (4): tuotantotestaus ja "Hae kohteita"
+
+- Tuotanto testattu selaimella julkiselta puolelta (kirjautuminen, virhesivut, otsakkeet, omat kirjastot) ja
+  kannasta: kaikki organisaatiot aktiivisia, migraatiot ajan tasalla. Mailgun hyväksyy lähetykset (testiviestit
+  11.11.), `MAILGUN_WEBHOOK_SIGNING_KEY` on asetettu, webhook-muoto vastaa Mailgunin dokumentaatiota.
+  Kalenteriliitos on yhä kokeilematta (yhtään kalenteria ei ole yhdistetty).
+- Testiviestin vastaanottajan voi kirjoittaa itse (Sähköpostiloki-sivu); aiemmin viesti meni aina
+  kirjautuneen käyttäjän osoitteeseen.
+- **Hae kohteita** (`TARGET_FETCH_ENABLED`, oletuksena päällä; migraatio `c7d8e9f0a1b2`): uudet osumat
+  jäävät varastoon (`ListingMatch.released_at IS NULL`) eivätkä näy Kohteet-sivulla, sivupalkissa tai
+  kojelaudalla. Asiakas painaa Kohteet-sivun painiketta, sivu näyttää 10–15 sekunnin hakuanimaation ja
+  varastosta vapautuu vaihteleva määrä kohteita (`TARGET_FETCH_MIN`–`TARGET_FETCH_MAX`, oletus 3–8, uusimmat
+  ensin). Yksi haku tunnissa per organisaatio (`TARGET_FETCH_COOLDOWN_MINUTES`), myös kun mitään ei löytynyt;
+  superadminia raja ei koske. Superadmin näkee Kohteet-sivulla varaston koon. Päiväkooste kertoo tässä tilassa
+  vain, että uusia kohteita on haettavissa. Testit: `tests/test_target_fetch.py`.
+- Tämän repon pilviympäristö `flowleads-crm` sallii tuotanto-osoitteen, joten tuotantoa voi testata
+  Claude-istunnosta.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

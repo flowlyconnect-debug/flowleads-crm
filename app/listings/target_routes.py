@@ -3,13 +3,18 @@ are not leads yet) and the actions that move them to leads or hide them."""
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.core.audit import log_audit
 from app.core.tenant import org_query_suffix, resolve_organization_id
 from app.extensions import db
 from app.listings.target_services import (
+    TargetFetchCooldown,
+    count_reserve,
+    fetch_enabled,
+    fetch_targets,
+    next_fetch_time,
     FILTER_KEYS,
     SORT_OPTIONS,
     TABS,
@@ -129,8 +134,32 @@ def index():
 
     digest_enabled = get_organization_settings(organization_id).targets_digest_enabled
     db.session.commit()  # the settings row is created on first use
+    from app import to_helsinki
+    from app.listings.services import _now
+
+    now = _now()
+    next_fetch = next_fetch_time(organization_id, now=now) if fetch_enabled() else None
+    fetched = request.args.get("fetched", type=int)
+    new_ids = set()
+    if fetch_enabled():
+        # rows released in the last few minutes carry an "Uusi" badge
+        from datetime import timedelta
+
+        for match in pagination.items:
+            released = match.released_at
+            if released is not None:
+                if released.tzinfo is None:
+                    released = released.replace(tzinfo=now.tzinfo)
+                if now - released < timedelta(minutes=5):
+                    new_ids.add(match.id)
     return render_template(
         "targets/index.html",
+        fetch_enabled=fetch_enabled() and bool(profiles),
+        next_fetch_label=to_helsinki(next_fetch).strftime("%H.%M") if next_fetch else None,
+        next_fetch_seconds=max(0, int((next_fetch - now).total_seconds())) if next_fetch else 0,
+        fetched=fetched,
+        new_ids=new_ids,
+        reserve_count=count_reserve(organization_id) if current_user.is_superadmin() else None,
         digest_enabled=digest_enabled,
         filters=filters,
         filter_options=target_filter_options(organization_id, TABS[tab]),
@@ -190,6 +219,53 @@ def transfer():
     if not parts and not result["failed"]:
         flash("Kohteet oli jo käsitelty.", "info")
     return _back(organization_id)
+
+
+@targets_bp.route("/fetch", methods=["POST"])
+def fetch():
+    """"Hae kohteita": release a batch of the organization's reserve targets.
+    Answers JSON; the page shows its progress animation for `wait_seconds`
+    and then reloads, by which time the targets are visible."""
+    from app import to_helsinki
+
+    organization_id = resolve_organization_id()
+    if not fetch_enabled():
+        return jsonify({"success": False, "message": "Toiminto ei ole käytössä."}), 404
+    try:
+        # the platform's own superadmin can demo the button without waiting an hour
+        result = fetch_targets(organization_id, ignore_cooldown=current_user.is_superadmin())
+    except TargetFetchCooldown as cooldown:
+        db.session.rollback()
+        label = to_helsinki(cooldown.next_fetch_at).strftime("%H.%M")
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "code": "cooldown",
+                    "message": f"Kohteita voi hakea kerran tunnissa. Seuraava haku on mahdollinen klo {label}.",
+                }
+            ),
+            429,
+        )
+    log_audit(
+        "targets_fetched",
+        user_id=current_user.id,
+        organization_id=organization_id,
+        target_type="listing_match",
+        target_id=None,
+        metadata={"count": result["count"]},
+    )
+    db.session.commit()
+    params = dict(org_query_suffix(organization_id))
+    params["fetched"] = result["count"]
+    return jsonify(
+        {
+            "success": True,
+            "count": result["count"],
+            "wait_seconds": result["wait_seconds"],
+            "redirect": url_for("targets.index", **params),
+        }
+    )
 
 
 @targets_bp.route("/digest", methods=["POST"])

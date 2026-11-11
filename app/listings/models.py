@@ -161,6 +161,10 @@ class ListingMatch(db.Model):
     confidence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     lead_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the match became visible on Kohteet. NULL = still in the reserve
+    # (TARGET_FETCH_ENABLED); a time in the near future = released by "Hae
+    # kohteita" and appearing when its progress animation ends.
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing")
     profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821

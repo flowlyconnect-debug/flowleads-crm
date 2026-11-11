@@ -31,6 +31,11 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
+- **Reserve + "Hae kohteita"** (`TARGET_FETCH_ENABLED`, on by default, off in tests): a new match has
+  `released_at = NULL` and is invisible to the customer until they press the button on Kohteet
+  (`fetch_targets()`), which releases a batch of varying size once per hour per organization. The page shows
+  a 10-15 s progress animation; the batch gets a `released_at` that far in the future. `count_targets()` and
+  everything built on it count released targets only; `count_reserve()` is the rest.
 - Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
   `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner.
