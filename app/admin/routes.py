@@ -108,7 +108,12 @@ def dashboard():
 @require_2fa
 def customers_list():
     customers = list_customers_summary()
-    return render_template("admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG)
+    return render_template(
+        "admin/customers.html",
+        customers=customers,
+        feature_catalog=FEATURE_CATALOG,
+        remonttityypit=REMONTTITYYPIT,
+    )
 
 
 @admin_bp.route("/organizations", methods=["POST"])
@@ -120,6 +125,8 @@ def create_organization_route():
     slug = request.form.get("slug", "").strip().lower()
     try:
         org = create_organization(name, slug)
+        # no toimialat until the superadmin grants them on /admin/customers
+        org.remonttityypit = []
         db.session.commit()
         flash(f"Organisaatio luotu: {org.name}", "success")
     except UserServiceError as exc:
@@ -271,7 +278,8 @@ def create_invite_route():
         "organization_name": request.form.get("organization_name", "").strip(),
         "admin_email": request.form.get("admin_email", "").strip(),
         "search_profile_name": request.form.get("search_profile_name", "").strip(),
-        "remonttityyppi": request.form.get("remonttityyppi", "").strip(),
+        "remonttityypit": [t for t in request.form.getlist("remonttityypit") if t.strip()]
+        or [t for t in [request.form.get("remonttityyppi", "").strip()] if t],
         "source": (request.form.get("source") or "oikotie").strip(),
         "allowed_features": allowed_features,
     }
@@ -282,7 +290,7 @@ def create_invite_route():
             organization_name=form_data["organization_name"],
             admin_email=form_data["admin_email"],
             search_profile_name=form_data["search_profile_name"],
-            remonttityyppi=form_data["remonttityyppi"],
+            remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             allowed_features=allowed_features,
         )
@@ -381,6 +389,39 @@ def update_customer_features_route(organization_id: int):
     return redirect(url_for("admin.customers_list"))
 
 
+@admin_bp.route("/customers/<int:organization_id>/toimialat", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def update_customer_types_route(organization_id: int):
+    """Which toimialat the customer gets targets from. Only a superadmin can
+    change this; the customer's profiles follow."""
+    from app.core.audit import log_audit
+    from app.search.profile_services import SearchProfileServiceError, set_organization_types
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    try:
+        types = set_organization_types(organization, request.form.getlist("remonttityypit"))
+    except SearchProfileServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return redirect(url_for("admin.customers_list"))
+    log_audit(
+        "organization_types_updated",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"remonttityypit": types},
+    )
+    db.session.commit()
+    flash(f"Toimialat päivitetty: {organization.name}. Kohteet päivittyvät noin 10 minuutin kuluessa.", "success")
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/catalogue")
 @login_required
 @require_role("superadmin")
@@ -388,7 +429,12 @@ def update_customer_features_route(organization_id: int):
 def catalogue_status():
     from app.listings.services import catalogue_health
 
-    return render_template("admin/catalogue.html", health=catalogue_health(), remonttityypit=REMONTTITYYPIT)
+    return render_template(
+        "admin/catalogue.html",
+        health=catalogue_health(),
+        remonttityypit=REMONTTITYYPIT,
+        finnish_regions=FINNISH_REGIONS,
+    )
 
 
 @admin_bp.route("/catalogue/import", methods=["POST"])
@@ -398,7 +444,7 @@ def catalogue_status():
 def catalogue_import():
     """CSV import of listings from a source other than the Oikotie crawler."""
     from app.core.audit import log_audit
-    from app.listings.import_services import import_listings, parse_listing_csv
+    from app.listings.import_services import import_listings, import_match_summary, parse_listing_csv
     from app.listings.services import ListingServiceError
 
     upload = request.files.get("file")
@@ -406,8 +452,15 @@ def catalogue_import():
         flash("Valitse CSV-tiedosto.", "danger")
         return redirect(url_for("admin.catalogue_status"))
     try:
-        rows = parse_listing_csv(upload.read(5 * 1024 * 1024 + 1)[: 5 * 1024 * 1024])
-        result = import_listings(rows)
+        default_maakunta = (request.form.get("default_maakunta") or "").strip()
+        rows = parse_listing_csv(
+            upload.read(5 * 1024 * 1024 + 1)[: 5 * 1024 * 1024], require_maakunta=not default_maakunta
+        )
+        result = import_listings(
+            rows,
+            default_types=[t for t in request.form.getlist("default_remonttityypit") if t.strip()],
+            default_maakunta=default_maakunta,
+        )
     except ListingServiceError as exc:
         db.session.rollback()
         flash(exc.message, "danger")
@@ -419,7 +472,8 @@ def catalogue_import():
         organization_id=None,
         target_type="listing",
         target_id=None,
-        metadata={k: v for k, v in result.items() if k != "errors"} | {"errors": len(result["errors"])},
+        metadata={k: v for k, v in result.items() if k not in ("errors", "analysed_listing_ids")}
+        | {"errors": len(result["errors"])},
     )
     db.session.commit()
     flash(
@@ -428,6 +482,18 @@ def catalogue_import():
         f"AI-analyysiin jonossa {result['queued']}.",
         "success",
     )
+    summary = import_match_summary(result["analysed_listing_ids"])
+    if summary["customers"]:
+        flash(
+            "Kohteet näkyvät asiakkaille: " + ", ".join(f"{name} ({count})" for name, count in summary["customers"]) + ".",
+            "info",
+        )
+    if summary["unmatched"]:
+        flash(
+            f"{summary['unmatched']} kohdetta ei osunut yhdellekään asiakkaalle (ei asiakasta, jolla on tämä "
+            "toimiala ja alue). Ne jäävät katalogiin ja näkyvät, kun sopiva asiakas lisätään.",
+            "warning",
+        )
     if result["errors"]:
         shown = "; ".join(f"rivi {e['row'] + 1}: {e['error']}" for e in result["errors"][:8])
         more = len(result["errors"]) - 8

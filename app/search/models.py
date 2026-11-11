@@ -87,8 +87,15 @@ class SearchProfile(db.Model):
 
     @property
     def wanted_types(self) -> list[str]:
-        types = [t for t in (self.remonttityypit or []) if t]
-        return types or [self.remonttityyppi]
+        """The toimialat this profile matches. Never outside what the
+        organization is entitled to (Organization.remonttityypit), even if the
+        stored list is older than a narrowed entitlement."""
+        types = [t for t in (self.remonttityypit or []) if t] or [self.remonttityyppi]
+        organization = self.organization
+        allowed = organization.remonttityypit if organization is not None else None
+        if allowed is not None:
+            types = [t for t in types if t in allowed]
+        return types
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
     jobs: Mapped[list["SearchJob"]] = relationship(

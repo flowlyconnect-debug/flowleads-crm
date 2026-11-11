@@ -6,10 +6,17 @@ source the operator is entitled to use (own research, a licensed data feed such
 as the housing-information system, a partner's export).
 
 Two kinds of rows:
-    * with `remonttityyppi` -> stored as analysed, matched and turned into leads
+    * with `remonttityyppi` (the toimiala) -> stored as analysed and matched
       right away (no AI, no n8n);
     * without it but with `teksti` -> queued for the n8n Analyzer, which
       classifies the text exactly like an Oikotie listing page.
+
+Who sees a row: the toimiala and the maakunta are the only "marking" a row
+needs. A row lands on the Kohteet page of exactly those customers whose
+organization is entitled to the toimiala (Organization.remonttityypit, set by
+the superadmin) and whose profile covers the maakunta. A whole file can be
+marked at upload (`default_types`, `default_maakunta`) when it has no such
+columns; a value on the row wins over the file's default.
 """
 
 from __future__ import annotations
@@ -121,7 +128,7 @@ def _confidence(value) -> int:
         return 100
 
 
-def parse_listing_csv(data: bytes) -> list[dict]:
+def parse_listing_csv(data: bytes, *, require_maakunta: bool = True) -> list[dict]:
     """Rows of a CSV export as dicts keyed by canonical column name. Accepts
     comma, semicolon or tab separated files in UTF-8 or Windows-1252 (Excel)."""
     if not data or not data.strip():
@@ -140,8 +147,10 @@ def parse_listing_csv(data: bytes) -> list[dict]:
         raise ListingServiceError("Tiedosto on tyhjä.") from None
 
     columns = [_HEADER_TO_COLUMN.get(_header_key(cell)) for cell in header]
-    if "maakunta" not in columns:
-        raise ListingServiceError("Tiedostosta puuttuu sarake 'maakunta'.")
+    if require_maakunta and "maakunta" not in columns:
+        raise ListingServiceError(
+            "Tiedostosta puuttuu sarake 'maakunta'. Lisää sarake tai valitse maakunta koko tiedostolle."
+        )
     if "taloyhtio" not in columns and "osoite" not in columns:
         raise ListingServiceError("Tiedostosta puuttuu sarake 'taloyhtio' tai 'osoite'.")
 
@@ -173,7 +182,7 @@ def _renovations(raw: dict) -> tuple[list[dict], str | None]:
                 continue
             name = _renovation_type(item.get("remonttityyppi"))
             if not name:
-                return [], f"Tuntematon remonttityyppi: {item.get('remonttityyppi')}"
+                return [], f"Tuntematon toimiala: {item.get('remonttityyppi')}"
             parsed.append(
                 {
                     "remonttityyppi": name,
@@ -193,7 +202,7 @@ def _renovations(raw: dict) -> tuple[list[dict], str | None]:
             continue
         name = _renovation_type(part)
         if not name:
-            return [], f"Tuntematon remonttityyppi: {part.strip()}"
+            return [], f"Tuntematon toimiala: {part.strip()}"
         parsed.append(
             {
                 "remonttityyppi": name,
@@ -213,7 +222,42 @@ def _external_id(raw: dict, taloyhtio: str | None, osoite: str | None, kaupunki:
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:20]
 
 
-def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | None = None) -> dict:
+def import_match_summary(listing_ids: list[int]) -> dict:
+    """Which customers got the imported listings: {"customers": [(name, n)],
+    "unmatched": listings that no customer's profile wanted}."""
+    from sqlalchemy import func
+
+    from app.listings.models import ListingMatch
+    from app.search.models import SearchProfile
+    from app.users.models import Organization
+
+    if not listing_ids:
+        return {"customers": [], "unmatched": 0}
+    rows = (
+        db.session.query(Organization.name, func.count(func.distinct(ListingMatch.listing_id)))
+        .join(SearchProfile, SearchProfile.organization_id == Organization.id)
+        .join(ListingMatch, ListingMatch.profile_id == SearchProfile.id)
+        .filter(ListingMatch.listing_id.in_(listing_ids))
+        .group_by(Organization.id, Organization.name)
+        .order_by(Organization.name)
+        .all()
+    )
+    matched = (
+        db.session.query(func.count(func.distinct(ListingMatch.listing_id)))
+        .filter(ListingMatch.listing_id.in_(listing_ids))
+        .scalar()
+    ) or 0
+    return {"customers": [(name, count) for name, count in rows], "unmatched": len(listing_ids) - matched}
+
+
+def import_listings(
+    rows: list,
+    *,
+    source: str = IMPORT_SOURCE,
+    now: datetime | None = None,
+    default_types: list[str] | None = None,
+    default_maakunta: str | None = None,
+) -> dict:
     """Upsert listings from a source other than the Oikotie crawler. Rows with
     renovation types become leads for matching profiles immediately; rows with
     only text wait for the n8n Analyzer. Bad rows are reported, not fatal."""
@@ -225,14 +269,36 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
     if source == SOURCE:
         raise ListingServiceError("Oikotie listings come from the crawler (/ingest), not from import.")
 
+    file_types = []
+    for value in default_types or []:
+        name = _renovation_type(value)
+        if not name:
+            raise ListingServiceError(f"Tuntematon toimiala: {value}")
+        if name not in file_types:
+            file_types.append(name)
+    file_region = None
+    if _clean(default_maakunta):
+        file_region = _region(default_maakunta)
+        if not file_region:
+            raise ListingServiceError(f"Tuntematon maakunta: {default_maakunta}")
+
     now = now or _now()
-    result = {"created": 0, "updated": 0, "analysed": 0, "queued": 0, "matches": 0, "leads_created": 0, "errors": []}
+    result = {
+        "created": 0,
+        "updated": 0,
+        "analysed": 0,
+        "queued": 0,
+        "matches": 0,
+        "leads_created": 0,
+        "errors": [],
+        "analysed_listing_ids": [],
+    }
 
     for index, raw in enumerate(rows, start=1):
         if not isinstance(raw, dict):
             result["errors"].append({"row": index, "error": "Rivi ei ole kelvollinen."})
             continue
-        maakunta = _region(raw.get("maakunta"))
+        maakunta = _region(raw.get("maakunta")) or (file_region if not _clean(raw.get("maakunta")) else None)
         taloyhtio = _clean(raw.get("taloyhtio"), 255)
         osoite = _clean(raw.get("osoite"), 255)
         kaupunki = _clean(raw.get("kaupunki"), 100)
@@ -243,13 +309,15 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
         if not taloyhtio and not osoite:
             result["errors"].append({"row": index, "error": "Taloyhtiö tai osoite puuttuu."})
             continue
+        if file_types and not _clean(raw.get("remonttityyppi")) and not raw.get("renovations"):
+            raw = {**raw, "remonttityyppi": ";".join(file_types)}
         renovations, error = _renovations(raw)
         if error:
             result["errors"].append({"row": index, "error": error})
             continue
         if not renovations and len(description or "") < MIN_TEXT_LENGTH:
             result["errors"].append(
-                {"row": index, "error": "Rivillä pitää olla remonttityyppi tai vähintään 30 merkin teksti."}
+                {"row": index, "error": "Rivillä pitää olla toimiala (remonttityyppi) tai vähintään 30 merkin teksti."}
             )
             continue
 
@@ -323,6 +391,7 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
             now=now,
         )
         result["analysed"] += 1
+        result["analysed_listing_ids"].append(listing.id)
         result["matches"] += saved.get("matches", 0)
         result["leads_created"] += saved.get("leads_created", 0)
 

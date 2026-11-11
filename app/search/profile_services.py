@@ -111,6 +111,64 @@ def _optional_int(value, *, low: int, high: int, message: str) -> int | None:
     return number
 
 
+def allowed_types(organization_id: int | None) -> tuple[str, ...]:
+    """The toimialat an organization's profiles may use, in catalogue order.
+    Everything when the organization is not restricted."""
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id) if organization_id else None
+    if organization is None or organization.remonttityypit is None:
+        return REMONTTITYYPIT
+    return tuple(t for t in REMONTTITYYPIT if t in organization.remonttityypit)
+
+
+def clean_types(values) -> list[str]:
+    """Valid toimiala names in catalogue order, no duplicates."""
+    chosen = {(v or "").strip() for v in (values or [])}
+    unknown = chosen - set(REMONTTITYYPIT) - {""}
+    if unknown:
+        raise SearchProfileServiceError("Valitse toimialat listasta.")
+    return [t for t in REMONTTITYYPIT if t in chosen]
+
+
+def _check_entitlement(profile: SearchProfile) -> None:
+    allowed = allowed_types(profile.organization_id)
+    if not allowed:
+        raise SearchProfileServiceError(
+            "Organisaatiolle ei ole vielä määritetty toimialoja. Ota yhteyttä FlowLeadsiin.",
+            "no_entitlement",
+        )
+    types = [t for t in (profile.remonttityypit or []) if t] or [profile.remonttityyppi]
+    outside = [t for t in types if t not in allowed]
+    if outside:
+        raise SearchProfileServiceError(
+            f"Toimiala ei kuulu organisaation tilaukseen: {', '.join(outside)}.",
+            "type_not_allowed",
+        )
+
+
+def set_organization_types(organization, types) -> list[str]:
+    """Set the toimialat a customer is entitled to and bring its profiles in
+    line: a removed toimiala is dropped from every profile, a newly granted one
+    is added, and what the customer had switched off stays off. Profiles are
+    rematched by the scheduler."""
+    new = clean_types(types)
+    if not new:
+        raise SearchProfileServiceError("Valitse vähintään yksi toimiala.")
+    previous = organization.remonttityypit
+    organization.remonttityypit = new
+    for profile in SearchProfile.query.filter_by(organization_id=organization.id).all():
+        current = [t for t in (profile.remonttityypit or []) if t] or [profile.remonttityyppi]
+        kept = [t for t in new if t in current or (previous is not None and t not in previous)]
+        kept = kept or list(new)
+        if kept != current:
+            profile.remonttityyppi = kept[0]
+            profile.remonttityypit = kept
+            profile.needs_rematch = True
+            profile.updated_at = datetime.now(timezone.utc)
+    return new
+
+
 def normalize_types(remonttityyppi: str, remonttityypit) -> list[str]:
     """All wanted renovation types, the primary one first, no duplicates."""
     types: list[str] = []
@@ -284,6 +342,7 @@ def build_profile(
         build_year_max=build_year_max,
         building_types=building_types,
     )
+    _check_entitlement(profile)
     return profile
 
 
@@ -347,6 +406,7 @@ def update_profile(
         build_year_max=build_year_max,
         building_types=building_types,
     )
+    _check_entitlement(profile)
     # filter may have changed: the scheduler rebuilds this profile's matches
     profile.needs_rematch = True
     profile.updated_at = datetime.now(timezone.utc)

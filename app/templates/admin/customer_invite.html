@@ -10,7 +10,8 @@
         <h1>Kutsu asiakas</h1>
         <p class="text-muted">
           Luo organisaatio ja lähetä asiakkaalle kertakäyttöinen, 7 vuorokautta voimassa oleva
-          kutsulinkki. Asiakas asettaa itse salasanansa ja valitsee hakualueensa linkin takaa.
+          kutsulinkki. Sinä valitset asiakkaan toimialat; asiakas asettaa linkin takaa vain salasanansa
+          ja hakualueensa eikä voi itse vaihtaa toimialoja.
           Hakuprofiili aktivoituu heti, kun asiakas hyväksyy kutsun, ja ensimmäiset liidit
           tulevat noin 10 minuutin kuluessa.
         </p>
@@ -39,15 +40,18 @@
                    value="{{ form_data.get('search_profile_name', '') }}">
           </label>
 
-          <label class="form-label">Remonttityyppi
-            <select name="remonttityyppi" class="form-select" required>
-              <option value="">Valitse…</option>
-              {% for option in remonttityypit %}
-              <option value="{{ option }}"
-                {% if form_data.get('remonttityyppi') == option %}selected{% endif %}>{{ option }}</option>
-              {% endfor %}
-            </select>
-          </label>
+          <fieldset style="margin-top:1rem;">
+            <legend class="form-label">Toimialat</legend>
+            <p class="form-helper mb-2">Valitse yksi tai useampi. Asiakas näkee vain näiden toimialojen kohteet. Voit muuttaa valintaa myöhemmin asiakaslistasta.</p>
+            {% set selected_types = form_data.get('remonttityypit', []) %}
+            {% for option in remonttityypit %}
+            <label class="form-check">
+              <input type="checkbox" name="remonttityypit" value="{{ option }}"
+                {% if option in selected_types %}checked{% endif %}>
+              {{ option }}
+            </label>
+            {% endfor %}
+          </fieldset>
 
           <input type="hidden" name="source" value="oikotie">
           <p class="form-helper">Asiakas valitsee alueet (tai Koko Suomen) kutsulinkin takaa. Muut suodattimet voi säätää hakuprofiilin asetuksista.</p>

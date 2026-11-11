@@ -244,6 +244,11 @@ def test_e2e_admin_cannot_access_superadmin_routes(app, client):
 
 def test_e2e_customer_admin_can_edit_own_profile(app, client):
     ctx = _onboard_customer(app, slug_suffix="profile-edit")
+    with app.app_context():
+        # the superadmin has granted both toimialat to this customer
+        org = db.session.get(Organization, ctx["org_id"])
+        org.remonttityypit = ["Putki- ja viemäriurakointi", "Julkisivu- ja parvekeurakointi"]
+        db.session.commit()
 
     _login(client, ctx["admin_email"])
     _bypass_2fa_for(client, app, ctx["admin_email"])

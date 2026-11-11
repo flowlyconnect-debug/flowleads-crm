@@ -24,6 +24,11 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 - A catalogue lead is **one housing company's renovation**, not a property manager: leads are never
   merged by email (`match_by_email=False`); another apartment of the same taloyhtiö joins the existing
   lead (`ListingMatch.status == "merged"`).
+- **Toimialat are the superadmin's decision, never the customer's.** `Organization.remonttityypit` is the
+  entitlement (set on the invite and on `/admin/customers`; `None` = not restricted, `[]` = nothing yet).
+  Profiles can only use those types (`profile_services._check_entitlement`, `SearchProfile.wanted_types`
+  intersects again); change it with `set_organization_types()`. A CSV row reaches a customer only through
+  its toimiala + maakunta, which can also be set for a whole file at upload.
 - Onboarding (`app/admin/onboarding_services.py`, `invite_services.py`) creates an **active** profile and
   nothing else per customer: no API key, no SearchJob. Turning a profile on must go through
   `activate_profile()` so it is rematched. Billing is manual for now.

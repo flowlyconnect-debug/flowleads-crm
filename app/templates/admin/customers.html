@@ -26,6 +26,7 @@
               <th>Hakuprofiilit</th>
               <th>Liidejä</th>
               <th>Viimeisin liidi</th>
+              <th>Toimialat</th>
               <th>Toiminnot käytössä</th>
               <th></th>
             </tr>
@@ -70,6 +71,27 @@
                 </div>
               </td>
               <td>{{ row.last_search_label }}</td>
+              <td>
+                {% set org_types = row.org.remonttityypit %}
+                <details>
+                  <summary>
+                    {% if org_types is none %}Ei rajattu
+                    {% elif org_types %}{{ org_types | join(' · ') }}
+                    {% else %}<span class="badge badge-inactive">Ei toimialoja</span>{% endif %}
+                  </summary>
+                  <form method="post" action="{{ url_for('admin.update_customer_types_route', organization_id=row.org.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% for option in remonttityypit %}
+                    <label class="form-check">
+                      <input type="checkbox" name="remonttityypit" value="{{ option }}"
+                        {% if org_types and option in org_types %}checked{% endif %}>
+                      {{ option }}
+                    </label>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-secondary btn-sm">Tallenna toimialat</button>
+                  </form>
+                </details>
+              </td>
               <td>
                 <form method="post" action="{{ url_for('admin.update_customer_features_route', organization_id=row.org.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

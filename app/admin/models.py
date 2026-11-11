@@ -36,6 +36,9 @@ class CustomerInvite(db.Model):
     allowed_features: Mapped[list] = mapped_column(json_type, default=list, nullable=False)
     search_profile_name: Mapped[str] = mapped_column(String(100), nullable=False)
     remonttityyppi: Mapped[str] = mapped_column(String(100), nullable=False)
+    # every toimiala the superadmin picked for this customer (remonttityyppi
+    # above = the first one); None on invites created before this existed
+    remonttityypit: Mapped[list | None] = mapped_column(json_type, nullable=True)
     source: Mapped[str] = mapped_column(String(50), default="oikotie", nullable=False)
 
     invited_by_user_id: Mapped[int | None] = mapped_column(
@@ -52,6 +55,11 @@ class CustomerInvite(db.Model):
     )
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
+
+    @property
+    def wanted_types(self) -> list[str]:
+        types = [t for t in (self.remonttityypit or []) if t]
+        return types or [self.remonttityyppi]
 
     def is_valid(self, *, now: datetime | None = None) -> bool:
         if self.accepted_at is not None or self.revoked_at is not None:

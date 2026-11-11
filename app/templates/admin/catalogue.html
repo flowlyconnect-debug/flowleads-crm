@@ -62,18 +62,37 @@
 
         <h2 class="form-section-title" style="margin-top:1.5rem;">Tuo kohteita tiedostosta</h2>
         <p class="text-muted text-sm">
-          Kohteita voi tuoda myös muusta lähteestä kuin Oikotieltä. Rivi, jolla on remonttityyppi, täsmäytetään heti
-          hakuprofiileihin ja siitä syntyy liidit. Rivi, jolla on vain teksti, menee AI-analyysiin (Analyzer).
-          Pakolliset sarakkeet: <code>maakunta</code> sekä <code>taloyhtio</code> tai <code>osoite</code>.
+          Kohteen <strong>toimiala</strong> ja <strong>maakunta</strong> ratkaisevat, kenelle se näkyy: kohde tulee vain
+          niiden asiakkaiden Kohteet-sivulle, joille olet antanut kyseisen toimialan ja joiden hakualueeseen maakunta
+          kuuluu. Merkitse toimiala joko tiedoston <code>remonttityyppi</code>-sarakkeeseen tai valitse se alta koko
+          tiedostolle (rivin oma arvo voittaa). Rivi, jolla ei ole toimialaa mutta on teksti, menee AI-analyysiin.
+          Pakolliset: <code>taloyhtio</code> tai <code>osoite</code> sekä maakunta (sarake tai valinta alla).
         </p>
         <form method="post" action="{{ url_for('admin.catalogue_import') }}" enctype="multipart/form-data" style="margin-top:0.75rem;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <fieldset style="margin-bottom:0.75rem;">
+            <legend class="form-label">Toimiala koko tiedostolle (valinnainen)</legend>
+            {% for option in remonttityypit %}
+            <label class="form-check">
+              <input type="checkbox" name="default_remonttityypit" value="{{ option }}">
+              {{ option }}
+            </label>
+            {% endfor %}
+          </fieldset>
+          <label class="form-label" style="margin-bottom:0.75rem;">Maakunta koko tiedostolle (valinnainen)
+            <select name="default_maakunta" class="form-select">
+              <option value="">Tiedoston maakunta-sarakkeesta</option>
+              {% for region in finnish_regions %}
+              <option value="{{ region }}">{{ region }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <input type="file" name="file" accept=".csv,text/csv" required>
           <button type="submit" class="btn btn-primary">Tuo kohteet</button>
           <a href="{{ url_for('admin.catalogue_import_template') }}" class="btn btn-secondary">Lataa mallitiedosto</a>
         </form>
         <p class="text-muted text-sm mt-2">
-          Remonttityypit (useampi erotetaan puolipisteellä): {{ remonttityypit | join('; ') }}.
+          Toimialat sarakkeessa <code>remonttityyppi</code> (useampi erotetaan puolipisteellä): {{ remonttityypit | join('; ') }}.
         </p>
 
         <h2 class="form-section-title" style="margin-top:1.5rem;">Maakunnat</h2>

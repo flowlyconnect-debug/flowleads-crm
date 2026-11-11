@@ -29,6 +29,7 @@ from app.search.constants import (
 from app.search.models import SEARCH_SCHEDULES
 from app.search.profile_services import (
     SearchProfileServiceError,
+    allowed_types,
     build_profile,
     create_profile,
     create_test_search_job,
@@ -56,7 +57,8 @@ def _search_profiles_template_defaults(
         "latest_job": None,
         "match_stats": None,
         "catalogue": None,
-        "remonttityypit": REMONTTITYYPIT,
+        "remonttityypit": allowed_types(organization_id),
+        "types_restricted": False,
         "finnish_regions": FINNISH_REGIONS,
         "all_finland_region": ALL_FINLAND_REGION,
         "building_types": BUILDING_TYPES,
@@ -96,7 +98,8 @@ def _render_search_profiles(
         latest_job=latest_job,
         match_stats=match_stats,
         catalogue=catalogue_stats(),
-        remonttityypit=REMONTTITYYPIT,
+        remonttityypit=allowed_types(organization_id),
+        types_restricted=len(allowed_types(organization_id)) < len(REMONTTITYYPIT),
         finnish_regions=FINNISH_REGIONS,
         all_finland_region=ALL_FINLAND_REGION,
         building_types=BUILDING_TYPES,

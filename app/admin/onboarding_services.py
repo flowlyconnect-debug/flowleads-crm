@@ -130,6 +130,10 @@ def create_customer(
 
         admin_user.must_change_password = True
 
+        # the customer is entitled to this toimiala only; a superadmin widens
+        # it on /admin/customers
+        organization.remonttityypit = [(remonttityyppi or "").strip()]
+
         profile = create_profile(
             organization.id,
             name=search_profile_name,

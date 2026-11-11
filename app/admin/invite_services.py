@@ -1,12 +1,16 @@
 """Customer invite + self-service onboarding.
 
 Flow:
-1. Superadmin calls create_invite(): creates the Organization (no admin user,
-   no search profile yet) and a CustomerInvite with a 7-day single-use token.
+1. Superadmin calls create_invite(): picks the customer's toimialat, creates
+   the Organization (entitled to exactly those toimialat; no admin user, no
+   search profile yet) and a CustomerInvite with a 7-day single-use token.
 2. The customer clicks the emailed link, GET /invite/<token> shows a form.
 3. accept_invite(): sets the admin's password, creates the SearchProfile with
-   the regions/"Koko Suomi" they chose, and records which of the allowed
-   features they turned on.
+   the superadmin's toimialat and the regions/"Koko Suomi" the customer chose,
+   and records which of the allowed features they turned on.
+
+The customer never chooses a toimiala: not on the invite page and not later in
+the settings (Organization.remonttityypit, see profile_services).
 
 The profile is created ACTIVE. It is only a filter over the shared listing
 catalogue (docs/ARKKITEHTUURI_KOHDEKATALOGI.md), so nothing is scraped per
@@ -31,7 +35,12 @@ from app.core.audit import log_audit
 from app.core.security import validate_password
 from app.extensions import db
 from app.search.models import SearchProfile
-from app.search.profile_services import SearchProfileServiceError, activate_profile, create_profile
+from app.search.profile_services import (
+    SearchProfileServiceError,
+    activate_profile,
+    clean_types,
+    create_profile,
+)
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_organization, create_user
 
@@ -81,7 +90,8 @@ def create_invite(
     organization_name: str,
     admin_email: str,
     search_profile_name: str,
-    remonttityyppi: str,
+    remonttityyppi: str = "",
+    remonttityypit: list[str] | None = None,
     source: str = "oikotie",
     allowed_features: list[str] | None = None,
     slug: str | None = None,
@@ -97,16 +107,24 @@ def create_invite(
     source = (source or "oikotie").strip() or "oikotie"
 
     try:
+        types = clean_types([remonttityyppi, *(remonttityypit or [])])
+    except SearchProfileServiceError as exc:
+        raise InviteServiceError(exc.message, "invalid_types") from exc
+    if not types:
+        raise InviteServiceError("Valitse asiakkaalle vähintään yksi toimiala.", "invalid_types")
+
+    try:
         organization = create_organization(organization_name, org_slug)
     except UserServiceError as exc:
         raise InviteServiceError(exc.message, exc.code) from exc
+    organization.remonttityypit = list(types)
 
     invite, token = _issue_invite_row(
         organization=organization,
         email=admin_email,
         invited_by=actor,
         search_profile_name=search_profile_name,
-        remonttityyppi=remonttityyppi,
+        remonttityypit=types,
         source=source,
         allowed_features=valid_feature_keys(allowed_features),
         ttl_days=ttl_days,
@@ -134,7 +152,7 @@ def renew_invite(invite: CustomerInvite, *, actor: User, ttl_days: int = INVITE_
         email=invite.email,
         invited_by=actor,
         search_profile_name=invite.search_profile_name,
-        remonttityyppi=invite.remonttityyppi,
+        remonttityypit=invite.wanted_types,
         source=invite.source,
         allowed_features=invite.allowed_features,
         ttl_days=ttl_days,
@@ -157,7 +175,7 @@ def _issue_invite_row(
     email: str,
     invited_by: User,
     search_profile_name: str,
-    remonttityyppi: str,
+    remonttityypit: list[str],
     source: str,
     allowed_features: list[str],
     ttl_days: int,
@@ -177,7 +195,8 @@ def _issue_invite_row(
         token_hash=_hash_invite_token(token),
         allowed_features=list(allowed_features),
         search_profile_name=search_profile_name,
-        remonttityyppi=remonttityyppi,
+        remonttityyppi=remonttityypit[0],
+        remonttityypit=list(remonttityypit),
         source=source,
         invited_by_user_id=invited_by.id,
         expires_at=now + timedelta(days=ttl_days),
@@ -222,10 +241,15 @@ def accept_invite(
             is_active=True,
         )
 
+        # the toimialat come from the superadmin's invite (or from a change
+        # made on /admin/customers since), never from the customer
+        types = [t for t in (organization.remonttityypit or []) if t] or invite.wanted_types
+        organization.remonttityypit = list(types)
         profile = create_profile(
             organization.id,
             name=invite.search_profile_name,
-            remonttityyppi=invite.remonttityyppi,
+            remonttityyppi=types[0],
+            remonttityypit=types,
             regions=regions,
             is_active=True,
             source=invite.source,
@@ -243,6 +267,7 @@ def accept_invite(
             target_id=organization.id,
             metadata={
                 "regions": regions,
+                "remonttityypit": types,
                 "enabled_features": chosen_features,
                 "search_profile_id": profile.id,
             },

@@ -42,8 +42,9 @@
       {% endfor %}
     </div>
     <p class="lp-solo__hint" style="margin-top:10px;">
-      Saat liidejä kohteista, joissa on tulossa <strong>{{ invite.remonttityyppi }}</strong> valitsemillasi alueilla.
-      Ensimmäiset liidit tulevat noin 10 minuutin kuluttua, ja voit tarkentaa hakua myöhemmin asetuksista.
+      Saat kohteita valitsemiltasi alueilta seuraavilta toimialoilta:
+      {% for t in (invite.organization.remonttityypit or invite.wanted_types) %}<strong>{{ t }}</strong>{{ ", " if not loop.last else "." }}{% endfor %}
+      Ensimmäiset kohteet tulevat noin 10 minuutin kuluttua, ja voit tarkentaa alueita myöhemmin asetuksista.
     </p>
   </div>
 

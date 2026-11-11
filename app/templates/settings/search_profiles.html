@@ -61,10 +61,17 @@
                        value="{{ selected_profile.name if selected_profile else '' }}">
               </label>
 
-              {% set selected_types = selected_profile.wanted_types if selected_profile else [] %}
+              {% set selected_types = selected_profile.wanted_types if selected_profile else (remonttityypit if types_restricted else []) %}
               <fieldset class="search-profiles-regions">
-                <legend class="form-label">Remonttityypit</legend>
-                <p class="form-helper mb-2">Valitse yksi tai useampi. Kohteesta syntyy liidi, kun siinä on tulossa jokin valituista remonteista.</p>
+                <legend class="form-label">Toimialat</legend>
+                {% if types_restricted %}
+                <p class="form-helper mb-2">Organisaatiosi toimialat. Jos haluat lisätä tai vaihtaa toimialaa, ota yhteyttä FlowLeadsiin.</p>
+                {% else %}
+                <p class="form-helper mb-2">Valitse yksi tai useampi. Kohde tulee Kohteet-sivulle, kun siinä on tulossa jokin valituista töistä.</p>
+                {% endif %}
+                {% if not remonttityypit %}
+                <p class="form-helper mb-2">Toimialoja ei ole vielä määritetty.</p>
+                {% endif %}
                 <div class="search-profiles-regions__grid">
                   {% for option in remonttityypit %}
                   <label class="form-check">

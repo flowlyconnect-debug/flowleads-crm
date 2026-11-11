@@ -32,6 +32,12 @@ class Organization(db.Model):
     # app/admin/constants.py FEATURE_CATALOG). Enforced by
     # app/core/features.py; a superadmin edits them on /admin/customers.
     enabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    # Toimialat (app/search/constants.py REMONTTITYYPIT) this customer is
+    # entitled to. Set by the superadmin when inviting and on /admin/customers;
+    # the customer's search profiles can only use these, and matching never
+    # goes outside them. None = not restricted (organizations that are not
+    # customers, e.g. the operator's own).
+    remonttityypit: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
