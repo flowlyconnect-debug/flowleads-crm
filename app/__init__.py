@@ -34,6 +34,7 @@ def create_app(config_object=None):
     _init_extensions(app)
     _register_blueprints(app)
     register_error_handlers(app)
+    _register_security_headers(app)
     _register_cli(app)
     _register_root_routes(app)
     _init_ai_enrichment(app)
@@ -55,6 +56,25 @@ def _apply_proxy_fix(app):
 
     hops = app.config.get("PROXY_FIX_X_FOR", 1)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+
+
+def _register_security_headers(app):
+    """Security headers on every response. Render serves the app directly, so
+    deploy/nginx.conf (which sets the same headers) is not in front of it."""
+
+    @app.after_request
+    def add_security_headers(response):
+        from flask import request
+
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # The web form embed page is meant to sit in an iframe on customer sites.
+        if request.endpoint != "forms.iframe_embed":
+            headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        if request.is_secure:
+            headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
 
 
 def _init_sentry(app):

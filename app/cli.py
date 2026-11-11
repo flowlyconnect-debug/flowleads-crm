@@ -159,6 +159,32 @@ def register_cli(app):
             click.echo(exc.message, err=True)
             sys.exit(1)
 
+    @app.cli.command("purge-leads")
+    @click.option("--with-listings", is_flag=True, help="Also delete the whole listing catalogue and its matches.")
+    @click.option("--yes", is_flag=True, help="Actually delete. Without it only the counts are shown.")
+    @with_appcontext
+    def purge_leads_cmd(with_listings, yes):
+        """Permanently delete ALL leads of ALL organizations (dry run by default)."""
+        from app.core.audit import log_audit
+        from app.leads.purge import purge_all_leads
+
+        try:
+            counts = purge_all_leads(with_listings=with_listings, dry_run=not yes)
+            if yes:
+                log_audit("leads_purged", target_type="lead", metadata={"with_listings": with_listings, "rows": counts})
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+        click.echo("Poistettu:" if yes else "Kuiva-ajo, mitään ei poistettu. Poistettaisiin:")
+        for name, n in sorted(counts.items()):
+            click.echo(f"  {name}: {n}")
+        if not counts:
+            click.echo("  (ei rivejä)")
+        if not yes:
+            click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
+
     @app.cli.command("run-scheduler")
     @with_appcontext
     def run_scheduler_cmd():

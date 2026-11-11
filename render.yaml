@@ -13,6 +13,8 @@ services:
     buildCommand: pip install -r requirements.txt
     # 2 workers: the starter plan has 512 MB RAM; 4 workers risked OOM restarts.
     startCommand: flask db upgrade && gunicorn run:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
+    # A deploy only goes live once this answers 200.
+    healthCheckPath: /api/v1/health
     envVars:
       - key: FLASK_APP
         value: run.py

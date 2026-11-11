@@ -26,12 +26,17 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
     def run_daily_backup():
         with app.app_context():
             from app.backups.services import BackupServiceError, create_backup
+            from app.extensions import db
 
+            logger.info("Scheduled backup starting")
             try:
                 create_backup(triggered_by_user_id=None)
                 logger.info("Scheduled backup completed")
             except BackupServiceError as exc:
                 logger.error("Scheduled backup failed: %s", exc.message)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Scheduled backup crashed")
 
     def run_task_reminders():
         with app.app_context():

@@ -53,6 +53,9 @@ class Config:
     BACKUP_DIR = os.environ.get("BACKUP_DIR", "./backups")
     BACKUP_RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", 30))
     UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "./uploads")
+    # Largest request body the app accepts (Flask answers 413 above it). The
+    # biggest legitimate bodies are the n8n listing import and the CSV upload.
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "16")) * 1024 * 1024
 
     # Backup storage backend: "local" (default, ephemeral disk — fine for dev only)
     # or "s3" (any S3-compatible object store: AWS S3, Cloudflare R2, Backblaze B2,
