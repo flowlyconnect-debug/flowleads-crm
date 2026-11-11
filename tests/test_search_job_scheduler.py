@@ -22,7 +22,7 @@ def _create_profile(app, *, is_active=True, schedule="daily", slug_suffix="", na
         profile = SearchProfile(
             organization_id=org.id,
             name=name or f"{schedule.title()} profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             source="oikotie",
             crm_api_key="fl_live_scheduler",

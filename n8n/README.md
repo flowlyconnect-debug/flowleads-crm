@@ -40,7 +40,7 @@ Uudet nimet eivät törmää vanhoihin workfloweihin. Vanhoihin ei kosketa.
 
 ## Käsitesti
 
-1. CRM: luo hakuprofiili (esim. Lukkoremontti / kulunvalvonta, Uusimaa).
+1. CRM: luo hakuprofiili (esim. Lukitus, kulunvalvonta ja oviautomatiikka, Uusimaa).
 2. Aja **Crawler** käsin. Executionissa `HTTP – CRM Ingest` vastaa `created: 24` (ensimmäisellä kerralla).
    Jos vastauksessa on virhe, katso CRM:n `listing_crawl_state.last_error`.
 3. Aja **Analyzer** käsin. `HTTP – CRM Save Analysis` vastaa `status: done`, ja osumista näkyy `matches`/`leads_created`.

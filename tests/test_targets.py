@@ -12,8 +12,8 @@ from app.listings.models import Listing, ListingMatch, ListingRenovation
 from app.search.models import SearchProfile
 from app.users.services import create_organization, create_user
 
-LOCK = "Lukkoremontti / kulunvalvonta"
-PIPE = "Putkiremontti"
+LOCK = "Lukitus, kulunvalvonta ja oviautomatiikka"
+PIPE = "Putki- ja viemäriurakointi"
 NOW = datetime.now(timezone.utc)
 PASSWORD = "securepassword1"
 

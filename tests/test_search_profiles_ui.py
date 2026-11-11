@@ -54,7 +54,7 @@ def _login(client, email):
 def _profile_form(**overrides):
     data = {
         "name": "Lukkoremontti Uusimaa",
-        "remonttityyppi": "Lukkoremontti / kulunvalvonta",
+        "remonttityyppi": "Lukitus, kulunvalvonta ja oviautomatiikka",
         "regions": ["Uusimaa", "Pirkanmaa"],
         "schedule_description": "daily",
         "crm_api_key": "fl_live_test_key",
@@ -112,7 +112,7 @@ def test_search_profiles_update(app, client):
         f"/settings/search-profiles/{profile_id}",
         data=_profile_form(
             name="Putki Pirkanmaa",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Pirkanmaa"],
             schedule_description="weekly",
         ),
@@ -123,7 +123,7 @@ def test_search_profiles_update(app, client):
     with app.app_context():
         updated = db.session.get(SearchProfile, profile_id)
         assert updated.name == "Putki Pirkanmaa"
-        assert updated.remonttityyppi == "Putkiremontti"
+        assert updated.remonttityyppi == "Putki- ja viemäriurakointi"
         assert updated.schedule_description == "weekly"
 
 
@@ -210,7 +210,7 @@ def test_create_test_search_job_requires_admin(app, client):
         profile = SearchProfile(
             organization_id=ctx["org_id"],
             name="Active profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             is_active=True,
         )
@@ -229,7 +229,7 @@ def test_create_test_search_job_success(app, client):
         profile = SearchProfile(
             organization_id=ctx["org_id"],
             name="Active profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             is_active=True,
         )
@@ -260,7 +260,7 @@ def test_create_test_search_job_rejects_duplicate(app, client):
         profile = SearchProfile(
             organization_id=ctx["org_id"],
             name="Active profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             is_active=True,
         )
@@ -289,7 +289,7 @@ def test_create_test_search_job_visible_in_n8n_pending_list(app, client):
         profile = SearchProfile(
             organization_id=ctx["org_id"],
             name="Active profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             is_active=True,
             crm_api_key="fl_live_test",
@@ -319,7 +319,7 @@ def test_search_profiles_sidepanel_shows_catalogue_matches(app, client):
         profile = SearchProfile(
             organization_id=ctx["org_id"],
             name="Stats profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             needs_rematch=False,
             last_run_at=datetime.now(timezone.utc) - timedelta(hours=2),
@@ -388,7 +388,7 @@ def _profile_with_key(app, key="fl_live_original_key_12345"):
         profile = SearchProfile(
             organization_id=org.id,
             name="Key profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             crm_api_key=key,
         )
@@ -404,7 +404,7 @@ def test_update_profile_preserves_key_when_missing(app):
         update_profile(
             profile,
             name="Updated",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             schedule_description="daily",
             crm_api_key=None,
@@ -421,7 +421,7 @@ def test_update_profile_preserves_key_when_empty(app):
         update_profile(
             profile,
             name="Updated",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             schedule_description="daily",
             crm_api_key="",
@@ -438,7 +438,7 @@ def test_update_profile_preserves_key_when_whitespace(app):
         update_profile(
             profile,
             name="Updated",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             schedule_description="daily",
             crm_api_key="   ",
@@ -456,7 +456,7 @@ def test_update_profile_updates_key_when_new_value(app):
         update_profile(
             profile,
             name="Updated",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             schedule_description="daily",
             crm_api_key=new_key,

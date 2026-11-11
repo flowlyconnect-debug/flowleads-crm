@@ -16,8 +16,8 @@ from app.users.services import create_organization
 # flow (Kohteet page) is covered in tests/test_targets.py.
 pytestmark = pytest.mark.usefixtures("auto_create_leads")
 
-LOCK = "Lukkoremontti / kulunvalvonta"
-PIPE = "Putkiremontti"
+LOCK = "Lukitus, kulunvalvonta ja oviautomatiikka"
+PIPE = "Putki- ja viemäriurakointi"
 
 
 def _h():

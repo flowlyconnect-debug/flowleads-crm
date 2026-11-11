@@ -25,7 +25,7 @@ def _onboard_customer(app, *, slug_suffix="e2e"):
             admin_name="E2E Admin",
             search_profile_name=f"Haku {slug_suffix}",
             regions=["Uusimaa", "Pirkanmaa"],
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             source="oikotie",
             is_active=True,
         )
@@ -251,7 +251,7 @@ def test_e2e_customer_admin_can_edit_own_profile(app, client):
         f"/settings/search-profiles/{ctx['profile_id']}",
         data={
             "name": "Päivitetty profiili",
-            "remonttityypit": ["Putkiremontti", "Julkisivuremontti"],
+            "remonttityypit": ["Putki- ja viemäriurakointi", "Julkisivu- ja parvekeurakointi"],
             "region_mode": "specific",
             "regions": ["Uusimaa"],
             "cities": "helsinki, Espoo",
@@ -264,8 +264,8 @@ def test_e2e_customer_admin_can_edit_own_profile(app, client):
     with app.app_context():
         profile = SearchProfile.query.filter_by(organization_id=ctx["org_id"]).one()
         assert profile.name == "Päivitetty profiili"
-        assert profile.remonttityyppi == "Putkiremontti"
-        assert profile.wanted_types == ["Putkiremontti", "Julkisivuremontti"]
+        assert profile.remonttityyppi == "Putki- ja viemäriurakointi"
+        assert profile.wanted_types == ["Putki- ja viemäriurakointi", "Julkisivu- ja parvekeurakointi"]
         assert profile.cities == ["Helsinki", "Espoo"]
         assert profile.needs_rematch is True
 
@@ -282,7 +282,7 @@ def test_e2e_duplicate_email_rejected(app):
             admin_name=None,
             search_profile_name="Profiili 1",
             regions=["Uusimaa"],
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
 
@@ -295,7 +295,7 @@ def test_e2e_duplicate_email_rejected(app):
                 admin_name=None,
                 search_profile_name="Profiili 2",
                 regions=["Pirkanmaa"],
-                remonttityyppi="Putkiremontti",
+                remonttityyppi="Putki- ja viemäriurakointi",
             )
         assert exc.value.code == "duplicate_email"
 
@@ -312,7 +312,7 @@ def test_e2e_duplicate_org_name_gets_unique_slug(app):
             admin_name=None,
             search_profile_name="Profiili A",
             regions=["Uusimaa"],
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
         second = create_customer(
@@ -323,7 +323,7 @@ def test_e2e_duplicate_org_name_gets_unique_slug(app):
             admin_name=None,
             search_profile_name="Profiili B",
             regions=["Pirkanmaa"],
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
 
@@ -343,7 +343,7 @@ def test_e2e_superadmin_ui_onboarding_flow(client, app):
             "admin_email": "uiadmin@flow.fi",
             "temporary_password": "securepassword1",
             "search_profile_name": "UI profiili",
-            "remonttityyppi": "Putkiremontti",
+            "remonttityyppi": "Putki- ja viemäriurakointi",
             "regions": ["Keski-Suomi"],
             "source": "oikotie",
             "is_active": "y",

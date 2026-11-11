@@ -20,7 +20,7 @@ from sqlalchemy import func, or_, update
 
 from app.extensions import db
 from app.listings.models import CrawlState, Listing, ListingMatch, ListingRenovation
-from app.search.constants import ALL_FINLAND_REGION, BUILDING_TYPES, FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.constants import ALL_FINLAND_REGION, BUILDING_TYPES, FINNISH_REGIONS, REMONTTITYYPIT, REMONTTITYYPPI_KUVAUKSET
 from app.search.models import SearchProfile
 
 logger = logging.getLogger(__name__)
@@ -502,6 +502,7 @@ def claim_analysis(*, limit: int, now: datetime | None = None) -> dict:
     return {
         "listings": [_listing_brief(l) for l in claimed],
         "remonttityypit": list(REMONTTITYYPIT),
+        "remonttityyppi_kuvaukset": dict(REMONTTITYYPPI_KUVAUKSET),
         "talotyypit": list(BUILDING_TYPES),
     }
 

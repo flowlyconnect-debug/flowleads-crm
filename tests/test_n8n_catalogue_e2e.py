@@ -104,10 +104,10 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         db.session.flush()
         db.session.add_all(
             [
-                SearchProfile(organization_id=org.id, name="Lukot Uusimaa", remonttityyppi="Lukkoremontti / kulunvalvonta",
+                SearchProfile(organization_id=org.id, name="Lukot Uusimaa", remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
                               regions=["Uusimaa"], source="oikotie", is_active=True, needs_rematch=False,
                               daily_lead_limit=0),
-                SearchProfile(organization_id=other.id, name="Putket", remonttityyppi="Putkiremontti",
+                SearchProfile(organization_id=other.id, name="Putket", remonttityyppi="Putki- ja viemäriurakointi",
                               regions=["Uusimaa"], source="oikotie", is_active=True, needs_rematch=False),
             ]
         )
@@ -147,7 +147,7 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         l2b = Listing.query.filter_by(external_id="1002").one()
         assert (l2b.build_year, l2b.building_type) == (1988, "Rivitalo")
         assert l1.renovations[0].timing_year == 2027
-        assert [r.remonttityyppi for r in l1.renovations] == ["Lukkoremontti / kulunvalvonta"]
+        assert [r.remonttityyppi for r in l1.renovations] == ["Lukitus, kulunvalvonta ja oviautomatiikka"]
         assert l1.contact_status == "none"  # contacts were on the page
         l2 = Listing.query.filter_by(external_id="1002").one()
         assert l2.contact_status == "pending"
@@ -205,7 +205,7 @@ def test_analyzer_analyses_imported_text_without_fetching_a_page(live_crm, tmp_p
         org = create_organization("Import Org", "import-org")
         db.session.flush()
         db.session.add(
-            SearchProfile(organization_id=org.id, name="Lukot", remonttityyppi="Lukkoremontti / kulunvalvonta",
+            SearchProfile(organization_id=org.id, name="Lukot", remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
                           regions=["Uusimaa"], source="oikotie", is_active=True, needs_rematch=False,
                           daily_lead_limit=0)
         )
@@ -230,6 +230,6 @@ def test_analyzer_analyses_imported_text_without_fetching_a_page(live_crm, tmp_p
     with app.app_context():
         listing = Listing.query.one()
         assert listing.analysis_status == "done"
-        assert [r.remonttityyppi for r in listing.renovations] == ["Lukkoremontti / kulunvalvonta"]
+        assert [r.remonttityyppi for r in listing.renovations] == ["Lukitus, kulunvalvonta ja oviautomatiikka"]
         lead = Lead.query.filter_by(organization_id=org_id).one()
         assert lead.source == "import"

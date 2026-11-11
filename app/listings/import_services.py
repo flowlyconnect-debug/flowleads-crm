@@ -36,7 +36,7 @@ from app.listings.services import (
     _parse_year,
     save_analysis,
 )
-from app.search.constants import REMONTTITYYPIT
+from app.search.constants import REMONTTITYYPIT, VANHAT_REMONTTITYYPIT
 
 MAX_IMPORT_ROWS = 2000
 MAX_TEXT_LENGTH = 20000
@@ -106,8 +106,11 @@ def _renovation_type(value) -> str | None:
     if not _TYPES_BY_KEY:
         for name in REMONTTITYYPIT:
             _TYPES_BY_KEY[_fold(name)] = name
+        # files written with the pre-11/2026 names still import
+        for old, name in VANHAT_REMONTTITYYPIT.items():
+            _TYPES_BY_KEY.setdefault(_fold(old), name)
             # "Lukkoremontti / kulunvalvonta" is also accepted as "Lukkoremontti"
-            _TYPES_BY_KEY.setdefault(_fold(name.split("/")[0]), name)
+            _TYPES_BY_KEY.setdefault(_fold(old.split("/")[0]), name)
     return _TYPES_BY_KEY.get(_fold(value))
 
 
@@ -338,7 +341,7 @@ def csv_template() -> str:
             "Esimerkkikatu 1",
             "Tampere",
             "Pirkanmaa",
-            "Putkiremontti",
+            "Putki- ja viemäriurakointi",
             "2027",
             "Yhtiökokous on päättänyt linjasaneerauksen hankesuunnittelusta. Toteutus arviolta 2027.",
             "Isännöinti Esimerkki Oy",

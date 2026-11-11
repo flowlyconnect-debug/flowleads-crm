@@ -50,7 +50,7 @@ def test_create_invite_creates_org_without_admin_or_profile(app):
             organization_name="Kutsu Oy",
             admin_email="uusi.admin@kutsu.fi",
             search_profile_name="Lukkoremontti",
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             allowed_features=["sequences", "not_a_real_feature"],
         )
         db.session.commit()
@@ -74,7 +74,7 @@ def test_get_valid_invite_rejects_expired_revoked_or_accepted(app):
             organization_name="Vanheneva Oy",
             admin_email="admin@vanheneva.fi",
             search_profile_name="Profiili",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
 
@@ -97,7 +97,7 @@ def test_accept_invite_creates_admin_and_active_profile(mock_send, app):
             organization_name="Hyväksy Oy",
             admin_email="admin@hyvaksy.fi",
             search_profile_name="Hyväksy profiili",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             allowed_features=["sequences", "automations"],
         )
         db.session.commit()
@@ -146,7 +146,7 @@ def test_accept_invite_stores_all_finland_as_its_own_value(mock_send, app):
             organization_name="Koko Suomi Oy",
             admin_email="admin@kokosuomi.fi",
             search_profile_name="Koko Suomi profiili",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
 
@@ -178,7 +178,7 @@ def test_activate_source_rematches_instead_of_creating_a_job(mock_send, app):
             organization_name="Aktivoi Oy",
             admin_email="admin@aktivoi.fi",
             search_profile_name="Aktivoi profiili",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
         accept_invite(result.invite, password="brandnewpassword1", regions=["Uusimaa"], enabled_features=[])
@@ -213,7 +213,7 @@ def test_renew_invite_invalidates_previous_link(app):
             organization_name="Uusinta Oy",
             admin_email="admin@uusinta.fi",
             search_profile_name="Profiili",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
         )
         db.session.commit()
         old_token = result.token
@@ -241,7 +241,7 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
                 "organization_name": org_name,
                 "admin_email": email,
                 "search_profile_name": profile_name,
-                "remonttityyppi": "Putkiremontti",
+                "remonttityyppi": "Putki- ja viemäriurakointi",
                 "source": "oikotie",
                 "allowed_features": ["sequences"],
             },

@@ -39,7 +39,7 @@ def test_create_customer_service_creates_full_stack(app):
             admin_name="Admin User",
             search_profile_name="Lukkoremontti Uusimaa",
             regions=["Uusimaa"],
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             source="oikotie",
             is_active=True,
         )
@@ -57,7 +57,7 @@ def test_create_customer_service_creates_full_stack(app):
 
         profile = SearchProfile.query.filter_by(organization_id=org.id).one()
         assert profile.name == "Lukkoremontti Uusimaa"
-        assert profile.remonttityyppi == "Lukkoremontti / kulunvalvonta"
+        assert profile.remonttityyppi == "Lukitus, kulunvalvonta ja oviautomatiikka"
         assert profile.regions == ["Uusimaa"]
         assert profile.source == "oikotie"
         assert profile.schedule_description == "daily"
@@ -90,9 +90,9 @@ def test_create_customer_generates_password_when_missing(app):
             admin_email="auto@salasana.fi",
             admin_password=None,
             admin_name=None,
-            search_profile_name="Putkiremontti",
+            search_profile_name="Putki- ja viemäriurakointi",
             regions=["Pirkanmaa"],
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             is_active=True,
         )
         db.session.commit()
@@ -125,7 +125,7 @@ def test_onboarded_customer_gets_leads_from_catalogue_history(app):
             published_at=now,
         )
         listing.renovations.append(
-            ListingRenovation(remonttityyppi="Lukkoremontti / kulunvalvonta", confidence=90)
+            ListingRenovation(remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka", confidence=90)
         )
         db.session.add(listing)
         actor = create_user("actor3@test.com", "securepassword1", role="superadmin")
@@ -138,7 +138,7 @@ def test_onboarded_customer_gets_leads_from_catalogue_history(app):
             admin_name=None,
             search_profile_name="Katalogiprofiili",
             regions=["Uusimaa"],
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             is_active=True,
         )
         db.session.commit()
@@ -162,7 +162,7 @@ def test_superadmin_customers_new_get_renders_form(client, app):
     assert 'name="organization_name"' in page
     assert 'name="remonttityyppi"' in page
     assert 'name="regions"' in page
-    assert "Putkiremontti" in page
+    assert "Putki- ja viemäriurakointi" in page
     assert "Uusimaa" in page
 
 
@@ -181,7 +181,7 @@ def test_superadmin_onboarding_form_and_result(client, app):
             "admin_email": "webadmin@onboard.fi",
             "temporary_password": "securepassword1",
             "search_profile_name": "Web profiili",
-            "remonttityyppi": "Putkiremontti",
+            "remonttityyppi": "Putki- ja viemäriurakointi",
             "regions": ["Varsinais-Suomi"],
             "source": "oikotie",
             "is_active": "y",
@@ -217,7 +217,7 @@ def test_superadmin_customers_list(app, client):
             admin_name=None,
             search_profile_name="Lukkoremontti Uusimaa",
             regions=["Uusimaa"],
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             is_active=True,
         )
         db.session.commit()

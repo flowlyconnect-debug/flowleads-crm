@@ -73,7 +73,7 @@
           <a href="{{ url_for('admin.catalogue_import_template') }}" class="btn btn-secondary">Lataa mallitiedosto</a>
         </form>
         <p class="text-muted text-sm mt-2">
-          Remonttityypit (useampi erotetaan puolipisteellä): {{ remonttityypit | join(', ') }}.
+          Remonttityypit (useampi erotetaan puolipisteellä): {{ remonttityypit | join('; ') }}.
         </p>
 
         <h2 class="form-section-title" style="margin-top:1.5rem;">Maakunnat</h2>

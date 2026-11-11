@@ -18,7 +18,7 @@ pytestmark = pytest.mark.usefixtures("auto_create_leads")
 N8N_HEADERS = {"X-N8N-Secret": "test-n8n-secret"}
 
 
-def _profile(slug="imp-org", *, rtype="Putkiremontti", regions=("Pirkanmaa",), **extra):
+def _profile(slug="imp-org", *, rtype="Putki- ja viemäriurakointi", regions=("Pirkanmaa",), **extra):
     org = create_organization(f"Org {slug}", slug)
     db.session.flush()
     profile = SearchProfile(
@@ -43,7 +43,7 @@ def _row(**overrides):
         "osoite": "Esimerkkikatu 1",
         "kaupunki": "Tampere",
         "maakunta": "Pirkanmaa",
-        "remonttityyppi": "Putkiremontti",
+        "remonttityyppi": "Putki- ja viemäriurakointi",
         "timing": "2027",
         "isannoitsija": "Isännöinti Esimerkki Oy",
         "isannoitsija_email": "isannointi@esimerkki.fi",
@@ -63,7 +63,7 @@ def test_row_with_renovation_type_becomes_a_lead_immediately(app):
         assert listing.source == "import"
         assert listing.analysis_status == "done"
         assert [(r.remonttityyppi, r.confidence, r.timing_year) for r in listing.renovations] == [
-            ("Putkiremontti", 100, 2027)
+            ("Putki- ja viemäriurakointi", 100, 2027)
         ]
         lead = Lead.query.filter_by(organization_id=org.id).one()
         assert lead.source == "import"
@@ -86,7 +86,7 @@ def test_reimporting_the_same_row_updates_instead_of_duplicating(app):
 
 def test_profile_filters_apply_to_imported_listings(app):
     with app.app_context():
-        org, _ = _profile(rtype="Lukkoremontti / kulunvalvonta", regions=("Uusimaa",))
+        org, _ = _profile(rtype="Lukitus, kulunvalvonta ja oviautomatiikka", regions=("Uusimaa",))
         result = import_listings(
             [
                 _row(),  # wrong type and region
@@ -127,7 +127,7 @@ def test_text_only_row_waits_for_the_analyzer_without_a_page_fetch(app):
 
         saved = save_analysis(
             claimed[0]["listing_id"],
-            {"status": "done", "renovations": [{"remonttityyppi": "Putkiremontti", "confidence": 90, "timing": "2027"}]},
+            {"status": "done", "renovations": [{"remonttityyppi": "Putki- ja viemäriurakointi", "confidence": 90, "timing": "2027"}]},
         )
         assert saved["leads_created"] == 1
         assert Lead.query.filter_by(organization_id=org.id).one().source == "import"
@@ -171,7 +171,7 @@ def test_import_refuses_the_oikotie_source(app):
 def test_csv_semicolon_and_windows_encoding(app):
     data = (
         "Taloyhtiö;Osoite;Paikkakunta;Maakunta;Remonttityyppi;Ajankohta;Isännöitsijä\r\n"
-        "As Oy Järvenpää;Järvitie 1;Jyväskylä;Keski-Suomi;Julkisivuremontti;2028;Isännöinti Äijälä\r\n"
+        "As Oy Järvenpää;Järvitie 1;Jyväskylä;Keski-Suomi;Julkisivu- ja parvekeurakointi;2028;Isännöinti Äijälä\r\n"
         ";;;;;;\r\n"
     ).encode("cp1252")
     rows = parse_listing_csv(data)
@@ -181,7 +181,7 @@ def test_csv_semicolon_and_windows_encoding(app):
             "osoite": "Järvitie 1",
             "kaupunki": "Jyväskylä",
             "maakunta": "Keski-Suomi",
-            "remonttityyppi": "Julkisivuremontti",
+            "remonttityyppi": "Julkisivu- ja parvekeurakointi",
             "timing": "2028",
             "isannoitsija": "Isännöinti Äijälä",
         }

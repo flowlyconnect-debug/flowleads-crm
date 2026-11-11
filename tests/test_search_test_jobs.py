@@ -15,7 +15,7 @@ def _create_active_profile(app, *, slug_suffix="", is_active=True):
         profile = SearchProfile(
             organization_id=org.id,
             name="Active profile",
-            remonttityyppi="Putkiremontti",
+            remonttityyppi="Putki- ja viemäriurakointi",
             regions=["Uusimaa"],
             source="oikotie",
             schedule_description="daily",

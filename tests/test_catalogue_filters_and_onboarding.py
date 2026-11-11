@@ -24,8 +24,8 @@ from app.users.services import create_organization, create_user
 # Automatic match -> lead pipeline; the default manual flow is in test_targets.py.
 pytestmark = pytest.mark.usefixtures("auto_create_leads")
 
-LOCK = "Lukkoremontti / kulunvalvonta"
-PIPE = "Putkiremontti"
+LOCK = "Lukitus, kulunvalvonta ja oviautomatiikka"
+PIPE = "Putki- ja viemäriurakointi"
 NOW =datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
 
 
@@ -84,7 +84,7 @@ def test_profile_can_want_several_renovation_types(app):
 
         pipe_only = _listing(1, renovations=[(PIPE, 80, None)])
         both = _listing(2, renovations=[(PIPE, 70, None), (LOCK, 95, None)])
-        facade = _listing(3, renovations=[("Julkisivuremontti", 99, None)])
+        facade = _listing(3, renovations=[("Julkisivu- ja parvekeurakointi", 99, None)])
 
         assert _wants(profile, pipe_only).remonttityyppi == PIPE
         assert _wants(profile, both).remonttityyppi == LOCK  # highest confidence wins
@@ -158,9 +158,9 @@ def test_filter_validation(app):
 
         # an old single-type update keeps the other filters untouched
         profile = _profile(org, name="keep", cities=["Espoo"], remonttityypit=[PIPE])
-        update_profile(profile, name="keep", remonttityyppi="Julkisivuremontti", regions=["Uusimaa"], is_active=True)
+        update_profile(profile, name="keep", remonttityyppi="Julkisivu- ja parvekeurakointi", regions=["Uusimaa"], is_active=True)
         assert profile.cities == ["Espoo"]
-        assert profile.wanted_types == ["Julkisivuremontti"]
+        assert profile.wanted_types == ["Julkisivu- ja parvekeurakointi"]
         assert profile.needs_rematch is True
 
 

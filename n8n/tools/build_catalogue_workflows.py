@@ -360,14 +360,8 @@ __TYPES__
 Säännöt tuleville remonteille:
 - Ota mukaan vain tuleva, suunniteltu, päätetty, budjetoitu, ehdotettu, kuntoarviossa tai PTS:ssä mainittu tai muuten vielä tekemätön työ.
 - ÄLÄ ota mukaan jo tehtyjä, valmistuneita tai aiemmin toteutettuja remontteja.
-- Luokittele jokainen tuleva remontti yhteen tyyppiin. Jos sopivaa tyyppiä ei ole, käytä "Muu remontti".
-- "Lukkoremontti / kulunvalvonta": lukitus, lukkojen tai avainten uusiminen, sarjoitus, sähkölukitus, iLOQ, kulunvalvonta tai kulkuoikeudet oviin ja sisäänkäynteihin. EI kameravalvontaa, murtohälytintä, paloilmoitinta eikä pelkkää ovipuhelinta.
-- "Putkiremontti": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus.
-- "Sähkö- ja tietoliikennejärjestelmät": sähköverkon, sähköpääkeskuksen, nousujohtojen, antenni-, valokuitu- tai tietoliikenneverkon uusiminen.
-- "Lämmitysjärjestelmän remontti": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.
-- "Julkisivuremontti": julkisivu, ikkunat, parvekkeet.
-- "Katto- ja vesikattoremontti": katto, vesikatto, yläpohja.
-- "Huoneistoremontit": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.
+- Luokittele jokainen tuleva remontti siihen tyyppiin, johon se parhaiten kuuluu. Jos työ ei kuulu mihinkään tyyppiin, jätä se pois listasta.
+__TYPE_RULES__
 - confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.
 - evidence = lyhyt suora lainaus tekstistä. timing = esim. "2027", "suunnitteilla", "PTS 2026–2028" tai "".
 - Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.
@@ -424,7 +418,8 @@ return [{ json: { started_at: Date.now(), crm_base_url: String(cfg.crm_base_url 
 const start = $('CODE – Start').first().json;
 const r = $input.first().json || {};
 const types = r.remonttityypit || [];
-return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_base_url: start.crm_base_url, n8n_secret: start.n8n_secret } }));
+const typeInfo = r.remonttityyppi_kuvaukset || {};
+return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, remonttityyppi_kuvaukset: typeInfo, crm_base_url: start.crm_base_url, n8n_secret: start.n8n_secret } }));
 """,
             [880, 100],
         ),
@@ -479,11 +474,13 @@ const ok = useOwnText
   : !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;
 const PROMPT = %s;
 const types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');
+const typeInfo = listing.remonttityyppi_kuvaukset || {};
+const typeRules = (listing.remonttityypit || []).filter(t => typeInfo[t]).map(t => `- "${t}": ${typeInfo[t]}`).join('\\n');
 return [{ json: {
   ...listing,
   ok,
   error: ok ? '' : (useOwnText ? 'Imported listing has no text to analyse' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`),
-  ai_system_prompt: PROMPT.replace('__TYPES__', types),
+  ai_system_prompt: PROMPT.replace('__TYPES__', types).replace('__TYPE_RULES__', typeRules),
   ai_user_prompt: useOwnText
     ? `Taloyhtiö: ${listing.taloyhtio || ''}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\n\\nKohteen teksti:\\n${text}`
     : `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,

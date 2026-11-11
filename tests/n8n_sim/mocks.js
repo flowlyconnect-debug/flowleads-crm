@@ -78,10 +78,12 @@ exports.openai = (values, nodeName) => {
   const system = values.filter(v => v.role === 'system').map(v => v.content).join('\n');
   const text = values.filter(v => v.role !== 'system').map(v => v.content).join('\n');
   if (nodeName === 'AI – Analyze Listing') {
-    if (!system.includes('- Lukkoremontti / kulunvalvonta')) throw new Error('analysis prompt is missing the CRM types');
+    if (!system.includes('- Lukitus, kulunvalvonta ja oviautomatiikka\n')) throw new Error('analysis prompt is missing the CRM types');
+    if (!system.includes('- "Hissihuolto ja hissien modernisointi": hissin uusiminen')) throw new Error('analysis prompt is missing the CRM type rules');
+    if (system.includes('__TYPE')) throw new Error('analysis prompt has an unfilled placeholder');
     const renovations = [];
     if (text.includes('iLOQ')) {
-      renovations.push({ remonttityyppi: 'Lukkoremontti / kulunvalvonta', confidence: 88, timing: '2027', evidence: 'Lukituksen uusiminen (iLOQ)' });
+      renovations.push({ remonttityyppi: 'Lukitus, kulunvalvonta ja oviautomatiikka', confidence: 88, timing: '2027', evidence: 'Lukituksen uusiminen (iLOQ)' });
     }
     const out = {
       taloyhtio: (text.match(/Taloyhtiö (As Oy \w+)/) || [])[1] || '',

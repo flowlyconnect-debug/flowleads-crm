@@ -19,7 +19,7 @@ def _create_profile_and_job(app, *, status="pending", scheduled_at=None, is_acti
         profile = SearchProfile(
             organization_id=org.id,
             name="Test profile",
-            remonttityyppi="Lukkoremontti / kulunvalvonta",
+            remonttityyppi="Lukitus, kulunvalvonta ja oviautomatiikka",
             regions=["Uusimaa", "Pirkanmaa"],
             source="oikotie",
             crm_api_key="fl_live_test",
@@ -62,7 +62,7 @@ def test_list_pending_jobs(client, app):
     assert job["job_id"] == ctx["job_id"]
     assert job["profile_id"] == ctx["profile_id"]
     assert job["organization_id"] == ctx["org_id"]
-    assert job["remonttityyppi"] == "Lukkoremontti / kulunvalvonta"
+    assert job["remonttityyppi"] == "Lukitus, kulunvalvonta ja oviautomatiikka"
     assert job["regions"] == ["Uusimaa", "Pirkanmaa"]
     assert job["source"] == "oikotie"
     # crm_api_key is now a short-lived job-scoped token, never the
