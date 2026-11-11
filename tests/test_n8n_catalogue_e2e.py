@@ -37,6 +37,8 @@ def live_crm(tmp_path):
     class E2EConfig(TestingConfig):
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'e2e.db'}"
         SERVER_NAME = None
+        # the workflows are checked end to end, down to the enriched lead
+        LISTING_AUTO_CREATE_LEADS = True
 
     app = create_app(E2EConfig)
     apply_testing_defaults(app)

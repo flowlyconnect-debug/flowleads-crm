@@ -85,6 +85,14 @@ class Config:
     # SearchJob pipeline is superseded; its scheduler jobs only run when
     # SEARCH_JOBS_ENABLED is explicitly turned on.
     SEARCH_JOBS_ENABLED = os.environ.get("SEARCH_JOBS_ENABLED", "false").lower() in ("1", "true", "yes")
+    # Matches wait on the customer's Kohteet page and become leads only when the
+    # customer moves them. "true" brings back the old behaviour where the
+    # scheduler turns every match into a lead (within daily_lead_limit).
+    LISTING_AUTO_CREATE_LEADS = os.environ.get("LISTING_AUTO_CREATE_LEADS", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     LISTING_CRAWL_REGIONS = os.environ.get("LISTING_CRAWL_REGIONS", "all")
     LISTING_INCREMENTAL_MAX_PAGES = int(os.environ.get("LISTING_INCREMENTAL_MAX_PAGES", "10"))
     LISTING_FULL_PAGES_PER_RUN = int(os.environ.get("LISTING_FULL_PAGES_PER_RUN", "30"))

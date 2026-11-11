@@ -26,6 +26,17 @@ def app():
 
 
 @pytest.fixture
+def auto_create_leads(app):
+    """The optional automatic match -> lead conversion
+    (LISTING_AUTO_CREATE_LEADS). Off by default: matches wait on the Kohteet
+    page. Modules that test the automatic pipeline opt in with
+    `pytestmark = pytest.mark.usefixtures("auto_create_leads")`."""
+    app.config["LISTING_AUTO_CREATE_LEADS"] = True
+    yield
+    app.config["LISTING_AUTO_CREATE_LEADS"] = False
+
+
+@pytest.fixture
 def client(app):
     return app.test_client()
 

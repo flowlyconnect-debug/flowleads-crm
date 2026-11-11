@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{% block title %}Kohteet — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+{% endblock %}
+{% block content %}
+{% set is_hidden_tab = tab == 'hidden' %}
+{% set filtered = search or profile_id %}
+{% macro tab_url(name) -%}
+  {{- url_for('targets.index', tab=(name if name != 'available' else none), **org_query) -}}
+{%- endmacro %}
+{% macro page_url(number) -%}
+  {{- url_for('targets.index', tab=(tab if is_hidden_tab else none), search=search or none, profile_id=profile_id, page=number, **org_query) -}}
+{%- endmacro %}
+
+<section class="leads-page targets-page">
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">Kohteet</h1>
+      <p class="leads-header__sub">
+        {% if available_count %}
+        {{ available_count }} {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla. Siirrä kiinnostavat liideiksi.
+        {% else %}
+        Hakuprofiiliisi osuvat taloyhtiöt näkyvät täällä. Siirrä kiinnostavat liideiksi.
+        {% endif %}
+      </p>
+    </div>
+    <div class="leads-header__actions">
+      {% if can_edit_profiles %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}">Hakuprofiilit</a>
+      {% endif %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
+    </div>
+  </header>
+
+  <div class="leads-work">
+    <div class="leads-toolbar" role="toolbar" aria-label="Kohdelistan työkalupalkki">
+      <nav class="leads-opp-tabs" aria-label="Näkymä">
+        <a href="{{ tab_url('available') }}" class="leads-opp-tab{% if not is_hidden_tab %} is-active{% endif %}"{% if not is_hidden_tab %} aria-current="page"{% endif %}>
+          Saatavilla <span class="targets-tab-count">{{ available_count }}</span>
+        </a>
+        <a href="{{ tab_url('hidden') }}" class="leads-opp-tab{% if is_hidden_tab %} is-active{% endif %}"{% if is_hidden_tab %} aria-current="page"{% endif %}>
+          Piilotetut <span class="targets-tab-count">{{ hidden_count }}</span>
+        </a>
+      </nav>
+      <form method="get" class="leads-toolbar__tools" role="search" aria-label="Hae kohteita">
+        {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+        {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+        {% if profiles|length > 1 %}
+        <select name="profile_id" class="form-input targets-profile-select" aria-label="Hakuprofiili" onchange="this.form.submit()">
+          <option value="">Kaikki hakuprofiilit</option>
+          {% for profile in profiles %}
+          <option value="{{ profile.id }}"{% if profile_id == profile.id %} selected{% endif %}>{{ profile.name }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        <label class="leads-opp-search">
+          <span class="leads-opp-search__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <input type="search" name="search" value="{{ search }}" class="leads-opp-search__input" placeholder="Hae taloyhtiötä tai kaupunkia…" aria-label="Hae taloyhtiötä tai kaupunkia">
+        </label>
+      </form>
+    </div>
+
+    {% if not rows %}
+    <div class="targets-empty">
+      {% if filtered %}
+        {{ empty_state(none, "Ei osumia näillä rajauksilla", "Kokeile toista hakusanaa tai hakuprofiilia.", "Tyhjennä rajaukset", tab_url(tab)) }}
+      {% elif is_hidden_tab %}
+        {{ empty_state(none, "Ei piilotettuja kohteita", "Kohteet, jotka piilotat Saatavilla-listalta, löytyvät täältä.") }}
+      {% elif not profiles %}
+        {{ empty_state(none, "Hakuprofiilia ei ole vielä", "Kohteet haetaan hakuprofiilin perusteella: alueet ja remonttityypit.", "Luo hakuprofiili" if can_edit_profiles else none, url_for('settings.search_profiles_list', id='new', **org_query) if can_edit_profiles else none) }}
+      {% else %}
+        {{ empty_state(none, "Ei uusia kohteita juuri nyt", "Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät tänne sitä mukaa kun niitä löytyy.") }}
+      {% endif %}
+    </div>
+    {% else %}
+    <form method="post" id="targets-form" action="{{ url_for('targets.restore' if is_hidden_tab else 'targets.transfer', **org_query) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+      {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+      {% if pagination.page > 1 %}<input type="hidden" name="page" value="{{ pagination.page }}">{% endif %}
+
+      <div class="targets-bulk">
+        <label class="targets-bulk__all">
+          <input type="checkbox" id="targets-select-all">
+          <span>Valitse kaikki tällä sivulla</span>
+        </label>
+        <span class="targets-bulk__count" id="targets-selected-count" aria-live="polite"></span>
+        <span class="targets-bulk__actions">
+          {% if is_hidden_tab %}
+          <button type="submit" class="btn btn-secondary btn-sm" data-bulk disabled>Palauta valitut</button>
+          {% else %}
+          <button type="submit" class="btn btn-secondary btn-sm" data-bulk disabled
+                  formaction="{{ url_for('targets.dismiss', **org_query) }}">Piilota valitut</button>
+          <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled>Siirrä valitut liideiksi</button>
+          {% endif %}
+        </span>
+      </div>
+
+      <ul class="targets-list">
+        {% for row in rows %}
+        {% set listing = row.listing %}
+        {% set renovation = row.renovation %}
+        <li class="target-row">
+          <input type="checkbox" class="target-row__check" name="match_ids" value="{{ row.match.id }}"
+                 aria-label="Valitse {{ row.title }}">
+          <div class="target-row__main">
+            <div class="target-row__title">
+              <span class="target-row__name">{{ row.title }}</span>
+              {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
+            </div>
+            <div class="target-row__facts">
+              {% if renovation %}
+              <span class="badge badge-accent">{{ renovation.remonttityyppi }}</span>
+              {% if renovation.timing %}<span class="target-row__fact">{{ renovation.timing }}</span>{% endif %}
+              <span class="target-row__fact" title="Kuinka varma AI on tulevasta remontista">Varmuus {{ renovation.confidence }} %</span>
+              {% endif %}
+              {% if listing.building_type or listing.build_year %}
+              <span class="target-row__fact">{{ [listing.building_type, listing.build_year]|select|join(', ') }}</span>
+              {% endif %}
+              {% if row.seen_at %}<span class="target-row__fact">Löydetty {{ row.seen_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+            </div>
+            <div class="target-row__contact">
+              {% if listing.isannoitsija %}Isännöinti: {{ listing.isannoitsija }}{% endif %}
+              {% if listing.has_contact %}
+              <span class="target-row__contact-ok">{{ '· yhteystiedot saatavilla' if listing.isannoitsija else 'Yhteystiedot saatavilla' }}</span>
+              {% elif listing.contact_status in ('pending', 'processing') %}
+              <span>{{ '· yhteystietoja haetaan' if listing.isannoitsija else 'Yhteystietoja haetaan' }}</span>
+              {% elif not listing.isannoitsija %}
+              <span>Isännöitsijän yhteystietoja ei löytynyt</span>
+              {% endif %}
+            </div>
+            {% if (renovation and renovation.evidence) or listing.tulevat_remontit or listing.url %}
+            <details class="target-row__more">
+              <summary>Lisätiedot</summary>
+              {% if listing.tulevat_remontit %}<p><strong>Tulevat remontit:</strong> {{ listing.tulevat_remontit }}</p>{% endif %}
+              {% if renovation and renovation.evidence %}<p><strong>Peruste:</strong> {{ renovation.evidence }}</p>{% endif %}
+              {% if listing.url and listing.url.startswith('http') %}
+              <p><a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">Avaa alkuperäinen ilmoitus</a></p>
+              {% endif %}
+            </details>
+            {% endif %}
+          </div>
+          <div class="target-row__actions">
+            {% if is_hidden_tab %}
+            <button type="submit" class="btn btn-secondary btn-sm" name="single_id" value="{{ row.match.id }}">Palauta</button>
+            <button type="submit" class="btn btn-primary btn-sm" name="single_id" value="{{ row.match.id }}"
+                    formaction="{{ url_for('targets.transfer', **org_query) }}">Siirrä liidiksi</button>
+            {% else %}
+            <button type="submit" class="btn btn-ghost btn-sm" name="single_id" value="{{ row.match.id }}"
+                    formaction="{{ url_for('targets.dismiss', **org_query) }}">Piilota</button>
+            <button type="submit" class="btn btn-primary btn-sm" name="single_id" value="{{ row.match.id }}">Siirrä liidiksi</button>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </form>
+
+    <footer class="targets-footer">
+      <span>{{ pagination.total }} {{ 'kohde' if pagination.total == 1 else 'kohdetta' }}{% if filtered %} näillä rajauksilla{% endif %}</span>
+      {% if pagination.pages > 1 %}
+      <nav class="targets-footer__pager" aria-label="Sivutus">
+        <span>Sivu {{ pagination.page }} / {{ pagination.pages }}</span>
+        {% if pagination.has_prev %}<a href="{{ page_url(pagination.prev_num) }}" class="btn btn-secondary btn-sm">Edellinen</a>{% endif %}
+        {% if pagination.has_next %}<a href="{{ page_url(pagination.next_num) }}" class="btn btn-secondary btn-sm">Seuraava</a>{% endif %}
+      </nav>
+      {% endif %}
+    </footer>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.getElementById('targets-form');
+  if (!form) return;
+  var all = document.getElementById('targets-select-all');
+  var boxes = Array.prototype.slice.call(form.querySelectorAll('.target-row__check'));
+  var bulk = form.querySelectorAll('[data-bulk]');
+  var label = document.getElementById('targets-selected-count');
+  function refresh() {
+    var count = boxes.filter(function (b) { return b.checked; }).length;
+    bulk.forEach(function (button) { button.disabled = count === 0; });
+    label.textContent = count ? count + ' valittu' : '';
+    all.checked = count === boxes.length;
+    all.indeterminate = count > 0 && count < boxes.length;
+  }
+  all.addEventListener('change', function () {
+    boxes.forEach(function (b) { b.checked = all.checked; });
+    refresh();
+  });
+  boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+  refresh();
+});
+</script>
+{% endblock %}

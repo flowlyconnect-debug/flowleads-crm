@@ -1,0 +1,163 @@
+/* Kohteet page. Reuses the leads list shell (.leads-page, .leads-work,
+   .leads-toolbar) from main.css; only the target rows are defined here. */
+
+.targets-tab-count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.leads-opp-tab.is-active .targets-tab-count {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-emphasis);
+}
+
+.targets-profile-select {
+  width: auto;
+  max-width: 220px;
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--font-size-sm);
+}
+
+.targets-empty { padding: 32px 16px; }
+
+.targets-bulk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.targets-bulk__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.targets-bulk__count { color: var(--color-text-primary); font-weight: var(--font-weight-medium); }
+
+.targets-bulk__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.targets-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.target-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.target-row:last-child { border-bottom: none; }
+.target-row:hover { background: var(--color-card-hover); }
+
+.target-row__check { margin-top: 4px; }
+
+.target-row__title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+}
+
+.target-row__name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.target-row__location {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.target-row__facts {
+  display: flex;
+  align-items: center;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.target-row__contact {
+  margin-top: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.target-row__contact-ok { color: var(--color-success-emphasis); }
+
+.target-row__more {
+  margin-top: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.target-row__more summary {
+  cursor: pointer;
+  color: var(--color-text-accent);
+  width: fit-content;
+}
+
+.target-row__more p {
+  margin: 6px 0 0;
+  max-width: 78ch;
+  line-height: var(--line-height-base);
+  overflow-wrap: anywhere;
+}
+
+.target-row__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.targets-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.targets-footer__pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .target-row { grid-template-columns: auto minmax(0, 1fr); }
+  .target-row__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .targets-bulk__actions { margin-left: 0; }
+}

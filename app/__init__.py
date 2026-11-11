@@ -180,6 +180,7 @@ def _register_blueprints(app):
     from app.forms import forms_bp, forms_public_api_bp
     from app.search.n8n_routes import n8n_bp
     from app.listings.routes import listings_n8n_bp
+    from app.listings.target_routes import targets_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -205,6 +206,7 @@ def _register_blueprints(app):
     app.register_blueprint(webhooks_bp)
     app.register_blueprint(n8n_bp)
     app.register_blueprint(listings_n8n_bp)
+    app.register_blueprint(targets_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)
@@ -262,6 +264,30 @@ def source_label_fi(code) -> str:
     return SOURCE_LABELS_FI.get(str(code).strip().lower(), str(code))
 
 
+def _nav_targets_count() -> int:
+    """Targets waiting on the Kohteet page for the organization in view (the
+    sidebar badge). Never lets a page fail."""
+    from flask import request
+    from flask_login import current_user
+
+    try:
+        if not current_user.is_authenticated or current_user.role not in ("superadmin", "admin", "user"):
+            return 0
+        org_id = current_user.organization_id
+        if current_user.is_superadmin():
+            org_id = request.args.get("organization_id", type=int)
+        if not org_id:
+            return 0
+        from app.listings.target_services import count_targets
+
+        return count_targets(org_id)
+    except Exception:
+        from app.extensions import db
+
+        db.session.rollback()
+        return 0
+
+
 def _register_root_routes(app):
     @app.context_processor
     def inject_ui_helpers():
@@ -269,6 +295,7 @@ def _register_root_routes(app):
             return endpoint_name in app.view_functions
 
         return {
+            "nav_targets_count": _nav_targets_count(),
             "has_endpoint": has_endpoint,
             "stage_label": stage_label_fi,
             "source_label": source_label_fi,

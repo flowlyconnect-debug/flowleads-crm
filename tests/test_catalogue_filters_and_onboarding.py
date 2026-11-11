@@ -21,9 +21,12 @@ from app.search.profile_services import (
 from app.users.models import AuditLog, Organization, User
 from app.users.services import create_organization, create_user
 
+# Automatic match -> lead pipeline; the default manual flow is in test_targets.py.
+pytestmark = pytest.mark.usefixtures("auto_create_leads")
+
 LOCK = "Lukkoremontti / kulunvalvonta"
 PIPE = "Putkiremontti"
-NOW = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
+NOW =datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
 
 
 def _org(slug):

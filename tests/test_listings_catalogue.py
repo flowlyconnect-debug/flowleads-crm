@@ -3,12 +3,18 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from app.extensions import db
 from app.leads.models import Lead
 from app.listings.models import CrawlState, Listing, ListingMatch
 from app.listings import services as svc
 from app.search.models import SearchProfile
 from app.users.services import create_organization
+
+# These tests cover the automatic match -> lead pipeline; the default manual
+# flow (Kohteet page) is covered in tests/test_targets.py.
+pytestmark = pytest.mark.usefixtures("auto_create_leads")
 
 LOCK = "Lukkoremontti / kulunvalvonta"
 PIPE = "Putkiremontti"

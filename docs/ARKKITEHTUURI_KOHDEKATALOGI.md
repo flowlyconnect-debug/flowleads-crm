@@ -104,8 +104,14 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
   profiili luodaan, **aktivoidaan** tai sen suodatin muuttuu (`needs_rematch=True`), ja se ottaa kohteet viimeiseltä
   `LISTING_MATCH_HISTORY_DAYS` (30) päivältä. Ei-aktiivisen profiilin lippu nollataan, joten aktivointi pitää tehdä
   `activate_profile()`-funktiolla (asettaa lipun takaisin).
-- `materialize_pending_matches()` tekee odottavista osumista liidit uusimmat ensin, enintään profiilin
-  `daily_lead_limit` (oletus 50, 0 = ei rajaa) per UTC-päivä. Loput odottavat seuraavaan päivään.
+- **Osuma ei muutu liidiksi itsestään.** Odottavat osumat (`status=pending`) näkyvät asiakkaan **Kohteet**-sivulla
+  (`/targets`, `app/listings/target_routes.py` + `target_services.py`). Käyttäjä siirtää kohteen liidiksi
+  (`transfer_targets` → `materialize_match`) tai piilottaa sen (`status=dismissed`, palautettavissa). Saatavilla
+  olevien kohteiden määrä näkyy kojelaudassa, sivupalkissa ja superadminin asiakaslistassa (`count_targets`).
+  Jos sama kohde osuu organisaation useaan profiiliin, se on yksi kohde.
+- Vanha automaattinen luonti on jäljellä vain asetuksen takana: `LISTING_AUTO_CREATE_LEADS=true` saa
+  `materialize_pending_matches()`-funktion tekemään odottavista osumista liidit uusimmat ensin, enintään profiilin
+  `daily_lead_limit` (oletus 50, 0 = ei rajaa) per UTC-päivä. Oletuksena pois, jolloin päivärajalla ei ole merkitystä.
 - Liidi luodaan `upsert_lead`-funktiolla (sama kuin API) ja liidireitityksellä:
   - `source=oikotie`, `source_ref=oikotie-<cardId>` (uniikki per organisaatio)
   - isännöitsijä = company
@@ -117,7 +123,9 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
   uusi osuma liitetään siihen (`status=merged`, liidille aktiviteettimerkintä). Uutta liidiä ei synny eikä päivärajaa
   kulu. Myöhemmin löytyvät yhteystiedot päivitetään yhteiseen liidiin.
 - Osuman status pysyy `lead_created`, vaikka liidi poistettaisiin, joten poistettua liidiä ei luoda uudelleen.
-- Ajastin (`app/scheduler.py`, `listing_matching`, 10 min) ajaa `rematch_profiles` + `materialize_pending_matches`.
+- Ajastin (`app/scheduler.py`, `listing_matching`, 10 min) ajaa `rematch_profiles` + `merge_into_existing_leads`
+  (saman taloyhtiön toinen asunto liittyy olemassa olevaan liidiin) ja `materialize_pending_matches` vain, jos
+  `LISTING_AUTO_CREATE_LEADS` on päällä.
 
 ### 4. Yhteystiedot – Enricher (`flowleads-enricher.json`)
 
@@ -133,7 +141,7 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
   (`users.must_change_password`, `/auth/change-password`).
 - **Kutsu asiakas** (`invite_services`): asiakas asettaa itse salasanan ja valitsee alueet. Profiili on heti
   aktiivinen, eli erillistä "aktivoi lähde" -vaihetta ei tarvita. `activate_source` on jäljellä vain pois kytketyille profiileille.
-- Kummassakin tapauksessa liidit katalogin viime viikoilta tulevat seuraavalla `listing_matching`-ajolla (≤ 10 min).
+- Kummassakin tapauksessa kohteet katalogin viime viikoilta tulevat Kohteet-sivulle seuraavalla `listing_matching`-ajolla (≤ 10 min).
 - **Valinnaiset toiminnot** (`organizations.enabled_features`, `app/core/features.py`): sekvenssit, automaatiot ja
   AI-rikastus. Uudella organisaatiolla kaikki päällä; kutsuttu asiakas valitsee sallituista. Superadmin muuttaa
   asiakaslistasta. Superadminia ei rajata.
@@ -155,7 +163,7 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
 |---|---|
 | `listings` | Kohde (uniikki `source`+`external_id`): osoite, kaupunki, maakunta, hinta, kuvaus, `build_year`, `building_type`, `content_hash`, `first/last_seen_at`, `is_active`. Lisäksi analyysin tila ja isännöitsijätiedot sekä yhteystietojonon tila. |
 | `listing_renovations` | Kohteen tulevat remontit: `remonttityyppi` (yksi `REMONTTITYYPIT`-arvoista), `confidence`, `timing`, `timing_year`, `evidence`. |
-| `listing_matches` | Profiili × kohde (uniikki). `status` = pending/lead_created/merged, `lead_id` (SET NULL), `lead_created_at`. |
+| `listing_matches` | Profiili × kohde (uniikki). `status` = pending/dismissed/lead_created/merged, `lead_id` (SET NULL), `lead_created_at`. |
 | `listing_crawl_state` | Per maakunta: `full_offset`, `full_started_at`, `prev_full_started_at`, `full_completed_at`, `last_incremental_at`, `last_error`. |
 | `search_profiles` (+) | `min_confidence` (60), `daily_lead_limit` (50), `needs_rematch` sekä lisäsuodattimet `remonttityypit`, `cities`, `timing_within_years`, `build_year_min/max`, `building_types`. |
 
@@ -204,7 +212,10 @@ Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
 ## Testit
 
-- `tests/test_listings_catalogue.py`: keruu, poistot, jonot, täsmäytys, päiväraja, historiaikkuna, yhteystiedot ja API.
+- `tests/test_targets.py`: Kohteet-sivu: osuma odottaa kohteena, siirto liidiksi, piilotus ja palautus, organisaatioiden
+  eristys, kojelaudan ja asiakaslistan luvut.
+- `tests/test_listings_catalogue.py`: keruu, poistot, jonot, täsmäytys, päiväraja, historiaikkuna, yhteystiedot ja API
+  (automaattinen luonti päällä `auto_create_leads`-fixturella).
 - `tests/test_catalogue_filters_and_onboarding.py`: lisäsuodattimet, esikatselu, liidi per taloyhtiö, säilytys,
   hälytys, salasanan vaihtopakko ja valinnaiset toiminnot.
 - `tests/test_listing_import.py`: CSV- ja API-tuonti, liidit tuoduista kohteista, virherivit.
@@ -218,7 +229,8 @@ Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 - **Oikotie-skreippaus on hauras.** Jos markup tai API muuttuu, Crawler kirjaa virheen `listing_crawl_state.last_error`:iin.
 - **Alkutäyttö**: koko Suomi on kymmeniä tuhansia kohteita. Keruu kestää noin 1–2 vrk (30 sivua × 2 maakuntaa per tunti),
   ja analyysi noin 300–400 kohdetta tunnissa, eli noin viikon. AI-kulu on suurin alkutäytössä, sen jälkeen pieni.
-- **Päiväraja**: alkutäytön aikana osumia voi tulla paljon. `daily_lead_limit` estää pipelinen tulvimisen.
+- **Alkutäyttö**: osumia voi tulla paljon, mutta ne kertyvät Kohteet-sivulle eivätkä tulvi pipelineen. `daily_lead_limit`
+  vaikuttaa vain, jos `LISTING_AUTO_CREATE_LEADS` on päällä.
 - **GDPR**: isännöitsijätiedot ovat B2B-tietoja, ja perusteena on oikeutettu etu. Poistuneet kohteet poistetaan
   `LISTING_RETENTION_DAYS` päivän jälkeen.
 - **Valinnaisten toimintojen rajaus** estää sivut, automaatioiden laukaisun ja AI-rikastuksen, mutta ei piilota

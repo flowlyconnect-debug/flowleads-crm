@@ -424,7 +424,8 @@ def catalogue_import():
     db.session.commit()
     flash(
         f"Tuotu {result['created']} uutta ja päivitetty {result['updated']} kohdetta. "
-        f"Liidejä luotu {result['leads_created']}, AI-analyysiin jonossa {result['queued']}.",
+        f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
+        f"AI-analyysiin jonossa {result['queued']}.",
         "success",
     )
     if result["errors"]:

@@ -65,9 +65,9 @@
               </td>
               <td>
                 {{ row.lead_count }}
-                {% if row.pending_matches %}
-                <div class="text-muted text-sm">+{{ row.pending_matches }} odottaa päivärajaa</div>
-                {% endif %}
+                <div class="text-muted text-sm">
+                  <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>
+                </div>
               </td>
               <td>{{ row.last_search_label }}</td>
               <td>

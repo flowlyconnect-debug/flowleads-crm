@@ -810,9 +810,12 @@ def dashboard():
             continue
         new_leads.append(lead)
 
+    from app.listings.target_services import count_targets
+
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
+        targets_available=count_targets(organization_id),
         now=now,
         new_leads=new_leads,
         organizations=organizations,

@@ -264,16 +264,23 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 logger.exception("Weekly search job creation failed")
 
     def run_listing_matching():
-        """Rebuild matches for changed profiles and turn pending matches into
-        leads (respects each profile's daily lead limit, so a backlog drains
-        over the following days)."""
+        """Rebuild matches for changed profiles. Matches then wait on the
+        customer's Kohteet page; only another apartment of a housing company
+        that already has a lead is joined to that lead here. Leads are created
+        automatically only when LISTING_AUTO_CREATE_LEADS is on."""
         with app.app_context():
             from app.extensions import db
-            from app.listings.services import materialize_pending_matches, rematch_profiles
+            from app.listings.services import (
+                auto_create_leads,
+                materialize_pending_matches,
+                merge_into_existing_leads,
+                rematch_profiles,
+            )
 
             try:
                 matched = rematch_profiles()
-                created = materialize_pending_matches()
+                merge_into_existing_leads()
+                created = materialize_pending_matches() if auto_create_leads() else 0
                 if matched or created:
                     logger.info("Listing matching: %s new match(es), %s lead(s) created", matched, created)
             except Exception:
