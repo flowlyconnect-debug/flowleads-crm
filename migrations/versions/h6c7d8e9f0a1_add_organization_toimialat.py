@@ -22,6 +22,9 @@ depends_on = None
 
 json_type = postgresql.JSONB().with_variant(sa.JSON(), "sqlite")
 
+# old type names that have no successor: never part of an entitlement
+RETIRED = {"Sähkö- ja tietoliikennejärjestelmät", "Huoneistoremontit", "Muu remontti"}
+
 
 def _as_list(value) -> list:
     if isinstance(value, str):
@@ -43,7 +46,7 @@ def upgrade():
     ).fetchall()
     for org_id, primary, types in profiles:
         for name in _as_list(types) or [primary]:
-            if name and name not in wanted.setdefault(org_id, []):
+            if name and name not in RETIRED and name not in wanted.setdefault(org_id, []):
                 wanted[org_id].append(name)
     invites = bind.execute(
         sa.text(
@@ -52,7 +55,7 @@ def upgrade():
         )
     ).fetchall()
     for org_id, primary in invites:
-        if org_id not in wanted and primary:
+        if org_id not in wanted and primary and primary not in RETIRED:
             wanted[org_id] = [primary]
 
     organizations = sa.table("organizations", sa.column("id", sa.Integer), sa.column("remonttityypit", sa.JSON))

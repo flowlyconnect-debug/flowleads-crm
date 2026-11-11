@@ -72,12 +72,14 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <fieldset style="margin-bottom:0.75rem;">
             <legend class="form-label">Toimiala koko tiedostolle (valinnainen)</legend>
-            {% for option in remonttityypit %}
-            <label class="form-check">
-              <input type="checkbox" name="default_remonttityypit" value="{{ option }}">
-              {{ option }}
-            </label>
-            {% endfor %}
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0.25rem 1rem;">
+              {% for option in remonttityypit %}
+              <label class="form-check">
+                <input type="checkbox" name="default_remonttityypit" value="{{ option }}">
+                {{ option }}
+              </label>
+              {% endfor %}
+            </div>
           </fieldset>
           <label class="form-label" style="margin-bottom:0.75rem;">Maakunta koko tiedostolle (valinnainen)
             <select name="default_maakunta" class="form-select">
