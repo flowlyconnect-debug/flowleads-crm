@@ -905,6 +905,121 @@
   }
 }
 
+/* --- Karttaesimerkki ----------------------------------------------------- */
+
+.lp-mapdemo { padding-top: 0; }
+
+.lp-map {
+  display: grid;
+  gap: 20px;
+}
+
+.lp-map__canvas {
+  position: relative;
+  width: 100%;
+  max-width: 230px;
+  margin: 0 auto;
+  aspect-ratio: 212 / 425;
+}
+
+.lp-map__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lp-map__svg path {
+  fill: var(--lp-violet-soft);
+  stroke: var(--lp-violet-line);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.lp-map__pin {
+  position: absolute;
+  width: var(--pin, 26px);
+  height: var(--pin, 26px);
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--lp-violet);
+  color: #fff;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.82;
+  box-shadow: var(--lp-shadow-sm);
+  transition: opacity 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.lp-map__pin:hover { opacity: 1; }
+
+.lp-map__pin:focus-visible {
+  outline: 2px solid var(--lp-ink);
+  outline-offset: 2px;
+}
+
+.lp-map__pin.is-active {
+  z-index: 1;
+  opacity: 1;
+  background: var(--lp-violet-hover);
+  box-shadow: 0 0 0 6px rgba(105, 72, 220, 0.22);
+}
+
+.lp-map__panel { display: none; }
+.lp-map__panel.is-active { display: block; }
+
+.lp-map__city {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lp-ink);
+}
+
+.lp-map__city span {
+  margin-left: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #5b6178;
+}
+
+.lp-map__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-map__target {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--lp-border);
+  border-radius: 10px;
+  background: var(--lp-surface);
+}
+
+.lp-map__name { font-weight: 600; color: var(--lp-ink); }
+.lp-map__meta { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: #475069; }
+.lp-map__manager { font-size: 13px; color: #5b6178; }
+.lp-map__more { margin: 12px 0 0; font-size: 13.5px; color: #5b6178; }
+
+@media (min-width: 768px) {
+  .lp-map {
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 40px;
+    align-items: center;
+    padding: 28px 32px;
+  }
+  .lp-map__side { min-height: 300px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lp * { transition: none !important; }
 }

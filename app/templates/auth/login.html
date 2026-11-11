@@ -48,6 +48,37 @@
   {"company": "Lumikko Design Oy", "contact": "Mikko Aalto, yrittäjä", "origin": "existing", "stage": "Tarjous lähetetty", "color": "#06B6D4", "task_type": "Sähköposti", "task": "Kysy tarjouksen tilanne", "due": "Pe", "due_mod": ""},
 ] %}
 
+{# Karttaesimerkin kuvitteellinen data: x ja y ovat prosentteja karttakuvan koosta. #}
+{% set demo_map = [
+  {"city": "Helsinki", "x": 45.3, "y": 95.3, "count": 14, "targets": [
+    {"name": "As Oy Merikortteli", "type": "Putkiremontti", "year": "2027", "manager": "Isännöintitoimisto A"},
+    {"name": "As Oy Kallionrinne", "type": "Julkisivuremontti", "year": "2026", "manager": "Isännöintitoimisto B"},
+    {"name": "As Oy Puistolan Helmi", "type": "Kattoremontti", "year": "2028", "manager": "Isännöintitoimisto A"}]},
+  {"city": "Tampere", "x": 35.8, "y": 82.8, "count": 9, "targets": [
+    {"name": "As Oy Tammelan Torni", "type": "Putkiremontti", "year": "2028", "manager": "Isännöintitoimisto C"},
+    {"name": "As Oy Pyynikin Rinne", "type": "Ikkunaremontti", "year": "2027", "manager": "Isännöintitoimisto C"}]},
+  {"city": "Turku", "x": 24.0, "y": 92.7, "count": 7, "targets": [
+    {"name": "As Oy Aurajoen Ranta", "type": "Julkisivuremontti", "year": "2027", "manager": "Isännöintitoimisto D"},
+    {"name": "As Oy Port Arthur", "type": "Kattoremontti", "year": "2026", "manager": "Isännöintitoimisto D"}]},
+  {"city": "Oulu", "x": 49.5, "y": 49.8, "count": 6, "targets": [
+    {"name": "As Oy Toppilan Salmi", "type": "Putkiremontti", "year": "2029", "manager": "Isännöintitoimisto E"},
+    {"name": "As Oy Tuiranpuisto", "type": "Parvekeremontti", "year": "2027", "manager": "Isännöintitoimisto E"}]},
+  {"city": "Jyväskylä", "x": 51.7, "y": 75.9, "count": 5, "targets": [
+    {"name": "As Oy Harjun Laita", "type": "Ikkunaremontti", "year": "2026", "manager": "Isännöintitoimisto F"},
+    {"name": "As Oy Kuokkalan Kaari", "type": "Putkiremontti", "year": "2028", "manager": "Isännöintitoimisto F"}]},
+  {"city": "Kuopio", "x": 67.1, "y": 69.7, "count": 4, "targets": [
+    {"name": "As Oy Väinölänniemi", "type": "Julkisivuremontti", "year": "2028", "manager": "Isännöintitoimisto G"},
+    {"name": "As Oy Saaristokatu", "type": "Kattoremontti", "year": "2027", "manager": "Isännöintitoimisto G"}]},
+  {"city": "Lahti", "x": 51.0, "y": 87.7, "count": 3, "targets": [
+    {"name": "As Oy Salpausselkä", "type": "Putkiremontti", "year": "2027", "manager": "Isännöintitoimisto H"}]},
+  {"city": "Vaasa", "x": 21.0, "y": 67.8, "count": 3, "targets": [
+    {"name": "As Oy Vaskiluodon Tuuli", "type": "Ikkunaremontti", "year": "2028", "manager": "Isännöintitoimisto I"}]},
+  {"city": "Joensuu", "x": 83.7, "y": 72.5, "count": 2, "targets": [
+    {"name": "As Oy Pielisjoen Varsi", "type": "Kattoremontti", "year": "2026", "manager": "Isännöintitoimisto J"}]},
+  {"city": "Rovaniemi", "x": 51.6, "y": 35.8, "count": 2, "targets": [
+    {"name": "As Oy Ounasvaaran Rinne", "type": "Julkisivuremontti", "year": "2029", "manager": "Isännöintitoimisto K"}]},
+] %}
+
 {% block title %}Kirjaudu — FlowLeads CRM | Flowly Solutions{% endblock %}
 {% block body_class %} login-page{% endblock %}
 {% block head %}
@@ -196,6 +227,55 @@
     </div>
   </section>
 
+  <section class="lp-section lp-mapdemo" aria-labelledby="lp-map-title">
+    <div class="lp-container">
+      <div class="lp-section__head">
+        <h2 class="lp-section__title" id="lp-map-title">Tulevat remontit kartalla</h2>
+        <p class="lp-section__lead">Näet yhdellä silmäyksellä, missä taloyhtiöissä on remontteja tulossa. Valitse paikkakunta, niin näet sen kohteet, remontin ajankohdan ja isännöitsijän.</p>
+      </div>
+
+      <figure class="lp-demo">
+        <div class="lp-demo__bar">
+          <span class="lp-demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="lp-demo__badge">Esimerkkinäkymä</span>
+          <span class="lp-demo__note">Kuvitteellinen data</span>
+        </div>
+        <div class="lp-demo__body lp-map" data-lp-map>
+          <div class="lp-map__canvas">
+            <svg class="lp-map__svg" viewBox="0 0 212 425" aria-hidden="true" focusable="false">
+              <path d="M62.3 419.2 L80.1 412.0 L96.1 406.0 L113.9 400.0 L129.9 394.0 L144.3 390.0 L162.1 364.0 L174.7 350.0 L193.3 324.0 L208.2 296.0 L190.0 280.0 L190.8 248.0 L176.4 216.0 L178.1 188.0 L180.7 172.0 L166.3 140.0 L181.5 104.0 L156.1 72.0 L155.3 56.0 L162.9 40.0 L168.0 26.0 L152.8 16.0 L146.0 8.4 L130.8 16.0 L113.0 26.0 L110.5 36.0 L100.4 64.0 L95.3 67.2 L78.4 60.0 L66.5 66.8 L53.0 58.0 L39.5 50.0 L21.7 50.0 L46.3 72.0 L64.9 78.0 L74.2 94.0 L75.8 120.0 L79.2 140.0 L75.0 160.0 L82.6 178.0 L90.2 184.0 L102.0 200.0 L103.7 212.0 L87.7 224.0 L78.4 242.0 L64.9 258.0 L57.2 266.0 L38.7 288.0 L31.0 308.0 L35.3 322.0 L37.0 352.0 L37.0 366.8 L35.3 380.0 L39.5 394.0 L44.6 400.0 L54.7 410.0Z"/>
+            </svg>
+            {% for c in demo_map %}
+            <button type="button" class="lp-map__pin{% if loop.first %} is-active{% endif %}" style="left: {{ c.x }}%; top: {{ c.y }}%; --pin: {{ 22 + c.count }}px" data-lp-map-pin="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}" aria-controls="lp-map-panel-{{ loop.index0 }}">
+              <span aria-hidden="true">{{ c.count }}</span>
+              <span class="sr-only">{{ c.city }}, {{ c.count }} kohdetta</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <div class="lp-map__side" aria-live="polite">
+            {% for c in demo_map %}
+            <div class="lp-map__panel{% if loop.first %} is-active{% endif %}" id="lp-map-panel-{{ loop.index0 }}" data-lp-map-panel="{{ loop.index0 }}">
+              <p class="lp-map__city">{{ c.city }} <span>{{ c.count }} kohdetta</span></p>
+              <ul class="lp-map__list">
+                {% for t in c.targets %}
+                <li class="lp-map__target">
+                  <span class="lp-map__name">{{ t.name }}</span>
+                  <span class="lp-map__meta"><span class="lp-tag lp-tag--new">{{ t.type }}</span> {{ t.year }}</span>
+                  <span class="lp-map__manager">Isännöinti: {{ t.manager }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+              {% if c.count > c.targets | length %}<p class="lp-map__more">+ {{ c.count - c.targets | length }} muuta kohdetta</p>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <figcaption class="sr-only">Esimerkkinäkymä: tulevat remontit paikkakunnittain Suomen kartalla kuvitteellisella datalla.</figcaption>
+      </figure>
+    </div>
+  </section>
+
   <section class="lp-section lp-benefits" aria-labelledby="lp-benefits-title">
     <div class="lp-container">
       <h2 class="lp-section__title" id="lp-benefits-title">Mitä saat FlowLeadsin kanssa</h2>
@@ -245,4 +325,8 @@
     </div>
   </footer>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/login-map.js') }}" defer></script>
 {% endblock %}
