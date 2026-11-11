@@ -425,6 +425,10 @@
             </div>
             <div class="lead-row__sub">
               {% if contact_person %}<span class="lead-row__person">{{ contact_person }}</span>{% endif %}
+              {# catalogue leads: where and what, so ten leads of one manager are told apart #}
+              {% set meta = lead.ai_contact_info if lead.ai_contact_info is mapping else {} %}
+              {% set where_what = [meta.get('kaupunki'), (meta.get('remonttityyppi', '') ~ (' ' ~ meta.get('remontin_ajankohta') if meta.get('remontin_ajankohta') else ''))|trim]|select|join(' · ') %}
+              {% if where_what %}<span class="lead-row__person">{{ where_what }}</span>{% endif %}
               {% if urgency.mod == 'new' and arrived_text %}<span>{{ arrived_text }}</span>{% endif %}
               <span class="lead-row__contact-time lead-row__contact-time--{{ contact_mod }}">{{ contact_text }}</span>
               {% if lead.score_reason %}<span class="lead-row__reason" title="{{ lead.score_reason }}">{{ lead.score_reason|truncate(70, True, '…') }}</span>{% endif %}

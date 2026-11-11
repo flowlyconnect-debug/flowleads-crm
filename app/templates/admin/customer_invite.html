@@ -32,25 +32,29 @@
             <span class="form-helper">Kutsulinkki lähetetään tähän osoitteeseen.</span>
           </label>
 
-          <h2 style="margin-top:1.5rem;">Hakuprofiili</h2>
-          <label class="form-label">Hakuprofiilin nimi
-            <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
-                   placeholder="esim. Lukkoremontti Uusimaa"
+          <h2 style="margin-top:1.5rem;">Urakat</h2>
+          <fieldset style="margin-top:1rem;">
+            <legend class="form-label">Urakat (remonttityypit), joista asiakas haluaa kohteita</legend>
+            {% set chosen_types = form_data.get('remonttityypit', []) %}
+            <div class="search-profiles-regions__grid">
+              {% for option in remonttityypit %}
+              <label class="form-check">
+                <input type="checkbox" name="remonttityypit" value="{{ option }}"{% if option in chosen_types %} checked{% endif %}>
+                {{ option }}
+              </label>
+              {% endfor %}
+            </div>
+            <span class="form-helper">Valitse vähintään yksi. Asiakas näkee vain näiden urakoiden kohteet koko Suomesta ja rajaa alueen itse Kohteet-sivulla.</span>
+          </fieldset>
+
+          <label class="form-label" style="margin-top:1rem;">Hakuprofiilin nimi (valinnainen)
+            <input type="text" name="search_profile_name" class="form-input" maxlength="100"
+                   placeholder="Jätä tyhjäksi → urakoiden nimet"
                    value="{{ form_data.get('search_profile_name', '') }}">
           </label>
 
-          <label class="form-label">Remonttityyppi
-            <select name="remonttityyppi" class="form-select" required>
-              <option value="">Valitse…</option>
-              {% for option in remonttityypit %}
-              <option value="{{ option }}"
-                {% if form_data.get('remonttityyppi') == option %}selected{% endif %}>{{ option }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
           <input type="hidden" name="source" value="oikotie">
-          <p class="form-helper">Asiakas valitsee alueet (tai Koko Suomen) kutsulinkin takaa. Muut suodattimet voi säätää hakuprofiilin asetuksista.</p>
+          <p class="form-helper">Asiakas asettaa kutsulinkin takana vain salasanan. Kohteet tulevat koko Suomesta, ja asiakas rajaa alueen Kohteet-sivulla.</p>
 
           <fieldset style="margin-top:1rem;">
             <legend class="form-label">Sallitut toiminnot</legend>

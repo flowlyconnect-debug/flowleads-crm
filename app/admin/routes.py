@@ -11,7 +11,7 @@ from app.admin.services import get_accessible_organizations, get_dashboard_stats
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
-from app.search.constants import ALL_FINLAND_REGION, FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.constants import REMONTTITYYPIT
 from app.search.models import SearchProfile
 from app.users.services import UserServiceError, create_organization
 
@@ -265,22 +265,17 @@ def create_customer_route():
         return render_template(
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
-            finnish_regions=FINNISH_REGIONS,
             form_data={},
         )
 
-    if request.form.get("region_mode") == "all_finland":
-        regions = [ALL_FINLAND_REGION]
-    else:
-        regions = [region for region in request.form.getlist("regions") if region in FINNISH_REGIONS]
+    types = request.form.getlist("remonttityypit") or [request.form.get("remonttityyppi", "")]
     form_data = {
         "organization_name": request.form.get("organization_name", "").strip(),
         "admin_name": request.form.get("admin_name", "").strip(),
         "admin_email": request.form.get("admin_email", "").strip(),
         "temporary_password": request.form.get("temporary_password", "").strip(),
         "search_profile_name": request.form.get("search_profile_name", "").strip(),
-        "regions": regions,
-        "remonttityyppi": request.form.get("remonttityyppi", "").strip(),
+        "remonttityypit": [t.strip() for t in types if t.strip()],
         "source": (request.form.get("source") or "oikotie").strip(),
         "is_active": request.form.get("is_active") == "y",
     }
@@ -292,9 +287,8 @@ def create_customer_route():
             admin_email=form_data["admin_email"],
             admin_password=form_data["temporary_password"] or None,
             admin_name=form_data["admin_name"] or None,
-            search_profile_name=form_data["search_profile_name"],
-            regions=regions,
-            remonttityyppi=form_data["remonttityyppi"],
+            search_profile_name=form_data["search_profile_name"] or None,
+            remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             is_active=form_data["is_active"],
         )
@@ -305,7 +299,6 @@ def create_customer_route():
         return render_template(
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
-            finnish_regions=FINNISH_REGIONS,
             form_data=form_data,
         )
 
@@ -399,7 +392,11 @@ def create_invite_route():
         "organization_name": request.form.get("organization_name", "").strip(),
         "admin_email": request.form.get("admin_email", "").strip(),
         "search_profile_name": request.form.get("search_profile_name", "").strip(),
-        "remonttityyppi": request.form.get("remonttityyppi", "").strip(),
+        "remonttityypit": [
+            t.strip()
+            for t in (request.form.getlist("remonttityypit") or [request.form.get("remonttityyppi", "")])
+            if t.strip()
+        ],
         "source": (request.form.get("source") or "oikotie").strip(),
         "allowed_features": allowed_features,
     }
@@ -409,8 +406,8 @@ def create_invite_route():
             actor=current_user,
             organization_name=form_data["organization_name"],
             admin_email=form_data["admin_email"],
-            search_profile_name=form_data["search_profile_name"],
-            remonttityyppi=form_data["remonttityyppi"],
+            search_profile_name=form_data["search_profile_name"] or None,
+            remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             allowed_features=allowed_features,
         )

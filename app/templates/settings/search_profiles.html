@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
 {% from "_macros.html" import empty_state %}
-{% block title %}Hakuprofiili{% endblock %}
+{% block title %}Urakat ja kohdehaku{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
@@ -9,8 +9,8 @@
     <div class="settings-content">
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Hakuprofiili</h1>
-          <p class="settings-panel__subtitle">Profiili on suodatin yhteiseen kohdekatalogiin: kun taloyhtiössä on tulossa valitsemasi remontti valituilla alueilla, kohde ilmestyy Kohteet-sivulle, josta siirrät kiinnostavat liideiksi.</p>
+          <h1 class="settings-panel__title">Urakat ja kohdehaku</h1>
+          <p class="settings-panel__subtitle">Valitse urakat (remonttityypit), joita teette. Kun taloyhtiössä on tulossa jokin niistä, kohde ilmestyy Kohteet-sivulle, josta siirrät kiinnostavat liideiksi.</p>
           {% if page_error %}
           <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
           {% endif %}
@@ -76,8 +76,16 @@
                 </div>
               </fieldset>
 
-              {% set selected_regions = (selected_profile.regions or []) if selected_profile else [] %}
+              {% set selected_regions = (selected_profile.regions or []) if selected_profile else [all_finland_region] %}
               {% set all_finland = all_finland_region in selected_regions %}
+              {% set narrowed = selected_profile and (not all_finland or selected_profile.cities or selected_profile.timing_within_years is not none
+                   or selected_profile.building_types or selected_profile.build_year_min is not none
+                   or selected_profile.build_year_max is not none or selected_profile.min_confidence != 50) %}
+              {# Most customers only pick their urakat: everything else narrows the
+                 list and stays folded away (the Kohteet page has filters too). #}
+              <details class="search-profiles-advanced"{% if narrowed %} open{% endif %}>
+                <summary class="form-label" style="cursor:pointer;">Tarkemmat rajaukset (valinnainen)</summary>
+                <p class="form-helper mb-2">Oletuksena saat urakoidesi kohteet koko Suomesta ja rajaat alueen Kohteet-sivun suodattimilla. Rajaa tässä vain, jos et halua tiettyjä kohteita lainkaan.</p>
               <fieldset class="search-profiles-regions">
                 <legend class="form-label">Alueet</legend>
                 <label class="form-check">
@@ -145,11 +153,12 @@
               </div>
               <p class="form-helper">Tyhjä = ei rajaa. Kohteet, joiden rakennusvuotta tai talotyyppiä ei tiedetä, tulevat aina mukaan.</p>
 
-              <label class="form-label">AI-varmuus vähintään (0–100)
+              <label class="form-label">Varmuus vähintään (0–100)
                 <input type="number" name="min_confidence" class="form-input" min="0" max="100" step="1"
-                       value="{{ selected_profile.min_confidence if selected_profile else 60 }}">
+                       value="{{ selected_profile.min_confidence if selected_profile else 50 }}">
               </label>
-              <p class="form-helper">Kuinka varma AI:n pitää olla siitä, että kohteessa on tulossa juuri tämä remontti. 60 on hyvä oletus; nosta, jos kohteita tulee liikaa.</p>
+              <p class="form-helper">Kuinka varmasti remontin pitää olla tulossa lähdetietojen perusteella. 50 on oletus; nosta, jos haluat vain varmimmat kohteet.</p>
+              </details>
 
               {% if config.LISTING_AUTO_CREATE_LEADS %}
               <label class="form-label">Uusia liidejä enintään / päivä

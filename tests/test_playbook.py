@@ -206,7 +206,9 @@ def test_playbook_score_helpers():
     assert score_label(30) == "Heikko osuvuus — matala prioriteetti"
 
 
-def test_playbook_ui_copy_button_present(client, app):
+def test_playbook_ui_has_no_script_buttons(client, app):
+    """The e-mail template / call script buttons were removed: the plan card
+    shows only the analysis."""
     ctx = _setup_org(app, "pb-copy-ui")
     _login(client, ctx["admin_email"])
     lead_id = _create_lead(
@@ -220,6 +222,7 @@ def test_playbook_ui_copy_button_present(client, app):
 
     response = client.get(f"/leads/{lead_id}")
     html = response.data.decode()
-    assert 'id="playbook-copy-email"' in html
-    assert "Kopioi sähköpostipohja" in html
+    assert 'id="playbook-copy-email"' not in html
+    assert "Kopioi sähköpostipohja" not in html
+    assert "Näytä soittoavaus" not in html
     assert "AI-myyntisuunnitelma" in html

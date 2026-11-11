@@ -35,7 +35,8 @@ class CustomerInvite(db.Model):
     # Set by the inviting superadmin: what the invited admin is allowed to pick from.
     allowed_features: Mapped[list] = mapped_column(json_type, default=list, nullable=False)
     search_profile_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    remonttityyppi: Mapped[str] = mapped_column(String(100), nullable=False)
+    # one or more renovation types, "; "-separated (see invite_types())
+    remonttityyppi: Mapped[str] = mapped_column(String(500), nullable=False)
     source: Mapped[str] = mapped_column(String(50), default="oikotie", nullable=False)
 
     invited_by_user_id: Mapped[int | None] = mapped_column(
@@ -52,6 +53,10 @@ class CustomerInvite(db.Model):
     )
 
     organization: Mapped["Organization"] = relationship("Organization")  # noqa: F821
+
+    @property
+    def types(self) -> list[str]:
+        return [t.strip() for t in (self.remonttityyppi or "").split(";") if t.strip()]
 
     def is_valid(self, *, now: datetime | None = None) -> bool:
         if self.accepted_at is not None or self.revoked_at is not None:

@@ -255,5 +255,8 @@ def test_navigation_follows_the_workflow(client, app):
         email = user.email
     _login(client, email)
     page = client.get("/dashboard").get_data(as_text=True)
-    order = [page.index(f'sidebar-item__label">{label}<') for label in ("Kojelauta", "Kohteet", "Liidit", "Myyntiputki", "Isännöitsijät", "Yritykset")]
+    order = [page.index(f'sidebar-item__label">{label}<') for label in ("Kojelauta", "Kohteet", "Liidit", "Myyntiputki", "Isännöitsijät", "Tehtävät")]
     assert order == sorted(order)
+    # generic CRM pages a customer does not need are out of the menu
+    for label in ("Yritykset", "Kontaktit", "Lomakkeet"):
+        assert f'sidebar-item__label">{label}<' not in page

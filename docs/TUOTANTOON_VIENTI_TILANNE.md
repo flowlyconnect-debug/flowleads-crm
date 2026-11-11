@@ -151,6 +151,35 @@ Kolme toimintoa, jotka rakentuvat jo olemassa olevasta tiedosta (migraatio `d8e9
 Seuraava askel tästä: karttanäkymä (vaatii osoitteiden geokoodauksen) ja uudet tietolähteet (rakennusluvat,
 hankintailmoitukset).
 
+## Tehty 11.11.2026 (6): asiakasnäkymän yksinkertaistus ja kohdetiedoston tuonti
+
+Migraatio `e9f0a1b2c3d4`, testit `tests/test_customer_simplification.py`.
+
+- **Täsmäys tarkistettu.** Tiedosto `kaikki-kohteet-tuonti-2026-11-11.csv` (294 kohdetta, 18 maakuntaa) tuotiin
+  paikalliseen Postgresiin ja verrattiin kuuden erilaisen asiakasprofiilin kohteita tiedostosta erikseen
+  laskettuun odotukseen: kaikki täsmäsivät (ei puuttuvia, ei ylimääräisiä). Sama testinä.
+- **Oletusvarmuus 50 %** (oli 60). Tiedoston varmuudet ovat 50–88 %; 60 piilotti 51 kohdetta. Migraatio siirtää
+  60:ssä olevat profiilit 50:een ja merkitsee ne uudelleentäsmäytettäviksi.
+- **Ei aluevalintaa luonnissa.** Superadminin "Luo asiakas" ja "Kutsu asiakas" kysyvät vain urakat
+  (remonttityypit, useampi sallittu); profiilin nimi muodostuu niistä. Kutsun hyväksyjä asettaa vain salasanan.
+  Profiili kattaa koko Suomen; alue rajataan Kohteet-sivun suodattimilla (tai tarvittaessa asetusten
+  "Tarkemmat rajaukset" -osiosta).
+- **Kohteet-sivu.** Näkyvissä kaikki asiakkaan omat urakat ajankohtineen, isännöintitoimisto, yhteyshenkilö,
+  puhelin ja sähköposti. Uusi suodatin "Remontti alkaa viimeistään"; kaupunkilista seuraa valittua maakuntaa;
+  remonttisuodatin tarjoaa vain asiakkaan omat urakat. "Hae kohteita" vuorottelee urakoiden välillä.
+- **Liidi = taloyhtiö.** Kohteesta luotu liidi nimetään taloyhtiön mukaan; isännöitsijä (toimisto + henkilö) on
+  alaotsikossa. Liidilistalla näkyy kaupunki, remontti ja ajankohta.
+- **Tuonti** lukee myös sarakkeet `yhteyshenkilo`, `isannointitoimisto` (isännöitsijäksi, jotta saman toimiston
+  taloyhtiöt ryhmittyvät), `taloyhtion_ytunnus` ja `ilmoitus_poistunut` (kyllä = kohde piiloon). `huomio`
+  jätetään tarkoituksella pois (sisäisiä tutkimusmuistiinpanoja). Uudelleentuonti, jossa remonttityyppi muuttuu,
+  poistaa vanhentuneen kohteen.
+- **Poistettu:** liidisivun "Kopioi sähköpostipohja" / "Näytä soittoavaus" -napit ja niiden paneelit;
+  asiakkaan sivupalkista Yritykset, Kontaktit ja Lomakkeet (sivut toimivat yhä osoitteella).
+- **Asetukset asiakkaalle:** Käyttäjät (avautuu Asetukset-linkistä, kutsulomake heti ylhäällä), Urakat ja
+  kohdehaku, Tarjoukset, Kalenteri; tekniset asetukset taitettuna "Lisäasetukset"-osioon. Hakuprofiilisivu
+  ei enää näytä asiakkaalle varaston kokoa eikä varastossa olevia osoitteita.
+- **Kojelauta** ohjaa painamaan Hae kohteita, kun näkyviä kohteita ei ole mutta haettavaa on.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

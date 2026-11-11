@@ -160,10 +160,9 @@ def test_superadmin_customers_new_get_renders_form(client, app):
     assert "Something went wrong" not in page
     assert "Luo uusi asiakas" in page
     assert 'name="organization_name"' in page
-    assert 'name="remonttityyppi"' in page
-    assert 'name="regions"' in page
+    assert 'name="remonttityypit"' in page
+    assert 'name="regions"' not in page  # no region choice at onboarding
     assert "Putkiremontti" in page
-    assert "Uusimaa" in page
 
 
 def test_superadmin_onboarding_form_and_result(client, app):

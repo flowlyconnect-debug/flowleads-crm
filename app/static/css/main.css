@@ -3644,6 +3644,12 @@ body.modal-open {
   padding-left: calc(var(--space-3) + 8px);
 }
 
+.settings-nav__more { display: flex; flex-direction: column; margin-top: var(--space-2); }
+.settings-nav__more > summary { cursor: pointer; list-style: none; display: block; }
+.settings-nav__more > summary::after { content: " ▸"; }
+.settings-nav__more[open] > summary::after { content: " ▾"; }
+.settings-nav__more > a { display: block; }
+
 .settings-content {
   min-width: 0;
 }

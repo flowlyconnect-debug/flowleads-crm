@@ -34,7 +34,7 @@
   {# Organization-scoped settings need a chosen organization. #}
   {% if use_org %}
   <span class="settings-nav__group-label">Valittu organisaatio</span>
-  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Hakuprofiili') }}
+  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
   {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
   {{ org_link('settings.lead_settings', 'lead_settings', 'Liidiasetukset') }}
   {{ org_link('settings.email_settings', 'email', 'Sähköpostiasetukset') }}
@@ -54,28 +54,28 @@
 
   {% elif current_user.role == 'admin' %}
 
-  <span class="settings-nav__group-label">Liidit</span>
-  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Hakuprofiili') }}
-  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidiasetukset') }}
-
-  <span class="settings-nav__group-label">Organisaatio</span>
+  {# What a customer admin actually uses first; the technical settings stay
+     reachable under "Lisäasetukset" (open when one of them is active). #}
   {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
-  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
-  {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
-
-  <span class="settings-nav__group-label">Sähköposti</span>
-  {{ org_link('settings.email_settings', 'email', 'Sähköpostiasetukset') }}
-  {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
-
-  <span class="settings-nav__group-label">Integraatiot</span>
+  {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
+  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjoukset') }}
   {{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}
-  {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
-  {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+
+  {% set advanced_keys = ['lead_settings', 'email', 'email_templates', 'privacy', 'api_keys', 'webhooks'] %}
+  <details class="settings-nav__more"{% if active in advanced_keys %} open{% endif %}>
+    <summary class="settings-nav__group-label">Lisäasetukset</summary>
+    {{ org_link('settings.lead_settings', 'lead_settings', 'Liidien jako ja vaiheet') }}
+    {{ org_link('settings.email_settings', 'email', 'Sähköpostin lähettäjä') }}
+    {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
+    {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
+    {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
+    {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+  </details>
 
   {% else %}
 
-  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
   <a href="{{ url_for('settings.calendar_settings') }}" class="settings-nav__item{% if active == 'calendar' %} is-active{% endif %}">Kalenteri</a>
+  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
 
   {% endif %}
 </nav>

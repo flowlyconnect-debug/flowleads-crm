@@ -54,7 +54,11 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "timing": ("ajankohta", "timing", "vuosi", "remontin_ajankohta"),
     "confidence": ("varmuus", "confidence"),
     "tulevat_remontit": ("tulevat_remontit", "yhteenveto"),
-    "isannoitsija": ("isannoitsija", "isannointi", "isannoitsijatoimisto"),
+    "isannoitsija": ("isannoitsija", "isannointi"),
+    "isannointitoimisto": ("isannointitoimisto", "isannoitsijatoimisto", "isannointiyritys"),
+    "isannoitsija_henkilo": ("yhteyshenkilo", "isannoitsija_henkilo", "isannoitsijan_nimi"),
+    "ytunnus": ("taloyhtion_ytunnus", "taloyhtio_ytunnus", "taloyhtion_y_tunnus"),
+    "removed": ("ilmoitus_poistunut", "poistunut", "removed"),
     "isannoitsija_puh": ("isannoitsija_puh", "puhelin", "puh"),
     "isannoitsija_email": ("isannoitsija_email", "sahkoposti", "email"),
     "build_year": ("rakennusvuosi", "build_year"),
@@ -79,6 +83,9 @@ CSV_TEMPLATE_COLUMNS = (
     "talotyyppi",
     "url",
     "tunniste",
+    "yhteyshenkilo",
+    "isannointitoimisto",
+    "taloyhtion_ytunnus",
 )
 
 _REGIONS_BY_KEY: dict[str, str] = {}
@@ -109,6 +116,20 @@ def _renovation_type(value) -> str | None:
             # "Lukkoremontti / kulunvalvonta" is also accepted as "Lukkoremontti"
             _TYPES_BY_KEY.setdefault(_fold(name.split("/")[0]), name)
     return _TYPES_BY_KEY.get(_fold(value))
+
+
+_YES = {"kylla", "k", "yes", "y", "true", "1", "x", "poistunut"}
+
+
+def _is_yes(value) -> bool:
+    return _fold(value) in _YES
+
+
+def _manager(raw: dict) -> str | None:
+    """The property management office. A separate office column wins over the
+    free-form `isannoitsija` cell ("Hannu Räsänen, Retta Isännöinti Oy"), so the
+    Isännöitsijät page groups one office's housing companies together."""
+    return _clean(raw.get("isannointitoimisto"), 255) or _clean(raw.get("isannoitsija"), 255)
 
 
 def _confidence(value) -> int:
@@ -275,8 +296,14 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
 
         listing.maakunta = maakunta
         listing.last_seen_at = now
-        listing.is_active = True
-        listing.removed_at = None
+        if _is_yes(raw.get("removed")):
+            # the source says the listing is gone: keep the row, hide the target
+            if listing.is_active:
+                listing.removed_at = now
+            listing.is_active = False
+        else:
+            listing.is_active = True
+            listing.removed_at = None
         for field, value in (
             ("taloyhtio", taloyhtio),
             ("osoite", osoite),
@@ -286,6 +313,8 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
             ("published_at", _parse_datetime(raw.get("published_at"))),
             ("build_year", _parse_year(raw.get("build_year"))),
             ("building_type", _parse_building_type(raw.get("building_type"))),
+            ("isannoitsija_henkilo", _clean(raw.get("isannoitsija_henkilo"), 255)),
+            ("ytunnus", _clean(raw.get("ytunnus"), 20)),
         ):
             if value is not None:
                 setattr(listing, field, value)
@@ -293,8 +322,11 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
 
         if not renovations:
             # contacts given on the row are kept; the Analyzer adds the rest
-            for field, max_len in (("isannoitsija", 255), ("isannoitsija_puh", 50), ("isannoitsija_email", 255)):
-                value = _clean(raw.get(field), max_len)
+            for field, value in (
+                ("isannoitsija", _manager(raw)),
+                ("isannoitsija_puh", _clean(raw.get("isannoitsija_puh"), 50)),
+                ("isannoitsija_email", _clean(raw.get("isannoitsija_email"), 255)),
+            ):
                 if value:
                     setattr(listing, field, value)
             if listing.has_contact and not listing.contact_source:
@@ -313,7 +345,7 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
                 "status": "done",
                 "taloyhtio": taloyhtio,
                 "tulevat_remontit": summary,
-                "isannoitsija": raw.get("isannoitsija"),
+                "isannoitsija": _manager(raw),
                 "isannoitsija_puh": raw.get("isannoitsija_puh"),
                 "isannoitsija_email": raw.get("isannoitsija_email"),
                 "renovations": renovations,
@@ -349,6 +381,9 @@ def csv_template() -> str:
             "Kerrostalo",
             "",
             "",
+            "Matti Meikäläinen",
+            "Isännöinti Esimerkki Oy",
+            "1234567-8",
         ]
     )
     writer.writerow(
@@ -361,6 +396,9 @@ def csv_template() -> str:
             "",
             "Taloyhtiössä on suunnitteilla lukituksen uusiminen ja kulunvalvonta vuonna 2026. "
             "Julkisivuremontti tehty 2019.",
+            "",
+            "",
+            "",
             "",
             "",
             "",

@@ -23,6 +23,7 @@ from app.listings.target_services import (
     SORT_OPTIONS,
     TABS,
     target_filter_options,
+    organization_wanted_types,
     count_targets,
     dismiss_targets,
     list_targets,
@@ -162,6 +163,7 @@ def index():
     if profile_id:
         current_params["profile_id"] = str(profile_id)
     saved_searches = list_saved_searches(organization_id, current_user.id)
+    wanted_types = organization_wanted_types(organization_id)
     return render_template(
         "targets/index.html",
         saved_searches=saved_searches,
@@ -177,11 +179,11 @@ def index():
         reserve_count=count_reserve(organization_id) if current_user.is_superadmin() else None,
         digest_enabled=digest_enabled,
         filters=filters,
-        filter_options=target_filter_options(organization_id, TABS[tab]),
+        filter_options=target_filter_options(organization_id, TABS[tab], filters),
         sort_options=SORT_OPTIONS,
         transferred_leads=transferred_leads,
         assignees=assignees,
-        rows=[target_row(match) for match in pagination.items],
+        rows=[target_row(match, wanted_types) for match in pagination.items],
         pagination=pagination,
         tab=tab,
         search=search,

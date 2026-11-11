@@ -42,7 +42,7 @@
       </span>
       {% endif %}
       {% if can_edit_profiles %}
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}">Hakuprofiilit</a>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}" title="Mistä urakoista kohteita haetaan">Urakat</a>
       {% endif %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
     </div>
@@ -146,7 +146,32 @@
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
       {{ filter_select('renovation', 'Remontti', filter_options.renovations, 'Kaikki remontit') }}
       {{ filter_select('region', 'Maakunta', filter_options.regions, 'Kaikki maakunnat') }}
+      <script>
+        (function () {
+          var region = document.currentScript.parentNode.querySelector('select[name=region]');
+          if (!region) return;
+          region.onchange = function () {
+            var city = region.form.querySelector('select[name=city]');
+            if (city) city.value = '';  // a city of the previous region would match nothing
+            region.form.submit();
+          };
+        })();
+      </script>
       {{ filter_select('city', 'Kaupunki', filter_options.cities, 'Kaikki kaupungit') }}
+      {% macro year_select() -%}
+      {% if filter_options.years|length > 1 or filters.get('year') %}
+      <label class="targets-filter">
+        <span class="targets-filter__label">Remontti alkaa</span>
+        <select name="year" class="form-input targets-filter__select" onchange="this.form.submit()">
+          <option value="">Milloin tahansa</option>
+          {% for option in filter_options.years %}
+          <option value="{{ option }}"{% if filters.get('year') == option %} selected{% endif %}>viimeistään {{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      {%- endmacro %}
+      {{ year_select() }}
       {{ filter_select('building', 'Talotyyppi', filter_options.buildings, 'Kaikki talotyypit') }}
       <label class="targets-filter targets-filter--check">
         <input type="checkbox" name="contact" value="1"{% if filters.get('contact') == '1' %} checked{% endif %} onchange="flSubmitFilters(this.form)">
@@ -238,10 +263,14 @@
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
             </div>
             <div class="target-row__facts">
+              {% for item in row.renovations %}
+              <span class="target-row__reno">
+                <span class="badge badge-accent">{{ item.remonttityyppi }}</span>
+                {% if item.timing %}<span class="target-row__fact target-row__fact--strong">{{ item.timing }}</span>{% endif %}
+              </span>
+              {% endfor %}
               {% if renovation %}
-              <span class="badge badge-accent">{{ renovation.remonttityyppi }}</span>
-              {% if renovation.timing %}<span class="target-row__fact">{{ renovation.timing }}</span>{% endif %}
-              <span class="target-row__fact" title="Kuinka varma AI on tulevasta remontista">Varmuus {{ renovation.confidence }} %</span>
+              <span class="target-row__fact" title="Kuinka varmasti remontti on tulossa lähdetietojen perusteella">Varmuus {{ renovation.confidence }} %</span>
               {% endif %}
               {% if listing.building_type or listing.build_year %}
               <span class="target-row__fact">{{ [listing.building_type, listing.build_year]|select|join(', ') }}</span>
@@ -250,8 +279,10 @@
             </div>
             <div class="target-row__contact">
               {% if listing.isannoitsija %}Isännöinti: <a href="{{ url_for('insights.manager_detail', name=listing.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ listing.isannoitsija }}</a>{% endif %}
+              {% if listing.isannoitsija_henkilo %}<span>· {{ listing.isannoitsija_henkilo }}</span>{% endif %}
               {% if listing.has_contact %}
-              <span class="target-row__contact-ok">{{ '· yhteystiedot saatavilla' if listing.isannoitsija else 'Yhteystiedot saatavilla' }}</span>
+              {% if listing.isannoitsija_puh %}<a class="target-row__contact-ok" href="tel:{{ listing.isannoitsija_puh|replace(' ', '') }}">{{ listing.isannoitsija_puh }}</a>{% endif %}
+              {% if listing.isannoitsija_email %}<a class="target-row__contact-ok" href="mailto:{{ listing.isannoitsija_email }}">{{ listing.isannoitsija_email }}</a>{% endif %}
               {% elif listing.contact_status in ('pending', 'processing') %}
               <span>{{ '· yhteystietoja haetaan' if listing.isannoitsija else 'Yhteystietoja haetaan' }}</span>
               {% elif not listing.isannoitsija %}

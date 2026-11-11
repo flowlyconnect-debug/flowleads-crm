@@ -68,7 +68,8 @@ def test_row_with_renovation_type_becomes_a_lead_immediately(app):
         lead = Lead.query.filter_by(organization_id=org.id).one()
         assert lead.source == "import"
         assert lead.source_ref == listing.source_ref
-        assert lead.company == "Isännöinti Esimerkki Oy"
+        assert lead.company == "As Oy Esimerkkikatu 1"
+        assert lead.title.startswith("Isännöitsijä: Isännöinti Esimerkki Oy")
         assert lead.email == "isannointi@esimerkki.fi"
         assert ListingMatch.query.filter_by(profile_id=profile.id).one().status == "lead_created"
 

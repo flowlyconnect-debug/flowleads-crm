@@ -237,7 +237,7 @@ def build_profile(
     crm_api_key: str | None = None,
     is_active: bool = True,
     source: str = "oikotie",
-    min_confidence: int = 60,
+    min_confidence: int = 50,
     daily_lead_limit: int = 50,
     remonttityypit=None,
     cities=None,

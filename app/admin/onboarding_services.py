@@ -66,6 +66,23 @@ def _slug_from_name(name: str) -> str:
     return candidate
 
 
+def clean_renovation_types(values) -> list[str]:
+    """The chosen renovation types (urakat), in catalogue order, or []."""
+    from app.search.constants import REMONTTITYYPIT
+
+    if isinstance(values, str):
+        values = [v for v in values.split(";")]
+    chosen = {str(v).strip() for v in (values or []) if str(v).strip()}
+    return [t for t in REMONTTITYYPIT if t in chosen]
+
+
+def default_profile_name(types: list[str]) -> str:
+    """'Putkiremontti, Julkisivuremontti' (max 100 chars) when the admin left
+    the profile name empty."""
+    name = ", ".join(types) or "Hakuprofiili"
+    return name if len(name) <= 100 else name[:97].rstrip(", ") + "…"
+
+
 def _generate_temporary_password() -> str:
     min_len = current_app.config.get("PASSWORD_MIN_LENGTH", 12)
     while True:
@@ -80,14 +97,15 @@ def create_customer(
     organization_name: str,
     admin_email: str,
     admin_password: str | None,
-    admin_name: str | None,
-    search_profile_name: str,
-    regions: list[str],
-    remonttityyppi: str,
+    admin_name: str | None = None,
+    search_profile_name: str | None = None,
+    regions: list[str] | None = None,
+    remonttityyppi: str | None = None,
+    remonttityypit: list[str] | None = None,
     source: str = "oikotie",
     is_active: bool = True,
     slug: str | None = None,
-    min_confidence: int = 60,
+    min_confidence: int = 50,
     daily_lead_limit: int = 50,
     cities: list[str] | None = None,
 ) -> CustomerOnboardingResult:
@@ -102,6 +120,15 @@ def create_customer(
     organization_name = (organization_name or "").strip()
     if not organization_name:
         raise CustomerOnboardingError("Organisaation nimi on pakollinen.", "invalid_name")
+    types = clean_renovation_types(remonttityypit or ([remonttityyppi] if remonttityyppi else []))
+    if not types:
+        raise CustomerOnboardingError("Valitse vähintään yksi remonttityyppi.", "invalid_type")
+    # No region choice at onboarding: the customer sees the whole country and
+    # narrows the list on the Kohteet page (region / city filters).
+    from app.search.constants import ALL_FINLAND_REGION
+
+    regions = list(regions or []) or [ALL_FINLAND_REGION]
+    search_profile_name = (search_profile_name or "").strip() or default_profile_name(types)
 
     org_slug = (slug or "").strip().lower() or _slug_from_name(organization_name)
 
@@ -133,7 +160,8 @@ def create_customer(
         profile = create_profile(
             organization.id,
             name=search_profile_name,
-            remonttityyppi=remonttityyppi,
+            remonttityyppi=types[0],
+            remonttityypit=types,
             regions=regions,
             schedule_description="daily",
             crm_api_key=None,
