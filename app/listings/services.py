@@ -26,6 +26,10 @@ from app.search.models import SearchProfile
 logger = logging.getLogger(__name__)
 
 SOURCE = "oikotie"
+# Listings that did not come from the Oikotie crawler (CSV / API import, e.g. a
+# licensed data feed). They live in the same catalogue and match the same
+# profiles; only the crawl state and "removed from Oikotie" logic ignore them.
+IMPORT_SOURCE = "import"
 PAGE_SIZE = 24
 
 REGION_SLUGS: dict[str, str] = {
@@ -426,6 +430,10 @@ def _listing_brief(listing: Listing) -> dict:
         "isannoitsija": listing.isannoitsija,
         "build_year": listing.build_year,
         "building_type": listing.building_type,
+        "source": listing.source,
+        # Only Oikotie listings have a detail page worth fetching. Imported
+        # listings carry their full text in `description`.
+        "fetch_detail": listing.source == SOURCE,
     }
 
 
@@ -528,7 +536,7 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
         if value:
             setattr(listing, field, value)
     if listing.has_contact and not listing.contact_source:
-        listing.contact_source = "oikotie"
+        listing.contact_source = listing.source
     # the card's own values win; the AI fills what the card did not have
     if listing.build_year is None:
         listing.build_year = _parse_year(payload.get("rakennusvuosi"))
@@ -682,7 +690,6 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
     listings = (
         Listing.query.join(ListingRenovation, ListingRenovation.listing_id == Listing.id)
         .filter(
-            Listing.source == SOURCE,
             Listing.is_active.is_(True),
             Listing.analysis_status == "done",
             Listing.maakunta.in_(regions),
@@ -755,8 +762,15 @@ def rematch_profiles(*, now: datetime | None = None) -> int:
     return total
 
 
+def lead_source(listing: Listing) -> str:
+    """Lead.source for a catalogue lead: Oikotie listings keep "oikotie", every
+    other listing source is an import."""
+    return SOURCE if listing.source == SOURCE else IMPORT_SOURCE
+
+
 def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
     manager = listing.isannoitsija or ""
+    source = lead_source(listing)
     renovation = _best_renovation(profile, listing)
     rtype = renovation.remonttityyppi if renovation else profile.remonttityyppi
     building = ", ".join(
@@ -770,13 +784,13 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
             renovation and renovation.evidence and f"Osuma ({rtype}): {renovation.evidence}",
-            listing.url and f"Oikotie: {listing.url}",
+            listing.url and f"{'Oikotie' if source == SOURCE else 'Lähde'}: {listing.url}",
         )
         if part
     )
     website = listing.isannoitsija_website if (listing.isannoitsija_website or "").startswith("http") else None
     return {
-        "source": SOURCE,
+        "source": source,
         "source_ref": listing.source_ref,
         "company": manager or listing.taloyhtio or None,
         "title": "Isännöitsijä" if manager else None,
@@ -784,7 +798,7 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
         "email": listing.isannoitsija_email or None,
         "website": website,
         "notes": notes,
-        "tags": [t[:50] for t in (rtype, SOURCE, listing.maakunta) if t],
+        "tags": [t[:50] for t in (rtype, source, listing.maakunta) if t],
         "gdpr_legal_basis": "legitimate_interest",
         "metadata": _lead_metadata(listing, profile, renovation),
     }
@@ -797,7 +811,7 @@ def _lead_metadata(listing: Listing, profile: SearchProfile | None, renovation) 
         "isannoitsija_email": listing.isannoitsija_email or "",
         "taloyhtio": listing.taloyhtio or "",
         "tulevat_remontit": listing.tulevat_remontit or "",
-        "oikotie_url": listing.url or "",
+        ("oikotie_url" if listing.source == SOURCE else "lahde_url"): listing.url or "",
         "kaupunki": listing.kaupunki or "",
         "osoite": listing.osoite or "",
         "hinta": listing.hinta or "",

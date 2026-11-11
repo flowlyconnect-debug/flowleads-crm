@@ -388,7 +388,70 @@ def update_customer_features_route(organization_id: int):
 def catalogue_status():
     from app.listings.services import catalogue_health
 
-    return render_template("admin/catalogue.html", health=catalogue_health())
+    return render_template("admin/catalogue.html", health=catalogue_health(), remonttityypit=REMONTTITYYPIT)
+
+
+@admin_bp.route("/catalogue/import", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_import():
+    """CSV import of listings from a source other than the Oikotie crawler."""
+    from app.core.audit import log_audit
+    from app.listings.import_services import import_listings, parse_listing_csv
+    from app.listings.services import ListingServiceError
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Valitse CSV-tiedosto.", "danger")
+        return redirect(url_for("admin.catalogue_status"))
+    try:
+        rows = parse_listing_csv(upload.read(5 * 1024 * 1024 + 1)[: 5 * 1024 * 1024])
+        result = import_listings(rows)
+    except ListingServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return redirect(url_for("admin.catalogue_status"))
+
+    log_audit(
+        action="catalogue_import",
+        user_id=current_user.id,
+        organization_id=None,
+        target_type="listing",
+        target_id=None,
+        metadata={k: v for k, v in result.items() if k != "errors"} | {"errors": len(result["errors"])},
+    )
+    db.session.commit()
+    flash(
+        f"Tuotu {result['created']} uutta ja päivitetty {result['updated']} kohdetta. "
+        f"Liidejä luotu {result['leads_created']}, AI-analyysiin jonossa {result['queued']}.",
+        "success",
+    )
+    if result["errors"]:
+        shown = "; ".join(f"rivi {e['row'] + 1}: {e['error']}" for e in result["errors"][:8])
+        more = len(result["errors"]) - 8
+        flash(
+            f"{len(result['errors'])} riviä ohitettiin. {shown}" + (f" (+{more} muuta)" if more > 0 else ""),
+            "warning",
+        )
+    return redirect(url_for("admin.catalogue_status"))
+
+
+@admin_bp.route("/catalogue/import-template.csv")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_import_template():
+    from flask import Response
+
+    from app.listings.import_services import csv_template
+
+    # BOM so Excel opens the file as UTF-8
+    return Response(
+        "﻿" + csv_template(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=flowleads-kohteet-malli.csv"},
+    )
 
 
 @admin_bp.route("/api-keys", methods=["GET"])

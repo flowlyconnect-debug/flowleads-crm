@@ -197,6 +197,12 @@ return [{ json: { ...task, locations } }];
         )
     )
     boot = take(lib, "HTTP – Fetch Oikotie API Bootstrap", [1540, 200], onError="continueRegularOutput")
+    # The production Lead Worker never sent a cookie here: its expression read
+    # headers from an item that has none, which n8n resolves to "no header".
+    # Sending an empty `cookie:` header instead is a wire-level difference no
+    # browser makes, so the header is left out to match production exactly.
+    boot_headers = boot["parameters"]["headerParameters"]["parameters"]
+    boot["parameters"]["headerParameters"]["parameters"] = [h for h in boot_headers if h["name"].lower() != "cookie"]
     nodes.append(boot)
     nodes.append(
         code(
@@ -303,14 +309,20 @@ const r = $input.first()?.json || {};
 const page = Number(ctx.page_in_run || 1);
 // The CRM decides: incremental stops once a page brings nothing new, the
 // full pass stops after its per-run slice; max_pages is a local safety cap.
-const more = r.continue === true && page < Number(ctx.max_pages || 1);
-return [{ json: { ...ctx, more, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];
+// Oikotie's bot protection answers 403 (captcha) or 429 when we go too fast.
+// Then the whole run stops: no more pages and no further regions this hour.
+const err = String($('CODE – Normalize Cards').first().json.body.error || '');
+const blocked = /(?<!\\d)(403|429)(?!\\d)|captcha/i.test(err);
+const more = !blocked && r.continue === true && page < Number(ctx.max_pages || 1);
+return [{ json: { ...ctx, more, blocked, offset: Number(r.next_offset ?? (Number(ctx.offset || 0) + 24)), page_in_run: page + 1 } }];
 """,
             [2860, 200],
         )
     )
-    nodes.append(bool_if("IF – More Pages", "={{ $json.more }}", [3080, 200]))
-    nodes.append(wait_node("WAIT – Between Pages", 2, [3300, 340]))
+    # true output is deliberately unconnected: a blocked run ends here.
+    nodes.append(bool_if("IF – Oikotie Blocked", "={{ $json.blocked }}", [3080, 200]))
+    nodes.append(bool_if("IF – More Pages", "={{ $json.more }}", [3300, 200]))
+    nodes.append(wait_node("WAIT – Between Pages", 10, [3520, 340]))
 
     connect(c, "Every hour", "SET – Config")
     connect(c, "Manual Trigger", "SET – Config")
@@ -326,7 +338,8 @@ return [{ json: { ...ctx, more, offset: Number(r.next_offset ?? (Number(ctx.offs
     connect(c, "HTTP – Fetch Oikotie Listings API", "CODE – Normalize Cards")
     connect(c, "CODE – Normalize Cards", "HTTP – CRM Ingest")
     connect(c, "HTTP – CRM Ingest", "CODE – Next Page")
-    connect(c, "CODE – Next Page", "IF – More Pages")
+    connect(c, "CODE – Next Page", "IF – Oikotie Blocked")
+    connect(c, "IF – Oikotie Blocked", "IF – More Pages", out_index=1)
     connect(c, "IF – More Pages", "WAIT – Between Pages", out_index=0)
     connect(c, "IF – More Pages", "LOOP – Tasks", out_index=1)
     connect(c, "WAIT – Between Pages", "CODE – Page Context")
@@ -423,6 +436,9 @@ return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_b
             3,
         ),
         wait_node("WAIT – Rate Limit", 1, [1320, 260]),
+        # Imported listings (fetch_detail === false) carry their full text in
+        # `description`; only Oikotie listings have a detail page to fetch.
+        bool_if("IF – Fetch Detail Page", "={{ $json.fetch_detail !== false }}", [1430, 260]),
     ]
     detail = take(lib, "HTTP – Fetch Listing Detail Page", [1540, 260], onError="continueRegularOutput")
     detail["parameters"]["url"] = "={{ $('LOOP – Listings').first().json.url }}"
@@ -436,7 +452,8 @@ return (r.listings || []).map(l => ({ json: { ...l, remonttityypit: types, crm_b
             "CODE – Build Analysis Prompt",
             """
 const listing = $('LOOP – Listings').first().json;
-const h = $input.first()?.json || {};
+const useOwnText = listing.fetch_detail === false;
+const h = useOwnText ? {} : ($input.first()?.json || {});
 const status = Number(h.statusCode || 0);
 const html = String(h.pageHtml ?? h.body ?? h.data ?? '').slice(0, 200000);
 
@@ -455,16 +472,21 @@ for (const marker of ['Taloyhtiö', 'Tulevat remontit', 'Asunnon lisätiedot', '
   if (idx >= 0) { text = text.slice(idx); break; }
 }
 text = text.slice(0, 12000);
+if (useOwnText) text = String(listing.description || '').replace(/\\s+/g, ' ').trim().slice(0, 12000);
 
-const ok = !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;
+const ok = useOwnText
+  ? text.length >= 30
+  : !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;
 const PROMPT = %s;
 const types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');
 return [{ json: {
   ...listing,
   ok,
-  error: ok ? '' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`,
+  error: ok ? '' : (useOwnText ? 'Imported listing has no text to analyse' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`),
   ai_system_prompt: PROMPT.replace('__TYPES__', types),
-  ai_user_prompt: `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,
+  ai_user_prompt: useOwnText
+    ? `Taloyhtiö: ${listing.taloyhtio || ''}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\n\\nKohteen teksti:\\n${text}`
+    : `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,
 } }];
 """
             % json.dumps(ANALYSIS_PROMPT, ensure_ascii=False),
@@ -556,7 +578,9 @@ return [{ json: { more: claimed >= 20 && elapsed < 7 * 60 * 1000 } }];
     connect(c, "CODE – Split Listings", "LOOP – Listings")
     connect(c, "LOOP – Listings", "CODE – More To Claim", out_index=0)
     connect(c, "LOOP – Listings", "WAIT – Rate Limit", out_index=1)
-    connect(c, "WAIT – Rate Limit", "HTTP – Fetch Listing Detail Page")
+    connect(c, "WAIT – Rate Limit", "IF – Fetch Detail Page")
+    connect(c, "IF – Fetch Detail Page", "HTTP – Fetch Listing Detail Page", out_index=0)
+    connect(c, "IF – Fetch Detail Page", "CODE – Build Analysis Prompt", out_index=1)
     connect(c, "HTTP – Fetch Listing Detail Page", "CODE – Build Analysis Prompt")
     connect(c, "CODE – Build Analysis Prompt", "IF – Page OK")
     connect(c, "IF – Page OK", "AI – Analyze Listing", out_index=0)

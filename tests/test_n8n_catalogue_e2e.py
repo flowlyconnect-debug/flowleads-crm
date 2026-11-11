@@ -70,7 +70,7 @@ def _workflow_with_config(name, base_url, tmp_path):
     return out
 
 
-def _run(name, base_url, tmp_path):
+def _run(name, base_url, tmp_path, env=None):
     path = _workflow_with_config(name, base_url, tmp_path)
     proc = subprocess.run(
         [NODE, str(SIM / "executor.js"), str(path), base_url, str(SIM / "mocks.js")],
@@ -78,6 +78,7 @@ def _run(name, base_url, tmp_path):
         text=True,
         encoding="utf-8",
         timeout=120,
+        env={**os.environ, **(env or {})},
     )
     lines = [l for l in proc.stdout.splitlines() if l.startswith("{")]
     assert lines, f"no output from executor: {proc.stdout}\n{proc.stderr}"
@@ -169,3 +170,64 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         lead = Lead.query.filter_by(organization_id=org_id, source_ref="oikotie-1002").one()
         assert lead.phone == "0409998888"
         assert lead.company == "Avaimeton Isännöinti Oy"
+
+
+def test_crawler_stops_the_whole_run_when_oikotie_blocks_it(live_crm, tmp_path):
+    """A 403/captcha from Oikotie ends the run: one error is recorded and no
+    further regions are requested (hammering on only prolongs the block)."""
+    app, base = live_crm
+    from app.listings.models import CrawlState, Listing
+
+    crawl = _run("flowleads-crawler.json", base, tmp_path, env={"MOCK_OIKOTIE_BLOCKED": "1"})
+    assert crawl["runs"]["HTTP – Fetch Oikotie Listings API"] == 1
+    assert crawl["runs"]["HTTP – CRM Ingest"] == 1
+    with app.app_context():
+        assert Listing.query.count() == 0
+        errors = [s.last_error for s in CrawlState.query.all() if s.last_error]
+        assert len(errors) == 1
+        assert "403" in errors[0]
+
+
+def test_analyzer_analyses_imported_text_without_fetching_a_page(live_crm, tmp_path):
+    """An imported listing has no Oikotie page: the Analyzer classifies the
+    text it was imported with and the lead appears, with no detail-page request."""
+    app, base = live_crm
+    from app.extensions import db
+    from app.leads.models import Lead
+    from app.listings.import_services import import_listings
+    from app.listings.models import Listing
+    from app.search.models import SearchProfile
+    from app.users.services import create_organization
+
+    with app.app_context():
+        org = create_organization("Import Org", "import-org")
+        db.session.flush()
+        db.session.add(
+            SearchProfile(organization_id=org.id, name="Lukot", remonttityyppi="Lukkoremontti / kulunvalvonta",
+                          regions=["Uusimaa"], source="oikotie", is_active=True, needs_rematch=False,
+                          daily_lead_limit=0)
+        )
+        db.session.commit()
+        org_id = org.id
+        result = import_listings(
+            [
+                {
+                    "taloyhtio": "As Oy Tuonti",
+                    "osoite": "Tuontitie 1",
+                    "kaupunki": "Espoo",
+                    "maakunta": "Uusimaa",
+                    "description": "Taloyhtiö As Oy Tuonti. Hallitus valmistelee lukituksen uusimista (iLOQ) vuodelle 2027.",
+                }
+            ]
+        )
+        assert result["queued"] == 1
+
+    run = _run("flowleads-analyzer.json", base, tmp_path)
+    assert run["runs"].get("HTTP – Fetch Listing Detail Page", 0) == 0
+    assert run["runs"]["AI – Analyze Listing"] == 1
+    with app.app_context():
+        listing = Listing.query.one()
+        assert listing.analysis_status == "done"
+        assert [r.remonttityyppi for r in listing.renovations] == ["Lukkoremontti / kulunvalvonta"]
+        lead = Lead.query.filter_by(organization_id=org_id).one()
+        assert lead.source == "import"

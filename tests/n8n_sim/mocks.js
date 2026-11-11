@@ -37,6 +37,8 @@ exports.http = ({ url }) => {
   const u = new URL(url);
   if (u.hostname === 'asunnot.oikotie.fi') {
     if (u.pathname === '/api/search') {
+      // Bot protection: Oikotie answers 403 with a captcha URL when it blocks us.
+      if (process.env.MOCK_OIKOTIE_BLOCKED) return { status: 403, text: '{"url":"https://geo.captcha-delivery.com/captcha/"}' };
       const offset = Number(u.searchParams.get('offset') || 0);
       const locations = u.searchParams.get('locations') || '';
       const ids = locations.includes('uusimaa') || locations.includes('Uusimaa') ? UUSIMAA_IDS : [];

@@ -15,6 +15,7 @@ PROPERTY_INFO_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("rakennusvuosi", "Rakennusvuosi", False),
     ("remontin_ajankohta", "Remontin ajankohta", False),
     ("oikotie_url", "Oikotie-linkki", True),
+    ("lahde_url", "Lähde", True),
 )
 
 
@@ -40,7 +41,7 @@ def get_property_info_rows(ai_contact_info: dict | None) -> list[dict]:
         row: dict = {"key": key, "label": label, "value": text}
         if is_url:
             row["is_url"] = True
-            row["link_text"] = "Avaa Oikotiessä"
+            row["link_text"] = "Avaa Oikotiessä" if key == "oikotie_url" else "Avaa lähde"
         else:
             row["is_url"] = False
         rows.append(row)

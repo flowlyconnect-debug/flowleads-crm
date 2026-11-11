@@ -6,6 +6,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
 from app.extensions import db
+from app.listings.import_services import import_listings
 from app.listings.services import (
     ListingServiceError,
     claim_analysis,
@@ -70,6 +71,17 @@ def ingest():
         listings=body.get("listings") if body.get("listings") is not None else [],
         error=body.get("error") or None,
     )
+
+
+@listings_n8n_bp.route("/import", methods=["POST"])
+@require_n8n_secret
+def import_route():
+    """Listings from any source other than the Oikotie crawler (a licensed
+    feed, a partner export). Same row format as the admin CSV import."""
+    body = _body()
+    if body is None:
+        return _error("JSON body is required.")
+    return _run(import_listings, body.get("listings"), source=str(body.get("source") or "import"))
 
 
 @listings_n8n_bp.route("/analysis/claim", methods=["POST"])

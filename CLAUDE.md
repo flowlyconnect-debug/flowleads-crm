@@ -20,6 +20,10 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 - Onboarding (`app/admin/onboarding_services.py`, `invite_services.py`) creates an **active** profile and
   nothing else per customer: no API key, no SearchJob. Turning a profile on must go through
   `activate_profile()` so it is rematched. Billing is manual for now.
+- **Oikotie blocks n8n Cloud since 11/2026** (DataDome 403 + captcha, the old Lead Worker too). The Crawler stops
+  at the first block; never add bot-protection workarounds. Listings can come from any other source through
+  `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
+  Rows with a renovation type become leads at once; text-only rows go to the Analyzer (`fetch_detail: false`).
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run
