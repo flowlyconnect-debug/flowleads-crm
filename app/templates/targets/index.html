@@ -29,12 +29,38 @@
       </p>
     </div>
     <div class="leads-header__actions">
+      {% if fetch_enabled and not is_hidden_tab %}
+      <span class="targets-fetch">
+        {% if next_fetch_label %}
+        <span class="targets-fetch__next" id="targets-fetch-next" data-seconds="{{ next_fetch_seconds }}">Seuraava haku klo {{ next_fetch_label }}</span>
+        {% endif %}
+        <button type="button" class="btn btn-primary btn-sm" id="targets-fetch-btn"
+                data-url="{{ url_for('targets.fetch', **org_query) }}"{% if next_fetch_label %} disabled{% endif %}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.35-4.35"/></svg>
+          Hae kohteita
+        </button>
+      </span>
+      {% endif %}
       {% if can_edit_profiles %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}">Hakuprofiilit</a>
       {% endif %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
     </div>
   </header>
+
+  {% if fetched is not none %}
+  <div class="targets-fetched{% if not fetched %} targets-fetched--none{% endif %}" role="status">
+    {% if fetched %}
+    <strong>{{ 'Löytyi 1 uusi kohde.' if fetched == 1 else 'Löytyi ' ~ fetched ~ ' uutta kohdetta.' }}</strong>
+    Ne on merkitty listaan. Siirrä kiinnostavat liideiksi.
+    {% else %}
+    <strong>Tällä kertaa ei löytynyt uusia kohteita.</strong> Uusia kohteita tulee tarjolle sitä mukaa kun niitä löytyy. Kokeile myöhemmin uudelleen.
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if reserve_count is not none and fetch_enabled %}
+  <p class="targets-reserve-note">Ylläpidon näkymä: varastossa {{ reserve_count }} kohdetta, jotka asiakas saa näkyviin Hae kohteita -painikkeella.</p>
+  {% endif %}
 
   <div class="leads-work">
     <div class="leads-toolbar" role="toolbar" aria-label="Kohdelistan työkalupalkki">
@@ -124,7 +150,11 @@
       {% elif not profiles %}
         {{ empty_state(none, "Hakuprofiilia ei ole vielä", "Kohteet haetaan hakuprofiilin perusteella: alueet ja remonttityypit.", "Luo hakuprofiili" if can_edit_profiles else none, url_for('settings.search_profiles_list', id='new', **org_query) if can_edit_profiles else none) }}
       {% else %}
+        {% if fetch_enabled %}
+        {{ empty_state(none, "Ei kohteita listalla", "Paina Hae kohteita, niin haemme hakuprofiiliisi sopivia taloyhtiöitä." if not next_fetch_label else "Seuraava haku on mahdollinen klo " ~ next_fetch_label ~ ".") }}
+        {% else %}
         {{ empty_state(none, "Ei uusia kohteita juuri nyt", "Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät tänne sitä mukaa kun niitä löytyy.") }}
+        {% endif %}
       {% endif %}
     </div>
     {% else %}
@@ -172,6 +202,7 @@
           <div class="target-row__main">
             <div class="target-row__title">
               <span class="target-row__name">{{ row.title }}</span>
+              {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
             </div>
             <div class="target-row__facts">
@@ -243,8 +274,86 @@
     {% endif %}
   </div>
 </section>
+
+{% if fetch_enabled %}
+<div class="targets-fetch-overlay" id="targets-fetch-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="targets-fetch-title">
+  <div class="targets-fetch-dialog">
+    <div class="targets-fetch-spinner" aria-hidden="true"></div>
+    <h2 id="targets-fetch-title">Haetaan kohteita</h2>
+    <p class="targets-fetch-step" id="targets-fetch-step" aria-live="polite">Käydään läpi hakuprofiiliasi…</p>
+    <div class="targets-fetch-bar" aria-hidden="true"><span id="targets-fetch-progress"></span></div>
+    <p class="targets-fetch-hint">Tämä kestää hetken. Älä sulje sivua.</p>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
+{% if fetch_enabled %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var button = document.getElementById('targets-fetch-btn');
+  if (!button) return;
+  var overlay = document.getElementById('targets-fetch-overlay');
+  var stepEl = document.getElementById('targets-fetch-step');
+  var bar = document.getElementById('targets-fetch-progress');
+  var steps = [
+    'Käydään läpi hakuprofiiliasi…',
+    'Haetaan alueesi taloyhtiöitä…',
+    'Tarkistetaan tulevat remontit…',
+    'Verrataan remonttityyppeihisi…',
+    'Kootaan isännöitsijöiden yhteystiedot…',
+    'Viimeistellään tuloksia…'
+  ];
+  var csrf = document.querySelector('meta[name=csrf-token]').content;
+
+  // cooldown: enable the button when the hour is up, without a reload
+  var next = document.getElementById('targets-fetch-next');
+  if (next) {
+    setTimeout(function () { button.disabled = false; next.remove(); }, (parseInt(next.dataset.seconds, 10) + 1) * 1000);
+  }
+
+  function run(waitSeconds, redirect) {
+    overlay.hidden = false;
+    document.body.classList.add('modal-open');
+    var total = waitSeconds * 1000, started = Date.now(), index = 0;
+    stepEl.textContent = steps[0];
+    var stepTimer = setInterval(function () {
+      index = Math.min(index + 1, steps.length - 1);
+      stepEl.textContent = steps[index];
+    }, total / steps.length);
+    var barTimer = setInterval(function () {
+      var done = Math.min(1, (Date.now() - started) / total);
+      bar.style.width = Math.round(done * 100) + '%';
+    }, 120);
+    setTimeout(function () {
+      clearInterval(stepTimer); clearInterval(barTimer);
+      window.location.href = redirect;
+    }, total + 600);
+  }
+
+  button.addEventListener('click', function () {
+    button.disabled = true;
+    fetch(button.dataset.url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': csrf, 'Accept': 'application/json' }
+    }).then(function (response) {
+      return response.json().then(function (data) { return { ok: response.ok, data: data }; });
+    }).then(function (result) {
+      if (result.ok && result.data.success) {
+        run(result.data.wait_seconds, result.data.redirect);
+      } else {
+        alert(result.data.message || 'Haku ei onnistunut. Yritä hetken kuluttua uudelleen.');
+        if (result.data.code !== 'cooldown') button.disabled = false;
+      }
+    }).catch(function () {
+      alert('Haku ei onnistunut. Tarkista verkkoyhteys ja yritä uudelleen.');
+      button.disabled = false;
+    });
+  });
+});
+</script>
+{% endif %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var form = document.getElementById('targets-form');

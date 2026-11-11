@@ -61,6 +61,10 @@ class OrganizationSettings(db.Model):
     targets_digest_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # last press of "Hae kohteita" (one per cooldown for the organization)
+    targets_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
 
