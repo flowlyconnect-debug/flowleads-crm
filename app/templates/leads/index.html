@@ -238,11 +238,11 @@
       {{ empty_state(
         "ti-user-plus",
         "Ei liidejä vielä",
-        "Liidit saapuvat automaattisesti kun hakuprofiilisi on valmis.",
-        "Avaa hakuprofiili",
-        "/settings/leads",
-        "Lisää liidi manuaalisesti",
-        "/leads/new"
+        "Hakuprofiiliisi osuvat taloyhtiöt näkyvät Kohteet-sivulla. Siirrä sieltä kiinnostavat liideiksi tai lisää liidi käsin.",
+        "Avaa Kohteet",
+        url_for('targets.index', **({'organization_id': active_org_id} if current_user.is_superadmin() and active_org_id else {})),
+        "Lisää liidi käsin",
+        url_for('leads.new_lead', **({'organization_id': active_org_id} if current_user.is_superadmin() and active_org_id else {}))
       ) }}
     </div>
 

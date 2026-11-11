@@ -14,14 +14,22 @@ from app.users.team_services import (
 
 
 def _resolve_organization_id():
-    organization_id = current_user.organization_id
     if current_user.is_superadmin():
-        org_id_param = request.args.get("organization_id") or request.form.get("organization_id")
-        try:
-            organization_id = int(org_id_param) if org_id_param else None
-        except (TypeError, ValueError):
-            organization_id = None
-    return organization_id
+        from app.core.tenant import resolve_organization_id
+
+        return resolve_organization_id()
+    return current_user.organization_id
+
+
+def _flash_invite_result(delivery, success_message: str) -> None:
+    if delivery and not delivery.get("sent"):
+        flash(
+            "Käyttäjä on luotu, mutta kutsusähköpostia ei voitu lähettää. Välitä hänelle tämä "
+            f"salasanan asetuslinkki (voimassa 7 päivää): {delivery.get('url')}",
+            "warning",
+        )
+        return
+    flash(success_message, "success")
 
 
 def _redirect_to_team(organization_id):
@@ -71,9 +79,9 @@ def register_team_settings_routes(settings_bp):
         email = (request.form.get("email") or "").strip()
         role = request.form.get("role") or "user"
         try:
-            invite_teammate(organization_id, email, role, actor=current_user)
+            user = invite_teammate(organization_id, email, role, actor=current_user)
             db.session.commit()
-            flash("Kutsu lähetetty.", "success")
+            _flash_invite_result(getattr(user, "invite_delivery", None), "Kutsu lähetetty.")
         except UserServiceError as exc:
             db.session.rollback()
             flash(exc.message, "danger")
@@ -86,9 +94,9 @@ def register_team_settings_routes(settings_bp):
     def resend_team_invite(user_id):
         target = _load_team_target(user_id)
         try:
-            resend_teammate_invite(target, actor=current_user)
+            delivery = resend_teammate_invite(target, actor=current_user)
             db.session.commit()
-            flash("Kutsu lähetetty uudelleen.", "success")
+            _flash_invite_result(delivery, "Kutsu lähetetty uudelleen.")
         except UserServiceError as exc:
             db.session.rollback()
             flash(exc.message, "danger")

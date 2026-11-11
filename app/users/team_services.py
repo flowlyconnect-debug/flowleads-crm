@@ -34,26 +34,37 @@ def invite_teammate(organization_id: int, email: str, role: str, *, actor: User)
         actor=actor,
     )
     db.session.flush()
-    _send_invite(user)
+    user.invite_delivery = _send_invite(user)
     return user
 
 
-def resend_teammate_invite(user: User, *, actor: User) -> None:
+def resend_teammate_invite(user: User, *, actor: User) -> dict:
     ensure_same_organization(actor, user)
-    _send_invite(user)
+    return _send_invite(user)
 
 
-def _send_invite(user: User) -> None:
+# A colleague may not open the invitation the same hour it was sent.
+TEAM_INVITE_MAX_AGE_SECONDS = 7 * 24 * 3600
+
+
+def _send_invite(user: User) -> dict:
+    """Send the set-password link. Returns {"sent": bool, "url": str} so the
+    caller can show the link when the email could not be sent (it used to
+    report success either way)."""
     from flask import url_for
 
     from app.auth.services import issue_password_reset_token
     from app.email.services import EmailService
 
-    token = issue_password_reset_token(user)
+    token = issue_password_reset_token(user, max_age_seconds=TEAM_INVITE_MAX_AGE_SECONDS)
     set_password_url = url_for("auth.reset_password", token=token, _external=True)
     organization = db.session.get(Organization, user.organization_id)
-    EmailService.send_teammate_invite_email(
-        to_email=user.email,
-        set_password_url=set_password_url,
-        organization_name=organization.name if organization else "FlowLeads",
-    )
+    try:
+        result = EmailService.send_teammate_invite_email(
+            to_email=user.email,
+            set_password_url=set_password_url,
+            organization_name=organization.name if organization else "FlowLeads",
+        )
+    except Exception:
+        result = {"success": False}
+    return {"sent": bool(result and result.get("success")), "url": set_password_url}

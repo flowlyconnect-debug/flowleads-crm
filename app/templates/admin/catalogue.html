@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
 {% block title %}Kohdekatalogi — Hallinta{% endblock %}
-{% macro when(value) %}{% if value %}{{ value.strftime('%d.%m.%Y %H:%M') }}{% else %}—{% endif %}{% endmacro %}
+{% macro when(value) %}{% if value %}{{ (value|helsinki).strftime('%d.%m.%Y %H:%M') }}{% else %}—{% endif %}{% endmacro %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
-    {{ settings_nav('customers') }}
+    {{ settings_nav('catalogue') }}
     <div class="settings-content">
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">

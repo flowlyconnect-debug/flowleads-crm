@@ -55,7 +55,7 @@
         {% else %}
         <span class="lead-focus__value lead-focus__value--missing">Arvoa ei ole arvioitu</span>
         {% endif %}
-        {% if lead.created_at %}<span>Saapui {{ lead.created_at.strftime('%d.%m.%Y') }}</span>{% endif %}
+        {% if lead.created_at %}<span>Saapui {{ (lead.created_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
         {% if lead.assignee %}<span class="truncate">Vastuu: {{ lead.assignee.email.split('@')[0] }}</span>{% endif %}
       </div>
       <div class="lead-focus__badges lead-header-badges">
@@ -199,7 +199,7 @@
               <span class="contact-info-icon" aria-hidden="true">⚙</span>
               <div class="contact-info-value">
                 <span class="badge leads-source-badge">
-                  {{ lead.source }}{% if lead.source_ref %} · {{ lead.source_ref }}{% endif %}
+                  {{ source_label(lead.source) }}{% if lead.source_ref %} · {{ lead.source_ref }}{% endif %}
                 </span>
               </div>
             </div>
@@ -308,12 +308,12 @@
                     {% if 'email' in kind %}✉{% elif 'stage' in kind %}⬆{% elif 'task' in kind %}☑{% elif 'ai' in kind %}✦{% else %}●{% endif %}
                   </div>
                   <div class="activity-content">
-                    <div class="activity-title">{{ act.type }}</div>
+                    <div class="activity-title">{{ ACTIVITY_LABELS_FI.get(act.type, act.type) }}</div>
                     {% if act.content %}
                     <div class="activity-body">{{ act.content }}</div>
                     {% endif %}
                     <div class="activity-time">
-                      {{ act.created_at.strftime('%Y-%m-%d %H:%M') if act.created_at else '' }}
+                      {{ (act.created_at|helsinki).strftime('%Y-%m-%d %H:%M') if act.created_at else '' }}
                     </div>
                   </div>
                 </li>
@@ -378,7 +378,7 @@
                     <div class="activity-content">
                       <div class="activity-title"><s>{{ task.title }}</s></div>
                       <div class="activity-time">
-                        {{ task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '' }}
+                        {{ (task.completed_at|helsinki).strftime('%Y-%m-%d') if task.completed_at else '' }}
                       </div>
                     </div>
                   </li>
@@ -452,7 +452,7 @@
                       </td>
                       <td>
                         {% if row.enrollment.status == 'active' and row.next_send_at %}
-                        {{ row.next_send_at.strftime('%Y-%m-%d %H:%M') }}
+                        {{ (row.next_send_at|helsinki).strftime('%Y-%m-%d %H:%M') }}
                         {% else %}—{% endif %}
                       </td>
                       <td class="leads-cell-actions">
@@ -500,7 +500,7 @@
                   <div class="activity-content">
                     <div class="activity-title">{{ meeting.title }}</div>
                     <div class="activity-time">
-                      {{ meeting.start_at.strftime('%Y-%m-%d %H:%M') }}–{{ meeting.end_at.strftime('%H:%M') }}
+                      {{ (meeting.start_at|helsinki).strftime('%Y-%m-%d %H:%M') }}–{{ (meeting.end_at|helsinki).strftime('%H:%M') }}
                     </div>
                     {% if meeting.attendees %}
                     <div class="activity-body text-secondary">
@@ -533,7 +533,7 @@
                     <div class="activity-content">
                       <div class="activity-title"><s>{{ meeting.title }}</s></div>
                       <div class="activity-time">
-                        {{ meeting.start_at.strftime('%Y-%m-%d %H:%M') }}
+                        {{ (meeting.start_at|helsinki).strftime('%Y-%m-%d %H:%M') }}
                       </div>
                     </div>
                   </li>
@@ -593,7 +593,7 @@
                     <div class="contact-info-item">
                       <span class="contact-info-icon" aria-hidden="true">🕒</span>
                       <div class="contact-info-value">
-                        <strong>Suostumusaika:</strong> {{ lead.gdpr_consent_at.strftime('%Y-%m-%d %H:%M') if lead.gdpr_consent_at else '—' }}
+                        <strong>Suostumusaika:</strong> {{ (lead.gdpr_consent_at|helsinki).strftime('%Y-%m-%d %H:%M') if lead.gdpr_consent_at else '—' }}
                       </div>
                     </div>
                     <div class="contact-info-item">
@@ -617,7 +617,7 @@
                     <div class="contact-info-item">
                       <span class="contact-info-icon" aria-hidden="true">⛔</span>
                       <div class="contact-info-value">
-                        <strong>Uutiskirjeestä pois:</strong> {{ 'Kyllä' if lead.unsubscribed else 'Ei' }}{% if lead.unsubscribed_at %} ({{ lead.unsubscribed_at.strftime('%Y-%m-%d') }}){% endif %}
+                        <strong>Uutiskirjeestä pois:</strong> {{ 'Kyllä' if lead.unsubscribed else 'Ei' }}{% if lead.unsubscribed_at %} ({{ (lead.unsubscribed_at|helsinki).strftime('%Y-%m-%d') }}){% endif %}
                       </div>
                     </div>
                     <div class="contact-info-item">
@@ -664,14 +664,44 @@
           <form method="post" action="{{ url_for('leads.move_stage', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.move_stage', lead_id=lead.id) }}" id="stage-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="form-label text-sm">Vaihe</label>
-            <select name="stage_id" class="form-input form-input--compact" onchange="document.getElementById('stage-form').submit()">
+            <select name="stage_id" id="stage-select" class="form-input form-input--compact">
               {% for s in stages %}
-              <option value="{{ s.id }}" {% if s.id == lead.stage_id %}selected{% endif %}>{{ s.name }}</option>
+              <option value="{{ s.id }}" {% if s.id == lead.stage_id %}selected{% endif %}{% if s.name|lower in ('lost', 'closed lost', 'hävitty') %} data-lost="1"{% endif %}>{{ stage_label(s.name) }}</option>
               {% endfor %}
             </select>
+            {# Moving to Hävitty needs a reason, so that step is confirmed with a button. #}
+            <div id="stage-lost-fields" hidden class="mt-2">
+              <label class="form-label text-sm" for="stage-lost-reason">Häviön syy</label>
+              <select name="lost_reason" id="stage-lost-reason" class="form-input form-input--compact">
+                <option value="">Valitse syy…</option>
+                <option value="no_response">Ei vastannut</option>
+                <option value="wrong_target">Väärä kohderyhmä</option>
+                <option value="no_budget">Ei budjettia</option>
+                <option value="not_timely">Ei ajankohtainen</option>
+                <option value="competitor">Kilpailija voitti</option>
+                <option value="other">Muu syy</option>
+              </select>
+              <input type="text" name="lost_reason_note" class="form-input form-input--compact mt-2" placeholder="Lisätieto (valinnainen)" maxlength="500">
+              <button type="submit" class="btn btn-primary btn-sm mt-2">Merkitse hävityksi</button>
+            </div>
           </form>
+          <script>
+          (function () {
+            var form = document.getElementById('stage-form');
+            var select = document.getElementById('stage-select');
+            var lostFields = document.getElementById('stage-lost-fields');
+            var reason = document.getElementById('stage-lost-reason');
+            var initial = select.value;
+            select.addEventListener('change', function () {
+              var isLost = select.options[select.selectedIndex].dataset.lost === '1';
+              lostFields.hidden = !isLost;
+              reason.required = isLost;
+              if (!isLost && select.value !== initial) form.submit();
+            });
+          })();
+          </script>
           <div class="mt-3 text-sm text-secondary">
-            <div>Liidin status: <strong>{{ lead.status or '—' }}</strong></div>
+            <div>Liidin tila: <strong>{{ LEAD_STATUS_LABELS_FI.get(lead.status, lead.status or '—') }}</strong></div>
           </div>
         </div>
       </section>
@@ -740,7 +770,7 @@
               {% if lead.expected_value is not none %}{{ currency_symbol }}{{ '%.2f'|format(lead.expected_value) }}{% else %}—{% endif %}
             </p>
             {% if lead.probability_updated_at %}
-            <p class="ai-meta">Päivitetty: {{ lead.probability_updated_at.strftime('%Y-%m-%d %H:%M') }} UTC</p>
+            <p class="ai-meta">Päivitetty: {{ (lead.probability_updated_at|helsinki).strftime('%Y-%m-%d %H:%M') }}</p>
             {% endif %}
           </div>
 
@@ -1006,5 +1036,14 @@
     }
   });
 })();
+</script>
+<script>
+// /leads/<id>#tarjoukset (the lead drawer's link) opens the proposals tab
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.location.hash === '#tarjoukset') {
+    var tab = document.querySelector('.lead-tab[data-tab="proposals"]');
+    if (tab) tab.click();
+  }
+});
 </script>
 {% endblock %}

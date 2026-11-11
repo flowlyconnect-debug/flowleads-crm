@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import current_app
 
-from app.email.models import EmailTemplate
+from app.email.seed import get_system_template
 from app.email.services import EmailServiceError, _mailgun_send, _resolve_sender, email_sending_enabled
 from app.email.templates import build_task_reminder_context, render_template_text
 from app.tasks.models import Task
@@ -17,10 +17,7 @@ def send_task_reminder_email(task: Task) -> None:
     if not assignee or not assignee.email:
         raise EmailServiceError("Assignee has no email.", "no_recipient")
 
-    template = EmailTemplate.query.filter_by(
-        organization_id=None,
-        name="task_reminder",
-    ).first()
+    template = get_system_template("task_reminder")
     if not template:
         raise EmailServiceError("task_reminder template not found.", "no_template")
 

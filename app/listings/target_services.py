@@ -43,6 +43,14 @@ def _visible_match_ids(organization_id: int, status: str, *, profile_id: int | N
         )
         .group_by(ListingMatch.listing_id)
     )
+    if status == "pending":
+        # hidden once = hidden for the organization, even when another of its
+        # profiles matches the same listing later
+        hidden = db.session.query(ListingMatch.listing_id).filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status == "dismissed",
+        )
+        query = query.filter(ListingMatch.listing_id.notin_(hidden))
     if profile_id:
         query = query.filter(ListingMatch.profile_id == profile_id)
     return query

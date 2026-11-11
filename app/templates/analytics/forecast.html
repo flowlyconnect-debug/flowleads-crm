@@ -110,7 +110,7 @@
               <td>{{ probability_badge(row.probability) }}</td>
               <td>{% if row.deal_value %}{{ currency_symbol }}{{ '%.0f'|format(row.deal_value) }}{% else %}—{% endif %}</td>
               <td>{{ currency_symbol }}{{ '%.0f'|format(row.expected_value) }}</td>
-              <td>{{ row.last_contacted_at.strftime('%Y-%m-%d') if row.last_contacted_at else '—' }}</td>
+              <td>{{ (row.last_contacted_at|helsinki).strftime('%Y-%m-%d') if row.last_contacted_at else '—' }}</td>
             </tr>
             {% else %}
             <tr><td colspan="7">Ei aktiivisia liidejä.</td></tr>

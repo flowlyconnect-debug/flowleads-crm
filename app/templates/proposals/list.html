@@ -63,13 +63,13 @@
       {% if view_count > 0 %}
       <div class="proposal-view-signal">
         👁 Avattu <strong>{{ view_count }}x</strong>
-        {% if proposal.viewed_at %} · viimeksi {{ proposal.viewed_at.strftime('%d.%m. %H:%M') }}{% endif %}
+        {% if proposal.viewed_at %} · viimeksi {{ (proposal.viewed_at|helsinki).strftime('%d.%m. %H:%M') }}{% endif %}
         {% if view_count >= 3 %}<span class="badge badge-warning" style="margin-left:6px;">Korkea kiinnostus</span>{% endif %}
       </div>
       {% endif %}
 
       <div class="proposal-card-footer">
-        <span class="badge">{{ proposal.status }}</span>
+        <span class="badge">{{ {'draft': 'Luonnos', 'sent': 'Lähetetty', 'viewed': 'Avattu', 'accepted': 'Hyväksytty', 'declined': 'Hylätty', 'expired': 'Vanhentunut'}.get(proposal.status, proposal.status) }}</span>
         <div style="display:flex;gap:8px;">
           {% if proposal.status == 'draft' %}
           <a href="{{ url_for('proposals.edit_proposal', proposal_id=proposal.id, **org_query) }}" class="btn btn-secondary btn-sm">Muokkaa</a>

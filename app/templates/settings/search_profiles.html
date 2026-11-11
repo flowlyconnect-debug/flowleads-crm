@@ -10,7 +10,7 @@
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Hakuprofiili</h1>
-          <p class="settings-panel__subtitle">Profiili on suodatin yhteiseen Oikotie-kohdekatalogiin: kun kohteessa on tulossa valitsemasi remontti valituilla alueilla, siitä syntyy liidi automaattisesti.</p>
+          <p class="settings-panel__subtitle">Profiili on suodatin yhteiseen kohdekatalogiin: kun taloyhtiössä on tulossa valitsemasi remontti valituilla alueilla, kohde ilmestyy Kohteet-sivulle, josta siirrät kiinnostavat liideiksi.</p>
           {% if page_error %}
           <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
           {% endif %}
@@ -64,7 +64,7 @@
               {% set selected_types = selected_profile.wanted_types if selected_profile else [] %}
               <fieldset class="search-profiles-regions">
                 <legend class="form-label">Remonttityypit</legend>
-                <p class="form-helper mb-2">Valitse yksi tai useampi. Kohteesta syntyy liidi, kun siinä on tulossa jokin valituista remonteista.</p>
+                <p class="form-helper mb-2">Valitse yksi tai useampi. Kohde näkyy Kohteet-sivulla, kun siinä on tulossa jokin valituista remonteista.</p>
                 <div class="search-profiles-regions__grid">
                   {% for option in remonttityypit %}
                   <label class="form-check">
@@ -149,7 +149,7 @@
                 <input type="number" name="min_confidence" class="form-input" min="0" max="100" step="1"
                        value="{{ selected_profile.min_confidence if selected_profile else 60 }}">
               </label>
-              <p class="form-helper">Kuinka varma AI:n pitää olla siitä, että kohteessa on tulossa juuri tämä remontti. 60 on hyvä oletus; nosta, jos liidejä tulee liikaa.</p>
+              <p class="form-helper">Kuinka varma AI:n pitää olla siitä, että kohteessa on tulossa juuri tämä remontti. 60 on hyvä oletus; nosta, jos kohteita tulee liikaa.</p>
 
               {% if config.LISTING_AUTO_CREATE_LEADS %}
               <label class="form-label">Uusia liidejä enintään / päivä
@@ -186,7 +186,8 @@
             <form method="post"
                   action="{{ url_for('settings.search_profiles_delete', profile_id=selected_profile.id, **org_query) }}"
                   class="mt-3"
-                  onsubmit="return confirm('Poistetaanko hakuprofiili {{ selected_profile.name|e }}?');">
+                  data-confirm="Poistetaanko hakuprofiili {{ selected_profile.name }}?"
+                  onsubmit="return confirm(this.dataset.confirm);">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:#FECACA;">Poista profiili</button>
             </form>
@@ -194,7 +195,7 @@
             {% else %}
             {{ empty_state(
               "Valitse tai luo profiili",
-              "Luo ensimmäinen hakuprofiili aloittaaksesi automaattisen liidien haun.",
+              "Luo ensimmäinen hakuprofiili, niin sopivat kohteet alkavat näkyä Kohteet-sivulla.",
               icon="🔍"
             ) }}
             <div class="empty-state-actions mt-3">
@@ -249,7 +250,7 @@
               {% for match in match_stats.recent %}
               <li>
                 {% if match.lead_id %}
-                <a href="{{ url_for('leads.detail', lead_id=match.lead_id) }}">{{ match.listing.osoite or match.listing.external_id }}</a>
+                <a href="{{ url_for('leads.detail', lead_id=match.lead_id, **org_query) }}">{{ match.listing.osoite or match.listing.external_id }}</a>
                 {% else %}
                 {{ match.listing.osoite or match.listing.external_id }}
                 {% endif %}

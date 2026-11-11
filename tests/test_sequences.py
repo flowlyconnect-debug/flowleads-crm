@@ -195,7 +195,7 @@ def test_process_due_steps_sends_and_schedules_next(mock_send, app):
         assert enrollment.next_send_at is not None
         assert mock_send.called
         call_kwargs = mock_send.call_args.kwargs
-        assert "Unsubscribe" in call_kwargs["body_html"]
+        assert "Peru viestien tilaus" in call_kwargs["body_html"]
 
 
 @patch("app.email.services._mailgun_send", return_value=(True, "msg-1", None))
@@ -225,7 +225,7 @@ def test_unsubscribe_sets_flag_and_stops_emails(app, client):
 
     response = client.get(f"/unsubscribe?token={token}")
     assert response.status_code == 200
-    assert b"unsubscribed" in response.data.lower()
+    assert "Tilaus on peruttu" in response.get_data(as_text=True)
 
     with app.app_context():
         lead = db.session.get(Lead, lead_id)
@@ -392,7 +392,7 @@ def test_append_unsubscribe_footer(app):
             lead_id=5,
             sequence_id=9,
         )
-        assert "Unsubscribe" in html
+        assert "Peru viestien tilaus" in html
         assert "unsubscribe" in text.lower()
 
 

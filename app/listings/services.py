@@ -804,7 +804,7 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
         "company": manager or listing.taloyhtio or None,
         "title": "Isännöitsijä" if manager else None,
         "phone": listing.isannoitsija_puh or None,
-        "email": listing.isannoitsija_email or None,
+        "email": _valid_email_or_none(listing.isannoitsija_email),
         "website": website,
         "notes": notes,
         "tags": [t[:50] for t in (rtype, source, listing.maakunta) if t],
@@ -886,6 +886,17 @@ def _same_housing_company_lead(match: ListingMatch, listing: Listing):
         if lead is not None:
             return lead
     return None
+
+
+def _valid_email_or_none(value) -> str | None:
+    """Scraped and imported contact emails are free text ("info@firma",
+    "matti(at)x.fi"). A value the lead API would reject must not sink the
+    whole target: the lead is created without it (the raw text stays in the
+    lead's property-manager details)."""
+    from app.core.security import normalize_email, validate_email
+
+    email = normalize_email(value or "")
+    return email if email and validate_email(email) else None
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:

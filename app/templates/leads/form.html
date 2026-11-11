@@ -1,11 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{% if lead %}Edit lead{% else %}New lead{% endif %} — FlowLeads{% endblock %}
+{% block title %}{% if lead %}Muokkaa liidiä{% else %}Uusi liidi{% endif %} — FlowLeads{% endblock %}
 {% block content %}
 <main class="narrow">
 <div class="card">
-  <h1>{% if lead %}Edit lead{% else %}New lead{% endif %}</h1>
+  <h1>{% if lead %}Muokkaa liidiä{% else %}Uusi liidi{% endif %}</h1>
   <form method="post" action="{% if lead %}{{ url_for('leads.update_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.update_lead', lead_id=lead.id) }}{% else %}{{ url_for('leads.create_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.create_lead') }}{% endif %}">
     {{ form.hidden_tag() }}
+    {% if duplicate_lead is defined and duplicate_lead %}
+    <p class="errors">Olemassa oleva liidi: <a href="{{ url_for('leads.detail', lead_id=duplicate_lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.detail', lead_id=duplicate_lead.id) }}">{{ duplicate_lead.company or duplicate_lead.display_name }}</a></p>
+    {% endif %}
     {% if current_user.is_superadmin() %}
     <input type="hidden" name="organization_id" value="{{ organization_id }}">
     {% endif %}
@@ -32,7 +35,7 @@
       {% for error in errors %}<p class="errors">{{ field }}: {{ error }}</p>{% endfor %}
     {% endfor %}
     {{ form.submit(class_='btn') }}
-    <a class="btn secondary" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Cancel</a>
+    <a class="btn secondary" href="{{ url_for('leads.list_leads', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.list_leads') }}">Peruuta</a>
   </form>
 </div>
 </main>

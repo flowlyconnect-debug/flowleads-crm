@@ -38,16 +38,9 @@ def register_stream_settings_routes(settings_bp):
     @login_required
     @require_role("admin", "superadmin")
     def lead_settings():
-        organization_id = current_user.organization_id
-        if current_user.is_superadmin():
-            org_id_param = request.args.get("organization_id") or request.form.get("organization_id")
-            if org_id_param:
-                try:
-                    organization_id = int(org_id_param)
-                except (TypeError, ValueError):
-                    organization_id = None
-        if organization_id is None:
-            abort(403)
+        from app.core.tenant import resolve_organization_id
+
+        organization_id = resolve_organization_id()
         if db.session.get(Organization, organization_id) is None:
             abort(404)
 

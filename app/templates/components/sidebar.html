@@ -1,5 +1,5 @@
 {# Organization-scoped URLs for superadmin #}
-{% set org_id_param = request.args.get('organization_id') %}
+{% set org_id_param = active_org_id if current_user.is_superadmin() else none %}
 {% set use_org = current_user.is_superadmin() and org_id_param %}
 {% set ep = request.endpoint or '' %}
 {% if current_user.is_superadmin() %}
@@ -53,7 +53,8 @@
     {% else %}
     <div class="sidebar-org">
       <span class="sidebar-org__label">Organisaatio</span>
-      <span class="sidebar-org__name">{% if org is defined and org and org.name is defined %}{{ org.name }}{% elif org_id_param %}Valittu organisaatio{% else %}Kaikki organisaatiot{% endif %}</span>
+      <span class="sidebar-org__name">{% if org is defined and org and org.name is defined %}{{ org.name }}{% elif active_org_name %}{{ active_org_name }}{% else %}Ei valittu{% endif %}</span>
+      <a class="sidebar-org__switch" href="{{ url_for('analytics.dashboard') }}">{{ 'Vaihda organisaatiota' if org_id_param else 'Valitse organisaatio' }}</a>
     </div>
     {% endif %}
   {% elif current_user.organization %}
@@ -141,6 +142,43 @@
             <span class="sidebar-item__label">Kalenteri</span>
           </a>
         </li>
+
+        <li>
+          <a href="{{ nav_url('proposals.list_proposals') }}"
+             class="sidebar-item{% if ep and ep.startswith('proposals.') %} active{% endif %}"
+             {% if ep and ep.startswith('proposals.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/></svg>
+            <span class="sidebar-item__label">Tarjoukset</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ nav_url('forms.list_forms') }}"
+             class="sidebar-item{% if ep and ep.startswith('forms.') %} active{% endif %}"
+             {% if ep and ep.startswith('forms.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+            <span class="sidebar-item__label">Lomakkeet</span>
+          </a>
+        </li>
+        {% if has_feature('sequences') %}
+        <li>
+          <a href="{{ nav_url('sequences.list_sequences') }}"
+             class="sidebar-item{% if ep and ep.startswith('sequences.') %} active{% endif %}"
+             {% if ep and ep.startswith('sequences.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16v11H4z"/><path d="m4 7 8 6 8-6"/></svg>
+            <span class="sidebar-item__label">Sekvenssit</span>
+          </a>
+        </li>
+        {% endif %}
+        {% if has_feature('automations') %}
+        <li>
+          <a href="{{ nav_url('automations.list_automations') }}"
+             class="sidebar-item{% if ep and ep.startswith('automations.') %} active{% endif %}"
+             {% if ep and ep.startswith('automations.') %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg>
+            <span class="sidebar-item__label">Automaatiot</span>
+          </a>
+        </li>
+        {% endif %}
 
         <li><span class="nav-group-label">Hallinta</span></li>
         <li>

@@ -90,14 +90,7 @@ def register_settings_gdpr_routes(settings_bp):
     @login_required
     @require_role("admin", "superadmin")
     def privacy_settings():
-        organization_id = current_user.organization_id
-        if current_user.is_superadmin():
-            org_param = request.args.get("organization_id") or request.form.get("organization_id")
-            if org_param:
-                try:
-                    organization_id = int(org_param)
-                except (TypeError, ValueError):
-                    pass
+        organization_id = resolve_organization_id()
 
         settings = get_privacy_settings(organization_id)
         form = PrivacySettingsForm()
@@ -135,7 +128,7 @@ def register_settings_gdpr_routes(settings_bp):
     @login_required
     @require_role("admin", "superadmin")
     def gdpr_export_info():
-        organization_id = current_user.organization_id
+        organization_id = resolve_organization_id()
         settings = get_privacy_settings(organization_id)
         return jsonify(
             {

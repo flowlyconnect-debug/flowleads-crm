@@ -67,9 +67,9 @@ def compose(lead_id):
         flash(exc.message, "danger")
         return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
 
-    templates = TemplateService.list_for_organization(organization_id)
+    templates = TemplateService.list_sales_templates(organization_id)
     form = ComposeEmailForm()
-    form.template_id.choices = [(0, "— No template —")] + [(t.id, t.name) for t in templates]
+    form.template_id.choices = [(0, "— Ei mallia —")] + [(t.id, t.name) for t in templates]
 
     selected_id = request.args.get("template_id", type=int) or 0
     preview_subject = ""
@@ -102,8 +102,8 @@ def compose(lead_id):
 def send(lead_id):
     organization_id = resolve_organization_id()
     form = ComposeEmailForm()
-    templates = TemplateService.list_for_organization(organization_id)
-    form.template_id.choices = [(0, "— No template —")] + [(t.id, t.name) for t in templates]
+    templates = TemplateService.list_sales_templates(organization_id)
+    form.template_id.choices = [(0, "— Ei mallia —")] + [(t.id, t.name) for t in templates]
     try:
         lead = get_lead_for_org(lead_id, organization_id)
         _check_lead_email_access(lead)
@@ -228,6 +228,21 @@ def admin_email_test():
 def mailgun_webhook():
     if not current_app.config.get("MAILGUN_WEBHOOK_SIGNING_KEY"):
         abort(503)
+
+    # Mailgun's current webhooks POST JSON: {"signature": {...}, "event-data": {...}}.
+    # The legacy format (form fields) is still accepted.
+    body = request.get_json(silent=True) if request.is_json else None
+    if isinstance(body, dict):
+        sig = body.get("signature") if isinstance(body.get("signature"), dict) else {}
+        timestamp, token, signature = sig.get("timestamp"), sig.get("token"), sig.get("signature")
+        if not timestamp or not token or not signature:
+            abort(403)
+        if not verify_mailgun_webhook_signature(str(timestamp), str(token), str(signature)):
+            abort(403)
+        event_data = body.get("event-data")
+        handle_mailgun_webhook(event_data if isinstance(event_data, dict) else {})
+        db.session.commit()
+        return "", 200
 
     timestamp = request.form.get("timestamp")
     token = request.form.get("token")

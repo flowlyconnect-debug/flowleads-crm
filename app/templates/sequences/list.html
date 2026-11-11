@@ -67,9 +67,7 @@
         "Ei sähköpostisekvenssejä vielä",
         "Luo automaattinen 3 viestin sähköpostiketju uusille liideille.",
         "Luo sekvenssi",
-        "/sequences/new",
-        "Katso esimerkki",
-        "#sequence-example-modal"
+        "#uusi-sekvenssi"
       ) }}
     </div>
   </div>
@@ -141,6 +139,10 @@ function openSequenceModal() {
   }
 }
 document.getElementById('btn-new-sequence')?.addEventListener('click', openSequenceModal);
+document.querySelector('a[href="#uusi-sekvenssi"]')?.addEventListener('click', e => {
+  e.preventDefault();
+  openSequenceModal();
+});
 document.getElementById('btn-cancel-new')?.addEventListener('click', closeSequenceModal);
 document.getElementById('btn-cancel-new-footer')?.addEventListener('click', closeSequenceModal);
 document.getElementById('new-sequence-modal')?.addEventListener('click', e => {

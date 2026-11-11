@@ -343,7 +343,7 @@ def register_proposal_settings_routes(settings_bp):
                     organization_id,
                     {
                         "default_valid_days": form.default_valid_days.data or 30,
-                        "default_tax_percent": form.default_tax_percent.data or 24,
+                        "default_tax_percent": form.default_tax_percent.data or 25.5,
                         "default_notes": form.default_notes.data,
                         "header_html": form.header_html.data,
                         "footer_html": form.footer_html.data,

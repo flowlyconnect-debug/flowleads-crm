@@ -160,7 +160,7 @@ def test_post_creates_lead(client, app):
         stage = db.session.get(PipelineStage, lead.stage_id)
         assert stage.name == "Uusi liidi"
         assert Activity.query.filter_by(lead_id=lead.id, type="created").count() == 1
-        assert "API" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
+        assert "Liidi luotu" in (Activity.query.filter_by(lead_id=lead.id).first().content or "")
 
 
 def test_post_creates_oikotie_lead_without_email(client, app):

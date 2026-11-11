@@ -366,7 +366,15 @@ def activate_profile(profile: SearchProfile) -> SearchProfile:
 def delete_profile(profile: SearchProfile) -> None:
     from app.listings.models import ListingMatch
 
-    ListingMatch.query.filter_by(profile_id=profile.id).delete(synchronize_session=False)
+    # Only the waiting targets go with the profile. What the customer already
+    # handled (moved to leads, merged, hidden) is kept without a profile, so a
+    # new profile does not offer the same housing companies again.
+    ListingMatch.query.filter_by(profile_id=profile.id, status="pending").delete(
+        synchronize_session=False
+    )
+    ListingMatch.query.filter_by(profile_id=profile.id).update(
+        {"profile_id": None}, synchronize_session=False
+    )
     db.session.delete(profile)
 
 

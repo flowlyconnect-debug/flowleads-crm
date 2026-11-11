@@ -345,18 +345,20 @@ class AutomationEngine:
         body_text = config.get("body_text")
         template_id = config.get("template_id")
         if template_id:
-            template = EmailTemplate.query.filter_by(
-                id=int(template_id), organization_id=organization_id
-            ).first()
-            if not template:
-                return False, "Email template not found."
-            ctx = build_template_context(lead)
-            subject = render_template_text(template.subject, ctx)
-            body_html = render_template_text(template.body_html or "", ctx)
-            body_text = render_template_text(template.body_text or "", ctx)
+            template = db.session.get(EmailTemplate, int(template_id))
+            # the organization's own template or a shared system template
+            if not template or template.organization_id not in (None, organization_id):
+                return False, "Sähköpostimallia ei löytynyt."
+            from app.users.models import Organization
+
+            org = db.session.get(Organization, organization_id)
+            ctx = build_template_context(lead, org.name if org else "")
+            subject = render_template_text(template.subject_template, ctx)
+            body_html = render_template_text(template.body_html_template or "", ctx)
+            body_text = render_template_text(template.body_text_template or "", ctx)
 
         try:
-            EmailService.send_to_lead(
+            result = EmailService.send_to_lead(
                 lead.id,
                 None,
                 subject,
@@ -364,6 +366,8 @@ class AutomationEngine:
                 body_text,
                 organization_id=organization_id,
             )
+            if isinstance(result, dict) and not result.get("success", True):
+                return False, result.get("error") or "Sähköpostin lähetys epäonnistui."
             return True, None
         except EmailServiceError as exc:
             return False, exc.message
@@ -386,7 +390,7 @@ class AutomationEngine:
         if not sequence_id:
             return False, "sequence_id is required."
         try:
-            SequenceService.enroll(int(sequence_id), lead.id, organization_id=organization_id)
+            SequenceService.enroll_lead(lead.id, int(sequence_id), organization_id=organization_id)
             return True, None
         except SequenceServiceError as exc:
             return False, exc.message

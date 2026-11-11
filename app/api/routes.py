@@ -42,6 +42,13 @@ from app.streams.services import LeadRoutingService
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
+
+@api_bp.errorhandler(ValueError)
+def _api_bad_value(error):
+    """?page=abc, "stage_id": "abc" and similar: a 400, not a 500."""
+    db.session.rollback()
+    return json_error("validation_error", "Invalid parameter value.", 400)
+
 API_VERSION = "1.0.0"
 
 

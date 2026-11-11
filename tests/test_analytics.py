@@ -372,7 +372,9 @@ def test_csv_export_pipeline(app):
     start, end = _range()
     with app.app_context():
         resp = export_report_csv("pipeline", ctx["org_id"], start, end)
-        reader = csv.reader(io.StringIO(resp.get_data(as_text=True)))
+        body = resp.get_data(as_text=True)
+        assert body.startswith("\ufeff")  # BOM: Excel reads ä/ö correctly
+        reader = csv.reader(io.StringIO(body.lstrip("\ufeff")), delimiter=";")
         rows = list(reader)
         assert rows[0][0] == "stage"
 

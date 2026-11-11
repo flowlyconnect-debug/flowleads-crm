@@ -1,24 +1,49 @@
 {% extends "base.html" %}
-{% block title %}{% if template %}Edit{% else %}New{% endif %} email template{% endblock %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}{% if template %}Muokkaa sähköpostimallia{% else %}Uusi sähköpostimalli{% endif %} — Asetukset{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>{% if template %}Edit{% else %}New{% endif %} email template</h1>
-  <p style="color:#94a3b8; font-size:0.9rem;">
-    Allowed variables: <code>{{"{{"}}first_name{{"}}"}}</code>,
-    <code>{{"{{"}}last_name{{"}}"}}</code>,
-    <code>{{"{{"}}company{{"}}"}}</code>,
-    <code>{{"{{"}}sender_name{{"}}"}}</code>,
-    <code>{{"{{"}}ai_summary{{"}}"}}</code>
-  </p>
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('email_templates') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <h1 class="page-title">{% if template %}Muokkaa sähköpostimallia{% else %}Uusi sähköpostimalli{% endif %}</h1>
+        <p class="page-subtitle">
+          Käytettävissä olevat muuttujat:
+          <code>{{"{{"}}first_name{{"}}"}}</code>,
+          <code>{{"{{"}}last_name{{"}}"}}</code>,
+          <code>{{"{{"}}company{{"}}"}}</code>,
+          <code>{{"{{"}}sender_name{{"}}"}}</code>,
+          <code>{{"{{"}}ai_summary{{"}}"}}</code>
+        </p>
 
-  <form method="post" action="{{ url_for('settings.email_templates_create', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_create') }}">
-    {{ form.hidden_tag() }}
-    <label>{{ form.name.label }}{{ form.name() }}</label>
-    <label>{{ form.subject_template.label }}{{ form.subject_template() }}</label>
-    <label>{{ form.body_html_template.label }}{{ form.body_html_template(rows=12) }}</label>
-    <label>{{ form.body_text_template.label }}{{ form.body_text_template(rows=6) }}</label>
-    {{ form.submit(class_='btn') }}
-    <a class="btn secondary" href="{{ url_for('settings.email_templates_list', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_list') }}">Cancel</a>
-  </form>
+        {# Editing posts back to the edit route; this form used to post to "create" and made a duplicate. #}
+        {% set org_q = {'organization_id': organization_id} if current_user.is_superadmin() else {} %}
+        <form method="post" action="{{ url_for('settings.email_templates_edit', template_id=template.id, **org_q) if template else url_for('settings.email_templates_create', **org_q) }}">
+          {{ form.hidden_tag() }}
+          {% for field in (form.name, form.subject_template) %}
+          <div class="form-group">
+            <label class="form-label" for="{{ field.id }}">{{ field.label.text }}</label>
+            {{ field(class_='form-input') }}
+            {% for error in field.errors %}<p class="form-error-text">Tämä kenttä on pakollinen.</p>{% endfor %}
+          </div>
+          {% endfor %}
+          <div class="form-group">
+            <label class="form-label" for="{{ form.body_html_template.id }}">{{ form.body_html_template.label.text }}</label>
+            {{ form.body_html_template(rows=12, class_='form-input') }}
+            {% for error in form.body_html_template.errors %}<p class="form-error-text">Tämä kenttä on pakollinen.</p>{% endfor %}
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="{{ form.body_text_template.id }}">{{ form.body_text_template.label.text }}</label>
+            {{ form.body_text_template(rows=6, class_='form-input') }}
+          </div>
+          <div class="form-actions">
+            {{ form.submit(class_='btn btn-primary') }}
+            <a class="btn btn-secondary" href="{{ url_for('settings.email_templates_list', **org_q) }}">Peruuta</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

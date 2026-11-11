@@ -346,7 +346,7 @@ def activate_source_route(profile_id: int):
         db.session.commit()
         flash(
             f"Hakuprofiili aktivoitu: {profile.name}. Osumat katalogin viime viikoilta "
-            "tulevat liideiksi noin 10 minuutin kuluessa.",
+            "ilmestyvät asiakkaan Kohteet-sivulle noin 10 minuutin kuluessa.",
             "success",
         )
     except InviteServiceError as exc:

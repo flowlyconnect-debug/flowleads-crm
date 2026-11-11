@@ -2,7 +2,7 @@
 {% block title %}Restore backup — FlowLeads{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>Restore backup</h1>
+  <h1>Palauta varmuuskopio</h1>
   <div class="flash danger">
     <strong>Danger:</strong> Restoring <code>{{ filename }}</code> will overwrite the current database and uploaded files.
     A safety backup is created automatically before restore begins.
@@ -25,7 +25,7 @@
     </label>
     {% for e in form.confirm_overwrite.errors %}<div class="errors">{{ e }}</div>{% endfor %}
   <button type="submit" style="background: var(--danger); color: #fff;">{{ form.submit.label.text }}</button>
-  <a class="btn secondary" href="{{ url_for('backups.backups_list') }}">Cancel</a>
+  <a class="btn secondary" href="{{ url_for('backups.backups_list') }}">Peruuta</a>
   </form>
 </div>
 {% endblock %}

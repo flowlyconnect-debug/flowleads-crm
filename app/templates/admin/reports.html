@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
-{% block title %}System reports — Asetukset{% endblock %}
+{% block title %}Järjestelmäraportit — Asetukset{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
     {{ settings_nav('admin_reports') }}
     <div class="settings-content">
 <div class="card settings-panel--wide">
-  <h1>System reports</h1>
+  <h1>Järjestelmäraportit</h1>
   <p class="ai-meta">Cross-tenant overview. No API key hashes or secrets are shown.</p>
 
   {% if range_error %}
@@ -17,27 +17,27 @@
   <form method="get" class="filters" style="margin-top:1rem;">
     <label>Range
       <select name="range">
-        <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>This week</option>
-        <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>This month</option>
+        <option value="this_week" {% if range_key == 'this_week' %}selected{% endif %}>Tämä viikko</option>
+        <option value="this_month" {% if range_key == 'this_month' %}selected{% endif %}>Tämä kuukausi</option>
         <option value="last_30_days" {% if range_key == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
-        <option value="custom" {% if range_key == 'custom' %}selected{% endif %}>Custom</option>
+        <option value="custom" {% if range_key == 'custom' %}selected{% endif %}>Oma aikaväli</option>
       </select>
     </label>
-    <label>Start <input type="date" name="start" value="{{ start_date }}"></label>
-    <label>End <input type="date" name="end" value="{{ end_date }}"></label>
-    <button type="submit" class="btn">Apply</button>
+    <label>Alku <input type="date" name="start" value="{{ start_date }}"></label>
+    <label>Loppu <input type="date" name="end" value="{{ end_date }}"></label>
+    <button type="submit" class="btn">Käytä</button>
   </form>
 
   {% if stats %}
   <div class="filters" style="margin-top:1.5rem;">
-    <div class="card" style="padding:1rem;"><strong>Organizations</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_organizations }} ({{ stats.active_organizations }} active)</p></div>
-    <div class="card" style="padding:1rem;"><strong>Total leads</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_leads }}</p></div>
-    <div class="card" style="padding:1rem;"><strong>Monthly active orgs</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.monthly_active_organizations }}</p></div>
+    <div class="card" style="padding:1rem;"><strong>Organisaatioita</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_organizations }} ({{ stats.active_organizations }} active)</p></div>
+    <div class="card" style="padding:1rem;"><strong>Liidejä yhteensä</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.total_leads }}</p></div>
+    <div class="card" style="padding:1rem;"><strong>Aktiivisia organisaatioita / kk</strong><p style="font-size:1.5rem;margin:0.35rem 0 0;">{{ stats.monthly_active_organizations }}</p></div>
   </div>
 
-  <h2 style="margin-top:2rem;">API usage by organization</h2>
+  <h2 style="margin-top:2rem;">API-käyttö organisaatioittain</h2>
   <table>
-    <thead><tr><th>Organization</th><th>Key name</th><th>Prefix</th><th>Requests</th><th>Last used</th><th>Active</th></tr></thead>
+    <thead><tr><th>Organisaatio</th><th>Avaimen nimi</th><th>Etuliite</th><th>Kutsuja</th><th>Viimeksi käytetty</th><th>Aktiivinen</th></tr></thead>
     <tbody>
       {% for row in stats.api_usage %}
       <tr>
@@ -49,15 +49,15 @@
         <td>{{ 'Yes' if row.is_active else 'No' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="6">No API keys.</td></tr>
+      <tr><td colspan="6">Ei API-avaimia.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <h2 style="margin-top:2rem;">AI enrichment cost by organization</h2>
+  <h2 style="margin-top:2rem;">AI-rikastuksen kustannus organisaatioittain</h2>
   <p class="ai-meta">Estimated from activity token metadata; not billed amounts.</p>
   <table>
-    <thead><tr><th>Organization</th><th>Tokens</th><th>Est. cost (USD)</th></tr></thead>
+    <thead><tr><th>Organisaatio</th><th>Tokenit</th><th>Arvioitu kustannus (USD)</th></tr></thead>
     <tbody>
       {% for row in stats.ai_cost_by_organization %}
       <tr>
@@ -66,7 +66,7 @@
         <td>{{ row.cost_estimate }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="3">No enrichment activity.</td></tr>
+      <tr><td colspan="3">Ei rikastuksia.</td></tr>
       {% endfor %}
     </tbody>
   </table>

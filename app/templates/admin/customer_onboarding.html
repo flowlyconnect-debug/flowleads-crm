@@ -8,7 +8,7 @@
     <div class="settings-content">
       <div class="card settings-panel--wide">
         <h1>Luo uusi asiakas</h1>
-        <p class="text-muted">Luo organisaatio, admin-käyttäjä ja hakuprofiili yhdellä toiminnolla. Profiili on suodatin yhteiseen kohdekatalogiin, joten liidit alkavat tulla noin 10 minuutin kuluessa.</p>
+        <p class="text-muted">Luo organisaatio, admin-käyttäjä ja hakuprofiili yhdellä toiminnolla. Profiili on suodatin yhteiseen kohdekatalogiin, joten osumat ilmestyvät asiakkaan Kohteet-sivulle noin 10 minuutin kuluessa.</p>
 
         <form method="post" action="{{ url_for('admin.create_customer_route') }}" class="form-group" style="margin-top:1.5rem;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

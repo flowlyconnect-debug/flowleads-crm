@@ -175,7 +175,7 @@ def test_superadmin_with_2fa_session_can_access_dashboard(client, app):
 
     response = client.get("/admin/dashboard")
     assert response.status_code == 200
-    assert b"Admin dashboard" in response.data
+    assert "Hallintapaneeli" in response.get_data(as_text=True)
 
 
 def test_audit_login_success_and_failed_and_logout(client, app):

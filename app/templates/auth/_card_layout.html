@@ -69,7 +69,7 @@
             <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="currentColor" class="lp-alert__icon">
               {% if is_error %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>{% else %}<path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.25v3.25a.75.75 0 0 0 1.5 0V9.75A.75.75 0 0 0 10 9H9Z" clip-rule="evenodd"/>{% endif %}
             </svg>
-            <span>{{ fi_messages.get(message, message) }}</span>
+            <span>{{ fi_messages.get(message, message)|fi_msg }}</span>
           </div>
           {% endfor %}
         </div>

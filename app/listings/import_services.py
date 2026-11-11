@@ -161,7 +161,8 @@ def parse_listing_csv(data: bytes) -> list[dict]:
 
 def _renovations(raw: dict) -> tuple[list[dict], str | None]:
     """(renovations, error). Accepts a ready `renovations` list (API) or a
-    `remonttityyppi` cell with one or more types separated by ; or |."""
+    `remonttityyppi` cell with one or more types separated by ; | or a comma
+    (no renovation type name contains one)."""
     items = raw.get("renovations")
     if isinstance(items, list) and items:
         parsed = []
@@ -185,7 +186,7 @@ def _renovations(raw: dict) -> tuple[list[dict], str | None]:
     if not cell:
         return [], None
     parsed = []
-    for part in re.split(r"[;|]", cell):
+    for part in re.split(r"[;|,]", cell):
         if not part.strip():
             continue
         name = _renovation_type(part)

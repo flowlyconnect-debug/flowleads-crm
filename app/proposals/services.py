@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from flask import url_for
 from sqlalchemy.orm import joinedload
@@ -26,6 +26,30 @@ from app.tasks.settings import get_organization_settings
 from app.users.models import User
 
 logger = logging.getLogger(__name__)
+
+
+# Finnish general VAT rate (25.5 % since 1.9.2024).
+DEFAULT_TAX_PERCENT = Decimal("25.5")
+
+
+def _dec(value) -> Decimal:
+    """A number typed by a user: "25,5" and "25.5" both work."""
+    try:
+        return Decimal(str(value).strip().replace(" ", "").replace(",", "."))
+    except (InvalidOperation, ValueError, TypeError):
+        raise ProposalServiceError(f"Virheellinen luku: {value}", "validation_error") from None
+
+
+def _date(value: str) -> date:
+    """ISO (2026-11-30) or Finnish (30.11.2026) date."""
+    text = str(value).strip()
+    try:
+        if "." in text:
+            day, month, year = (int(part) for part in text.split(".")[:3])
+            return date(year, month, day)
+        return date.fromisoformat(text[:10])
+    except (ValueError, TypeError):
+        raise ProposalServiceError(f"Virheellinen päivämäärä: {value}", "validation_error") from None
 
 
 class ProposalServiceError(Exception):
@@ -157,13 +181,13 @@ class ProposalService:
         if valid_until is None:
             valid_until = date.today() + timedelta(days=valid_days)
         elif isinstance(valid_until, str):
-            valid_until = date.fromisoformat(valid_until[:10])
+            valid_until = _date(valid_until)
 
         tax_percent = data.get("tax_percent")
         if tax_percent is None:
             tax_percent = get_default_tax_percent(organization_id)
         else:
-            tax_percent = Decimal(str(tax_percent))
+            tax_percent = _dec(tax_percent)
 
         proposal = Proposal(
             organization_id=organization_id,
@@ -174,7 +198,7 @@ class ProposalService:
             status="draft",
             valid_until=valid_until,
             currency=(data.get("currency") or "EUR")[:3],
-            discount_percent=Decimal(str(data.get("discount_percent") or 0)),
+            discount_percent=_dec(data.get("discount_percent") or 0),
             tax_percent=tax_percent,
             notes=(data.get("notes") or settings.proposal_default_notes or "").strip() or None,
             lead_name_snapshot=_lead_display_name(lead),
@@ -202,9 +226,9 @@ class ProposalService:
                 proposal_id=proposal.id,
                 order_index=item["order_index"],
                 description=item["description"],
-                quantity=Decimal(str(item["quantity"])),
-                unit_price=Decimal(str(item["unit_price"])),
-                discount_percent=Decimal(str(item["discount_percent"] or 0)),
+                quantity=_dec(item["quantity"]),
+                unit_price=_dec(item["unit_price"]),
+                discount_percent=_dec(item["discount_percent"] or 0),
             )
             line.total = line_item_total(line.quantity, line.unit_price, line.discount_percent)
             db.session.add(line)
@@ -253,7 +277,7 @@ class ProposalService:
         if "valid_until" in data:
             vu = data["valid_until"]
             if isinstance(vu, str):
-                proposal.valid_until = date.fromisoformat(vu[:10]) if vu else None
+                proposal.valid_until = _date(vu) if vu else None
             elif vu is None or isinstance(vu, date):
                 proposal.valid_until = vu
         if "notes" in data:
@@ -261,12 +285,12 @@ class ProposalService:
         if "currency" in data:
             proposal.currency = (data.get("currency") or "EUR")[:3]
         if "discount_percent" in data:
-            proposal.discount_percent = Decimal(str(data.get("discount_percent") or 0))
+            proposal.discount_percent = _dec(data.get("discount_percent") or 0)
         if "discount_amount" in data and not data.get("discount_percent"):
             proposal.discount_amount = money(data.get("discount_amount") or 0)
             proposal.discount_percent = Decimal("0")
         if "tax_percent" in data:
-            proposal.tax_percent = Decimal(str(data.get("tax_percent") or 0))
+            proposal.tax_percent = _dec(data.get("tax_percent") or 0)
 
         if "line_items" in data:
             ProposalLineItem.query.filter_by(proposal_id=proposal.id).delete()
@@ -276,13 +300,17 @@ class ProposalService:
                     proposal_id=proposal.id,
                     order_index=item["order_index"] if item.get("order_index") is not None else idx,
                     description=item["description"],
-                    quantity=Decimal(str(item["quantity"])),
-                    unit_price=Decimal(str(item["unit_price"])),
-                    discount_percent=Decimal(str(item["discount_percent"] or 0)),
+                    quantity=_dec(item["quantity"]),
+                    unit_price=_dec(item["unit_price"]),
+                    discount_percent=_dec(item["discount_percent"] or 0),
                 )
                 line.total = line_item_total(line.quantity, line.unit_price, line.discount_percent)
                 db.session.add(line)
             db.session.flush()
+            # The rows were replaced behind the relationship's back: without
+            # this, the totals below were summed over the old (deleted) rows
+            # and a saved proposal kept its previous total.
+            db.session.expire(proposal, ["line_items"])
 
         proposal.updated_at = _utc_now()
         ProposalService.calculate_totals(proposal)
@@ -374,7 +402,7 @@ class ProposalService:
             body_text = render_template_text(template.body_text_template or "", ctx)
 
         try:
-            EmailService.send_to_lead(
+            result = EmailService.send_to_lead(
                 lead.id,
                 user_id,
                 subject,
@@ -382,6 +410,10 @@ class ProposalService:
                 body_text,
                 organization_id=proposal.organization_id,
             )
+            if isinstance(result, dict) and not result.get("success", True):
+                raise EmailServiceError(
+                    result.get("error") or "Sähköpostin lähetys epäonnistui.", "send_failed"
+                )
         except EmailServiceError as exc:
             logger.warning("Proposal email failed: %s", exc.message)
             if exc.code == "sending_disabled":
@@ -544,11 +576,12 @@ class ProposalService:
     @staticmethod
     def _notify_assignee_accepted(proposal: Proposal) -> None:
         lead = proposal.lead or get_lead_for_org(proposal.lead_id, proposal.organization_id)
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
         link = f"/leads/{lead.id}"
         NotificationService.create(
-            user_id=lead.assigned_to,
+            user_id=recipient_id,
             organization_id=proposal.organization_id,
             type="proposal_accepted",
             title=f"Tarjous hyväksytty: {proposal.reference_number}",
@@ -559,9 +592,10 @@ class ProposalService:
 
     @staticmethod
     def _send_accept_notification_email(proposal: Proposal, lead: Lead) -> None:
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
-        assignee = db.session.get(User, lead.assigned_to)
+        assignee = db.session.get(User, recipient_id)
         if not assignee or not assignee.email:
             return
         from app.email.templates import render_template_text
@@ -597,7 +631,10 @@ class ProposalService:
             msg = Message(subject=subject, recipients=[assignee.email], html=body_html, body=body_text)
             from app.extensions import mail
 
-            mail.send(msg)
+            from app.email.services import send_system_message
+
+
+            send_system_message(msg)
         except Exception:
             logger.exception("Failed to send proposal accepted notification email")
 
@@ -650,17 +687,18 @@ class ProposalService:
     @staticmethod
     def _notify_assignee_declined(proposal: Proposal, reason: str) -> None:
         lead = proposal.lead or get_lead_for_org(proposal.lead_id, proposal.organization_id)
-        if not lead.assigned_to:
+        recipient_id = lead.assigned_to or proposal.created_by
+        if not recipient_id:
             return
         NotificationService.create(
-            user_id=lead.assigned_to,
+            user_id=recipient_id,
             organization_id=proposal.organization_id,
             type="proposal_declined",
             title=f"Tarjous hylätty: {proposal.reference_number}",
             message=reason[:500],
             link=f"/leads/{lead.id}",
         )
-        assignee = db.session.get(User, lead.assigned_to)
+        assignee = db.session.get(User, recipient_id)
         if assignee and assignee.email:
             from flask import current_app
             from flask_mail import Message
@@ -674,7 +712,10 @@ class ProposalService:
                     )
                     from app.extensions import mail
 
-                    mail.send(msg)
+                    from app.email.services import send_system_message
+
+
+                    send_system_message(msg)
                 except Exception:
                     logger.exception("Failed to send proposal declined notification email")
 
@@ -773,7 +814,7 @@ class ProposalService:
             db.session.add(template)
         template.default_valid_days = int(data.get("default_valid_days") or 30)
         template.default_notes = (data.get("default_notes") or "").strip() or None
-        template.default_tax_percent = Decimal(str(data.get("default_tax_percent") or 24))
+        template.default_tax_percent = _dec(data.get("default_tax_percent") or DEFAULT_TAX_PERCENT)
         template.header_html = (data.get("header_html") or "").strip() or None
         template.footer_html = (data.get("footer_html") or "").strip() or None
         if "name" in data and data.get("name"):
@@ -791,9 +832,7 @@ class ProposalService:
         if "proposal_default_valid_days" in data:
             settings.proposal_default_valid_days = int(data["proposal_default_valid_days"] or 30)
         if "proposal_default_tax_percent" in data:
-            settings.proposal_default_tax_percent = Decimal(
-                str(data["proposal_default_tax_percent"] or 24)
-            )
+            settings.proposal_default_tax_percent = _dec(data["proposal_default_tax_percent"] or DEFAULT_TAX_PERCENT)
         if "proposal_default_notes" in data:
             settings.proposal_default_notes = (data.get("proposal_default_notes") or "").strip() or None
         db.session.flush()

@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
-{% block title %}Backups — Asetukset{% endblock %}
+{% block title %}Varmuuskopiot — Asetukset{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
     {{ settings_nav('backups') }}
     <div class="settings-content">
 <div class="card settings-panel--wide">
-  <h1>Backups</h1>
+  <h1>Varmuuskopiot</h1>
   <p>Full backups include database dump, email templates, system settings (no secrets), and uploaded files.</p>
 
   <form method="post" action="{{ url_for('backups.backups_create') }}" style="margin-bottom: 1.5rem;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit">Create backup now</button>
+    <button type="submit">Luo varmuuskopio nyt</button>
   </form>
 
   {% if backups %}
   <table>
     <thead>
       <tr>
-        <th>Filename</th>
-        <th>Size</th>
-        <th>Created</th>
-        <th>Actions</th>
+        <th>Tiedosto</th>
+        <th>Koko</th>
+        <th>Luotu</th>
+        <th>Toiminnot</th>
       </tr>
     </thead>
     <tbody>
@@ -30,9 +30,9 @@
       <tr>
         <td>{{ b.filename }}</td>
         <td>{{ (b.size / 1024)|round(1) }} KB</td>
-        <td>{{ b.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+        <td>{{ (b.created_at|helsinki).strftime('%Y-%m-%d %H:%M') }}</td>
         <td>
-          <a class="btn secondary" href="{{ url_for('backups.backups_download', filename=b.filename) }}">Download</a>
+          <a class="btn secondary" href="{{ url_for('backups.backups_download', filename=b.filename) }}">Lataa</a>
           <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--danger); color: #fff;">Restore</a>
         </td>
       </tr>
@@ -40,7 +40,7 @@
     </tbody>
   </table>
   {% else %}
-  <p>No backups yet.</p>
+  <p>Ei varmuuskopioita.</p>
   {% endif %}
 </div>
     </div>

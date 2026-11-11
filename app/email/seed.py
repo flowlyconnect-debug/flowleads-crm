@@ -3,49 +3,49 @@ from app.extensions import db
 
 SYSTEM_TEMPLATES = [
     {
-        "name": "Initial Outreach",
-        "subject_template": "Quick intro — {{company}}",
+        "name": "Ensimmäinen yhteydenotto",
+        "subject_template": "Yhteydenotto — {{company}}",
         "body_html_template": (
-            "<p>Hi {{first_name}},</p>"
-            "<p>I wanted to reach out regarding {{company}}.</p>"
+            "<p>Hei {{first_name}},</p>"
+            "<p>Otan yhteyttä koskien kohdetta {{company}}.</p>"
             "<p>{{ai_summary}}</p>"
-            "<p>Best,<br>{{sender_name}}</p>"
+            "<p>Ystävällisin terveisin,<br>{{sender_name}}</p>"
         ),
         "body_text_template": (
-            "Hi {{first_name}},\n\n"
-            "I wanted to reach out regarding {{company}}.\n\n"
+            "Hei {{first_name}},\n\n"
+            "Otan yhteyttä koskien kohdetta {{company}}.\n\n"
             "{{ai_summary}}\n\n"
-            "Best,\n{{sender_name}}"
+            "Ystävällisin terveisin,\n{{sender_name}}"
         ),
         "variables": sorted(ALLOWED_TEMPLATE_VARIABLES),
     },
     {
-        "name": "Follow-up",
-        "subject_template": "Following up — {{company}}",
+        "name": "Seurantaviesti",
+        "subject_template": "Palaan asiaan — {{company}}",
         "body_html_template": (
-            "<p>Hi {{first_name}},</p>"
-            "<p>Just following up on my previous message.</p>"
-            "<p>Best,<br>{{sender_name}}</p>"
+            "<p>Hei {{first_name}},</p>"
+            "<p>Palaan aiempaan viestiini. Ehditkö katsoa asiaa?</p>"
+            "<p>Ystävällisin terveisin,<br>{{sender_name}}</p>"
         ),
         "body_text_template": (
-            "Hi {{first_name}},\n\n"
-            "Just following up on my previous message.\n\n"
-            "Best,\n{{sender_name}}"
+            "Hei {{first_name}},\n\n"
+            "Palaan aiempaan viestiini. Ehditkö katsoa asiaa?\n\n"
+            "Ystävällisin terveisin,\n{{sender_name}}"
         ),
         "variables": ["first_name", "company", "sender_name"],
     },
     {
-        "name": "Demo Request",
-        "subject_template": "Demo for {{company}}?",
+        "name": "Tapaamisehdotus",
+        "subject_template": "Sovitaanko lyhyt tapaaminen? — {{company}}",
         "body_html_template": (
-            "<p>Hi {{first_name}},</p>"
-            "<p>Would you be open to a short demo for {{company}}?</p>"
-            "<p>Best,<br>{{sender_name}}</p>"
+            "<p>Hei {{first_name}},</p>"
+            "<p>Sopisiko lyhyt tapaaminen tai puhelu kohteen {{company}} tiimoilta?</p>"
+            "<p>Ystävällisin terveisin,<br>{{sender_name}}</p>"
         ),
         "body_text_template": (
-            "Hi {{first_name}},\n\n"
-            "Would you be open to a short demo for {{company}}?\n\n"
-            "Best,\n{{sender_name}}"
+            "Hei {{first_name}},\n\n"
+            "Sopisiko lyhyt tapaaminen tai puhelu kohteen {{company}} tiimoilta?\n\n"
+            "Ystävällisin terveisin,\n{{sender_name}}"
         ),
         "variables": ["first_name", "company", "sender_name"],
     },
@@ -130,10 +130,10 @@ SYSTEM_TEMPLATES = [
     },
     {
         "name": "lead_stale_alert",
-        "subject_template": "Ei uusia liideja {{ days }} paivaan — {{ org_name }}",
+        "subject_template": "Ei uusia liidejä {{ days }} päivään — {{ org_name }}",
         "body_html_template": (
             "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
-            "<h2 style='color:#B45309;'>Ei uusia liideja</h2>"
+            "<h2 style='color:#B45309;'>Ei uusia liidejä</h2>"
             "<p>Viimeisin liidi saapui {{ last_lead_at }} — onko kaikki kunnossa?</p>"
             "<p><a href='/settings/leads'>Tarkista liidiasetukset</a></p>"
             "<p style='margin-top:20px;color:#6B7280;font-size:12px;'>FlowLeads</p>"
@@ -148,7 +148,48 @@ SYSTEM_TEMPLATES = [
 ]
 
 
-def seed_system_email_templates() -> list[EmailTemplate]:
+# The first three templates used to be seeded in English under these names.
+# An untouched English row is replaced by the Finnish one; an edited row is kept.
+_LEGACY_ENGLISH_NAMES = {
+    "Initial Outreach": ("Ensimmäinen yhteydenotto", "Quick intro — {{company}}"),
+    "Follow-up": ("Seurantaviesti", "Following up — {{company}}"),
+    "Demo Request": ("Tapaamisehdotus", "Demo for {{company}}?"),
+}
+
+
+# System templates that the app itself sends (reminders, notifications). They
+# are not sales emails, so they stay out of the compose and sequence pickers.
+INTERNAL_TEMPLATE_NAMES = frozenset(
+    {
+        "task_reminder",
+        "proposal_sent",
+        "proposal_accepted_notification",
+        "proposal_declined_notification",
+        "lead_stale_alert",
+    }
+)
+
+
+def seed_system_email_templates(commit: bool = False) -> list[EmailTemplate]:
+    """Create the missing system templates. Flushes only, unless `commit` is
+    set: a caller that renders ids into links (the template list page) must
+    commit, otherwise the rows vanish with the request and the links 404."""
+    specs = {spec["name"]: spec for spec in SYSTEM_TEMPLATES}
+    changed = False
+    for old_name, (new_name, old_subject) in _LEGACY_ENGLISH_NAMES.items():
+        legacy = EmailTemplate.query.filter_by(organization_id=None, name=old_name).first()
+        if not legacy or legacy.subject_template != old_subject:
+            continue
+        if EmailTemplate.query.filter_by(organization_id=None, name=new_name).first():
+            continue
+        spec = specs[new_name]
+        legacy.name = new_name
+        legacy.subject_template = spec["subject_template"]
+        legacy.body_html_template = spec["body_html_template"]
+        legacy.body_text_template = spec.get("body_text_template")
+        legacy.variables = spec.get("variables")
+        changed = True
+
     created = []
     for spec in SYSTEM_TEMPLATES:
         existing = EmailTemplate.query.filter_by(
@@ -168,6 +209,18 @@ def seed_system_email_templates() -> list[EmailTemplate]:
         )
         db.session.add(template)
         created.append(template)
-    if created:
+    if created or changed:
         db.session.flush()
+        if commit:
+            db.session.commit()
     return created
+
+
+def get_system_template(name: str) -> EmailTemplate | None:
+    """A system template by name, seeding the defaults first when it is
+    missing (a fresh database has none until someone opens the template list)."""
+    template = EmailTemplate.query.filter_by(organization_id=None, name=name).first()
+    if template is None:
+        seed_system_email_templates()
+        template = EmailTemplate.query.filter_by(organization_id=None, name=name).first()
+    return template

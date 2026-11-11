@@ -12,7 +12,7 @@ def get_proposal_settings(organization_id: int) -> OrganizationSettings:
 
 def get_default_tax_percent(organization_id: int) -> Decimal:
     settings = get_proposal_settings(organization_id)
-    return Decimal(str(settings.proposal_default_tax_percent or 24))
+    return Decimal(str(settings.proposal_default_tax_percent or "25.5"))
 
 
 def get_default_valid_days(organization_id: int) -> int:

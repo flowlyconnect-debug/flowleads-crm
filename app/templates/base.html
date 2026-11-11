@@ -87,7 +87,7 @@
         {% if messages %}
         <div class="flash-messages" role="status" aria-live="polite">
           {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
+          <div class="flash {{ category }}">{{ message|fi_msg }}</div>
           {% endfor %}
         </div>
         {% endif %}
@@ -100,7 +100,7 @@
       {% if messages %}
       <div class="flash-messages" role="status" aria-live="polite">
         {% for category, message in messages %}
-        <div class="flash {{ category }}">{{ message }}</div>
+        <div class="flash {{ category }}">{{ message|fi_msg }}</div>
         {% endfor %}
       </div>
       {% endif %}
@@ -146,16 +146,14 @@
       <div class="cmd-item" onclick="window.location='/leads/new'">
         <span class="cmd-item-icon">+</span>
         <span class="cmd-item-label">Lisää uusi liidi</span>
-        <span class="cmd-item-shortcut">N</span>
       </div>
       <div class="cmd-item" onclick="window.location='/tasks'">
         <span class="cmd-item-icon">✓</span>
         <span class="cmd-item-label">Lisää tehtävä</span>
-        <span class="cmd-item-shortcut">T</span>
       </div>
       <div class="cmd-item" onclick="window.location='/leads/pipeline'">
         <span class="cmd-item-icon">⬜</span>
-        <span class="cmd-item-label">Avaa pipeline</span>
+        <span class="cmd-item-label">Avaa myyntiputki</span>
       </div>
       <div class="cmd-item" onclick="window.location='/dashboard'">
         <span class="cmd-item-icon">📊</span>
@@ -356,7 +354,7 @@
       '<div class="drawer-quick-actions">' +
         '<a href="' + withOrgQuery('/leads/' + lead.id + '/email/compose') + '" class="btn btn-primary btn-sm">✉ Sähköposti</a>' +
         '<a href="' + withOrgQuery('/tasks') + '" class="btn btn-secondary btn-sm">+ Tehtävä</a>' +
-        '<a href="' + withOrgQuery('/leads/' + lead.id + '/proposals') + '" class="btn btn-secondary btn-sm">📄 Tarjous</a>' +
+        '<a href="' + withOrgQuery('/leads/' + lead.id) + '#tarjoukset" class="btn btn-secondary btn-sm">📄 Tarjoukset</a>' +
       '</div>' +
       '<div class="drawer-activities">' +
         '<div class="drawer-section-title">Viimeisin aktiviteetti</div>' +
@@ -366,9 +364,9 @@
 
   function defaultCmdResults() {
     return '<div class="cmd-section-label">Nopeat toiminnot</div>' +
-      '<div class="cmd-item" onclick="window.location=\'/leads/new\'"><span class="cmd-item-icon">+</span><span class="cmd-item-label">Lisää uusi liidi</span><span class="cmd-item-shortcut">N</span></div>' +
-      '<div class="cmd-item" onclick="window.location=\'/tasks\'"><span class="cmd-item-icon">✓</span><span class="cmd-item-label">Lisää tehtävä</span><span class="cmd-item-shortcut">T</span></div>' +
-      '<div class="cmd-item" onclick="window.location=\'/leads/pipeline\'"><span class="cmd-item-icon">⬜</span><span class="cmd-item-label">Avaa pipeline</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/leads/new\'"><span class="cmd-item-icon">+</span><span class="cmd-item-label">Lisää uusi liidi</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/tasks\'"><span class="cmd-item-icon">✓</span><span class="cmd-item-label">Lisää tehtävä</span></div>' +
+      '<div class="cmd-item" onclick="window.location=\'/leads/pipeline\'"><span class="cmd-item-icon">⬜</span><span class="cmd-item-label">Avaa myyntiputki</span></div>' +
         '<div class="cmd-item" onclick="window.location=\'/dashboard\'"><span class="cmd-item-icon">📊</span><span class="cmd-item-label">Kojelauta</span></div>';
   }
 

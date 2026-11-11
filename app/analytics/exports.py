@@ -17,8 +17,10 @@ def _sanitize_cell(value) -> str:
 
 
 def _rows_to_csv(headers: list[str], rows: list[list]) -> str:
+    # Finnish Excel: UTF-8 BOM so ä/ö survive, semicolon as the delimiter
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer, delimiter=";")
     writer.writerow(headers)
     for row in rows:
         writer.writerow([_sanitize_cell(cell) for cell in row])

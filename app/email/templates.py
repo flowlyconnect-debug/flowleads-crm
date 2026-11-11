@@ -4,6 +4,7 @@ from app.email.models import ALLOWED_TEMPLATE_VARIABLES
 
 VARIABLE_PATTERN = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 UNKNOWN_TOKEN_PATTERN = re.compile(r"\{\{[^}]+\}\}")
+_EMPTY_NAME_GREETING = re.compile(r"\b(Hei|Moi|Terve|Hyvä|Hi|Hello) +,")
 
 FALLBACKS = {
     "first_name": "",
@@ -38,7 +39,7 @@ def validate_template_variables(*texts: str) -> tuple[bool, str | None]:
 def build_template_context(lead, sender_name: str) -> dict[str, str]:
     first_name = (lead.first_name or "").strip()
     return {
-        "first_name": first_name or "there",
+        "first_name": first_name,
         "last_name": (lead.last_name or "").strip(),
         "company": (lead.company or "").strip(),
         "sender_name": sender_name or "",
@@ -57,7 +58,7 @@ def build_task_reminder_context(task) -> dict[str, str]:
         "lead_name": lead.display_name if lead else "",
         "lead_company": (lead.company or "").strip() if lead else "",
         "assignee_name": (assignee.email.split("@")[0] if assignee and assignee.email else ""),
-        "first_name": (assignee.email.split("@")[0] if assignee and assignee.email else "there"),
+        "first_name": (assignee.email.split("@")[0] if assignee and assignee.email else ""),
         "last_name": "",
         "company": (lead.company or "").strip() if lead else "",
         "sender_name": "FlowLeads",
@@ -75,13 +76,12 @@ def render_template_text(text: str, context: dict[str, str]) -> str:
             return match.group(0)
         value = context.get(key)
         if value is None or (isinstance(value, str) and not value.strip()):
-            fallback = FALLBACKS.get(key, "")
-            if key == "first_name" and not fallback:
-                return "there"
-            return fallback
+            return FALLBACKS.get(key, "")
         return str(value)
 
-    return VARIABLE_PATTERN.sub(replacer, text)
+    rendered = VARIABLE_PATTERN.sub(replacer, text)
+    # A lead without a first name (most housing-company leads): "Hei ," -> "Hei,"
+    return _EMPTY_NAME_GREETING.sub(r"\1,", rendered)
 
 
 def body_preview(text: str | None, max_len: int = 300) -> str:

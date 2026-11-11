@@ -19,9 +19,9 @@
       {{ empty_state(
         "ti-chart-bar",
         "Ei dataa vielä",
-        "Raportit päivittyvät automaattisesti kun liidejä saapuu.",
-        "Avaa hakuprofiili",
-        "/settings/leads"
+        "Raportit päivittyvät, kun liidejä kertyy. Siirrä kohteita liideiksi Kohteet-sivulta.",
+        "Avaa Kohteet",
+        url_for('targets.index', **({'organization_id': active_org_id} if current_user.is_superadmin() and active_org_id else {}))
       ) }}
       <ul class="mt-3">
         {% for org in organizations %}
@@ -260,9 +260,9 @@
       {{ empty_state(
         "ti-chart-bar",
         "Ei dataa vielä",
-        "Raportit päivittyvät automaattisesti kun liidejä saapuu.",
-        "Avaa hakuprofiili",
-        "/settings/leads"
+        "Raportit päivittyvät, kun liidejä kertyy. Siirrä kohteita liideiksi Kohteet-sivulta.",
+        "Avaa Kohteet",
+        url_for('targets.index', **({'organization_id': active_org_id} if current_user.is_superadmin() and active_org_id else {}))
       ) }}
     </div>
   </div>

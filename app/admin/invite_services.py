@@ -91,6 +91,24 @@ def create_invite(
     if not organization_name:
         raise InviteServiceError("Organisaation nimi on pakollinen.", "invalid_name")
 
+    # Validate everything before the organization is created: a bad invite
+    # used to leave an organization behind that nobody could ever join.
+    from app.core.security import normalize_email, validate_email
+    from app.search.constants import REMONTTITYYPIT
+    from app.users.services import get_user_by_email
+
+    admin_email = normalize_email(admin_email or "")
+    if not admin_email or not validate_email(admin_email):
+        raise InviteServiceError("Anna kelvollinen sähköpostiosoite.", "invalid_email")
+    if get_user_by_email(admin_email) is not None:
+        raise InviteServiceError(
+            "Tällä sähköpostiosoitteella on jo käyttäjätili.", "email_taken"
+        )
+    if not (search_profile_name or "").strip():
+        raise InviteServiceError("Hakuprofiilin nimi on pakollinen.", "invalid_profile")
+    if remonttityyppi not in REMONTTITYYPIT:
+        raise InviteServiceError("Valitse kelvollinen remonttityyppi.", "invalid_type")
+
     from app.admin.onboarding_services import _slug_from_name
 
     org_slug = (slug or "").strip().lower() or _slug_from_name(organization_name)

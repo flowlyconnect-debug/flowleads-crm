@@ -91,8 +91,10 @@ def register_calendar_lead_routes(leads_bp):
             start_at = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
         else:
             start_at = start_raw
-        if start_at.tzinfo is None:
-            start_at = start_at.replace(tzinfo=timezone.utc)
+        # The form sends the wall-clock time the user typed, i.e. Finnish time.
+        from app import helsinki_to_utc
+
+        start_at = helsinki_to_utc(start_at)
         end_at = start_at + timedelta(minutes=duration)
 
         if not attendees and lead.email:

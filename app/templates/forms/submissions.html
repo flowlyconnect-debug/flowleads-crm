@@ -23,7 +23,7 @@
     {% set data = s.raw_data or {} %}
     {% set name = ((data.get('first_name') or '') ~ ' ' ~ (data.get('last_name') or '')).strip() or '—' %}
     <tr class="submission-row" style="cursor:pointer;" data-json="{{ data|tojson|e }}">
-      <td>{{ s.created_at.strftime('%d.%m.%Y %H:%M') if s.created_at else '—' }}</td>
+      <td>{{ (s.created_at|helsinki).strftime('%d.%m.%Y %H:%M') if s.created_at else '—' }}</td>
       <td>{{ name }}</td>
       <td>{{ data.get('email') or '—' }}</td>
       <td>{{ data.get('company') or '—' }}</td>

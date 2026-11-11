@@ -642,7 +642,7 @@ class LeadService:
             normalized_reason = _normalize_lost_reason(lost_reason)
             if not normalized_reason:
                 raise LeadServiceError(
-                    "lost_reason on pakollinen siirrettäessä hävittyyn vaiheeseen.",
+                    "Valitse häviön syy, kun siirrät liidin Hävitty-vaiheeseen.",
                     "validation_error",
                 )
             lead.lost_reason = normalized_reason
@@ -1142,14 +1142,20 @@ class LeadService:
         else:
             query = LeadService._apply_filters(query, organization_id, filters)
 
+        # Finnish Excel: UTF-8 BOM (ä/ö), semicolon delimiter, Finnish headers.
+        from app import stage_label_fi, source_label_fi, to_helsinki
+
         output = io.StringIO()
-        writer = csv.writer(output)
+        output.write("\ufeff")
+        writer = csv.writer(output, delimiter=";")
         writer.writerow([
-            "ID", "First Name", "Last Name", "Email", "Phone", "Company", "Title",
-            "Stage", "Status", "Score", "Source", "Assigned To", "Tags", "Created At",
+            "ID", "Etunimi", "Sukunimi", "Sähköposti", "Puhelin", "Yritys", "Titteli",
+            "Verkkosivu", "Vaihe", "Tila", "Pisteet", "Kaupan arvo", "Lähde",
+            "Vastuuhenkilö", "Tunnisteet", "Luotu",
         ])
         for lead in query.all():
             assignee_email = lead.assignee.email if lead.assignee else ""
+            created = to_helsinki(lead.created_at)
             writer.writerow([
                 lead.id,
                 sanitize_csv_value(lead.first_name),
@@ -1158,13 +1164,15 @@ class LeadService:
                 sanitize_csv_value(lead.phone),
                 sanitize_csv_value(lead.company),
                 sanitize_csv_value(lead.title),
-                sanitize_csv_value(lead.stage.name if lead.stage else ""),
+                sanitize_csv_value(lead.website),
+                sanitize_csv_value(stage_label_fi(lead.stage.name) if lead.stage else ""),
                 lead.status,
                 lead.score if lead.score is not None else "",
-                lead.source,
+                str(lead.deal_value).replace(".", ",") if lead.deal_value is not None else "",
+                source_label_fi(lead.source) if lead.source else "",
                 sanitize_csv_value(assignee_email),
                 sanitize_csv_value(", ".join(lead.tags or [])),
-                lead.created_at.isoformat() if lead.created_at else "",
+                created.strftime("%d.%m.%Y %H:%M") if created else "",
             ])
         return output.getvalue()
 
@@ -1207,7 +1215,13 @@ class LeadService:
             if not stage_id:
                 raise LeadServiceError("Stage is required.", "validation_error")
             for lead in leads:
-                LeadService.move_stage(lead.id, int(stage_id), organization_id, user_id)
+                LeadService.move_stage(
+                    lead.id,
+                    int(stage_id),
+                    organization_id,
+                    user_id,
+                    lost_reason=payload.get("lost_reason"),
+                )
             return {"updated": len(leads)}
 
         if action == "archive":

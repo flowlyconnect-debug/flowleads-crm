@@ -31,7 +31,7 @@ class GDPRService:
     @staticmethod
     def anonymize_lead(
         lead_id: int,
-        requested_by_user_id: int,
+        requested_by_user_id: int | None,
         organization_id: int,
         reason: str | None = None,
     ) -> Lead:
@@ -49,7 +49,21 @@ class GDPRService:
         lead.last_name = "Henkilö"
         lead.phone = None
         lead.linkedin_url = None
+        lead.title = None
         lead.ai_summary = None
+        # property manager's name, phone and email for catalogue leads
+        lead.ai_contact_info = None
+        # contact persons that belong to this lead only
+        for contact in list(lead.contacts):
+            if any(other.id != lead.id for other in contact.leads):
+                continue
+            contact.first_name = "Anonymoitu"
+            contact.last_name = None
+            contact.email = None
+            contact.phone = None
+            contact.title = None
+            contact.linkedin_url = None
+            contact.notes = None
         lead.notes = "[Tiedot poistettu GDPR-pyynnöstä]"
         lead.is_anonymized = True
         lead.anonymized_at = now
@@ -94,14 +108,14 @@ class GDPRService:
 
     @staticmethod
     def verify_password(user: User, password: str) -> None:
-        if not password or not check_password(user.password_hash, password):
+        if not password or not check_password(password, user.password_hash):
             raise GDPRServiceError("Invalid password.", "invalid_password")
 
     @staticmethod
     def _send_anonymization_confirmation(
-        user_id: int, lead: Lead, reason: str | None
+        user_id: int | None, lead: Lead, reason: str | None
     ) -> None:
-        user = db.session.get(User, user_id)
+        user = db.session.get(User, user_id) if user_id else None
         if not user or not user.email:
             return
         if not current_app.config.get("EMAIL_SENDING_ENABLED"):
@@ -115,7 +129,9 @@ class GDPRService:
                     f"Syy: {reason or '—'}\n"
                 ),
             )
-            mail.send(msg)
+            from app.email.services import send_system_message
+
+            send_system_message(msg)
         except Exception:
             logger.exception("Failed to send GDPR anonymization confirmation email")
 
@@ -149,7 +165,7 @@ class GDPRService:
                 continue
             GDPRService.anonymize_lead(
                 lead.id,
-                requested_by_user_id=0,
+                requested_by_user_id=None,
                 organization_id=organization_id,
                 reason="retention_policy",
             )

@@ -402,7 +402,7 @@ def test_detail_shows_score_badge_and_summary(mock_openai, client, app):
     html = response.data.decode()
     assert "score-high" in html
     assert "Strong B2B prospect" in html
-    assert "AI Enriched" in html
+    assert "AI-rikastettu" in html
 
 
 def test_detail_processing_state(client, app):
@@ -422,7 +422,7 @@ def test_detail_processing_state(client, app):
 
     response = client.get(f"/leads/{lead_id}")
     html = response.data.decode()
-    assert "Enriching" in html
+    assert "Rikastetaan" in html
     assert "ai-pending" in html
 
 

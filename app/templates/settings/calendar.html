@@ -19,7 +19,7 @@
           </p>
           <p class="text-sm mb-2"><strong>Kalenteri ID:</strong> {{ connection.calendar_id or '—' }}</p>
           <p class="text-sm mb-2"><strong>Viimeisin synkronointi:</strong>
-            {{ connection.last_synced_at.strftime('%Y-%m-%d %H:%M') if connection.last_synced_at else 'Ei vielä' }}
+            {{ (connection.last_synced_at|helsinki).strftime('%Y-%m-%d %H:%M') if connection.last_synced_at else 'Ei vielä' }}
           </p>
           <p class="text-sm mb-0"><strong>Synkronointi:</strong> {{ 'Käytössä' if connection.sync_enabled else 'Pois' }}</p>
         </div>

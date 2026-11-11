@@ -272,6 +272,41 @@ SOURCE_LABELS_FI = {
 }
 
 
+ACTIVITY_LABELS_FI = {
+    "note": "Muistiinpano",
+    "email_sent": "Sähköposti lähetetty",
+    "email_opened": "Sähköposti avattu",
+    "email_clicked": "Sähköpostin linkkiä klikattu",
+    "email_reply_received": "Vastaus saatu",
+    "call": "Puhelu",
+    "stage_changed": "Vaihe vaihdettu",
+    "ai_enriched": "AI-rikastus",
+    "created": "Liidi luotu",
+    "updated": "Tiedot päivitetty",
+    "archived": "Arkistoitu",
+    "assigned": "Vastuuhenkilö vaihdettu",
+    "task_created": "Tehtävä luotu",
+    "task_completed": "Tehtävä tehty",
+    "task_reminder_sent": "Tehtävämuistutus lähetetty",
+    "sequence_enrolled": "Lisätty sekvenssiin",
+    "sequence_email_sent": "Sekvenssiviesti lähetetty",
+    "sequence_unenrolled": "Poistettu sekvenssistä",
+    "meeting_scheduled": "Tapaaminen sovittu",
+    "meeting_cancelled": "Tapaaminen peruttu",
+    "proposal_sent": "Tarjous lähetetty",
+    "proposal_viewed": "Tarjous avattu",
+    "proposal_accepted": "Tarjous hyväksytty",
+    "proposal_declined": "Tarjous hylätty",
+}
+
+LEAD_STATUS_LABELS_FI = {
+    "active": "Avoin",
+    "won": "Voitettu",
+    "lost": "Hävitty",
+    "archived": "Arkistoitu",
+}
+
+
 def stage_label_fi(name) -> str:
     if not name:
         return "—"
@@ -284,6 +319,79 @@ def source_label_fi(code) -> str:
     return SOURCE_LABELS_FI.get(str(code).strip().lower(), str(code))
 
 
+def to_helsinki(value):
+    """UTC datetime (aware, or naive as SQLite returns it) -> Europe/Helsinki."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    if not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(ZoneInfo("Europe/Helsinki"))
+
+
+def helsinki_to_utc(value):
+    """A wall-clock time the user typed (naive = Finnish time) -> aware UTC."""
+    from datetime import timezone
+    from zoneinfo import ZoneInfo
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=ZoneInfo("Europe/Helsinki"))
+    return value.astimezone(timezone.utc)
+
+
+def _nav_org_id() -> int | None:
+    """The organization the navigation is showing: the user's own, or the one
+    a superadmin has chosen (URL parameter, else the remembered choice)."""
+    from flask_login import current_user
+
+    if not current_user.is_authenticated:
+        return None
+    if current_user.is_superadmin():
+        from app.core.tenant import parse_organization_id_param
+
+        return parse_organization_id_param()
+    return current_user.organization_id
+
+
+def _nav_org_name() -> str | None:
+    """Name of the organization a superadmin is looking at (sidebar)."""
+    from flask_login import current_user
+
+    try:
+        if not current_user.is_authenticated or not current_user.is_superadmin():
+            return None
+        org_id = _nav_org_id()
+        if not org_id:
+            return None
+        from app.extensions import db
+        from app.users.models import Organization
+
+        org = db.session.get(Organization, org_id)
+        return org.name if org else None
+    except Exception:
+        return None
+
+
+def _nav_overdue_count() -> int:
+    """Overdue tasks of the signed-in user (sidebar badge on every page)."""
+    from flask_login import current_user
+
+    try:
+        org_id = _nav_org_id()
+        if not org_id or current_user.role not in ("superadmin", "admin", "user"):
+            return 0
+        from app.tasks.services import TaskService
+
+        return TaskService.count_overdue(org_id, current_user.id)
+    except Exception:
+        from app.extensions import db
+
+        db.session.rollback()
+        return 0
+
+
 def _nav_targets_count() -> int:
     """Targets waiting on the Kohteet page for the organization in view (the
     sidebar badge). Never lets a page fail."""
@@ -293,9 +401,7 @@ def _nav_targets_count() -> int:
     try:
         if not current_user.is_authenticated or current_user.role not in ("superadmin", "admin", "user"):
             return 0
-        org_id = current_user.organization_id
-        if current_user.is_superadmin():
-            org_id = request.args.get("organization_id", type=int)
+        org_id = _nav_org_id()
         if not org_id:
             return 0
         from app.listings.target_services import count_targets
@@ -316,12 +422,29 @@ def _register_root_routes(app):
 
         return {
             "nav_targets_count": _nav_targets_count(),
+            "nav_overdue_count": _nav_overdue_count(),
+            "active_org_id": _nav_org_id(),
+            "active_org_name": _nav_org_name(),
             "has_endpoint": has_endpoint,
             "stage_label": stage_label_fi,
             "source_label": source_label_fi,
             "STAGE_LABELS_FI": STAGE_LABELS_FI,
+            "ACTIVITY_LABELS_FI": ACTIVITY_LABELS_FI,
+            "LEAD_STATUS_LABELS_FI": LEAD_STATUS_LABELS_FI,
             "SOURCE_LABELS_FI": SOURCE_LABELS_FI,
         }
+
+    @app.template_filter("helsinki")
+    def helsinki(value):
+        """A stored UTC timestamp as Finnish local time, for display. Dates
+        and empty values pass through untouched."""
+        return to_helsinki(value)
+
+    @app.template_filter("fi_msg")
+    def fi_msg(message):
+        from app.core.messages_fi import fi_message
+
+        return fi_message(message)
 
     @app.template_filter("fi_percent")
     def fi_percent(value, decimals=1):

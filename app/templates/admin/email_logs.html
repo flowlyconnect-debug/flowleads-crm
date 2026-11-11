@@ -3,10 +3,10 @@
 {% block content %}
 <div class="card">
   <div class="toolbar">
-    <h1 style="margin:0;">Email logs</h1>
+    <h1 style="margin:0;">Sähköpostiloki</h1>
     <form method="post" action="{{ url_for('email.admin_email_test') }}" style="display:inline;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn secondary">Send test email to me</button>
+      <button type="submit" class="btn secondary">Lähetä testiviesti minulle</button>
     </form>
   </div>
 
@@ -25,11 +25,11 @@
     <thead>
       <tr>
         <th>ID</th>
-        <th>Subject</th>
-        <th>Status</th>
-        <th>Lead</th>
-        <th>Organization</th>
-        <th>Date</th>
+        <th>Aihe</th>
+        <th>Tila</th>
+        <th>Liidi</th>
+        <th>Organisaatio</th>
+        <th>Päiväys</th>
       </tr>
     </thead>
     <tbody>
@@ -43,7 +43,7 @@
         <td>{{ log.created_at }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="6">No email logs.</td></tr>
+      <tr><td colspan="6">Ei lähetettyjä viestejä.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -51,11 +51,11 @@
   {% if pagination.pages > 1 %}
   <p style="margin-top:1rem;">
     {% if pagination.has_prev %}
-    <a href="{{ url_for('email.admin_email_logs', page=pagination.prev_num, organization_id=org_filter) }}">Previous</a>
+    <a href="{{ url_for('email.admin_email_logs', page=pagination.prev_num, organization_id=org_filter) }}">Edellinen</a>
     {% endif %}
     Page {{ pagination.page }} of {{ pagination.pages }}
     {% if pagination.has_next %}
-    <a href="{{ url_for('email.admin_email_logs', page=pagination.next_num, organization_id=org_filter) }}">Next</a>
+    <a href="{{ url_for('email.admin_email_logs', page=pagination.next_num, organization_id=org_filter) }}">Seuraava</a>
     {% endif %}
   </p>
   {% endif %}

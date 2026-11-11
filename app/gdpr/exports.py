@@ -438,7 +438,9 @@ class DataExportService:
                     f"Tietojen vienti on valmis. Lataa tiedosto 48 tunnin kuluessa:\n{download_url}\n"
                 ),
             )
-            mail.send(msg)
+            from app.email.services import send_system_message
+
+            send_system_message(msg)
         except Exception:
             import logging
 

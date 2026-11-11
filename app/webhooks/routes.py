@@ -141,7 +141,9 @@ def register_settings_webhook_routes(settings_bp):
             endpoint.name = (form.name.data or "").strip()
             endpoint.provider = form.provider.data
             endpoint.url_encrypted = encrypt_webhook_secret(form.url.data)
-            endpoint.secret_encrypted = encrypt_webhook_secret(form.secret.data or "")
+            if (form.secret.data or "").strip():
+                # an empty field keeps the current secret, as the form says
+                endpoint.secret_encrypted = encrypt_webhook_secret(form.secret.data)
             endpoint.is_active = bool(form.is_active.data)
             endpoint.events = events
             db.session.commit()
