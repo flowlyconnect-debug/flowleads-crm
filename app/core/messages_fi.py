@@ -87,6 +87,8 @@ _MESSAGES: dict[str, str] = {
     "Lead must have company, website, or LinkedIn URL.": "Rikastus vaatii yrityksen nimen, verkkosivun tai LinkedIn-osoitteen.",
     # --- tasks ---
     "Task created.": "Tehtävä luotu.",
+    "Invalid task priority.": "Virheellinen prioriteetti.",
+    "Invalid task type.": "Virheellinen tehtävätyyppi.",
     "Task completed.": "Tehtävä merkitty tehdyksi.",
     "Invalid task data.": "Tarkista tehtävän tiedot.",
     "Task not found.": "Tehtävää ei löytynyt.",

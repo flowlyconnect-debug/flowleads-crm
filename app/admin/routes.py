@@ -111,6 +111,133 @@ def customers_list():
     return render_template("admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG)
 
 
+@admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_active_route(organization_id: int):
+    """Switch a customer organization off or back on. Off: its users cannot
+    sign in, open sessions end, API keys stop working. Data is kept."""
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    organization.is_active = request.form.get("active") == "1"
+    log_audit(
+        "organization_activated" if organization.is_active else "organization_deactivated",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+    )
+    db.session.commit()
+    flash(
+        f"{organization.name}: " + ("otettu käyttöön." if organization.is_active else "poistettu käytöstä."),
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
+
+
+@admin_bp.route("/users/<int:user_id>/reset-2fa", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def reset_user_two_factor_route(user_id: int):
+    """A user lost their phone and backup codes: clear the second factor so
+    they set it up again at the next sign-in (2FA stays mandatory)."""
+    from app.auth.models import BackupCode
+    from app.core.audit import log_audit
+    from app.users.models import User
+
+    user = db.session.get(User, user_id)
+    if user is None:
+        abort(404)
+    if user.id == current_user.id:
+        flash("Et voi nollata omaa kaksivaiheista tunnistautumistasi.", "danger")
+    else:
+        user.totp_enabled = False
+        user.totp_secret = None
+        BackupCode.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        log_audit(
+            "two_factor_reset",
+            user_id=current_user.id,
+            organization_id=user.organization_id,
+            target_type="user",
+            target_id=user.id,
+            metadata={"email": user.email},
+        )
+        db.session.commit()
+        flash(
+            f"Kaksivaiheinen tunnistautuminen nollattu: {user.email}. "
+            "Käyttäjä ottaa sen uudelleen käyttöön seuraavalla kirjautumisella.",
+            "success",
+        )
+    if user.organization_id:
+        return redirect(url_for("settings.team_members", organization_id=user.organization_id))
+    return redirect(url_for("admin.customers_list"))
+
+
+AUDIT_ACTION_LABELS_FI = {
+    "login_success": "Kirjautuminen",
+    "login_failed": "Epäonnistunut kirjautuminen",
+    "logout": "Uloskirjautuminen",
+    "customer_invited": "Asiakas kutsuttu",
+    "customer_created": "Asiakas luotu",
+    "targets_transferred": "Kohteita siirretty liideiksi",
+    "leads_imported": "Liidejä tuotu tiedostosta",
+    "leads_purged": "Liidit poistettu",
+    "lead_archived": "Liidi arkistoitu",
+    "lead_restored": "Liidi palautettu",
+    "lead_anonymized": "Liidi anonymisoitu",
+    "organization_activated": "Organisaatio otettu käyttöön",
+    "organization_deactivated": "Organisaatio poistettu käytöstä",
+    "two_factor_reset": "2FA nollattu",
+    "backup_created": "Varmuuskopio luotu",
+    "backup_failed": "Varmuuskopiointi epäonnistui",
+    "email_template_created": "Sähköpostimalli luotu",
+    "email_template_updated": "Sähköpostimalli muokattu",
+    "api_key_created": "API-avain luotu",
+    "api_key_revoked": "API-avain poistettu käytöstä",
+}
+
+
+@admin_bp.route("/audit-log", methods=["GET"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def audit_log():
+    """Who did what: the audit trail the app has always written, browsable."""
+    from app.users.models import AuditLog, Organization
+
+    organization_id = request.args.get("org", type=int)
+    action = (request.args.get("action") or "").strip()
+    page = max(1, request.args.get("page", 1, type=int) or 1)
+
+    query = AuditLog.query
+    if organization_id:
+        query = query.filter(AuditLog.organization_id == organization_id)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    pagination = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
+    organizations = Organization.query.order_by(Organization.name.asc()).all()
+    actions = [row[0] for row in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action).all()]
+    return render_template(
+        "admin/audit_log.html",
+        pagination=pagination,
+        entries=pagination.items,
+        organizations=organizations,
+        organization_names={o.id: o.name for o in organizations},
+        actions=actions,
+        action_labels=AUDIT_ACTION_LABELS_FI,
+        selected_org=organization_id,
+        selected_action=action,
+    )
+
+
 @admin_bp.route("/organizations", methods=["POST"])
 @login_required
 @require_role("superadmin")

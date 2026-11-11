@@ -86,6 +86,13 @@
               <td>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=row.org.id) }}">Avaa</a>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id) }}">Muokkaa</a>
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.team_members', organization_id=row.org.id) }}">Käyttäjät</a>
+                <form method="post" action="{{ url_for('admin.set_customer_active_route', organization_id=row.org.id) }}" style="display:inline;"
+                      {% if row.org.is_active %}onsubmit="return confirm('Poistetaanko {{ row.org.name|e }} käytöstä? Sen käyttäjät eivät pääse kirjautumaan. Tiedot säilyvät.');"{% endif %}>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="active" value="{{ '0' if row.org.is_active else '1' }}">
+                  <button type="submit" class="btn btn-secondary btn-sm">{{ 'Poista käytöstä' if row.org.is_active else 'Ota käyttöön' }}</button>
+                </form>
               </td>
             </tr>
             {% endfor %}

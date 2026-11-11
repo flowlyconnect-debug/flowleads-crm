@@ -328,6 +328,7 @@ def register_proposal_settings_routes(settings_bp):
                 form.default_notes.data = template.default_notes
                 form.header_html.data = template.header_html
                 form.footer_html.data = template.footer_html
+                form.logo_url.data = template.logo_url
         elif form.validate_on_submit():
             try:
                 ProposalService.save_org_settings(
@@ -347,6 +348,7 @@ def register_proposal_settings_routes(settings_bp):
                         "default_notes": form.default_notes.data,
                         "header_html": form.header_html.data,
                         "footer_html": form.footer_html.data,
+                        "logo_url": form.logo_url.data,
                     },
                     current_user.id,
                 )

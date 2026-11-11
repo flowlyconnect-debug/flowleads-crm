@@ -37,6 +37,12 @@ def authenticate_api_key(raw_key: str | None) -> tuple[APIKey | None, str | None
     if api_key.is_expired():
         return None, "expired_api_key"
 
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, api_key.organization_id) if api_key.organization_id else None
+    if organization is not None and not organization.is_active:
+        return None, "inactive_api_key"
+
     return api_key, None
 
 

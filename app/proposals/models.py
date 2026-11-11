@@ -153,6 +153,8 @@ class ProposalTemplate(db.Model):
     )
     header_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     footer_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # https address of the company logo shown at the top of the PDF
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )

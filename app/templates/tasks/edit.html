@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Muokkaa tehtävää — FlowLeads{% endblock %}
+{% block content %}
+<section class="tasks-page">
+  <header class="tasks-page__header">
+    <h1>Muokkaa tehtävää</h1>
+    <a class="btn btn-secondary" href="{{ url_for('tasks.list_tasks', **org_query) }}">Takaisin tehtäviin</a>
+  </header>
+
+  <div class="card" style="max-width:640px;">
+    <div class="card-body">
+      {% if task.lead %}
+      <p class="text-sm text-secondary">Liidi:
+        <a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">{{ task.lead.company or task.lead.display_name }}</a>
+      </p>
+      {% endif %}
+      <form method="post" action="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label" for="task-title">Otsikko</label>
+          <input type="text" id="task-title" name="title" class="form-input" value="{{ task.title }}" maxlength="200" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="task-description">Kuvaus</label>
+          <textarea id="task-description" name="description" class="form-input" rows="3" maxlength="5000">{{ task.description or '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="task-due">Eräpäivä ja aika</label>
+          <input type="datetime-local" id="task-due" name="due_date" class="form-input" value="{{ task.due_date.strftime('%Y-%m-%dT%H:%M') }}" required>
+          <p class="form-helper">
+            Siirrä:
+            <button type="button" class="btn btn-ghost btn-sm" data-shift-days="1">+1 päivä</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-shift-days="3">+3 päivää</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-shift-days="7">+1 viikko</button>
+          </p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="task-type">Tyyppi</label>
+          <select id="task-type" name="type" class="form-select">
+            {% for value in task_types %}
+            <option value="{{ value }}"{% if task.type == value %} selected{% endif %}>{{ type_labels.get(value, value) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="task-priority">Prioriteetti</label>
+          <select id="task-priority" name="priority" class="form-select">
+            {% for value in priorities %}
+            <option value="{{ value }}"{% if task.priority == value %} selected{% endif %}>{{ priority_labels.get(value, value) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if can_assign_others and users|length > 1 %}
+        <div class="form-group">
+          <label class="form-label" for="task-assignee">Vastuuhenkilö</label>
+          <select id="task-assignee" name="assigned_to" class="form-select">
+            {% for user in users %}
+            <option value="{{ user.id }}"{% if task.assigned_to == user.id %} selected{% endif %}>{{ user.email }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="form-actions" style="display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">Tallenna</button>
+          <a class="btn btn-secondary" href="{{ url_for('tasks.list_tasks', **org_query) }}">Peruuta</a>
+        </div>
+      </form>
+
+      <form method="post" action="{{ url_for('tasks.delete_task', task_id=task.id, **org_query) }}" style="margin-top:1.5rem;"
+            onsubmit="return confirm('Poistetaanko tehtävä pysyvästi?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:#FECACA;">Poista tehtävä</button>
+      </form>
+    </div>
+  </div>
+</section>
+<script>
+// "+1 päivä" style buttons move the due date without retyping it
+document.querySelectorAll('[data-shift-days]').forEach(function (button) {
+  button.addEventListener('click', function () {
+    var input = document.getElementById('task-due');
+    var date = input.value ? new Date(input.value) : new Date();
+    date.setDate(date.getDate() + parseInt(button.dataset.shiftDays, 10));
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    input.value = date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  });
+});
+</script>
+{% endblock %}

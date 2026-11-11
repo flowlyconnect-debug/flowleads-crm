@@ -2,7 +2,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Liidit — FlowLeads{% endblock %}
 {% block content %}
-{% set has_active_filters = filters.search or filters.source or filters.stage_id or filters.assigned_to or filters.status or filters.score_min or filters.score_max or filters.no_contact_7 or filters.gdpr_consent or filters.marketing_opt_in or filters.unsubscribed or filters.is_anonymized %}
+{% set has_active_filters = filters.renovation or filters.city or filters.region or filters.search or filters.source or filters.stage_id or filters.assigned_to or filters.status or filters.score_min or filters.score_max or filters.no_contact_7 or filters.gdpr_consent or filters.marketing_opt_in or filters.unsubscribed or filters.is_anonymized %}
 {% set show_onboarding = pagination.total == 0 and not has_active_filters %}
 {% set show_no_results = pagination.total == 0 and has_active_filters %}
 {% set active_sort = filters.sort or 'created_at' %}
@@ -23,6 +23,9 @@
   'marketing_opt_in': 1 if filters.marketing_opt_in else none,
   'unsubscribed': 1 if filters.unsubscribed else none,
   'is_anonymized': 1 if filters.is_anonymized else none,
+  'renovation': filters.renovation,
+  'city': filters.city,
+  'region': filters.region,
 } %}
 {% set quick_tab = 'all' %}
 {% if filters.no_contact_7 %}
@@ -75,6 +78,7 @@
       </p>
     </div>
     <div class="leads-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.import_leads_route', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.import_leads_route') }}">Tuo CSV</a>
       <a class="btn btn-secondary btn-sm leads-export" href="{{ export_url }}">Vie CSV</a>
       <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
     </div>
@@ -189,6 +193,51 @@
       </div>
     </div>
 
+    {# Quick filters: one click, applied at once. Only values that occur on the leads are offered. #}
+    {% if not show_onboarding %}
+    {% macro quick_select(name, label, options, all_label) -%}
+    {% if options|length > 1 or filters.get(name) %}
+    <label class="leads-quick-filter">
+      <span class="leads-quick-filter__label">{{ label }}</span>
+      <select name="{{ name }}" class="form-input leads-quick-filter__select" onchange="this.form.submit()">
+        <option value="">{{ all_label }}</option>
+        {% for option in options %}
+        <option value="{{ option }}"{% if filters.get(name) == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {%- endmacro %}
+    <form method="get" class="leads-quick-filters" aria-label="Rajaa liidejä">
+      {% if current_user.is_superadmin() %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+      {% for key, value in base_filters.items() if value is not none and value != '' and key not in ('stage_id', 'assigned_to', 'renovation', 'city', 'region') %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endfor %}
+      <label class="leads-quick-filter">
+        <span class="leads-quick-filter__label">Vaihe</span>
+        <select name="stage_id" class="form-input leads-quick-filter__select" onchange="flSubmitFilters(this.form)">
+          {% for value, label in filter_form.stage_id.choices %}
+          <option value="{{ value if value else '' }}"{% if filters.stage_id == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {{ quick_select('renovation', 'Remontti', quick_filter_options.renovation, 'Kaikki remontit') }}
+      {{ quick_select('city', 'Kaupunki', quick_filter_options.city, 'Kaikki kaupungit') }}
+      {{ quick_select('region', 'Maakunta', quick_filter_options.region, 'Kaikki maakunnat') }}
+      {% if can_assign_others and filter_form.assigned_to.choices|length > 2 %}
+      <label class="leads-quick-filter">
+        <span class="leads-quick-filter__label">Vastuuhenkilö</span>
+        <select name="assigned_to" class="form-input leads-quick-filter__select" onchange="flSubmitFilters(this.form)">
+          {% for value, label in filter_form.assigned_to.choices %}
+          <option value="{{ value if value else '' }}"{% if filters.assigned_to == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <noscript><button type="submit" class="btn btn-secondary btn-sm">Rajaa</button></noscript>
+    </form>
+    {% endif %}
+
     {% if has_active_filters and not show_onboarding %}
     <div class="leads-opp-chips" aria-label="Aktiiviset suodattimet">
       <span class="leads-opp-chips__label">Rajaukset:</span>
@@ -214,6 +263,11 @@
         {{ assignee_label|truncate(20, True, '…') }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
       </a>
       {% endif %}
+      {% for key in ('renovation', 'city', 'region') if filters.get(key) %}
+      <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, **{key: none})) }}">
+        {{ filters.get(key) }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+      </a>
+      {% endfor %}
       {% if filters.score_min %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, score_min=none)) }}">
         Pisteet ≥ {{ filters.score_min }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>

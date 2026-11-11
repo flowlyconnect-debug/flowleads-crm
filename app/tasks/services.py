@@ -187,6 +187,72 @@ class TaskService:
         return task
 
     @staticmethod
+    def _ensure_can_change(task: Task, actor: User | None) -> None:
+        """Admins manage every task of the organization; a salesperson only
+        the ones assigned to or created by them."""
+        if actor is None or actor.role in ("admin", "superadmin"):
+            return
+        if task.assigned_to != actor.id and task.created_by != actor.id:
+            raise TaskServiceError("Insufficient permissions.", "forbidden")
+
+    @staticmethod
+    def update(task_id: int, data: dict, organization_id: int, actor: User | None) -> Task:
+        """Edit or reschedule an open task. Only the keys present in `data`
+        change."""
+        task = get_task_for_org(task_id, organization_id)
+        TaskService._ensure_can_change(task, actor)
+        if task.status in ("completed", "cancelled"):
+            raise TaskServiceError("Suljettua tehtävää ei voi muokata.", "closed")
+
+        if "title" in data:
+            title = (data.get("title") or "").strip()
+            if not title:
+                raise TaskServiceError("Title is required.", "validation_error")
+            if len(title) > 200:
+                raise TaskServiceError("Title must be at most 200 characters.", "validation_error")
+            task.title = title
+        if "description" in data:
+            task.description = (data.get("description") or "").strip()[:5000] or None
+        if "priority" in data:
+            if data["priority"] not in TASK_PRIORITIES:
+                raise TaskServiceError("Invalid task priority.", "validation_error")
+            task.priority = data["priority"]
+        if "type" in data and data["type"]:
+            if data["type"] not in TASK_TYPES:
+                raise TaskServiceError("Invalid task type.", "validation_error")
+            task.type = data["type"]
+        if "due_date" in data:
+            due_date = data["due_date"]
+            if isinstance(due_date, str):
+                try:
+                    due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+                except ValueError:
+                    raise TaskServiceError("Invalid due_date format.", "validation_error") from None
+            if due_date is None:
+                raise TaskServiceError("due_date is required.", "validation_error")
+            new_due = _ensure_tz(due_date)
+            if new_due != _ensure_tz(task.due_date):
+                task.due_date = new_due
+                task.reminder_sent = False  # a moved task may remind again
+        if data.get("assigned_to"):
+            new_assignee = int(data["assigned_to"])
+            if new_assignee != task.assigned_to:
+                if actor is not None and actor.role not in ("admin", "superadmin") and new_assignee != actor.id:
+                    raise TaskServiceError("Insufficient permissions.", "forbidden")
+                _validate_assignee(new_assignee, organization_id)
+                task.assigned_to = new_assignee
+        task.updated_at = _utc_now()
+        db.session.flush()
+        return task
+
+    @staticmethod
+    def delete(task_id: int, organization_id: int, actor: User | None) -> None:
+        task = get_task_for_org(task_id, organization_id)
+        TaskService._ensure_can_change(task, actor)
+        db.session.delete(task)
+        db.session.flush()
+
+    @staticmethod
     def complete(task_id: int, organization_id: int, user_id: int | None) -> Task:
         task = get_task_for_org(task_id, organization_id)
         if task.status == "completed":

@@ -80,6 +80,7 @@
         <div class="task-row__action">
           {% if task.lead %}<a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">Avaa liidi →</a>{% endif %}
         </div>
+        <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}
     </div>
@@ -108,6 +109,7 @@
           <span class="priority-dot" title="Korkea prioriteetti"></span>
           {% endif %}
         </div>
+        <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}
     </div>
@@ -129,6 +131,7 @@
           </div>
         </div>
         <div class="task-row__due">{{ weekday_names[task.due_date.weekday()] }} {{ task.due_date.strftime('%d.%m.') }}</div>
+        <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}
     </div>
@@ -150,6 +153,7 @@
           </div>
         </div>
         <div class="task-row__due">{{ task.due_date.strftime('%d.%m.') }}</div>
+        <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}
     </div>
@@ -244,6 +248,7 @@
       '<div class="task-row__main"><div class="task-row__title">' + esc(task.title) + '</div><div class="task-row__meta">' + leadHtml + '</div></div>' +
       '<div class="task-row__due' + (task.section === 'overdue' ? ' task-row__due--danger' : '') + '">' + dueText + '</div>' +
       '<div class="task-row__action">' + (task.section === 'today' ? priorityDot : action) + '</div>' +
+      '<a class="task-row__edit" href="/tasks/' + esc(task.id) + '/edit' + (window.location.search.indexOf('organization_id=') >= 0 ? '?organization_id=' + encodeURIComponent(new URLSearchParams(window.location.search).get('organization_id')) : '') + '">Muokkaa</a>' +
       '</article>';
     var wrapper = document.createElement('div');
     wrapper.innerHTML = html;

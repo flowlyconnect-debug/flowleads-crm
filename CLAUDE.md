@@ -31,6 +31,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
+- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
+  digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
+  `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner.
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run
@@ -58,6 +61,10 @@ Keep that file up to date as items are finished.
   Catalogue tests: `tests/test_listings_catalogue.py`, `tests/test_catalogue_filters_and_onboarding.py`, `tests/test_targets.py` (Kohteet). n8n workflow e2e (needs Node.js):
   `tests/test_n8n_catalogue_e2e.py`, which runs the generated workflows with the mini n8n emulator in
   `tests/n8n_sim/` against a live local CRM. Re-run it after regenerating workflows.
+- Front-end libraries (Chart.js, Sortable, Quill, Inter) are vendored in `app/static/vendor/`; do not add
+  CDN links. CI (`.github/workflows/tests.yml`) runs migrations and the suite on every PR and on main.
+- UI messages are Finnish: services raise English messages (shared with the JSON API) and
+  `app/core/messages_fi.py` translates them when flashed. Timestamps are shown with the `helsinki` filter.
 - Migrations: Alembic in `migrations/versions/`. Check with
   `DATABASE_URL=sqlite:///<tmp>.db flask --app run.py db upgrade` (and `downgrade`). Use
   `batch_alter_table` for drops (SQLite).

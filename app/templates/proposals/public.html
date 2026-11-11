@@ -72,12 +72,12 @@
       </tbody>
     </table>
     <div class="totals">
-      <p>Välisumma: {{ proposal_data.subtotal }} {{ proposal_data.currency }}</p>
-      {% if proposal_data.discount_amount != '0.00' %}
-      <p>Alennus: {{ proposal_data.discount_amount }} {{ proposal_data.currency }}</p>
-      {% endif %}
-      <p>ALV {{ proposal_data.tax_percent }}%</p>
-      <p class="grand">Yhteensä: {{ proposal_data.total }} {{ proposal_data.currency }}</p>
+      {% set d = proposal_data.display %}
+      <p>Välisumma: {{ d.subtotal }}</p>
+      {% if d.discount %}<p>Alennus: -{{ d.discount }}</p>{% endif %}
+      <p>Veroton yhteensä: {{ d.net }}</p>
+      <p>ALV {{ d.tax_percent }} %: {{ d.tax_amount }}</p>
+      <p class="grand">Yhteensä (sis. ALV): {{ d.gross }}</p>
     </div>
     {% if proposal_data.notes %}
     <div style="margin-top:1.5rem;padding:1rem;background:#0f172a;border-radius:8px;">

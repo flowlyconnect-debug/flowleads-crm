@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, DecimalField, IntegerField, StringField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, NumberRange, Optional
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 
 class ProposalSettingsForm(FlaskForm):
@@ -20,6 +20,7 @@ class ProposalSettingsForm(FlaskForm):
     default_valid_days = IntegerField("Mallin voimassaolopäivät", validators=[Optional(), NumberRange(min=1, max=365)])
     default_tax_percent = DecimalField("Mallin ALV %", places=2, validators=[Optional()])
     default_notes = TextAreaField("Mallin huomautukset", validators=[Optional()])
+    logo_url = StringField("Logon osoite (https://…)", validators=[Optional(), Length(max=500)])
     header_html = TextAreaField("PDF/HTML ylätunniste", validators=[Optional()])
     footer_html = TextAreaField("PDF/HTML alatunniste", validators=[Optional()])
     submit = SubmitField("Tallenna")

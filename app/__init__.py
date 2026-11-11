@@ -152,7 +152,11 @@ def _init_extensions(app):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        user = db.session.get(User, int(user_id))
+        # a deactivated organization ends its users' open sessions too
+        if user is not None and user.organization is not None and not user.organization.is_active:
+            return None
+        return user
 
     with app.app_context():
         from app.admin import models as admin_models  # noqa: F401

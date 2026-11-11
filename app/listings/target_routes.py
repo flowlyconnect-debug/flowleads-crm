@@ -3,14 +3,17 @@ are not leads yet) and the actions that move them to leads or hide them."""
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.core.audit import log_audit
 from app.core.tenant import org_query_suffix, resolve_organization_id
 from app.extensions import db
 from app.listings.target_services import (
+    FILTER_KEYS,
+    SORT_OPTIONS,
     TABS,
+    target_filter_options,
     count_targets,
     dismiss_targets,
     list_targets,
@@ -37,11 +40,29 @@ def _back(organization_id: int):
     tab = request.form.get("tab")
     if tab in TABS and tab != "available":
         params["tab"] = tab
-    for key in ("search", "profile_id", "page"):
+    for key in ("search", "profile_id", "page", *FILTER_KEYS):
         value = (request.form.get(key) or "").strip()
         if value:
             params[key] = value
     return redirect(url_for("targets.index", **params))
+
+
+_TRANSFERRED_KEY = "targets_transferred_lead_ids"
+
+
+def _valid_assignee(organization_id: int, user_id: int | None) -> int | None:
+    """Owner for the new leads. Admins may pick anyone in the organization;
+    a salesperson's transfers become their own leads."""
+    from app.users.models import User
+
+    if current_user.role == "user":
+        return current_user.id
+    if not user_id:
+        return None
+    user = db.session.get(User, user_id)
+    if user is None or user.organization_id != organization_id or not user.is_active:
+        return None
+    return user.id
 
 
 def _selected_ids() -> list[str]:
@@ -65,11 +86,17 @@ def index():
     if profile_id not in {p.id for p in profiles}:
         profile_id = None
     search = (request.args.get("search") or "").strip()
+    filters = {
+        key: (request.args.get(key) or "").strip()
+        for key in FILTER_KEYS
+        if (request.args.get(key) or "").strip()
+    }
     pagination = list_targets(
         organization_id,
         status=TABS[tab],
         profile_id=profile_id,
         search=search,
+        filters=filters,
         page=request.args.get("page", 1, type=int) or 1,
     )
     if not pagination.items and pagination.total and pagination.page > 1:
@@ -77,8 +104,39 @@ def index():
         args = request.args.to_dict()
         args["page"] = pagination.pages or 1
         return redirect(url_for("targets.index", **args))
+    # leads created by the transfer that just happened: shown once, with links
+    transferred_leads = []
+    lead_ids = session.pop(_TRANSFERRED_KEY, None)
+    if lead_ids:
+        from app.leads.models import Lead
+
+        transferred_leads = (
+            Lead.query.filter(Lead.organization_id == organization_id, Lead.id.in_(lead_ids))
+            .order_by(Lead.id.asc())
+            .all()
+        )
+    can_assign = current_user.role in ("admin", "superadmin")
+    assignees = []
+    if can_assign:
+        from app.users.models import User
+
+        assignees = (
+            User.query.filter_by(organization_id=organization_id, is_active=True)
+            .order_by(User.email.asc())
+            .all()
+        )
+    from app.tasks.settings import get_organization_settings
+
+    digest_enabled = get_organization_settings(organization_id).targets_digest_enabled
+    db.session.commit()  # the settings row is created on first use
     return render_template(
         "targets/index.html",
+        digest_enabled=digest_enabled,
+        filters=filters,
+        filter_options=target_filter_options(organization_id, TABS[tab]),
+        sort_options=SORT_OPTIONS,
+        transferred_leads=transferred_leads,
+        assignees=assignees,
         rows=[target_row(match) for match in pagination.items],
         pagination=pagination,
         tab=tab,
@@ -100,7 +158,10 @@ def transfer():
     if not match_ids:
         flash("Valitse vähintään yksi kohde.", "warning")
         return _back(organization_id)
-    result = transfer_targets(organization_id, match_ids)
+    assigned_to = _valid_assignee(organization_id, request.form.get("assigned_to", type=int))
+    result = transfer_targets(organization_id, match_ids, assigned_to=assigned_to)
+    if result["lead_ids"]:
+        session[_TRANSFERRED_KEY] = result["lead_ids"][:25]
     log_audit(
         "targets_transferred",
         user_id=current_user.id,
@@ -128,6 +189,26 @@ def transfer():
         flash(f"{result['failed']} kohteen siirto epäonnistui.", "danger")
     if not parts and not result["failed"]:
         flash("Kohteet oli jo käsitelty.", "info")
+    return _back(organization_id)
+
+
+@targets_bp.route("/digest", methods=["POST"])
+def digest_setting():
+    """Switch the daily "new targets" summary on or off for the organization."""
+    if current_user.role not in ("admin", "superadmin"):
+        abort(403)
+    from app.tasks.settings import get_organization_settings
+
+    organization_id = resolve_organization_id()
+    settings = get_organization_settings(organization_id)
+    settings.targets_digest_enabled = request.form.get("enabled") == "1"
+    db.session.commit()
+    flash(
+        "Päiväkooste uusista kohteista on päällä."
+        if settings.targets_digest_enabled
+        else "Päiväkooste uusista kohteista on pois päältä.",
+        "success",
+    )
     return _back(organization_id)
 
 

@@ -306,6 +306,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Listing retention failed")
 
+    def run_target_digest():
+        """Morning summary of new targets for each customer (Kohteet page)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.target_services import send_target_digests
+
+            try:
+                count = send_target_digests()
+                if count:
+                    logger.info("Target digest: notified %s organization(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Target digest failed")
+
     def run_catalogue_health_check():
         """Email superadmins when crawling or analysis has stopped."""
         with app.app_context():
@@ -483,6 +497,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_listing_retention,
         CronTrigger(hour=3, minute=30, timezone="UTC"),
         id="listing_retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_target_digest,
+        CronTrigger(hour=7, minute=30, timezone="Europe/Helsinki"),
+        id="target_digest",
         replace_existing=True,
     )
     scheduler.add_job(

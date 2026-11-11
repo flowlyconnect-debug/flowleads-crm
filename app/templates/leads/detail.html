@@ -25,6 +25,12 @@
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.edit_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.edit_lead', lead_id=lead.id) }}">
         Muokkaa
       </a>
+      {% if lead.status in ('archived', 'lost') %}
+      <form method="post" action="{{ url_for('leads.restore_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.restore_lead', lead_id=lead.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary btn-sm">{{ 'Palauta arkistosta' if lead.status == 'archived' else 'Avaa uudelleen' }}</button>
+      </form>
+      {% endif %}
       {% if can_archive and lead.status != 'archived' %}
       <form method="post" action="{{ url_for('leads.delete_lead', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.delete_lead', lead_id=lead.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -233,7 +239,22 @@
               Lähetä sähköposti
             </button>
             {% endif %}
+            {% if lead.phone %}
+            <a class="btn btn-secondary btn-sm" href="tel:{{ lead.phone|replace(' ', '') }}">Soita {{ lead.phone }}</a>
+            {% endif %}
           </div>
+          {% if lead.status != 'archived' %}
+          {# One click logs the contact; the note is optional. #}
+          <form method="post" class="lead-log-contact mt-3" action="{{ url_for('leads.log_contact', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.log_contact', lead_id=lead.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="note" class="form-input form-input--compact lead-log-contact__note" maxlength="2000" placeholder="Lyhyt muistiinpano (valinnainen)" aria-label="Muistiinpano yhteydenotosta">
+            <button type="submit" name="kind" value="call" class="btn btn-secondary btn-sm">Kirjaa soitto</button>
+            <button type="submit" name="kind" value="email" class="btn btn-secondary btn-sm">Kirjaa sähköposti</button>
+            {% if lead.last_contacted_at %}
+            <span class="text-sm text-secondary">Viimeksi yhteydessä {{ (lead.last_contacted_at|helsinki).strftime('%d.%m.%Y %H:%M') }}</span>
+            {% endif %}
+          </form>
+          {% endif %}
         </div>
       </section>
 
