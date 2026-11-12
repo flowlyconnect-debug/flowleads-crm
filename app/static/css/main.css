@@ -5204,3 +5204,13 @@ select.form-input--compact {
   gap: 8px;
   margin-left: auto;
 }
+
+/* Lead list: export menu (CSV / HubSpot / Pipedrive import files) */
+.leads-export-menu { position: relative; display: inline-block; }
+.leads-export-menu > summary { list-style: none; cursor: pointer; }
+.leads-export-menu > summary::-webkit-details-marker { display: none; }
+.leads-export-menu__list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 220px; display: grid; padding: 6px; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; box-shadow: 0 10px 30px rgba(17, 24, 39, .12); }
+.leads-export-menu__list a { padding: 8px 10px; border-radius: 6px; color: #111827; text-decoration: none; font-size: 14px; }
+.leads-export-menu__list a:hover, .leads-export-menu__list a:focus { background: #F3F4F6; }
+.lead-crm-export__body { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.lead-crm-export__body form { display: flex; align-items: center; gap: 8px; }

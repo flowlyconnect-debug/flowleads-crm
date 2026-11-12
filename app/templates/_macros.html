@@ -42,6 +42,7 @@
   {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
   {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
   {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+  {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot (HubSpot, Pipedrive)') }}
   {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
   {% endif %}
 
@@ -60,6 +61,7 @@
   {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
   {{ org_link('settings.proposals_settings', 'proposals', 'Tarjoukset') }}
   {{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}
+  {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot') }}
 
   {% set advanced_keys = ['lead_settings', 'email', 'email_templates', 'privacy', 'api_keys', 'webhooks'] %}
   <details class="settings-nav__more"{% if active in advanced_keys %} open{% endif %}>

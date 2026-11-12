@@ -179,6 +179,17 @@ _MESSAGES: dict[str, str] = {
     "You cannot change your own role.": "Et voi vaihtaa omaa rooliasi.",
     "Password must be at least 12 characters.": "Salasanan pitää olla vähintään 12 merkkiä.",
     "Two-factor sign-in required.": "Kaksivaiheinen tunnistautuminen vaaditaan.",
+    # --- CRM export (app/integrations) ---
+    "Unknown CRM.": "Tuntematon CRM-järjestelmä.",
+    "The API token looks incomplete.": "API-avain näyttää vajaalta. Kopioi koko avain.",
+    "HubSpot is not connected.": "HubSpot-yhteyttä ei ole. Yhdistä se asetusten Integraatiot-sivulla.",
+    "Pipedrive is not connected.": "Pipedrive-yhteyttä ei ole. Yhdistä se asetusten Integraatiot-sivulla.",
+    "HubSpot rejected the API token.": "HubSpot ei hyväksynyt API-avainta. Tarkista avain ja sen oikeudet (crm.objects.companies, contacts ja deals).",
+    "Pipedrive rejected the API token.": "Pipedrive ei hyväksynyt API-avainta. Tarkista avain.",
+    "HubSpot rate limit reached. Try again in a minute.": "HubSpotin pyyntöraja täyttyi. Yritä minuutin päästä uudelleen.",
+    "Pipedrive rate limit reached. Try again in a minute.": "Pipedriven pyyntöraja täyttyi. Yritä minuutin päästä uudelleen.",
+    "HubSpot did not return an id.": "HubSpot ei palauttanut tunnistetta.",
+    "Pipedrive did not return an id.": "Pipedrive ei palauttanut tunnistetta.",
 }
 
 # Messages that carry a variable part: (English prefix, Finnish prefix).
@@ -188,6 +199,10 @@ _PREFIXES: tuple[tuple[str, str], ...] = (
     ("Mailgun request failed: ", "Sähköpostipalvelun kutsu epäonnistui: "),
     ("S3 upload failed: ", "Varmuuskopion tallennus epäonnistui: "),
     ("Unknown template variable: ", "Tuntematon muuttuja: "),
+    ("HubSpot did not answer: ", "HubSpot ei vastannut: "),
+    ("Pipedrive did not answer: ", "Pipedrive ei vastannut: "),
+    ("HubSpot refused the data: ", "HubSpot hylkäsi tiedot: "),
+    ("Pipedrive refused the data: ", "Pipedrive hylkäsi tiedot: "),
     ("Account is temporarily locked", "Tili on väliaikaisesti lukittu liian monen epäonnistuneen kirjautumisen vuoksi. Yritä hetken kuluttua uudelleen."),
 )
 
