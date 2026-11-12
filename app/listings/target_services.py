@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import String, and_, cast, func, or_
+from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import aliased, contains_eager, joinedload
 
 from app.extensions import db

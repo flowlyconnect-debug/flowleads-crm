@@ -155,3 +155,15 @@ def test_monthly_email_once_per_month_to_admins(app, monkeypatch):
         assert "/reports/monthly?month=2026-10" in sent[0].body
         assert send_monthly_reports(now=now) == 0  # once a month
         assert get_organization_settings(quiet.id).monthly_report_sent_for == "2026-10"
+
+
+def test_two_listings_of_one_housing_company_are_one_target(app):
+    with app.app_context():
+        org, _admin, _seller = _org("samecompany")
+        for ext, name in ((1, "As Oy Sama"), (2, "Asunto Oy Sama")):
+            listing = Listing(source="import", external_id=f"s{ext}", maakunta="Uusimaa", kaupunki="Espoo", taloyhtio=name)
+            db.session.add(listing)
+            db.session.flush()
+            db.session.add(ListingMatch(organization_id=org.id, listing_id=listing.id, status="pending", created_at=OCT, released_at=OCT))
+        db.session.commit()
+        assert monthly_report(org.id, Month(2026, 10))["figures"]["received"] == 1

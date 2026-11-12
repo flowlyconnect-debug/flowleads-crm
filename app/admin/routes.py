@@ -1,5 +1,5 @@
 
-from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.admin.constants import FEATURE_CATALOG

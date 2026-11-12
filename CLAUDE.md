@@ -45,6 +45,16 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).
   **Saved searches** on Kohteet (`SavedTargetSearch`, per user) are notified by `notify_saved_searches()` in the
   `listing_matching` job. Tests: `tests/test_insights.py`.
+- **One housing company = one target** (`app/listings/housing.py`): `Listing.company_key` (normalised name + city;
+  Y-tunnus only for nameless rows) groups listings on Kohteet, on the taloyhtiökortti (signal timeline) and in
+  transfers/hiding/fetching. Each target has a score 0-100 (`ListingMatch.score`, default sort "Parhaat ensin").
+  Board chair / maintenance company / property-manager offices: `app/listings/contacts.py`. Map: `/targets/map`
+  (`app/listings/geo.py`, vendored Leaflet). Plain-language search: `app/listings/nl_search.py`.
+- Other customer modules: CRM export to HubSpot/Pipedrive (`app/integrations/`), monthly report
+  (`app/analytics/monthly.py`), plans/trial/monthly contract and public `/hinnasto` (`app/billing/`, prices in
+  `plans.py`; an ended trial blocks fetching and transferring targets only). Superadmin `/admin/system` and
+  `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
+  when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run

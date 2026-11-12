@@ -28,7 +28,7 @@ import re
 import unicodedata
 from datetime import datetime, timezone
 
-from sqlalchemy import event, func
+from sqlalchemy import event
 
 from app.extensions import db
 

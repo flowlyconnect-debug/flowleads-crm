@@ -85,10 +85,17 @@ def month_figures(organization_id: int, month: Month) -> dict:
         return (column >= start) & (column < end)
 
     received_at = ListingMatch.released_at if fetch_enabled() else ListingMatch.created_at
+    from sqlalchemy import String, cast
+
+    from app.listings.models import Listing
+
+    # one housing company = one target, as on the Kohteet page
+    company = func.coalesce(Listing.company_key, cast(Listing.id, String))
     received = _count(
-        db.session.query(func.count(func.distinct(ListingMatch.listing_id))).filter(
-            ListingMatch.organization_id == organization_id, between(received_at)
-        )
+        db.session.query(func.count(func.distinct(company)))
+        .select_from(ListingMatch)
+        .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(ListingMatch.organization_id == organization_id, between(received_at))
     )
     transferred = _count(
         db.session.query(func.count(func.distinct(ListingMatch.lead_id))).filter(

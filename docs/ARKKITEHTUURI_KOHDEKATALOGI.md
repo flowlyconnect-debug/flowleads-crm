@@ -157,6 +157,34 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
 - **Säilytys** (ajastin `listing_retention`, päivittäin): Oikotieltä poistuneet kohteet remontteineen ja osumineen
   poistetaan `LISTING_RETENTION_DAYS` päivän kuluttua poistumisesta. Asiakkaan liidit jäävät asiakkaan CRM:ään.
 
+### 7. Taloyhtiö yhtenä kohteena, pisteet ja kartta
+
+- **Taloyhtiön avain** (`app/listings/housing.py`): `listings.company_key` = `n:<nimi>|<kaupunki>` normalisoidusta
+  nimestä ("As. Oy Kallio" = "Asunto Oy Kallio"), `y:<Y-tunnus>` vain riveille, joilla ei ole nimeä. Avain pidetään
+  ajan tasalla SQLAlchemyn `before_flush`-kuuntelijalla; `reconcile_company_key` liittää nimettömän rivin saman
+  Y-tunnuksen nimettyyn taloyhtiöön vain, jos Y-tunnus osoittaa yhteen nimeen (tuontitiedostoissa on ollut
+  isännöitsijän Y-tunnus taloyhtiön sarakkeessa). Vanhat rivit saavat avaimen ajastimessa (`backfill_company_keys`).
+- **Yksi kohde per taloyhtiö**: `_visible_match_ids` ryhmittelee taloyhtiön mukaan. Piilotus, palautus, "Hae kohteita"
+  ja siirto liidiksi koskevat koko taloyhtiötä; siirrossa muut ilmoitukset yhdistyvät samaan liidiin. Näkyvän
+  taloyhtiön uusi ilmoitus vapautuu heti (se on uusi signaali, ei uusi kohde). Taloyhtiö, jolla on jo liidi, ei näy
+  kohteena; ajastin yhdistää sen uudet ilmoitukset liidiin (`merge_into_existing_leads`, organisaatiokohtainen).
+- **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
+  `listing_matches.score` on Kohteet-sivun oletusjärjestys "Parhaat ensin"; `refresh_scores` ajetaan
+  `listing_matching`-ajossa. Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
+  vaikuta pisteisiin.
+- **Taloyhtiökortti**: pisteet, signaalien aikajana (ilmoitukset, remonttimaininnat, yhteystiedot, kohteen tila,
+  liidin myyntityö) sekä hallituksen puheenjohtaja, huoltoyhtiö ja isännöintitoimiston tiedot.
+- **Yhteystiedot** (`app/listings/contacts.py`): `listings.hallitus_pj*`, `huoltoyhtio*` ja jaettu taulu
+  `property_manager_offices` (Y-tunnus, osoite, vaihde, sähköposti, www). Tuonti: kohdetiedoston lisäsarakkeet,
+  toimistolista `/admin/catalogue` tai `POST /api/v1/n8n/listings/managers/import`. Analyzer poimii huoltoyhtiön ja
+  isännöitsijän nimen.
+- **Kartta** (`/targets/map`, `app/listings/geo.py`): sijainti tuonnin koordinaateista (`lat`/`lon`), valinnaisesta
+  osoitteen geokoodauksesta (`GEOCODING_ENABLED`, ajastin `geocode_listings`, Nominatim, kerran per kohde) tai kunnan /
+  maakunnan keskipisteestä (`geo_data.py`, merkitään likimääräiseksi). Leaflet omalta palvelimelta, laatat
+  `MAP_TILE_URL`.
+- **Haku tavallisella kielellä** (`/targets/ask`, `app/listings/nl_search.py`): teksti → samat suodattimet kuin
+  suodatinpalkissa; valinnainen tekoäly (`NL_SEARCH_AI_ENABLED`) saa palauttaa vain tarjolla olevia arvoja.
+
 ## Tietomalli (`app/listings/models.py`)
 
 | Taulu | Sisältö |
@@ -233,5 +261,7 @@ Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
   vaikuttaa vain, jos `LISTING_AUTO_CREATE_LEADS` on päällä.
 - **GDPR**: isännöitsijätiedot ovat B2B-tietoja, ja perusteena on oikeutettu etu. Poistuneet kohteet poistetaan
   `LISTING_RETENTION_DAYS` päivän jälkeen.
-- **Valinnaisten toimintojen rajaus** estää sivut, automaatioiden laukaisun ja AI-rikastuksen, mutta ei piilota
-  valikkolinkkejä eikä pysäytä jo käynnissä olevia sekvenssejä, jos toiminto otetaan asiakkaalta pois jälkikäteen.
+- **Valinnaisten toimintojen rajaus** estää sivut ja piilottaa valikkolinkit; taustalla automaatiot eivät laukea eikä
+  sekvenssi lähetä viestejä, kun toiminto on pois (ilmoittautumiset odottavat ja jatkuvat, jos toiminto palautetaan).
+- **Taloyhtiön tunnistus nimellä**: kirjoitusasun normalisointi kattaa yleiset muodot, mutta eri nimellä tai väärällä
+  kaupungilla kirjattu sama taloyhtiö jää kahdeksi kohteeksi.

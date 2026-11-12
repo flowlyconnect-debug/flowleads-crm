@@ -1,6 +1,6 @@
 # Tuotantoon vienti – tilanne ja jatko
 
-Päivitetty 11.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
+Päivitetty 12.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
 **"Jatka FlowLeadsin tuotantoon vientiä"**, lue tämä tiedosto ja jatka kohdasta
 "Seuraavaksi". Päivitä tiedosto, kun kohtia valmistuu.
 
@@ -234,6 +234,40 @@ Jätetty ennalleen (pieniä tai vaativat erillisen päätöksen): tarjousnumeron
 käyttäjälistalla ei ole "kutsuttu"-tilaa (ei viimeisen kirjautumisen kenttää), vanha testihaun reitti
 `create-test-job` on yhä olemassa, kuiva-ajon rivimäärät voivat laskea saman rivin kahdesti.
 
+## Tehty 12.11.2026 (3): Metroc-vertailun kehityskohteet ja tuotantovalmius
+
+Taustana `docs/TUTKIMUS_KEHITYS_JA_METROC.md`. Migraatiot `f0a1b2c3d4e5` … `f8b9c0d1e2f3` (11 kpl, testattu ylös
+ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test_housing_contacts.py`,
+`test_targets_map.py`, `test_crm_export.py`, `test_nl_search.py`, `test_monthly_report.py`, `test_billing.py`,
+`test_backup_logical.py`, `test_production_fixes.py`.
+
+- **Taloyhtiö yhtenä kohteena** ja **pisteet 0–100**, oletusjärjestys "Parhaat ensin", taloyhtiökortille
+  signaalien aikajana ja ikäarviot. Ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md` kohta 7.
+- **Yhteystiedot**: hallituksen puheenjohtaja, huoltoyhtiö, isännöintitoimistot (tuonti CSV:llä ja API:lla).
+- **Kohteet kartalla** (`/targets/map`). Osoitteiden geokoodaus on oletuksena pois (`GEOCODING_ENABLED`), jolloin
+  kohteet näkyvät kunnan keskustassa. Kartan laatat tulevat OpenStreetMapista (`MAP_TILE_URL`): kevyeen käyttöön
+  sopii, isommalle käytölle kannattaa vaihtaa maksulliseen palveluun.
+- **Vienti HubSpotiin ja Pipedriveen**: tuontitiedostot liidilistan Vie-valikosta, suora vienti API-avaimella
+  (Asetukset → Integraatiot). Avaimet salataan `WEBHOOK_ENCRYPTION_KEY`:llä. Ei testattu oikeita tilejä vasten.
+- **Haku tavallisella kielellä** Kohteet-sivulla (säännöt; tekoäly `NL_SEARCH_AI_ENABLED=true`).
+- **Kuukausiraportti** `/reports/monthly` ja sähköposti ylläpitäjille kuun 1. päivänä klo 8 (ajastin `monthly_report`).
+- **Hinnasto ja tilaus**: julkinen `/hinnasto` (hinnat `app/billing/plans.py`: Perus 149 €, Ammattilainen 290 €,
+  Yritys sopimuksen mukaan, alv 0 %, **ehdotus, vahvista ennen julkaisua**), kokeilupyyntölomake, 14 päivän
+  kokeilu (Luo asiakas / Kutsu asiakas), Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun, peru), päättynyt kokeilu
+  estää uusien kohteiden haun ja siirron, muistutus 3 pv ennen kokeilun loppua. Laskutus edelleen käsin:
+  tilaus ja irtisanominen lähettävät superadmineille sähköpostin. Vanhat organisaatiot pysyvät aktiivisina.
+- **Varmuuskopiot**: Python-dumppi (`app/backups/logical.py`) käytetään automaattisesti, kun `pg_dump` puuttuu tai
+  on tietokantaa vanhempi (todennäköinen syy tuotannon `backup_failed`-riviin: Renderin pg_dump vs. Postgres 18).
+  Palautus samaan skeemaversioon, testattu Postgresilla. Korjattu: palautusta edeltävä turvakopio saattoi korvata
+  palautettavan kopion.
+- **Avoimet virheet korjattu**: tehtävien aikavyöhyke (migraatio korjaa käsin luodut), kojelaudan tehtäväluvut,
+  voitettu/hävitty-raporttien päivämäärä, sekvenssien avaus/klikkaus, `lead_no_activity` kerran per hiljainen jakso,
+  automaation salattu otsake, Slack/Teams-otsikko, salaisuudet pois istuntoevästeestä (`one_time_secrets`),
+  Content-Security-Policy (`CONTENT_SECURITY_POLICY`, vielä `'unsafe-inline'`), purge-kuiva-ajon tuplalaskenta,
+  tarjousnumeron etuliite, Kutsuttu-tila käyttäjälistalla, pois kytketyt sekvenssit/automaatiot taustalla.
+- **Järjestelmän tila** `/admin/system` ja `flask system-check`: sähköposti (myös sandbox-domainin tunnistus),
+  varmuuskopiot, avaimet ja migraatiot. Aja tämä ensimmäiseksi tuotannossa.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):
@@ -250,15 +284,19 @@ Käyttäjän tehtävät (vaativat tilejä ja avaimia):
    `flask send-test-email` ja testaa kutsu- ja salasananpalautusviestit.
 5. **Renderin health check** käyttöön: blueprint-synkka tai polku käsin palvelun asetuksiin.
 
+0. **Aja `flask system-check`** Renderin Shellissä (tai avaa `/admin/system`): se kertoo kohdat 1–5 kerralla.
+   Vahvista hinnat `app/billing/plans.py`:ssä ennen kuin `/hinnasto` linkitetään mihinkään.
+
 Claude voi tehdä:
 
 6. Tarkistaa klo 02 UTC jälkeen ajastimen lokista rivit `Scheduled backup starting` / `completed` / `failed`.
    Ennen lokituskorjausta ajastin ei kirjoittanut yöllä mitään.
-7. Selvittää `pg_dump`-version Renderin Python-ympäristössä. Kanta on Postgres 18; vanhempi `pg_dump`
-   epäonnistuu, jolloin varmuuskopiointi vaatii Docker-ajoympäristön tai muun ratkaisun.
-8. Korjata `purge-leads`-kuiva-ajon tuloste: se laskee osumat kahteen kertaan, kun `--with-listings` on mukana.
+7. (Tehty) `pg_dump`-versio-ongelma: Python-dumppi otetaan käyttöön automaattisesti; `/admin/system` näyttää
+   kumpaa käytetään.
+8. (Tehty) `purge-leads`-kuiva-ajon tuplalaskenta.
 9. (Tehty) CI: `.github/workflows/tests.yml`. Halutessa mainin suojaus GitHubissa niin, että punainen ajo estää yhdistämisen.
-10. Content-Security-Policy (vaatii inline-skriptien läpikäynnin).
+10. (Osittain) Content-Security-Policy on käytössä; `'unsafe-inline'` poistuu, kun inline-skriptit siirretään
+    tiedostoihin.
 
 Suositeltavat, ei kiireelliset: oma domain (päivitä `APP_BASE_URL`), Postgresin IP-sallintalistan rajaus
 (nyt `0.0.0.0/0`), Sentry, käyttöehdot ja DPA, laskutusprosessi, juuren vanhojen suunnitelmadokumenttien siivous.

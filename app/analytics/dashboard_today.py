@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import exists, func, not_
+from sqlalchemy import exists, not_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db

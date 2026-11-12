@@ -509,3 +509,5 @@
 .targets-ask__input { flex: 1 1 320px; min-width: 0; }
 .targets-ask__result { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; font-size: 13px; color: #374151; }
 .targets-ask__unknown { color: #6B7280; }
+/* cards side by side: no stacked-card spacing (main.css .card + .card) */
+.insights-grid > .card + .card { margin-top: 0; }
