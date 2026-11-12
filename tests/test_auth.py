@@ -216,8 +216,17 @@ def test_login_page_shows_form_and_public_product_intro(client):
     assert 'id="kirjaudu"' in html
 
     # Public product intro, example view and Flowly links
-    assert "Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla." in html
+    assert "Kohteesta kauppaan yhdessä paikassa." in html
     assert "Esimerkkinäkymä" in html
+    # Interactive demo: targets, leads + sequence, call list and proposal
+    assert "data-lp-flow" in html
+    assert "Priorisointi oppii valinnoistasi." in html
+    assert "Soittolista" in html and "Tarjous ja kauppa" in html
+    assert "js/login-demo.js" in html
+    # Target customers, pricing and trial
+    assert "Tehty pienille remonttiurakoitsijoille" in html
+    assert "data-lp-carousel" in html and "Lukot ja kulunvalvonta" in html
+    assert "kuukausihinta" not in html
     assert "Pyydä esittely" in html
     assert 'href="https://flowlysolutions.net/yhteystiedot"' in html
     assert 'href="https://flowlysolutions.net"' in html

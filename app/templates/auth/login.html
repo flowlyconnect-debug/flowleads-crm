@@ -6,9 +6,9 @@
   Täytä puuttuvat arvot, kun ne on vahvistettu. Tyhjät kentät (None)
   jätetään pois näkymästä.
 
-  Tuotenäkymän data on staattista ja kuvitteellista. Se noudattaa CRM:n
-  liidilistan rakennetta: yritys, yhteyshenkilö, alkuperä, myyntiputken
-  oletusvaihe (DEFAULT_PIPELINE_STAGES) ja liidiin liitetty tehtävä.
+  Esittelyosion data on staattista ja kuvitteellista. Se noudattaa Kohteet-sivun
+  rakennetta (taloyhtiö, remonttityyppi, isännöitsijä) ja kuvaa ketjun kohteesta
+  liidiksi, sähköpostisekvenssiin, soittolistalle ja tarjoukseen.
 #}
 {% set flowly = {
   "name": "Flowly Solutions",
@@ -40,49 +40,51 @@
   "Invalid email address.": "Tarkista sähköpostiosoite.",
 } %}
 
-{# Esimerkkinäkymän kuvitteellinen data #}
-{% set demo_rows = [
-  {"company": "Kuusiranta Logistiikka Oy", "contact": "Laura Mäkinen, toimitusjohtaja", "origin": "new", "stage": "Uusi liidi", "color": "#3B82F6", "task_type": "Soitto", "task": "Ensikontakti", "due": "Tänään", "due_mod": "today"},
-  {"company": "Valoisa Kiinteistöt Oy", "contact": "Jari Lehto, myyntipäällikkö", "origin": "existing", "stage": "Kontaktoitu", "color": "#8B5CF6", "task_type": "Seuranta", "task": "Palaa asiaan sovitusti", "due": "2 viikon päästä", "due_mod": ""},
-  {"company": "Pohjanmaan Kone Oy", "contact": "Sanna Virta, hankintapäällikkö", "origin": "new", "stage": "Kvalifioitu", "color": "#F59E0B", "task_type": "Tapaaminen", "task": "Tarpeiden kartoitus", "due": "Huomenna", "due_mod": ""},
-  {"company": "Lumikko Design Oy", "contact": "Mikko Aalto, yrittäjä", "origin": "existing", "stage": "Tarjous lähetetty", "color": "#06B6D4", "task_type": "Sähköposti", "task": "Kysy tarjouksen tilanne", "due": "Pe", "due_mod": ""},
+{# Demon kuvitteellinen data. Rakenne seuraa Kohteet-sivua: taloyhtiö, remonttityyppi,
+   ajankohta, rakennusvuosi, isännöitsijä ja yhteystietojen olemassaolo. Pisteet ja syyt
+   havainnollistavat priorisointia, joka painottaa asiakkaan aiemmin siirtämiä kohteita. #}
+{% set demo_targets = [
+  {"id": "t1", "name": "As Oy Merikortteli", "city": "Helsinki", "type": "Putkiremontti", "when": "2027", "built": "1972", "score": 94, "checked": True,
+   "manager": "Isännöinti Rantala Oy", "person": "Laura Mäkinen", "phone": "040 000 0101",
+   "reasons": ["Putkiremontti 2027", "Uusimaa", "Rakennettu 1972", "Isännöitsijän puhelin ja sähköposti"]},
+  {"id": "t2", "name": "As Oy Kallionrinne", "city": "Espoo", "type": "Putkiremontti", "when": "2026", "built": "1968", "score": 91, "checked": True,
+   "manager": "Isännöinti Rantala Oy", "person": "Laura Mäkinen", "phone": "040 000 0101",
+   "reasons": ["Putkiremontti 2026", "Uusimaa", "Rakennettu 1968", "Sama isännöitsijä kuin voitetussa kaupassa"]},
+  {"id": "t3", "name": "As Oy Puistolan Helmi", "city": "Vantaa", "type": "Julkisivuremontti", "when": "2027", "built": "1979", "score": 86, "checked": True,
+   "manager": "Kiinteistöpalvelu Kaari Oy", "person": "Jari Lehto", "phone": "040 000 0202",
+   "reasons": ["Julkisivuremontti 2027", "Uusimaa", "Rakennettu 1979", "Isännöitsijän sähköposti"]},
+  {"id": "t4", "name": "As Oy Tammelan Torni", "city": "Tampere", "type": "Kattoremontti", "when": "2028", "built": "1985", "score": 71, "checked": False,
+   "manager": "Isännöinti Pyynikki Oy", "person": "Sanna Virta", "phone": "040 000 0303",
+   "reasons": ["Kattoremontti 2028", "Pirkanmaa", "Rakennettu 1985"]},
+  {"id": "t5", "name": "As Oy Harjun Laita", "city": "Jyväskylä", "type": "Ikkunaremontti", "when": "2028", "built": "1990", "score": 58, "checked": False,
+   "manager": "Isännöinti Harju Oy", "person": "Mikko Aalto", "phone": "040 000 0404",
+   "reasons": ["Ikkunaremontti 2028", "Keski-Suomi", "Piilotat usein ikkunaremontteja"]},
 ] %}
-
-{# Karttaesimerkin kuvitteellinen data: x ja y ovat prosentteja karttakuvan koosta. #}
-{% set demo_map = [
-  {"city": "Helsinki", "x": 45.3, "y": 95.3, "count": 14, "targets": [
-    {"name": "As Oy Merikortteli", "type": "Putkiremontti", "year": "2027", "manager": "Isännöintitoimisto A"},
-    {"name": "As Oy Kallionrinne", "type": "Julkisivuremontti", "year": "2026", "manager": "Isännöintitoimisto B"},
-    {"name": "As Oy Puistolan Helmi", "type": "Kattoremontti", "year": "2028", "manager": "Isännöintitoimisto A"}]},
-  {"city": "Tampere", "x": 35.8, "y": 82.8, "count": 9, "targets": [
-    {"name": "As Oy Tammelan Torni", "type": "Putkiremontti", "year": "2028", "manager": "Isännöintitoimisto C"},
-    {"name": "As Oy Pyynikin Rinne", "type": "Ikkunaremontti", "year": "2027", "manager": "Isännöintitoimisto C"}]},
-  {"city": "Turku", "x": 24.0, "y": 92.7, "count": 7, "targets": [
-    {"name": "As Oy Aurajoen Ranta", "type": "Julkisivuremontti", "year": "2027", "manager": "Isännöintitoimisto D"},
-    {"name": "As Oy Port Arthur", "type": "Kattoremontti", "year": "2026", "manager": "Isännöintitoimisto D"}]},
-  {"city": "Oulu", "x": 49.5, "y": 49.8, "count": 6, "targets": [
-    {"name": "As Oy Toppilan Salmi", "type": "Putkiremontti", "year": "2029", "manager": "Isännöintitoimisto E"},
-    {"name": "As Oy Tuiranpuisto", "type": "Parvekeremontti", "year": "2027", "manager": "Isännöintitoimisto E"}]},
-  {"city": "Jyväskylä", "x": 51.7, "y": 75.9, "count": 5, "targets": [
-    {"name": "As Oy Harjun Laita", "type": "Ikkunaremontti", "year": "2026", "manager": "Isännöintitoimisto F"},
-    {"name": "As Oy Kuokkalan Kaari", "type": "Putkiremontti", "year": "2028", "manager": "Isännöintitoimisto F"}]},
-  {"city": "Kuopio", "x": 67.1, "y": 69.7, "count": 4, "targets": [
-    {"name": "As Oy Väinölänniemi", "type": "Julkisivuremontti", "year": "2028", "manager": "Isännöintitoimisto G"},
-    {"name": "As Oy Saaristokatu", "type": "Kattoremontti", "year": "2027", "manager": "Isännöintitoimisto G"}]},
-  {"city": "Lahti", "x": 51.0, "y": 87.7, "count": 3, "targets": [
-    {"name": "As Oy Salpausselkä", "type": "Putkiremontti", "year": "2027", "manager": "Isännöintitoimisto H"}]},
-  {"city": "Vaasa", "x": 21.0, "y": 67.8, "count": 3, "targets": [
-    {"name": "As Oy Vaskiluodon Tuuli", "type": "Ikkunaremontti", "year": "2028", "manager": "Isännöintitoimisto I"}]},
-  {"city": "Joensuu", "x": 83.7, "y": 72.5, "count": 2, "targets": [
-    {"name": "As Oy Pielisjoen Varsi", "type": "Kattoremontti", "year": "2026", "manager": "Isännöintitoimisto J"}]},
-  {"city": "Rovaniemi", "x": 51.6, "y": 35.8, "count": 2, "targets": [
-    {"name": "As Oy Ounasvaaran Rinne", "type": "Julkisivuremontti", "year": "2029", "manager": "Isännöintitoimisto K"}]},
+{% set demo_sequence = [
+  {"day": "Päivä 1", "kind": "Sähköposti", "text": "Isännöitsijälle: putkiremontin suunnittelu ja aikataulu"},
+  {"day": "Päivä 4", "kind": "Sähköposti", "text": "Referenssit vastaavista taloyhtiöistä"},
+  {"day": "Päivä 7", "kind": "Soitto", "text": "Kohde nousee soittolistalle"},
+  {"day": "Päivä 14", "kind": "Tehtävä", "text": "Muistutus ennen hallituksen kokousta"},
+] %}
+{% set demo_offer = [
+  {"item": "Putkiremontin hankesuunnittelu", "qty": "1 kpl", "sum": "4 800,00 €"},
+  {"item": "Viemärien kuntotutkimus (kuvaus)", "qty": "1 kpl", "sum": "2 400,00 €"},
+] %}
+{# Urakkatyypit seuraavat app/search/constants.py::REMONTTITYYPIT-listaa ("Muu remontti" pois). #}
+{% set segments = [
+  {"title": "Putkiremontit", "text": "Taloyhtiöt, joissa linjasaneeraus tai sukitus on suunnitteilla."},
+  {"title": "Katto- ja vesikattoremontit", "text": "Vesikaton uusimiset ja korjaukset ennen kuin ne kilpailutetaan."},
+  {"title": "Julkisivuremontit", "text": "Julkisivun korjaukset ja uusimiset, usein parvekkeiden ja ikkunoiden kanssa."},
+  {"title": "Sähkö- ja tietoliikennejärjestelmät", "text": "Sähköverkon saneeraukset, nousukaapelit, latauspisteet ja kuituyhteydet."},
+  {"title": "Lämmitysjärjestelmät", "text": "Lämmitysmuodon vaihdot, maalämpö ja lämmönjaon uusimiset."},
+  {"title": "Lukot ja kulunvalvonta", "text": "Lukituksen uusimiset ja sähköiset kulunvalvontajärjestelmät."},
+  {"title": "Huoneistoremontit", "text": "Osakkaiden huoneistoremontit taloyhtiöissä, joissa iso remontti on tulossa."},
 ] %}
 
 {% block title %}Kirjaudu — FlowLeads CRM | Flowly Solutions{% endblock %}
 {% block body_class %} login-page{% endblock %}
 {% block head %}
-<meta name="description" content="Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla FlowLeads CRM:ssä. Kirjaudu sisään tai pyydä esittely.">
+<meta name="description" content="FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja vie ne kaupaksi asti: liidit, sähköpostisekvenssit, soittolista ja tarjoukset samassa paikassa. Kirjaudu sisään tai pyydä maksuton kokeilu.">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 {% endblock %}
 
@@ -116,11 +118,17 @@
   <section class="lp-hero" aria-labelledby="lp-title">
     <div class="lp-container lp-hero__grid">
       <div class="lp-hero__copy">
-        <p class="lp-eyebrow">FlowLeads CRM</p>
-        <h1 class="lp-hero__title" id="lp-title">Flowly tuo uusia liidejä ja pitää nykyiset myyntikohteesi ajan tasalla.</h1>
-        <p class="lp-hero__lead">Etsimme yrityksellesi uusia liidejä ja kokoamme nykyiset kohteesi valmiiksi FlowLeadsiin yrityksesi saatavilla olevista tiedoista. Huolehdimme tietojen päivittymisestä, jotta näet samasta paikasta uudet mahdollisuudet, käynnissä olevat keskustelut ja seuraavat yhteydenotot.</p>
+        <p class="lp-eyebrow">FlowLeads taloyhtiöremonttien myyntiin</p>
+        <h1 class="lp-hero__title" id="lp-title">Kohteesta kauppaan yhdessä paikassa.</h1>
+        <p class="lp-hero__lead">FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja asettaa ne järjestykseen sen mukaan, mitkä sopivat sinulle parhaiten. Vie kohteet liideiksi ja sähköpostisekvenssiin yhdellä painalluksella, soita soittolista läpi ja lähetä tarjous samasta näkymästä.</p>
+        <ul class="lp-hero__points">
+          <li>Putki-, katto-, julkisivu-, sähkö- ja LVI-urakoitsijoille</li>
+          <li>Priorisointi, joka oppii valinnoistasi</li>
+          <li>Maksuton kokeilu omalla alueellasi</li>
+        </ul>
         <div class="lp-hero__actions">
-          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä esittely<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
+          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä maksuton kokeilu<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
+          <a href="#lp-flow-title" class="lp-btn lp-btn--ghost">Kokeile demoa</a>
         </div>
       </div>
 
@@ -167,11 +175,11 @@
     </div>
   </section>
 
-  <section class="lp-section lp-product" aria-labelledby="lp-product-title">
+  <section class="lp-section lp-flowdemo" aria-labelledby="lp-flow-title">
     <div class="lp-container">
       <div class="lp-section__head">
-        <h2 class="lp-section__title" id="lp-product-title">Uudet liidit ja nykyiset kohteet samassa näkymässä</h2>
-        <p class="lp-section__lead">Flowlyn löytämät uudet liidit ja jo tuntemasi kohteet ovat samassa listassa. Jokaisesta näet myyntivaiheen ja seuraavan tehtävän.</p>
+        <h2 class="lp-section__title" id="lp-flow-title">Kohteesta kauppaan yhdessä paikassa</h2>
+        <p class="lp-section__lead">Kokeile itse: valitse kohteet, vie ne liideiksi ja sähköpostisekvenssiin yhdellä painalluksella, soita soittolista läpi ja lähetä tarjous. Et tarvitse erillistä hanketietopalvelua, CRM:ää ja tarjousohjelmaa.</p>
       </div>
 
       <figure class="lp-demo">
@@ -180,120 +188,180 @@
           <span class="lp-demo__badge">Esimerkkinäkymä</span>
           <span class="lp-demo__note">Kuvitteellinen data</span>
         </div>
-        <div class="lp-demo__body">
-          <div class="lp-demo__toolbar">
-            <p class="lp-demo__heading">Myyntimahdollisuudet</p>
-            <ul class="lp-demo__chips" aria-label="Suodattimet">
-              <li class="is-active">Kaikki <span>4</span></li>
-              <li><span class="lp-dot lp-dot--new" aria-hidden="true"></span>Uudet Flowlyltä <span>2</span></li>
-              <li><span class="lp-dot lp-dot--existing" aria-hidden="true"></span>Nykyiset kohteet <span>2</span></li>
-            </ul>
-          </div>
-          <div class="lp-demo__table" role="table" aria-label="Esimerkkinäkymä: myyntimahdollisuudet">
-            <div class="lp-demo__row lp-demo__row--head" role="row">
-              <span role="columnheader">Kohde</span>
-              <span role="columnheader">Alkuperä</span>
-              <span role="columnheader">Vaihe</span>
-              <span role="columnheader">Seuraava tehtävä</span>
-            </div>
-            {% for r in demo_rows %}
-            <div class="lp-demo__row" role="row">
-              <span class="lp-demo__cell lp-demo__cell--lead" role="cell">
-                <span class="lp-demo__company">{{ r.company }}</span>
-                <span class="lp-demo__contact">{{ r.contact }}</span>
-              </span>
-              <span class="lp-demo__cell lp-demo__cell--origin" role="cell">
-                {% if r.origin == 'new' %}
-                <span class="lp-tag lp-tag--new">Uusi · Flowly</span>
-                {% else %}
-                <span class="lp-tag lp-tag--existing">Nykyinen kohde</span>
-                {% endif %}
-              </span>
-              <span class="lp-demo__cell lp-demo__cell--stage" role="cell">
-                <span class="lp-stage"><span class="lp-stage__dot" style="background: {{ r.color }}" aria-hidden="true"></span>{{ r.stage }}</span>
-              </span>
-              <span class="lp-demo__cell lp-demo__cell--task" role="cell">
-                <span class="lp-task">
-                  <span class="lp-task__title"><span class="lp-task__type">{{ r.task_type }}:</span> {{ r.task }}</span>
-                  <span class="lp-task__due{% if r.due_mod %} lp-task__due--{{ r.due_mod }}{% endif %}">{{ r.due }}</span>
-                </span>
-              </span>
-            </div>
+        <div class="lp-demo__body lp-flow" data-lp-flow>
+          <ol class="lp-flow__steps" role="tablist" aria-label="Demon vaiheet">
+            {% for label in ["Valitse kohteet", "Liidit ja sekvenssi", "Soittolista", "Tarjous ja kauppa"] %}
+            <li role="presentation">
+              <button type="button" class="lp-flow__step{% if loop.first %} is-active{% endif %}" role="tab" id="lp-flow-tab-{{ loop.index0 }}" aria-controls="lp-flow-panel-{{ loop.index0 }}" aria-selected="{{ 'true' if loop.first else 'false' }}" data-lp-flow-tab="{{ loop.index0 }}"{% if not loop.first %} tabindex="-1"{% endif %}>
+                <span class="lp-flow__num" aria-hidden="true">{{ loop.index }}</span>{{ label }}
+              </button>
+            </li>
             {% endfor %}
+          </ol>
+
+          {# 1. Kohteet ja oppiva priorisointi #}
+          <div class="lp-flow__panel is-active" role="tabpanel" id="lp-flow-panel-0" aria-labelledby="lp-flow-tab-0" data-lp-flow-panel="0">
+            <div class="lp-learn">
+              <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5v2M4.7 4.7l1.4 1.4M2.5 10h2M15.3 4.7l-1.4 1.4M17.5 10h-2"/><path d="M7 14.5a4 4 0 1 1 6 0c-.6.5-1 1.2-1 2v.5H8v-.5c0-.8-.4-1.5-1-2Z"/></svg>
+              <p><strong>Priorisointi oppii valinnoistasi.</strong> Olet vienyt liideiksi eniten Uudenmaan putkiremontteja, joten ne nousevat kärkeen. Piilottamasi ikkunaremontit jäävät alemmas.</p>
+            </div>
+            <ul class="lp-targets" aria-label="Kohteet tärkeysjärjestyksessä">
+              {% for t in demo_targets %}
+              <li class="lp-target">
+                <label class="lp-target__pick">
+                  <input type="checkbox" value="{{ t.id }}" data-lp-flow-pick{% if t.checked %} checked{% endif %}>
+                  <span class="sr-only">Valitse {{ t.name }}</span>
+                </label>
+                <span class="lp-target__main">
+                  <span class="lp-target__name">{{ t.name }} <span class="lp-target__city">{{ t.city }}</span></span>
+                  <span class="lp-target__reasons">
+                    {% for r in t.reasons %}<span class="lp-reason">{{ r }}</span>{% endfor %}
+                  </span>
+                </span>
+                <span class="lp-score{% if t.score >= 85 %} lp-score--high{% elif t.score < 65 %} lp-score--low{% endif %}" title="Sopivuus">
+                  <span class="lp-score__value">{{ t.score }}</span><span class="lp-score__label">sopivuus</span>
+                </span>
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="lp-flow__actions">
+              <button type="button" class="lp-btn lp-btn--primary" data-lp-flow-go="1"><span>Vie <span data-lp-flow-count>3</span> kohdetta liideiksi ja käynnistä sekvenssi</span></button>
+            </div>
+          </div>
+
+          {# 2. Liidit ja sekvenssi #}
+          <div class="lp-flow__panel" role="tabpanel" id="lp-flow-panel-1" aria-labelledby="lp-flow-tab-1" data-lp-flow-panel="1">
+            <p class="lp-flow__done">
+              <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.7-9.3a.75.75 0 0 0-1.06-1.06L9 11.28 7.36 9.64a.75.75 0 1 0-1.06 1.06l2.17 2.17c.3.3.77.3 1.06 0l4.17-4.17Z" clip-rule="evenodd"/></svg>
+              <span><span data-lp-flow-count>3</span> liidiä luotu, omistaja: sinä. Sekvenssi "Taloyhtiön putkiremontti" käynnistetty.</span>
+            </p>
+            <div class="lp-flow__cols">
+              <div>
+                <p class="lp-flow__subhead">Uudet liidit</p>
+                <ul class="lp-leads">
+                  {% for t in demo_targets %}
+                  <li class="lp-lead" data-lp-flow-item="{{ t.id }}"{% if not t.checked %} hidden{% endif %}>
+                    <span class="lp-lead__name">{{ t.name }}</span>
+                    <span class="lp-lead__meta">{{ t.person }}, {{ t.manager }}</span>
+                    <span class="lp-stage"><span class="lp-stage__dot" style="background: #3B82F6" aria-hidden="true"></span>Uusi liidi</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+              <div>
+                <p class="lp-flow__subhead">Sekvenssin vaiheet</p>
+                <ol class="lp-seq">
+                  {% for s in demo_sequence %}
+                  <li class="lp-seq__step">
+                    <span class="lp-seq__day">{{ s.day }}</span>
+                    <span class="lp-seq__text"><span class="lp-task__type">{{ s.kind }}:</span> {{ s.text }}</span>
+                  </li>
+                  {% endfor %}
+                </ol>
+              </div>
+            </div>
+            <div class="lp-flow__actions">
+              <button type="button" class="lp-btn lp-btn--primary" data-lp-flow-go="2">Avaa soittolista</button>
+            </div>
+          </div>
+
+          {# 3. Soittolista #}
+          <div class="lp-flow__panel" role="tabpanel" id="lp-flow-panel-2" aria-labelledby="lp-flow-tab-2" data-lp-flow-panel="2">
+            <p class="lp-flow__hint">Soittolista kokoaa päivän puhelut järjestykseen. Kirjaa tulos yhdellä painalluksella, niin seuraava tehtävä syntyy itsestään.</p>
+            <ul class="lp-calls">
+              {% for t in demo_targets %}
+              <li class="lp-call" data-lp-flow-item="{{ t.id }}" data-lp-call{% if not t.checked %} hidden{% endif %}>
+                <span class="lp-call__who">
+                  <span class="lp-call__name">{{ t.person }}</span>
+                  <span class="lp-call__meta">{{ t.manager }} · {{ t.name }} · {{ t.type }} {{ t.when }}</span>
+                  <span class="lp-call__phone">{{ t.phone }}</span>
+                </span>
+                <span class="lp-call__outcomes" role="group" aria-label="Puhelun tulos: {{ t.person }}">
+                  <button type="button" class="lp-chipbtn" data-lp-call-outcome="Ei vastannut, soitto uudelleen huomenna">Ei vastannut</button>
+                  <button type="button" class="lp-chipbtn" data-lp-call-outcome="Pyysi tarjouksen">Pyysi tarjouksen</button>
+                  <button type="button" class="lp-chipbtn" data-lp-call-outcome="Tapaaminen sovittu">Tapaaminen</button>
+                </span>
+                <span class="lp-call__result" data-lp-call-result aria-live="polite"></span>
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="lp-flow__actions">
+              <button type="button" class="lp-btn lp-btn--primary" data-lp-flow-go="3">Tee tarjous liidistä</button>
+            </div>
+          </div>
+
+          {# 4. Tarjous ja kauppa #}
+          <div class="lp-flow__panel" role="tabpanel" id="lp-flow-panel-3" aria-labelledby="lp-flow-tab-3" data-lp-flow-panel="3">
+            <div class="lp-offer">
+              <div class="lp-offer__head">
+                <p class="lp-offer__title">Tarjous: <span data-lp-flow-first>{{ demo_targets[0].name }}</span></p>
+                <span class="lp-offer__status" data-lp-offer-status>Lähetetty</span>
+              </div>
+              <div class="lp-offer__rows" role="table" aria-label="Tarjouksen rivit">
+                {% for r in demo_offer %}
+                <div class="lp-offer__row" role="row"><span role="cell">{{ r.item }}</span><span role="cell">{{ r.qty }}</span><span role="cell">{{ r.sum }}</span></div>
+                {% endfor %}
+                <div class="lp-offer__row lp-offer__row--sub" role="row"><span role="cell">ALV 25,5 %</span><span role="cell"></span><span role="cell">1 836,00 €</span></div>
+                <div class="lp-offer__row lp-offer__row--total" role="row"><span role="cell">Yhteensä</span><span role="cell"></span><span role="cell">9 036,00 €</span></div>
+              </div>
+              <p class="lp-offer__note">Taloyhtiö hyväksyy tarjouksen sähköisesti, ja liidi siirtyy myyntiputkessa vaiheeseen Voitettu.</p>
+            </div>
+            <div class="lp-flow__actions">
+              <button type="button" class="lp-btn lp-btn--primary" data-lp-offer-accept>Näytä hyväksyntä</button>
+              <button type="button" class="lp-btn lp-btn--ghost" data-lp-flow-go="0">Aloita alusta</button>
+            </div>
           </div>
         </div>
-        <figcaption class="sr-only">Esimerkkinäkymä FlowLeads CRM:n myyntimahdollisuuksista kuvitteellisella datalla.</figcaption>
+        <figcaption class="sr-only">Interaktiivinen esimerkki FlowLeadsista kuvitteellisella datalla: kohteiden valinta, liidit ja sähköpostisekvenssi, soittolista sekä tarjous.</figcaption>
       </figure>
     </div>
   </section>
 
-  <section class="lp-section lp-mapdemo" aria-labelledby="lp-map-title">
+  <section class="lp-section lp-segments" aria-labelledby="lp-segments-title">
     <div class="lp-container">
       <div class="lp-section__head">
-        <h2 class="lp-section__title" id="lp-map-title">Tulevat remontit kartalla</h2>
-        <p class="lp-section__lead">Näet yhdellä silmäyksellä, missä taloyhtiöissä on remontteja tulossa. Valitse paikkakunta, niin näet sen kohteet, remontin ajankohdan ja isännöitsijän.</p>
+        <h2 class="lp-section__title" id="lp-segments-title">Tehty pienille remonttiurakoitsijoille</h2>
+        <p class="lp-section__lead">FlowLeads on rakennettu 1–20 hengen urakoitsijoille, jotka myyvät taloyhtiöille. Valitset omat urakkasi ja alueesi, ja näet vain sinulle sopivat kohteet.</p>
       </div>
-
-      <figure class="lp-demo">
-        <div class="lp-demo__bar">
-          <span class="lp-demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="lp-demo__badge">Esimerkkinäkymä</span>
-          <span class="lp-demo__note">Kuvitteellinen data</span>
+      <div class="lp-carousel" data-lp-carousel>
+        <ul class="lp-segments__list lp-carousel__track" data-lp-carousel-track tabindex="0" aria-label="Urakkatyypit">
+          {% for s in segments %}
+          <li class="lp-segment">
+            <h3 class="lp-segment__title">{{ s.title }}</h3>
+            <p>{{ s.text }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="lp-carousel__nav">
+          <button type="button" class="lp-carousel__btn" data-lp-carousel-prev aria-label="Edelliset urakkatyypit">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 15-5-5 5-5"/></svg>
+          </button>
+          <button type="button" class="lp-carousel__btn" data-lp-carousel-next aria-label="Seuraavat urakkatyypit">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 5 5 5-5 5"/></svg>
+          </button>
         </div>
-        <div class="lp-demo__body lp-map" data-lp-map>
-          <div class="lp-map__canvas">
-            <svg class="lp-map__svg" viewBox="0 0 212 425" aria-hidden="true" focusable="false">
-              <path d="M62.3 419.2 L80.1 412.0 L96.1 406.0 L113.9 400.0 L129.9 394.0 L144.3 390.0 L162.1 364.0 L174.7 350.0 L193.3 324.0 L208.2 296.0 L190.0 280.0 L190.8 248.0 L176.4 216.0 L178.1 188.0 L180.7 172.0 L166.3 140.0 L181.5 104.0 L156.1 72.0 L155.3 56.0 L162.9 40.0 L168.0 26.0 L152.8 16.0 L146.0 8.4 L130.8 16.0 L113.0 26.0 L110.5 36.0 L100.4 64.0 L95.3 67.2 L78.4 60.0 L66.5 66.8 L53.0 58.0 L39.5 50.0 L21.7 50.0 L46.3 72.0 L64.9 78.0 L74.2 94.0 L75.8 120.0 L79.2 140.0 L75.0 160.0 L82.6 178.0 L90.2 184.0 L102.0 200.0 L103.7 212.0 L87.7 224.0 L78.4 242.0 L64.9 258.0 L57.2 266.0 L38.7 288.0 L31.0 308.0 L35.3 322.0 L37.0 352.0 L37.0 366.8 L35.3 380.0 L39.5 394.0 L44.6 400.0 L54.7 410.0Z"/>
-            </svg>
-            {% for c in demo_map %}
-            <button type="button" class="lp-map__pin{% if loop.first %} is-active{% endif %}" style="left: {{ c.x }}%; top: {{ c.y }}%; --pin: {{ 22 + c.count }}px" data-lp-map-pin="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}" aria-controls="lp-map-panel-{{ loop.index0 }}">
-              <span aria-hidden="true">{{ c.count }}</span>
-              <span class="sr-only">{{ c.city }}, {{ c.count }} kohdetta</span>
-            </button>
-            {% endfor %}
-          </div>
-
-          <div class="lp-map__side" aria-live="polite">
-            {% for c in demo_map %}
-            <div class="lp-map__panel{% if loop.first %} is-active{% endif %}" id="lp-map-panel-{{ loop.index0 }}" data-lp-map-panel="{{ loop.index0 }}">
-              <p class="lp-map__city">{{ c.city }} <span>{{ c.count }} kohdetta</span></p>
-              <ul class="lp-map__list">
-                {% for t in c.targets %}
-                <li class="lp-map__target">
-                  <span class="lp-map__name">{{ t.name }}</span>
-                  <span class="lp-map__meta"><span class="lp-tag lp-tag--new">{{ t.type }}</span> {{ t.year }}</span>
-                  <span class="lp-map__manager">Isännöinti: {{ t.manager }}</span>
-                </li>
-                {% endfor %}
-              </ul>
-              {% if c.count > c.targets | length %}<p class="lp-map__more">+ {{ c.count - c.targets | length }} muuta kohdetta</p>{% endif %}
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        <figcaption class="sr-only">Esimerkkinäkymä: tulevat remontit paikkakunnittain Suomen kartalla kuvitteellisella datalla.</figcaption>
-      </figure>
+      </div>
     </div>
   </section>
 
   <section class="lp-section lp-benefits" aria-labelledby="lp-benefits-title">
     <div class="lp-container">
-      <h2 class="lp-section__title" id="lp-benefits-title">Mitä saat FlowLeadsin kanssa</h2>
+      <h2 class="lp-section__title" id="lp-benefits-title">Miksi FlowLeads</h2>
       <ul class="lp-benefits__list">
         <li class="lp-benefit">
-          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M11 8.5v5M8.5 11h5"/></svg></span>
-          <h3 class="lp-benefit__title">Uudet liidit Flowlyltä</h3>
-          <p>Etsimme yrityksellesi sopivia uusia liidejä ja tuomme ne valmiiksi FlowLeadsiin.</p>
-        </li>
-        <li class="lp-benefit">
-          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3.5v3.6h-3.6M5.5 20.5v-3.6h3.6"/></svg></span>
-          <h3 class="lp-benefit__title">Nykyiset kohteet ajan tasalla</h3>
-          <p>Kokoamme nykyiset kohteesi saatavilla olevista tiedoista ja huolehdimme niiden päivittymisestä.</p>
-        </li>
-        <li class="lp-benefit">
           <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="m15 17 2 2 4-4"/></svg></span>
-          <h3 class="lp-benefit__title">Myynnin seuranta yhdessä paikassa</h3>
-          <p>Sinä hoidat yhteydenotot. Näet jokaisen kohteen vaiheen, muistiinpanot ja seuraavan tehtävän.</p>
+          <h3 class="lp-benefit__title">Yksi työkalu kolmen sijaan</h3>
+          <p>Kohteet, asiakkuudet, sekvenssit ja tarjoukset ovat samassa paikassa. Mitään ei tarvitse siirtää käsin järjestelmästä toiseen.</p>
+        </li>
+        <li class="lp-benefit">
+          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 9 12l4 3 7-9"/><path d="M15 6h5v5"/></svg></span>
+          <h3 class="lp-benefit__title">Parhaat kohteet ensin</h3>
+          <p>Priorisointi oppii siitä, mitkä kohteet viet liideiksi ja mitkä piilotat. Aikasi menee kohteisiin, jotka todennäköisimmin johtavat kauppaan.</p>
+        </li>
+        <li class="lp-benefit">
+          <span class="lp-benefit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H6a3 3 0 0 0 0 6h3M15 7h3a3 3 0 0 1 0 6h-3M8 10h8"/></svg></span>
+          <h3 class="lp-benefit__title">Liitännät valmiina</h3>
+          <p>CSV-tuonti, webhookit ja rajapinta ovat käytössä heti. Liitännät toiminnanohjaukseen tai muuhun CRM:ään teemme tarpeen mukaan.</p>
         </li>
       </ul>
     </div>
@@ -303,8 +371,8 @@
     <div class="lp-container">
       <div class="lp-cta">
         <div>
-          <h2 class="lp-cta__title" id="lp-cta-title">Katsotaan yhdessä, miten FlowLeads sopii myyntiinne.</h2>
-          <p class="lp-cta__text">Esittelyssä käymme läpi, millaisia liidejä etsimme ja miten nykyiset kohteenne tuodaan järjestelmään.</p>
+          <h2 class="lp-cta__title" id="lp-cta-title">Katsotaan yhdessä, mitä kohteita alueellasi on.</h2>
+          <p class="lp-cta__text">Esittelyssä näytämme oikeita kohteita omista urakoistasi ja käymme läpi, miten ne etenevät kaupaksi FlowLeadsissa.</p>
         </div>
         <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä esittely<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
       </div>
@@ -328,5 +396,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/login-map.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/login-demo.js') }}" defer></script>
 {% endblock %}
