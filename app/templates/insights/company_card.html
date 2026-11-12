@@ -114,20 +114,5 @@
   </div>
   {% endif %}
 
-  <div class="card" style="margin-top:16px;">
-    <header class="card-header"><h2 class="card-title">Lähteet ({{ card.listing_list|length }})</h2></header>
-    <div class="card-body">
-      <ul class="insights-sources">
-        {% for listing in card.listing_list %}
-        <li>
-          {{ listing.osoite or card.name }}
-          {% set seen = listing.published_at or listing.first_seen_at %}
-          {% if seen %}<span class="text-sm text-secondary">· löydetty {{ (seen|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
-          {% if listing.url and listing.url.startswith('http') %} · <a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">Avaa lähde</a>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
 </section>
 {% endblock %}

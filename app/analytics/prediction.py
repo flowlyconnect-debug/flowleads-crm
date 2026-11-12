@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -21,6 +22,48 @@ from app.leads.services import LeadServiceError, get_lead_for_org
 from app.proposals.models import Proposal
 
 logger = logging.getLogger(__name__)
+
+_PROPOSAL_SIGNAL_FI = {
+    "sent": "tarjous lähetetty",
+    "viewed": "tarjous avattu",
+    "accepted": "tarjous hyväksytty",
+}
+
+# Predictions stored before the texts were Finnish: shown in Finnish on the page.
+_OLD_SIGNALS_FI = {
+    "has had meeting": "tapaaminen pidetty",
+    "recent contact": "tuore yhteydenotto",
+    "no proposal yet": "tarjousta ei ole vielä tehty",
+    "proposal still in draft": "tarjous on vielä luonnos",
+    "no meeting scheduled": "tapaamista ei ole sovittu",
+    "proposal sent": "tarjous lähetetty",
+    "proposal viewed": "tarjous avattu",
+    "proposal accepted": "tarjous hyväksytty",
+    "send proposal this week — lead shows meeting engagement": "Lähetä tarjous tällä viikolla, tapaaminen on jo pidetty",
+    "re-engage lead — no recent contact": "Ota liidiin uudelleen yhteyttä, viimeisestä yhteydenotosta on aikaa",
+    "continue nurturing based on current pipeline stage": "Jatka yhteydenpitoa myyntiputken vaiheen mukaisesti",
+}
+_NO_CONTACT = re.compile(r"^no contact in (\d+) days$", re.IGNORECASE)
+_HIGH_SCORE = re.compile(r"^high lead score \((\d+)\)$", re.IGNORECASE)
+
+
+def signal_fi(text) -> str:
+    """Finnish text for a prediction signal or recommendation (template filter
+    `fi_signal`). Unknown text, e.g. what the AI already wrote in Finnish,
+    passes through unchanged."""
+    if not text:
+        return ""
+    raw = str(text).strip()
+    known = _OLD_SIGNALS_FI.get(raw.lower())
+    if known:
+        return known
+    match = _NO_CONTACT.match(raw)
+    if match:
+        return f"ei yhteydenottoa {match.group(1)} päivään"
+    match = _HIGH_SCORE.match(raw)
+    if match:
+        return "korkea osuvuus"
+    return raw
 
 FALLBACK_MODEL_VERSION = "fallback-v1"
 OPENAI_PREDICTION_MODEL_VERSION = "openai-gpt-4.1-mini-v1"
@@ -357,12 +400,13 @@ Historical context for this organization:
 - Average days to close: {avg_days_str}
 - This lead has been in pipeline: {days_pipeline_str} days
 
+Write every signal and the recommendation in Finnish: the CRM's users are Finnish.
 Return ONLY a JSON object:
 {{
   "probability": 0.73,
-  "key_positive_signals": ["has had meeting", "email opened 3 times"],
-  "key_risk_signals": ["no proposal sent yet", "no contact in 7 days"],
-  "recommendation": "Send proposal this week — lead shows strong buying signals"
+  "key_positive_signals": ["tapaaminen pidetty", "sähköposti avattu 3 kertaa"],
+  "key_risk_signals": ["tarjousta ei ole vielä lähetetty", "ei yhteydenottoa 7 päivään"],
+  "recommendation": "Lähetä tarjous tällä viikolla, liidi on kiinnostunut"
 }}"""
 
     @staticmethod
@@ -448,36 +492,34 @@ Return ONLY a JSON object:
     def _fallback_positive_signals(signals: dict) -> list[str]:
         positive = []
         if signals.get("has_had_meeting"):
-            positive.append("has had meeting")
+            positive.append("tapaaminen pidetty")
         status = signals.get("proposal_status")
         if status in ("sent", "viewed", "accepted"):
-            positive.append(f"proposal {status}")
-        if signals.get("lead_score") and signals["lead_score"] >= 70:
-            positive.append(f"high lead score ({signals['lead_score']})")
+            positive.append(_PROPOSAL_SIGNAL_FI[status])
         if signals.get("days_since_last_contact") is not None and signals["days_since_last_contact"] <= 7:
-            positive.append("recent contact")
+            positive.append("tuore yhteydenotto")
         return positive
 
     @staticmethod
     def _fallback_risk_signals(signals: dict) -> list[str]:
         risks = []
         if not signals.get("has_proposal"):
-            risks.append("no proposal yet")
+            risks.append("tarjousta ei ole vielä tehty")
         elif signals.get("proposal_status") == "draft":
-            risks.append("proposal still in draft")
+            risks.append("tarjous on vielä luonnos")
         if signals.get("days_since_last_contact") is not None and signals["days_since_last_contact"] > 7:
-            risks.append(f"no contact in {signals['days_since_last_contact']} days")
+            risks.append(f"ei yhteydenottoa {signals['days_since_last_contact']} päivään")
         if not signals.get("has_had_meeting"):
-            risks.append("no meeting scheduled")
+            risks.append("tapaamista ei ole sovittu")
         return risks
 
     @staticmethod
     def _fallback_recommendation(signals: dict) -> str | None:
         if signals.get("proposal_status") in (None, "draft") and signals.get("has_had_meeting"):
-            return "Send proposal this week — lead shows meeting engagement"
+            return "Lähetä tarjous tällä viikolla, tapaaminen on jo pidetty"
         if signals.get("days_since_last_contact") is not None and signals["days_since_last_contact"] > 7:
-            return "Re-engage lead — no recent contact"
-        return "Continue nurturing based on current pipeline stage"
+            return "Ota liidiin uudelleen yhteyttä, viimeisestä yhteydenotosta on aikaa"
+        return "Jatka yhteydenpitoa myyntiputken vaiheen mukaisesti"
 
     @staticmethod
     def predict_batch(organization_id: int) -> dict:

@@ -95,7 +95,14 @@ def compose(lead_id):
         preview_subject=preview_subject,
         preview_html=preview_html,
         sender_name=sender_display_name(),
+        catalogue_vars=_catalogue_vars(lead),
     )
+
+
+def _catalogue_vars(lead) -> dict:
+    from app.email.templates import _catalogue_variables
+
+    return _catalogue_variables(lead)
 
 
 @email_bp.route("/leads/<int:lead_id>/email/send", methods=["POST"])

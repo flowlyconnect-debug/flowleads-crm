@@ -182,7 +182,7 @@
         <h3 class="form-section-title">Tallennetut syyt</h3>
         <ul class="text-sm">
           {% for r in report_data.won_lost_reasons %}
-          <li><span class="badge">{{ r.status }}</span> Liidi #{{ r.lead_id }}: {{ r.reason }}</li>
+          <li><span class="badge">{{ r.status|fi_label }}</span> Liidi #{{ r.lead_id }}: {{ r.reason }}</li>
           {% endfor %}
         </ul>
         {% endif %}
