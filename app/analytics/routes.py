@@ -893,6 +893,61 @@ def reports():
     )
 
 
+@analytics_bp.route("/reports/monthly")
+@require_role(*UI_ROLES)
+@require_2fa
+def monthly_report_page():
+    """Kuukausiraportti: one month's results beside the previous month."""
+    from app.analytics.monthly import Month, format_money, monthly_report
+    from app.tasks.settings import get_organization_settings
+
+    organization_id = _optional_organization_id()
+    organizations = get_accessible_organizations() if current_user.is_superadmin() else []
+    today_month = Month.parse(None)
+    month = Month.parse(request.args.get("month"))
+    if (month.year, month.month) > (today_month.year, today_month.month):
+        month = today_month
+    report = monthly_report(organization_id, month) if organization_id is not None else None
+    settings = get_organization_settings(organization_id) if organization_id is not None else None
+    db.session.commit()  # the settings row is created on first use
+    return render_template(
+        "analytics/monthly.html",
+        organizations=organizations,
+        organization_id=organization_id,
+        report=report,
+        month=month,
+        previous_month=month.previous(),
+        next_month=month.next() if (month.year, month.month) < (today_month.year, today_month.month) else None,
+        email_enabled=bool(settings and settings.monthly_report_enabled),
+        can_toggle_email=current_user.role in ("admin", "superadmin"),
+        format_money=format_money,
+    )
+
+
+@analytics_bp.route("/reports/monthly/email", methods=["POST"])
+@require_role("admin", "superadmin")
+@require_2fa
+def monthly_report_email_setting():
+    from app.tasks.settings import get_organization_settings
+
+    organization_id = _optional_organization_id()
+    if organization_id is None:
+        abort(400)
+    settings = get_organization_settings(organization_id)
+    settings.monthly_report_enabled = request.form.get("enabled") == "1"
+    db.session.commit()
+    flash(
+        "Kuukausiraportti lähetetään ylläpitäjille sähköpostilla kuun 1. päivänä."
+        if settings.monthly_report_enabled
+        else "Kuukausiraportin sähköposti on pois päältä.",
+        "success",
+    )
+    params = {"month": request.form.get("month") or None}
+    if current_user.is_superadmin():
+        params["organization_id"] = organization_id
+    return redirect(url_for("analytics.monthly_report_page", **params))
+
+
 @analytics_bp.route("/reports/forecast")
 @require_role(*UI_ROLES)
 @require_2fa

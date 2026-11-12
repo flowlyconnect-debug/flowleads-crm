@@ -341,6 +341,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Target digest failed")
 
+    def run_monthly_report():
+        """Last month's results to each customer's admins (1st of the month)."""
+        with app.app_context():
+            from app.analytics.monthly import send_monthly_reports
+            from app.extensions import db
+
+            try:
+                count = send_monthly_reports()
+                if count:
+                    logger.info("Monthly report sent to %s organization(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Monthly report failed")
+
     def run_catalogue_health_check():
         """Email superadmins when crawling or analysis has stopped."""
         with app.app_context():
@@ -531,6 +545,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_target_digest,
         CronTrigger(hour=7, minute=30, timezone="Europe/Helsinki"),
         id="target_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_monthly_report,
+        CronTrigger(day=1, hour=8, minute=0, timezone="Europe/Helsinki"),
+        id="monthly_report",
         replace_existing=True,
     )
     scheduler.add_job(

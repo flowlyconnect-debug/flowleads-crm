@@ -65,6 +65,10 @@ class OrganizationSettings(db.Model):
     targets_fetched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Monthly results email to the admins (app/analytics/monthly.py);
+    # sent_for = "YYYY-MM" of the last month reported
+    monthly_report_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    monthly_report_sent_for: Mapped[str | None] = mapped_column(String(7), nullable=True)
 
     default_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
 
