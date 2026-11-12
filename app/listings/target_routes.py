@@ -247,7 +247,29 @@ def transfer():
         flash("Kohteet oli jo käsitelty.", "info")
     if sequence is not None and result["lead_ids"]:
         _start_sequence(organization_id, sequence, result["lead_ids"])
+    if request.form.get("call_list") == "1" and result["lead_ids"]:
+        _add_to_call_list(organization_id, result["lead_ids"])
     return _back(organization_id)
+
+
+def _add_to_call_list(organization_id: int, lead_ids: list[int]) -> None:
+    """"Lisää soittolistalle": the new leads become today's calls."""
+    from app.tasks.call_list import prepare_call_tasks
+
+    added = prepare_call_tasks(organization_id, lead_ids, user_id=current_user.id)
+    db.session.commit()
+    if added["added"]:
+        flash(_plural(added["added"], "liidi lisätty", "liidiä lisätty") + " soittolistalle.", "success")
+    if added["no_phone"]:
+        count = added["no_phone"]
+        flash(
+            f"{count} liidiltä puuttuu puhelinnumero, joten "
+            + ("sitä" if count == 1 else "niitä")
+            + " ei lisätty soittolistalle.",
+            "warning",
+        )
+    if added["already"]:
+        flash(_plural(added["already"], "liidi oli", "liidiä oli") + " jo soittolistalla.", "info")
 
 
 def _start_sequence(organization_id: int, sequence, lead_ids: list[int]) -> None:

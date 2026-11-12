@@ -253,6 +253,10 @@
             {% endfor %}
           </select>
           {% endif %}
+          <label class="targets-calllist" title="Uusista liideistä tulee tämän päivän puheluita Soittolistalle">
+            <input type="checkbox" name="call_list" value="1" data-transfer-calls>
+            <span>Lisää soittolistalle</span>
+          </label>
           <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled data-transfer-button>Siirrä valitut liideiksi</button>
           {% endif %}
         </span>
@@ -450,21 +454,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // "Siirrä liideiksi ja lisää sekvenssiin": the button names the second step,
   // and the last chosen sequence is remembered in this browser.
+  // the button names what else happens, and the choices are remembered in this browser
   var sequence = form.querySelector('[data-transfer-sequence]');
+  var calls = form.querySelector('[data-transfer-calls]');
   var transferButton = form.querySelector('[data-transfer-button]');
-  if (sequence && transferButton) {
-    var storageKey = 'flowleads.targets.sequence';
+  if (transferButton && (sequence || calls)) {
+    var seqKey = 'flowleads.targets.sequence';
+    var callKey = 'flowleads.targets.calls';
     try {
-      var saved = window.localStorage.getItem(storageKey);
-      if (saved && sequence.querySelector('option[value="' + saved + '"]')) sequence.value = saved;
+      var saved = window.localStorage.getItem(seqKey);
+      if (sequence && saved && sequence.querySelector('option[value="' + saved + '"]')) sequence.value = saved;
+      if (calls) calls.checked = window.localStorage.getItem(callKey) === '1';
     } catch (e) {}
     var syncLabel = function () {
-      transferButton.textContent = sequence.value
-        ? 'Siirrä valitut liideiksi ja lisää sekvenssiin'
-        : 'Siirrä valitut liideiksi';
+      var extras = [];
+      if (sequence && sequence.value) extras.push('sekvenssiin');
+      if (calls && calls.checked) extras.push('soittolistalle');
+      transferButton.textContent = 'Siirrä valitut liideiksi' + (extras.length ? ' ja lisää ' + extras.join(' ja ') : '');
     };
-    sequence.addEventListener('change', function () {
-      try { window.localStorage.setItem(storageKey, sequence.value); } catch (e) {}
+    if (sequence) sequence.addEventListener('change', function () {
+      try { window.localStorage.setItem(seqKey, sequence.value); } catch (e) {}
+      syncLabel();
+    });
+    if (calls) calls.addEventListener('change', function () {
+      try { window.localStorage.setItem(callKey, calls.checked ? '1' : '0'); } catch (e) {}
       syncLabel();
     });
     syncLabel();

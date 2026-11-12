@@ -170,7 +170,19 @@
   }
   .targets-bulk__actions { margin-left: 0; width: 100%; justify-content: flex-start; }
   .targets-bulk__actions .targets-assignee { flex: 1 1 160px; max-width: none; }
-  .targets-bulk__actions .targets-assignee__label { margin-left: 0; }
+  .targets-bulk__actions .targets-calllist {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.targets-calllist input { margin: 0; width: 16px; height: 16px; }
+
+.targets-assignee__label { margin-left: 0; }
   .targets-bulk__actions [data-transfer-button] { flex: 1 1 100%; white-space: normal; }
 }
 

@@ -43,6 +43,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner and start an email sequence
   for the new leads in the same action (`sequences_for_transfer()`, `enroll_transferred_leads()`; leads without
   an email are skipped and reported).
+  The same transfer can put the new leads on the **Soittolista** (`/tasks/calls`, `app/tasks/call_list.py`):
+  open tasks of type `call`, the lead's automatic "Ota yhteyttä" task becomes the call; one-click outcomes
+  (`record_call_outcome`) log a `call` activity and move the task on. Tests: `tests/test_call_list.py`.
 - Read models over what an organization already sees (`app/listings/insight_services.py`,
   `insight_routes.py`, never the reserve): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
   (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).

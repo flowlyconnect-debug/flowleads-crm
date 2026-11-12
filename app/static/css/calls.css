@@ -1,0 +1,158 @@
+/* Soittolista (tasks/calls.html). */
+
+.calls-page {
+  max-width: 920px;
+}
+
+.calls-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.calls-header h1 { margin: 0; }
+
+.calls-header__lead {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.calls-scope {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+}
+
+.calls-scope__item {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.calls-scope__item.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-emphasis);
+}
+
+.calls-empty {
+  padding: 32px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+}
+
+.calls-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.call-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+}
+
+.call-card__main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.call-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.call-card__title a {
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.call-card__title a:hover { text-decoration: underline; }
+
+.call-card__late {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.call-card__contact,
+.call-card__meta,
+.call-card__nophone {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.call-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.call-card__tag {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--color-neutral-soft);
+  color: var(--color-text-primary);
+}
+
+.call-card__phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 4px;
+  color: var(--color-accent-emphasis);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+
+.call-card__phone:hover { text-decoration: underline; }
+
+.call-card__form {
+  display: grid;
+  gap: 8px;
+}
+
+.call-card__note { width: 100%; }
+
+.call-card__outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (min-width: 760px) {
+  .call-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
+    align-items: start;
+  }
+  .call-card__outcomes { justify-content: flex-end; }
+}

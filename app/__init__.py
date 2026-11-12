@@ -398,6 +398,26 @@ def _nav_overdue_count() -> int:
         return 0
 
 
+def _nav_calls_count() -> int:
+    """Calls on the signed-in user's Soittolista today (sidebar badge)."""
+    from flask_login import current_user
+
+    try:
+        if not current_user.is_authenticated or current_user.role not in ("superadmin", "admin", "user"):
+            return 0
+        org_id = _nav_org_id()
+        if not org_id:
+            return 0
+        from app.tasks.call_list import count_due_calls
+
+        return count_due_calls(org_id, current_user.id)
+    except Exception:
+        from app.extensions import db
+
+        db.session.rollback()
+        return 0
+
+
 def _nav_targets_count() -> int:
     """Targets waiting on the Kohteet page for the organization in view (the
     sidebar badge). Never lets a page fail."""
@@ -429,6 +449,7 @@ def _register_root_routes(app):
         return {
             "nav_targets_count": _nav_targets_count(),
             "nav_overdue_count": _nav_overdue_count(),
+            "nav_calls_count": _nav_calls_count(),
             "active_org_id": _nav_org_id(),
             "active_org_name": _nav_org_name(),
             "has_endpoint": has_endpoint,
