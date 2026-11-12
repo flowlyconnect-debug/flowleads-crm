@@ -195,6 +195,10 @@
       {% for lead in transferred_leads %}
       <a href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ lead.company or lead.display_name }}</a>{% if not loop.last %}<span aria-hidden="true">·</span>{% endif %}
       {% endfor %}
+      <span class="targets-transferred__actions">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('leads.detail', lead_id=transferred_leads[0].id, **org_query) }}">{{ 'Avaa liidi' if transferred_leads|length == 1 else 'Avaa ensimmäinen liidi' }}</a>
+        {% if nav_calls_count %}<a class="btn btn-secondary btn-sm" href="{{ url_for('tasks.call_list_page', **org_query) }}">Avaa soittolista</a>{% endif %}
+      </span>
     </div>
     {% endif %}
 
@@ -229,6 +233,7 @@
           <span>Valitse kaikki tällä sivulla</span>
         </label>
         <span class="targets-bulk__count" id="targets-selected-count" aria-live="polite"></span>
+        <span class="targets-bulk__warn" id="targets-selected-warn" aria-live="polite"></span>
         <span class="targets-bulk__actions">
           {% if is_hidden_tab %}
           <button type="submit" class="btn btn-secondary btn-sm" data-bulk disabled>Palauta valitut</button>
@@ -244,7 +249,20 @@
             {% endfor %}
           </select>
           {% endif %}
-          <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled>Siirrä valitut liideiksi</button>
+          {% if transfer_sequences %}
+          <label class="targets-assignee__label" for="targets-sequence">Sekvenssi</label>
+          <select name="sequence_id" id="targets-sequence" class="form-input targets-assignee" title="Sähköpostisekvenssi, joka käynnistetään uusille liideille" data-transfer-sequence>
+            <option value="">Ei sekvenssiä</option>
+            {% for sequence in transfer_sequences %}
+            <option value="{{ sequence.id }}">{{ sequence.name }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+          <label class="targets-calllist" title="Uusista liideistä tulee tämän päivän puheluita Soittolistalle">
+            <input type="checkbox" name="call_list" value="1" data-transfer-calls>
+            <span>Lisää soittolistalle</span>
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled data-transfer-button>Siirrä valitut liideiksi</button>
           {% endif %}
         </span>
       </div>
@@ -255,13 +273,22 @@
         {% set renovation = row.renovation %}
         <li class="target-row">
           <input type="checkbox" class="target-row__check" name="match_ids" value="{{ row.match.id }}"
+                 data-has-email="{{ '1' if (listing.isannoitsija_email or '').strip() else '0' }}"
+                 data-has-phone="{{ '1' if (listing.isannoitsija_puh or '').strip() else '0' }}"
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
             <div class="target-row__title">
               <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a></span>
               {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
+              {% if row.fit is not none %}
+              <span class="target-fit{% if row.fit >= 75 %} target-fit--high{% elif row.fit < 45 %} target-fit--low{% endif %}"
+                    title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut.">Sopivuus {{ row.fit }}</span>
+              {% endif %}
             </div>
+            {% if row.fit_reasons %}
+            <p class="target-row__why">{{ row.fit_reasons[:3]|join(' · ') }}</p>
+            {% endif %}
             <div class="target-row__facts">
               {% for item in row.renovations %}
               <span class="target-row__reno">
@@ -438,6 +465,57 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   boxes.forEach(function (b) { b.addEventListener('change', refresh); });
   refresh();
+
+  // "Siirrä liideiksi ja lisää sekvenssiin": the button names the second step,
+  // and the last chosen sequence is remembered in this browser.
+  // the button names what else happens, and the choices are remembered in this browser
+  var sequence = form.querySelector('[data-transfer-sequence]');
+  var calls = form.querySelector('[data-transfer-calls]');
+  var transferButton = form.querySelector('[data-transfer-button]');
+  if (transferButton && (sequence || calls)) {
+    var seqKey = 'flowleads.targets.sequence';
+    var callKey = 'flowleads.targets.calls';
+    try {
+      var saved = window.localStorage.getItem(seqKey);
+      if (sequence && saved && sequence.querySelector('option[value="' + saved + '"]')) sequence.value = saved;
+      if (calls) calls.checked = window.localStorage.getItem(callKey) === '1';
+    } catch (e) {}
+    // tell before the transfer how many of the chosen targets the sequence or
+    // the call list will have to skip
+    var warn = document.getElementById('targets-selected-warn');
+    var syncWarn = function () {
+      if (!warn) return;
+      var chosen = boxes.filter(function (b) { return b.checked; });
+      var parts = [];
+      if (sequence && sequence.value) {
+        var noEmail = chosen.filter(function (b) { return b.dataset.hasEmail !== '1'; }).length;
+        if (noEmail) parts.push(noEmail + ' ilman sähköpostia, ei mene sekvenssiin');
+      }
+      if (calls && calls.checked) {
+        var noPhone = chosen.filter(function (b) { return b.dataset.hasPhone !== '1'; }).length;
+        if (noPhone) parts.push(noPhone + ' ilman puhelinnumeroa, ei mene soittolistalle');
+      }
+      warn.textContent = parts.join(' · ');
+    };
+    var syncLabel = function () {
+      var extras = [];
+      if (sequence && sequence.value) extras.push('sekvenssiin');
+      if (calls && calls.checked) extras.push('soittolistalle');
+      transferButton.textContent = 'Siirrä valitut liideiksi' + (extras.length ? ' ja lisää ' + extras.join(' ja ') : '');
+      syncWarn();
+    };
+    boxes.forEach(function (b) { b.addEventListener('change', syncWarn); });
+    if (all) all.addEventListener('change', syncWarn);
+    if (sequence) sequence.addEventListener('change', function () {
+      try { window.localStorage.setItem(seqKey, sequence.value); } catch (e) {}
+      syncLabel();
+    });
+    if (calls) calls.addEventListener('change', function () {
+      try { window.localStorage.setItem(callKey, calls.checked ? '1' : '0'); } catch (e) {}
+      syncLabel();
+    });
+    syncLabel();
+  }
 });
 </script>
 {% endblock %}

@@ -139,11 +139,20 @@
         <li><span class="nav-group-label">Toiminta</span></li>
         <li>
           <a href="{{ nav_url('tasks.list_tasks') }}"
-             class="sidebar-item{% if ep and ep.startswith('tasks.') %} active{% endif %}"
-             {% if ep and ep.startswith('tasks.') %}aria-current="page"{% endif %}>
+             class="sidebar-item{% if ep and ep.startswith('tasks.') and ep != 'tasks.call_list_page' %} active{% endif %}"
+             {% if ep and ep.startswith('tasks.') and ep != 'tasks.call_list_page' %}aria-current="page"{% endif %}>
             <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-4.9"/></svg>
             <span class="sidebar-item__label">Tehtävät</span>
             {% if nav_overdue_count %}<span class="sidebar-badge">{{ nav_overdue_count }}</span>{% endif %}
+          </a>
+        </li>
+        <li>
+          <a href="{{ nav_url('tasks.call_list_page') }}"
+             class="sidebar-item{% if ep == 'tasks.call_list_page' %} active{% endif %}"
+             {% if ep == 'tasks.call_list_page' %}aria-current="page"{% endif %}>
+            <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h3.2l1.6 4.3-2.2 1.3a10 10 0 0 0 5.3 5.3l1.3-2.2 4.3 1.6v3.2a1.6 1.6 0 0 1-1.7 1.6A15 15 0 0 1 4.4 5.2 1.6 1.6 0 0 1 6 3.5Z"/></svg>
+            <span class="sidebar-item__label">Soittolista</span>
+            {% if nav_calls_count %}<span class="sidebar-badge">{{ nav_calls_count }}</span>{% endif %}
           </a>
         </li>
         <li>

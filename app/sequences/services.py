@@ -95,6 +95,31 @@ def _build_template_context(lead: Lead) -> dict[str, str]:
         "email": (lead.email or "").strip(),
         "phone": (lead.phone or "").strip(),
         "lead_id": str(lead.id),
+        **_catalogue_context(lead),
+    }
+
+
+def _catalogue_context(lead: Lead) -> dict[str, str]:
+    """Variables for leads moved from the Kohteet page (their listing data is
+    kept in `Lead.ai_contact_info`, see `_lead_metadata()` in
+    app/listings/services.py) plus the sender's own organization name."""
+    meta = lead.ai_contact_info if isinstance(lead.ai_contact_info, dict) else {}
+
+    def text(key: str) -> str:
+        value = meta.get(key)
+        return str(value).strip() if value not in (None, "") else ""
+
+    renovation = text("remonttityyppi")
+    if renovation:
+        renovation = renovation[0].lower() + renovation[1:]
+    organization = getattr(lead, "organization", None)
+    return {
+        "taloyhtio": text("taloyhtio") or (lead.company or "").strip(),
+        "remonttityyppi": renovation,
+        "ajankohta": text("remontin_ajankohta"),
+        "kaupunki": text("kaupunki"),
+        "isannoitsija": text("isannoitsija_henkilo") or text("isannoitsija_yritys"),
+        "yritys": (organization.name if organization is not None else "").strip(),
     }
 
 

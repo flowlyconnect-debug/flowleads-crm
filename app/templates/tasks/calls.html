@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{% block title %}Soittolista | FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calls.css') }}">
+{% endblock %}
+{% block content %}
+<div class="calls-page">
+  <header class="calls-header">
+    <div>
+      <h1>Soittolista</h1>
+      <p class="calls-header__lead">
+        {% if rows %}{{ rows|length }} {{ 'puhelu' if rows|length == 1 else 'puhelua' }} tänään{% else %}Ei puheluita tänään{% endif %}{% if upcoming %} · {{ upcoming }} tulossa myöhemmin{% endif %}
+      </p>
+    </div>
+    {% if can_show_all %}
+    <nav class="calls-scope" aria-label="Kenen puhelut">
+      <a href="{{ url_for('tasks.call_list_page', **org_query) }}" class="calls-scope__item{% if not show_all %} is-active{% endif %}"{% if not show_all %} aria-current="page"{% endif %}>Omat</a>
+      <a href="{{ url_for('tasks.call_list_page', all='1', **org_query) }}" class="calls-scope__item{% if show_all %} is-active{% endif %}"{% if show_all %} aria-current="page"{% endif %}>Koko tiimi</a>
+    </nav>
+    {% endif %}
+  </header>
+
+  {% if not rows %}
+  <div class="calls-empty">
+    {{ empty_state(none, "Soittolista on tyhjä", "Valitse Kohteet-sivulla Lisää soittolistalle, kun siirrät kohteita liideiksi. Puhelut näkyvät täällä järjestyksessä.", "Avaa Kohteet", url_for('targets.index', **org_query)) }}
+  </div>
+  {% else %}
+  <ol class="calls-list">
+    {% for row in rows %}
+    {% set task = row.task %}
+    {% set lead = row.lead %}
+    <li class="call-card">
+      <div class="call-card__main">
+        <p class="call-card__title">
+          {% if lead %}<a href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ lead.company or lead.display_name }}</a>{% else %}{{ task.title }}{% endif %}
+          {% if row.late %}<span class="call-card__late">Myöhässä</span>{% endif %}
+        </p>
+        {% if row.contact %}<p class="call-card__contact">{{ row.contact }}</p>{% endif %}
+        {% if row.renovation or row.timing or row.city %}
+        <p class="call-card__meta">
+          {% if row.renovation %}<span class="call-card__tag">{{ row.renovation }}{% if row.timing %} {{ row.timing }}{% endif %}</span>{% endif %}
+          {% if row.city %}<span>{{ row.city }}</span>{% endif %}
+        </p>
+        {% endif %}
+        {% if row.phone %}
+        <a class="call-card__phone" href="tel:{{ row.phone|replace(' ', '') }}">
+          <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3h3l1.5 4-2 1.2a9 9 0 0 0 4.8 4.8L13 11l4 1.5v3a1.5 1.5 0 0 1-1.6 1.5A13.5 13.5 0 0 1 3 4.6 1.5 1.5 0 0 1 4.5 3Z"/></svg>
+          {{ row.phone }}
+        </a>
+        {% else %}
+        <p class="call-card__nophone">Puhelinnumero puuttuu</p>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('tasks.call_outcome', task_id=task.id, **org_query) }}" class="call-card__form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+        <label class="sr-only" for="call-note-{{ task.id }}">Muistiinpano puhelusta</label>
+        <input type="text" name="note" id="call-note-{{ task.id }}" class="form-input call-card__note" maxlength="1000" placeholder="Muistiinpano (vapaaehtoinen)">
+        <div class="call-card__outcomes" role="group" aria-label="Puhelun tulos">
+          {% for key, label in outcomes.items() %}
+          <button type="submit" name="outcome" value="{{ key }}" class="btn btn-sm {{ 'btn-primary' if key in ('offer', 'meeting') else 'btn-secondary' }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </form>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endblock %}

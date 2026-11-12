@@ -259,6 +259,9 @@ def accept_invite(
         organization.enabled_features = chosen_features
         invite.accepted_at = datetime.now(timezone.utc)
         db.session.flush()
+        from app.sequences.defaults import ensure_default_sequences
+
+        ensure_default_sequences(organization.id, created_by=admin_user.id)
 
         log_audit(
             "customer_invite_accepted",
