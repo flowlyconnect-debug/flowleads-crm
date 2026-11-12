@@ -283,8 +283,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             )
 
             try:
+                from app.listings.housing import backfill_company_keys, refresh_scores
+
+                backfill_company_keys()  # listings stored before housing-company keys
                 matched = rematch_profiles()
                 merge_into_existing_leads()
+                refresh_scores()  # timing and freshness change with time
                 from app.listings.target_services import notify_saved_searches
 
                 notify_saved_searches()

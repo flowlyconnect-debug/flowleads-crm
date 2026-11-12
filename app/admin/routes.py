@@ -230,6 +230,7 @@ AUDIT_ACTION_LABELS_FI = {
     "organization_features_updated": "Asiakkaan toiminnot muutettu",
     "source_activated": "Hakuprofiili aktivoitu",
     "catalogue_import": "Kohteita tuotu katalogiin",
+    "catalogue_offices_import": "Isännöintitoimistoja tuotu",
     "catalogue_alert_sent": "Katalogihälytys lähetetty",
     "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",
     "account_email_failed": "Tiliviestin lähetys epäonnistui",
@@ -638,7 +639,14 @@ def update_customer_features_route(organization_id: int):
 def catalogue_status():
     from app.listings.services import catalogue_health
 
-    return render_template("admin/catalogue.html", health=catalogue_health(), remonttityypit=REMONTTITYYPIT)
+    from app.listings.models import PropertyManagerOffice
+
+    return render_template(
+        "admin/catalogue.html",
+        health=catalogue_health(),
+        remonttityypit=REMONTTITYYPIT,
+        office_count=PropertyManagerOffice.query.count(),
+    )
 
 
 @admin_bp.route("/catalogue/import", methods=["POST"])
@@ -691,6 +699,58 @@ def catalogue_import():
             "warning",
         )
     return redirect(url_for("admin.catalogue_status"))
+
+
+@admin_bp.route("/catalogue/offices/import", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_offices_import():
+    """CSV import of property management offices (isännöintitoimistot):
+    business ID, address, switchboard, email and website for the office pages."""
+    from app.core.audit import log_audit
+    from app.listings.contacts import OfficeImportError, import_offices, parse_office_csv
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Valitse CSV-tiedosto.", "danger")
+        return redirect(url_for("admin.catalogue_status"))
+    try:
+        result = import_offices(parse_office_csv(upload.read(5 * 1024 * 1024 + 1)[: 5 * 1024 * 1024]))
+    except OfficeImportError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return redirect(url_for("admin.catalogue_status"))
+    log_audit(
+        action="catalogue_offices_import",
+        user_id=current_user.id,
+        organization_id=None,
+        target_type="property_manager_office",
+        target_id=None,
+        metadata={"created": result["created"], "updated": result["updated"], "errors": len(result["errors"])},
+    )
+    db.session.commit()
+    flash(f"Isännöintitoimistoja: {result['created']} uutta, {result['updated']} päivitetty.", "success")
+    if result["errors"]:
+        shown = "; ".join(f"rivi {e['row'] + 1}: {e['error']}" for e in result["errors"][:8])
+        flash(f"{len(result['errors'])} riviä ohitettiin. {shown}", "warning")
+    return redirect(url_for("admin.catalogue_status"))
+
+
+@admin_bp.route("/catalogue/offices/import-template.csv")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_offices_template():
+    from flask import Response
+
+    from app.listings.contacts import office_template
+
+    return Response(
+        "\ufeff" + office_template(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=flowleads-isannointitoimistot-malli.csv"},
+    )
 
 
 @admin_bp.route("/catalogue/import-template.csv")

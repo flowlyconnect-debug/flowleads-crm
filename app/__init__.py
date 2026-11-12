@@ -32,6 +32,9 @@ def create_app(config_object=None):
         raise RuntimeError("DATABASE_URL environment variable is required.")
 
     _init_extensions(app)
+    from app.listings.housing import install_listeners
+
+    install_listeners()  # keeps Listing.company_key in step with the name / Y-tunnus
     _register_blueprints(app)
     register_error_handlers(app)
     _register_security_headers(app)

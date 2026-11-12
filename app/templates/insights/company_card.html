@@ -38,6 +38,7 @@
           <dt>Kaupunki</dt><dd>{{ card.city or '—' }}</dd>
           <dt>Rakennusvuosi</dt><dd>{{ card.build_year or 'Ei tiedossa' }}</dd>
           <dt>Talotyyppi</dt><dd>{{ card.building_type or 'Ei tiedossa' }}</dd>
+          {% if card.ytunnus %}<dt>Y-tunnus</dt><dd>{{ card.ytunnus }}</dd>{% endif %}
         </dl>
       </div>
     </div>
@@ -47,14 +48,69 @@
       <div class="card-body">
         {% for manager in card.manager_contacts %}
         <p class="insights-manager">
-          <a class="insights-name" href="{{ url_for('insights.manager_detail', name=manager.name, **org_query) }}">{{ manager.name }}</a><br>
+          <a class="insights-name" href="{{ url_for('insights.manager_detail', name=manager.name, **org_query) }}">{{ manager.name }}</a>
+          {% if manager.person %}<br><span>Isännöitsijä: {{ manager.person }}</span>{% endif %}<br>
           {% if manager.phone %}<a href="tel:{{ manager.phone|replace(' ', '') }}">{{ manager.phone }}</a>{% endif %}
           {% if manager.phone and manager.email %} · {% endif %}
           {% if manager.email %}<a href="mailto:{{ manager.email }}">{{ manager.email }}</a>{% endif %}
           {% if not manager.phone and not manager.email %}<span class="text-secondary">Ei yhteystietoja</span>{% endif %}
         </p>
+        {% if manager.office %}
+        <dl class="insights-facts insights-facts--compact">
+          {% if manager.office.ytunnus %}<dt>Toimiston Y-tunnus</dt><dd>{{ manager.office.ytunnus }}</dd>{% endif %}
+          {% if manager.office.osoite %}<dt>Osoite</dt><dd>{{ manager.office.osoite }}</dd>{% endif %}
+          {% if manager.office.puhelin %}<dt>Vaihde</dt><dd><a href="tel:{{ manager.office.puhelin|replace(' ', '') }}">{{ manager.office.puhelin }}</a></dd>{% endif %}
+          {% if manager.office.email %}<dt>Toimiston sähköposti</dt><dd><a href="mailto:{{ manager.office.email }}">{{ manager.office.email }}</a></dd>{% endif %}
+        </dl>
+        {% endif %}
+        {% if manager.website %}<p class="text-sm"><a href="{{ manager.website }}" target="_blank" rel="noopener noreferrer">Toimiston verkkosivut</a></p>{% endif %}
         {% else %}
         <p class="text-secondary">Isännöitsijä ei ole tiedossa.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <header class="card-header"><h2 class="card-title">Hallitus ja huolto</h2></header>
+      <div class="card-body">
+        {% set chair = card.people.chair %}
+        {% set maintenance = card.people.maintenance %}
+        <p class="insights-manager">
+          <strong>Hallituksen puheenjohtaja</strong><br>
+          {% if chair %}
+          {{ chair.name or 'Nimi ei tiedossa' }}
+          {% if chair.phone %}<br><a href="tel:{{ chair.phone|replace(' ', '') }}">{{ chair.phone }}</a>{% endif %}
+          {% if chair.email %}{{ ' · ' if chair.phone else '' }}{% if not chair.phone %}<br>{% endif %}<a href="mailto:{{ chair.email }}">{{ chair.email }}</a>{% endif %}
+          {% else %}<span class="text-secondary">Ei tiedossa</span>{% endif %}
+        </p>
+        <p class="insights-manager">
+          <strong>Huoltoyhtiö</strong><br>
+          {% if maintenance %}
+          {{ maintenance.name or 'Nimi ei tiedossa' }}
+          {% if maintenance.phone %}<br><a href="tel:{{ maintenance.phone|replace(' ', '') }}">{{ maintenance.phone }}</a>{% endif %}
+          {% if maintenance.email %}{{ ' · ' if maintenance.phone else '' }}{% if not maintenance.phone %}<br>{% endif %}<a href="mailto:{{ maintenance.email }}">{{ maintenance.email }}</a>{% endif %}
+          {% else %}<span class="text-secondary">Ei tiedossa</span>{% endif %}
+        </p>
+        {% if chair %}<p class="text-xs text-secondary">Puheenjohtajan tiedot ovat henkilötietoja: käytä niitä vain tämän taloyhtiön remonttiin liittyvään yhteydenottoon.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Kohteen pisteet</h2></header>
+    <div class="card-body insights-score">
+      <div>
+        <div class="insights-score__total">{{ card.score }}<small> / 100</small></div>
+        <span class="score-pill score-pill--{{ card.score_level }}">{{ card.score_label }}</span>
+      </div>
+      <div class="insights-score__parts">
+        {% for part in card.score_parts %}
+        <span class="target-score__part">
+          <span>{{ part.label }}</span>
+          <span class="target-score__bar" aria-hidden="true"><span style="width: {{ (100 * part.points / part.max)|round|int }}%"></span></span>
+          <span>{{ part.points }}/{{ part.max }}</span>
+          <span class="target-score__detail">{{ part.detail }}</span>
+        </span>
         {% endfor %}
       </div>
     </div>
@@ -80,6 +136,36 @@
       {% for note in card.renovation_notes %}
       <p class="text-sm"><strong>Ilmoituksen mukaan:</strong> {{ note }}</p>
       {% endfor %}
+      {% for hint in card.age_hints %}
+      <p class="insights-hint">
+        <strong>Arvio rakennusvuoden perusteella: {{ hint.type }}</strong>
+        {{ '(ajankohtainen jo nyt)' if hint.overdue else '(noin ' ~ hint.due ~ ')' }}.
+        {{ hint.reason }} Lähteet eivät mainitse tätä, joten se ei vaikuta pisteisiin.
+      </p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <header class="card-header"><h2 class="card-title">Signaalit aikajanalla ({{ card.timeline|length }})</h2></header>
+    <div class="card-body">
+      {% if card.timeline %}
+      <ol class="insights-signals">
+        {% for event in card.timeline %}
+        <li>
+          <span class="insights-signals__date">{{ (event.at|helsinki).strftime('%d.%m.%Y') }}</span>
+          <span>
+            <span class="insights-signals__kind insights-signals__kind--{{ event.kind }}" aria-hidden="true"></span>
+            <span class="insights-signals__title">{{ event.title }}</span>
+            {% if event.url %} · <a href="{{ event.url }}" target="_blank" rel="noopener noreferrer">Avaa lähde</a>{% endif %}
+            {% if event.detail %}<span class="insights-signals__detail">{{ event.detail }}</span>{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-secondary">Ei signaaleja vielä.</p>
+      {% endif %}
     </div>
   </div>
 

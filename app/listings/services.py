@@ -538,8 +538,11 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
         ("taloyhtio", 255),
         ("tulevat_remontit", 5000),
         ("isannoitsija", 255),
+        ("isannoitsija_henkilo", 255),
         ("isannoitsija_puh", 50),
         ("isannoitsija_email", 255),
+        ("huoltoyhtio", 255),
+        ("huoltoyhtio_puh", 50),
     ):
         value = _clean(payload.get(field), max_len)
         if value:
@@ -580,6 +583,9 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
     listing.analyzed_at = now
     listing.analysis_error = None
     db.session.flush()
+    from app.listings.housing import reconcile_company_key
+
+    reconcile_company_key(listing)  # same taloyhtiö as a listing known by Y-tunnus
 
     new_matches = match_listing(listing, now=now)
     db.session.commit()
@@ -689,7 +695,8 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
             status="pending",
             confidence=renovation.confidence,
             created_at=now,
-            released_at=_release_time(now),
+            released_at=_release_time(now, profile.organization_id, listing),
+            score=_initial_score(profile.organization_id, listing, now),
         )
         db.session.add(match)
         created.append(match)
@@ -767,7 +774,8 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 status="pending",
                 confidence=conf,
                 created_at=now,
-                released_at=_release_time(now),
+                released_at=_release_time(now, profile.organization_id, listing),
+                score=_initial_score(profile.organization_id, listing, now),
             )
         )
         _ensure_contact_queued(listing)
@@ -811,6 +819,8 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
             listing.taloyhtio and f"Taloyhtiö: {listing.taloyhtio}",
             listing.ytunnus and f"Taloyhtiön Y-tunnus: {listing.ytunnus}",
             listing.isannoitsija_henkilo and f"Yhteyshenkilö: {listing.isannoitsija_henkilo}",
+            _person_line("Hallituksen puheenjohtaja", listing.hallitus_pj, listing.hallitus_pj_puh, listing.hallitus_pj_email),
+            _person_line("Huoltoyhtiö", listing.huoltoyhtio, listing.huoltoyhtio_puh, listing.huoltoyhtio_email),
             f"Kohde: {', '.join(p for p in (listing.osoite, listing.kaupunki) if p)}",
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
@@ -838,6 +848,43 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
     }
 
 
+def _person_line(label: str, name, phone, email) -> str | None:
+    parts = [p for p in (name, phone, email) if (p or "").strip()]
+    return f"{label}: {', '.join(parts)}" if parts else None
+
+
+# lead metadata keys filled from the listing's other contacts; a merged listing
+# fills the ones the lead does not have yet
+_CONTACT_META = {
+    "hallitus_pj": "hallitus_pj",
+    "hallitus_pj_puh": "hallitus_pj_puh",
+    "hallitus_pj_email": "hallitus_pj_email",
+    "huoltoyhtio": "huoltoyhtio",
+    "huoltoyhtio_puh": "huoltoyhtio_puh",
+    "huoltoyhtio_email": "huoltoyhtio_email",
+    "isannoitsija_yritys": "isannoitsija",
+    "isannoitsija_henkilo": "isannoitsija_henkilo",
+    "isannoitsija_puh": "isannoitsija_puh",
+    "isannoitsija_email": "isannoitsija_email",
+}
+
+
+def _office_meta(listing: Listing) -> dict:
+    from app.listings.contacts import office_for
+
+    office = office_for(listing.isannoitsija) if listing.isannoitsija else None
+    if office is None:
+        return {}
+    return {
+        "isannointitoimisto_ytunnus": office.ytunnus or "",
+        "isannointitoimisto_osoite": ", ".join(
+            p for p in (office.osoite, " ".join(p for p in (office.postinumero, office.kaupunki) if p)) if p
+        ),
+        "isannointitoimisto_puh": office.puhelin or "",
+        "isannointitoimisto_www": office.website or "",
+    }
+
+
 def _lead_metadata(listing: Listing, profile: SearchProfile | None, renovation) -> dict:
     meta = {
         "isannoitsija_yritys": listing.isannoitsija or "",
@@ -856,6 +903,8 @@ def _lead_metadata(listing: Listing, profile: SearchProfile | None, renovation) 
         "yhteystieto_lahde": listing.contact_source or "",
         "rakennusvuosi": listing.build_year or "",
         "talotyyppi": listing.building_type or "",
+        **{key: getattr(listing, field) or "" for key, field in _CONTACT_META.items() if key.startswith(("hallitus", "huolto"))},
+        **_office_meta(listing),
     }
     if profile is not None:
         meta["remonttityyppi"] = renovation.remonttityyppi if renovation is not None else profile.remonttityyppi
@@ -888,27 +937,24 @@ def _create_lead(listing: Listing, profile: SearchProfile):
 
 
 def _same_housing_company_lead(match: ListingMatch, listing: Listing):
-    """An existing lead of this profile for the same housing company (another
-    apartment of the same taloyhtiö is on sale), or None."""
+    """An existing lead of the organization for the same housing company
+    (another apartment or another source of the same taloyhtiö, see
+    app/listings/housing.py), or None."""
     from app.leads.models import Lead
 
-    name = _norm(listing.taloyhtio)
-    if not name:
+    if not listing.company_key:
         return None
     query = (
         db.session.query(ListingMatch.lead_id)
         .join(Listing, Listing.id == ListingMatch.listing_id)
         .filter(
-            ListingMatch.profile_id == match.profile_id,
+            ListingMatch.organization_id == match.organization_id,
             ListingMatch.id != match.id,
             ListingMatch.lead_id.isnot(None),
-            func.lower(func.trim(Listing.taloyhtio)) == name,
+            Listing.company_key == listing.company_key,
         )
         .order_by(ListingMatch.lead_created_at.asc())
     )
-    city = _norm(listing.kaupunki)
-    if city:
-        query = query.filter(func.lower(func.trim(Listing.kaupunki)) == city)
     for (lead_id,) in query.all():
         lead = db.session.get(Lead, lead_id)
         if lead is not None:
@@ -927,12 +973,39 @@ def _valid_email_or_none(value) -> str | None:
     return email if email and validate_email(email) else None
 
 
-def _release_time(now: datetime) -> datetime | None:
+def _release_time(now: datetime, organization_id: int | None = None, listing: Listing | None = None) -> datetime | None:
     """released_at for a new match: at once, or None (reserve) when customers
-    release targets themselves with "Hae kohteita"."""
+    release targets themselves with "Hae kohteita". A new listing of a housing
+    company the customer already sees is released at once: it is a new signal
+    on a visible target, not a new target."""
     from flask import current_app
 
-    return None if current_app.config.get("TARGET_FETCH_ENABLED") else now
+    if not current_app.config.get("TARGET_FETCH_ENABLED"):
+        return now
+    if organization_id is not None and listing is not None and listing.company_key:
+        visible = (
+            db.session.query(ListingMatch.id)
+            .join(Listing, Listing.id == ListingMatch.listing_id)
+            .filter(
+                ListingMatch.organization_id == organization_id,
+                Listing.company_key == listing.company_key,
+                Listing.id != listing.id,
+                ListingMatch.released_at.isnot(None),
+            )
+            .first()
+        )
+        if visible is not None:
+            return now
+    return None
+
+
+def _initial_score(organization_id: int, listing: Listing, now: datetime) -> int:
+    """Score of a new match from its own listing; the scheduler refreshes it
+    with the rest of the housing company (housing.refresh_scores)."""
+    from app.listings.housing import score_target
+    from app.listings.target_services import organization_wanted_types
+
+    return score_target([listing], organization_wanted_types(organization_id), now=now)["total"]
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:
@@ -941,6 +1014,18 @@ def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime)
     match.status = "merged"
     match.lead_id = lead.id
     match.lead_created_at = now
+    # contacts this listing knows and the lead does not yet
+    meta = dict(lead.ai_contact_info) if isinstance(lead.ai_contact_info, dict) else {}
+    added = False
+    for key, field in _CONTACT_META.items():
+        value = getattr(listing, field, None)
+        if value and not meta.get(key):
+            meta[key] = value
+            added = True
+    if added:
+        lead.ai_contact_info = meta
+    if not lead.phone and listing.isannoitsija_puh:
+        lead.phone = listing.isannoitsija_puh
     where = ", ".join(p for p in (listing.osoite, listing.kaupunki) if p)
     try:
         LeadService.log_activity(
@@ -966,7 +1051,7 @@ def merge_into_existing_leads(
     query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
         ListingMatch.status == "pending",
         Listing.is_active.is_(True),
-        Listing.taloyhtio.isnot(None),
+        Listing.company_key.isnot(None),
     )
     if profile_ids:
         query = query.filter(ListingMatch.profile_id.in_(profile_ids))

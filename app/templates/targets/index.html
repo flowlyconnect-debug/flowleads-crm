@@ -252,6 +252,7 @@
       <ul class="targets-list">
         {% for row in rows %}
         {% set listing = row.listing %}
+        {% set contact = row.contact %}
         {% set renovation = row.renovation %}
         <li class="target-row">
           <input type="checkbox" class="target-row__check" name="match_ids" value="{{ row.match.id }}"
@@ -261,6 +262,23 @@
               <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a></span>
               {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
+              <details class="target-score target-score--{{ row.score_level }}">
+                <summary title="Kohteen pisteet: {{ row.score_label }}. Avaa erittely.">
+                  <span class="target-score__value">{{ row.score }}</span><span class="target-score__max">/100</span>
+                  <span class="sr-only">pistettä, {{ row.score_label }}</span>
+                </summary>
+                <div class="target-score__parts" role="list">
+                  <strong>{{ row.score }} / 100 · {{ row.score_label }}</strong>
+                  {% for part in row.score_parts %}
+                  <span class="target-score__part" role="listitem">
+                    <span>{{ part.label }}</span>
+                    <span class="target-score__bar" aria-hidden="true"><span style="width: {{ (100 * part.points / part.max)|round|int }}%"></span></span>
+                    <span>{{ part.points }}/{{ part.max }}</span>
+                    <span class="target-score__detail">{{ part.detail }}</span>
+                  </span>
+                  {% endfor %}
+                </div>
+              </details>
             </div>
             <div class="target-row__facts">
               {% for item in row.renovations %}
@@ -275,20 +293,37 @@
               {% if listing.building_type or listing.build_year %}
               <span class="target-row__fact">{{ [listing.building_type, listing.build_year]|select|join(', ') }}</span>
               {% endif %}
-              {% if row.seen_at %}<span class="target-row__fact">Löydetty {{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
+              {% if row.seen_at %}<span class="target-row__fact">{{ 'Uusin signaali' if row.signal_count > 1 else 'Löydetty' }} {{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
+              {% if row.signal_count > 1 %}
+              <a class="target-row__fact target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} ilmoitusta samasta taloyhtiöstä</a>
+              {% endif %}
             </div>
             <div class="target-row__contact">
-              {% if listing.isannoitsija %}Isännöinti: <a href="{{ url_for('insights.manager_detail', name=listing.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ listing.isannoitsija }}</a>{% endif %}
-              {% if listing.isannoitsija_henkilo %}<span>· {{ listing.isannoitsija_henkilo }}</span>{% endif %}
-              {% if listing.has_contact %}
-              {% if listing.isannoitsija_puh %}<a class="target-row__contact-ok" href="tel:{{ listing.isannoitsija_puh|replace(' ', '') }}">{{ listing.isannoitsija_puh }}</a>{% endif %}
-              {% if listing.isannoitsija_email %}<a class="target-row__contact-ok" href="mailto:{{ listing.isannoitsija_email }}">{{ listing.isannoitsija_email }}</a>{% endif %}
-              {% elif listing.contact_status in ('pending', 'processing') %}
-              <span>{{ '· yhteystietoja haetaan' if listing.isannoitsija else 'Yhteystietoja haetaan' }}</span>
-              {% elif not listing.isannoitsija %}
+              {% if contact.isannoitsija %}Isännöinti: <a href="{{ url_for('insights.manager_detail', name=contact.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ contact.isannoitsija }}</a>{% endif %}
+              {% if contact.isannoitsija_henkilo %}<span>· {{ contact.isannoitsija_henkilo }}</span>{% endif %}
+              {% if contact.has_contact %}
+              {% if contact.isannoitsija_puh %}<a class="target-row__contact-ok" href="tel:{{ contact.isannoitsija_puh|replace(' ', '') }}">{{ contact.isannoitsija_puh }}</a>{% endif %}
+              {% if contact.isannoitsija_email %}<a class="target-row__contact-ok" href="mailto:{{ contact.isannoitsija_email }}">{{ contact.isannoitsija_email }}</a>{% endif %}
+              {% elif contact.contact_status in ('pending', 'processing') %}
+              <span>{{ '· yhteystietoja haetaan' if contact.isannoitsija else 'Yhteystietoja haetaan' }}</span>
+              {% elif not contact.isannoitsija %}
               <span>Isännöitsijän yhteystietoja ei löytynyt</span>
               {% endif %}
             </div>
+            {% set people = row.people %}
+            {% if people.chair or people.maintenance %}
+            <div class="target-row__contact target-row__contact--people">
+              {% if people.chair %}
+              <span>Hallituksen pj: {{ people.chair.name or '–' }}</span>
+              {% if people.chair.phone %}<a class="target-row__contact-ok" href="tel:{{ people.chair.phone|replace(' ', '') }}">{{ people.chair.phone }}</a>{% endif %}
+              {% if people.chair.email %}<a class="target-row__contact-ok" href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}
+              {% endif %}
+              {% if people.maintenance %}
+              <span>{{ '· ' if people.chair else '' }}Huolto: {{ people.maintenance.name or '–' }}</span>
+              {% if people.maintenance.phone %}<a class="target-row__contact-ok" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}
+              {% endif %}
+            </div>
+            {% endif %}
             {% if (renovation and renovation.evidence) or listing.tulevat_remontit or listing.url %}
             <details class="target-row__more">
               <summary>Lisätiedot</summary>

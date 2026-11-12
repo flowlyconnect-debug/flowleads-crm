@@ -28,7 +28,7 @@ from app.listings.target_services import (
     dismiss_targets,
     list_targets,
     restore_targets,
-    target_row,
+    target_rows,
     transfer_targets,
 )
 from app.search.profile_services import list_profiles
@@ -183,7 +183,7 @@ def index():
         sort_options=SORT_OPTIONS,
         transferred_leads=transferred_leads,
         assignees=assignees,
-        rows=[target_row(match, wanted_types) for match in pagination.items],
+        rows=target_rows(organization_id, pagination.items, wanted_types),
         pagination=pagination,
         tab=tab,
         search=search,

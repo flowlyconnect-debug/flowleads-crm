@@ -5,7 +5,19 @@ PROPERTY_INFO_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("isannoitsija_yritys", "Isännöitsijäyritys", False),
     ("isannoitsija_puh", "Isännöitsijän puhelin", False),
     ("isannoitsija_email", "Isännöitsijän sähköposti", False),
+    ("isannoitsija_henkilo", "Isännöitsijä (henkilö)", False),
+    ("taloyhtio_ytunnus", "Taloyhtiön Y-tunnus", False),
     ("isannoitsija_ytunnus", "Y-tunnus", False),
+    ("isannointitoimisto_ytunnus", "Isännöintitoimiston Y-tunnus", False),
+    ("isannointitoimisto_osoite", "Isännöintitoimiston osoite", False),
+    ("isannointitoimisto_puh", "Isännöintitoimiston vaihde", False),
+    ("isannointitoimisto_www", "Isännöintitoimiston verkkosivut", True),
+    ("hallitus_pj", "Hallituksen puheenjohtaja", False),
+    ("hallitus_pj_puh", "Puheenjohtajan puhelin", False),
+    ("hallitus_pj_email", "Puheenjohtajan sähköposti", False),
+    ("huoltoyhtio", "Huoltoyhtiö", False),
+    ("huoltoyhtio_puh", "Huoltoyhtiön puhelin", False),
+    ("huoltoyhtio_email", "Huoltoyhtiön sähköposti", False),
     ("remonttityyppi", "Remonttityyppi", False),
     ("tulevat_remontit", "Tulevat remontit", False),
     ("kaupunki", "Kaupunki", False),
@@ -41,7 +53,13 @@ def get_property_info_rows(ai_contact_info: dict | None) -> list[dict]:
         row: dict = {"key": key, "label": label, "value": text}
         if is_url:
             row["is_url"] = True
-            row["link_text"] = "Avaa Oikotiessä" if key == "oikotie_url" else "Avaa lähde"
+            if not text.lower().startswith(("http://", "https://")):
+                row["is_url"] = False  # never a javascript: or relative link
+                rows.append(row)
+                continue
+            row["link_text"] = {"oikotie_url": "Avaa Oikotiessä", "isannointitoimisto_www": "Avaa verkkosivut"}.get(
+                key, "Avaa lähde"
+            )
         else:
             row["is_url"] = False
         rows.append(row)

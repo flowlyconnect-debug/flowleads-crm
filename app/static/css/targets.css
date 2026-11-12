@@ -434,3 +434,51 @@
 .targets-save-form input[type=text] { height: 30px; width: 190px; font-size: 13px; padding: 0 10px; }
 .target-row__name a, .target-row__contact a { color: inherit; text-decoration: none; }
 .target-row__name a:hover, .target-row__contact a:hover { color: var(--color-primary, #6846DC); text-decoration: underline; }
+
+/* Target score (app/listings/housing.py::score_target) */
+.target-score { position: relative; display: inline-block; margin-left: auto; }
+.target-score > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: baseline; gap: 1px; padding: 2px 9px; border-radius: 999px; font-weight: 700; font-size: 13px; line-height: 1.5; }
+.target-score > summary::-webkit-details-marker { display: none; }
+.target-score__max { font-weight: 500; font-size: 11px; opacity: .75; }
+.target-score--high > summary { background: #ECFDF5; color: #065F46; }
+.target-score--good > summary { background: #F1EDFC; color: #4C2FB8; }
+.target-score--mid > summary { background: #FFF7ED; color: #9A3412; }
+.target-score--low > summary { background: #F3F4F6; color: #4B5563; }
+.target-score__parts { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 300px; max-width: calc(100vw - 32px); display: grid; gap: 6px; padding: 12px 14px; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; box-shadow: 0 10px 30px rgba(17, 24, 39, .12); font-size: 12px; color: #374151; }
+.target-score__part { display: grid; grid-template-columns: 82px 1fr 38px; align-items: center; gap: 6px; }
+.target-score__detail { grid-column: 1 / -1; margin-top: -3px; color: #6B7280; }
+.target-score__bar { height: 6px; border-radius: 999px; background: #F3F4F6; overflow: hidden; }
+.target-score__bar > span { display: block; height: 100%; background: #6846DC; }
+.target-row__signals { color: #4C2FB8; text-decoration: none; font-weight: 600; }
+.target-row__signals:hover { text-decoration: underline; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Housing-company card: score and signal timeline */
+.insights-score { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.insights-score__total { font-size: 34px; font-weight: 700; line-height: 1; }
+.insights-score__total small { font-size: 14px; font-weight: 500; color: #6B7280; }
+.insights-score__parts { flex: 1 1 260px; display: grid; gap: 6px; font-size: 13px; }
+.insights-signals { list-style: none; margin: 0; padding: 0; }
+.insights-signals li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid #F3F4F6; font-size: 14px; }
+.insights-signals li:last-child { border-bottom: 0; }
+.insights-signals__date { color: #6B7280; font-size: 13px; white-space: nowrap; }
+.insights-signals__title { font-weight: 600; }
+.insights-signals__kind { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #9CA3AF; vertical-align: middle; }
+.insights-signals__kind--listing { background: #2563EB; }
+.insights-signals__kind--renovation { background: #6846DC; }
+.insights-signals__kind--contact { background: #0891B2; }
+.insights-signals__kind--lead, .insights-signals__kind--sales { background: #059669; }
+.insights-signals__kind--removed, .insights-signals__kind--hidden { background: #9CA3AF; }
+.insights-signals__detail { display: block; margin-top: 2px; color: #4B5563; font-size: 13px; }
+.insights-hint { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; background: #FFFBEB; color: #78350F; font-size: 13px; }
+@media (max-width: 640px) {
+  .insights-signals li { grid-template-columns: 1fr; gap: 2px; }
+  .target-score { margin-left: 0; }
+}
+.score-pill { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.score-pill--high { background: #ECFDF5; color: #065F46; }
+.score-pill--good { background: #F1EDFC; color: #4C2FB8; }
+.score-pill--mid { background: #FFF7ED; color: #9A3412; }
+.score-pill--low { background: #F3F4F6; color: #4B5563; }
+.insights-facts--compact { margin-top: 8px; font-size: 13px; }
+.target-row__contact--people { margin-top: 2px; }

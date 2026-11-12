@@ -171,13 +171,22 @@ def test_second_apartment_of_same_housing_company_joins_the_lead(app):
         org, _ = _org("same-yhtio")
         _profile(org)
         _listing(1, taloyhtio="As Oy Sama")
-        _listing(2, taloyhtio="As Oy Sama")
+        _listing(2, taloyhtio="As. Oy  SAMA")  # same company, spelled differently
+        # one housing company is one target
+        assert targets.count_targets(org.id) == 1
         ids = _match_ids(org)
         assert targets.transfer_targets(org.id, ids[:1])["created"] == 1
 
-        # the scheduler joins the other apartment to the lead; no new lead
-        assert svc.merge_into_existing_leads() == 1
+        # the other apartment joined the same lead at once; no new lead
+        assert {m.status for m in ListingMatch.query.filter_by(organization_id=org.id)} == {"lead_created", "merged"}
+        assert svc.merge_into_existing_leads() == 0
         assert targets.count_targets(org.id) == 0
+        assert Lead.query.filter_by(organization_id=org.id).count() == 1
+
+        # a third apartment found later joins the lead through the scheduler
+        _listing(3, taloyhtio="Asunto Oy Sama")
+        assert targets.count_targets(org.id) == 0  # not shown as a new target
+        assert svc.merge_into_existing_leads() == 1
         assert Lead.query.filter_by(organization_id=org.id).count() == 1
 
 
