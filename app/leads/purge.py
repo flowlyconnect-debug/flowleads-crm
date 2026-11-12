@@ -21,8 +21,18 @@ def _count(table: Table, condition) -> int:
     return db.session.execute(select(func.count()).select_from(table).where(condition)).scalar() or 0
 
 
-def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tuple = ()) -> None:
-    """Delete `table` rows matching `condition`, children first."""
+def _purge_table(
+    table: Table,
+    condition,
+    counts: dict,
+    dry_run: bool,
+    stack: tuple = (),
+    delete_with_parent: frozenset | set = frozenset(),
+) -> None:
+    """Delete `table` rows matching `condition`, children first. A nullable
+    reference keeps its row with the reference cleared, unless it is listed in
+    _DELETE_WITH_PARENT or `delete_with_parent`."""
+    always_delete = _DELETE_WITH_PARENT | set(delete_with_parent)
     if "id" in table.c:
         parent_ids = select(table.c.id).where(condition)
         for child in db.metadata.tables.values():
@@ -31,7 +41,7 @@ def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tu
                     continue
                 column = fk.parent
                 child_condition = column.in_(parent_ids)
-                keep_row = column.nullable and (child.name, column.name) not in _DELETE_WITH_PARENT
+                keep_row = column.nullable and (child.name, column.name) not in always_delete
                 if keep_row or child is table or child.name in stack:
                     key = f"{child.name}.{column.name} (viittaus tyhjennetty)"
                     counts[key] = counts.get(key, 0) + _count(child, child_condition)
@@ -41,7 +51,9 @@ def _purge_table(table: Table, condition, counts: dict, dry_run: bool, stack: tu
                             execution_options={"synchronize_session": False},
                         )
                 else:
-                    _purge_table(child, child_condition, counts, dry_run, stack + (table.name,))
+                    _purge_table(
+                        child, child_condition, counts, dry_run, stack + (table.name,), delete_with_parent
+                    )
 
     counts[table.name] = counts.get(table.name, 0) + _count(table, condition)
     if not dry_run:

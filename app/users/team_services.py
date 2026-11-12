@@ -67,4 +67,8 @@ def _send_invite(user: User) -> dict:
         )
     except Exception:
         result = {"success": False}
-    return {"sent": bool(result and result.get("success")), "url": set_password_url}
+    return {
+        "sent": bool(result and result.get("success")),
+        "url": set_password_url,
+        "error": (result or {}).get("error"),
+    }

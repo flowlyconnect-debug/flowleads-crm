@@ -23,9 +23,14 @@ def _resolve_organization_id():
 
 def _flash_invite_result(delivery, success_message: str) -> None:
     if delivery and not delivery.get("sent"):
+        from app.admin.routes import fi_email_error
+
+        reason = fi_email_error(delivery.get("error"))
         flash(
-            "Käyttäjä on luotu, mutta kutsusähköpostia ei voitu lähettää. Välitä hänelle tämä "
-            f"salasanan asetuslinkki (voimassa 7 päivää): {delivery.get('url')}",
+            "Käyttäjä on luotu, mutta kutsusähköpostia ei voitu lähettää"
+            + (f" ({reason})" if reason else "")
+            + ". Välitä hänelle tämä salasanan asetuslinkki (voimassa 7 päivää): "
+            + f"{delivery.get('url')}",
             "warning",
         )
         return
