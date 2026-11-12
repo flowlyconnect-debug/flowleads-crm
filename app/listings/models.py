@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     JSON,
@@ -103,6 +104,13 @@ class Listing(db.Model):
     huoltoyhtio: Mapped[str | None] = mapped_column(String(255), nullable=True)
     huoltoyhtio_puh: Mapped[str | None] = mapped_column(String(50), nullable=True)
     huoltoyhtio_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # map position (app/listings/geo.py). geo_precision: "source" (given by the
+    # import) or "address" (geocoded); NULL = not known, the map then uses the
+    # town's centre. geocoded_at = last geocoding attempt, also a failed one.
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    geo_precision: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    geocoded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # One housing company across listings and sources (app/listings/housing.py):
     # "y:<Y-tunnus>" or "n:<name>|<city>"; NULL = the listing stands alone.
     company_key: Mapped[str | None] = mapped_column(String(300), nullable=True)

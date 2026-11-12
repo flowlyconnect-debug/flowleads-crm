@@ -85,8 +85,9 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-@targets_bp.route("", methods=["GET"])
-def index():
+def _page_state():
+    """The organization, tab, profile, search and filters of the request:
+    shared by the list and the map."""
     organization_id = resolve_organization_id()
     tab = request.args.get("tab")
     if tab not in TABS:
@@ -101,6 +102,61 @@ def index():
         for key in FILTER_KEYS
         if (request.args.get(key) or "").strip()
     }
+    return organization_id, tab, profiles, profile_id, search, filters
+
+
+def _current_params(search: str, profile_id, filters: dict) -> dict:
+    params = dict(filters)
+    if search:
+        params["search"] = search
+    if profile_id:
+        params["profile_id"] = str(profile_id)
+    return params
+
+
+@targets_bp.route("/map", methods=["GET"])
+def map_view():
+    """The same targets as the list (same tab, search and filters) on a map."""
+    from flask import current_app
+
+    from app.listings.geo import MAX_MAP_POINTS, map_points
+
+    organization_id, tab, profiles, profile_id, search, filters = _page_state()
+    pagination = list_targets(
+        organization_id,
+        status=TABS[tab],
+        profile_id=profile_id,
+        search=search,
+        filters=filters,
+        page=1,
+        per_page=MAX_MAP_POINTS,
+    )
+    rows = target_rows(organization_id, pagination.items, organization_wanted_types(organization_id))
+    points = map_points(rows)
+    params = _current_params(search, profile_id, filters)
+    if tab != "available":
+        params["tab"] = tab
+    return render_template(
+        "targets/map.html",
+        points=points,
+        total=pagination.total,
+        truncated=pagination.total > MAX_MAP_POINTS,
+        approximate=sum(1 for p in points if p["precision"] in ("city", "region")),
+        missing=len(rows) - len(points),
+        tab=tab,
+        filters=filters,
+        search=search,
+        list_params=params,
+        tile_url=current_app.config.get("MAP_TILE_URL") or "",
+        tile_attribution=current_app.config.get("MAP_TILE_ATTRIBUTION") or "",
+        organization_id=organization_id,
+        org_query=org_query_suffix(organization_id),
+    )
+
+
+@targets_bp.route("", methods=["GET"])
+def index():
+    organization_id, tab, profiles, profile_id, search, filters = _page_state()
     pagination = list_targets(
         organization_id,
         status=TABS[tab],
@@ -157,11 +213,7 @@ def index():
                     released = released.replace(tzinfo=now.tzinfo)
                 if now - released < timedelta(minutes=5):
                     new_ids.add(match.id)
-    current_params = dict(filters)
-    if search:
-        current_params["search"] = search
-    if profile_id:
-        current_params["profile_id"] = str(profile_id)
+    current_params = _current_params(search, profile_id, filters)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
     return render_template(

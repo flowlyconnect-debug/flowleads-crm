@@ -299,6 +299,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Listing matching failed")
 
+    def run_geocode_listings():
+        """Street-address positions for the Kohteet map (GEOCODING_ENABLED)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.geo import geocode_listings
+
+            try:
+                found = geocode_listings()
+                if found:
+                    logger.info("Geocoded %s listing(s)", found)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Geocoding failed")
+
     def run_listing_retention():
         """Delete listings that left Oikotie long ago (LISTING_RETENTION_DAYS)."""
         with app.app_context():
@@ -500,6 +514,13 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="listing_matching",
         replace_existing=True,
     )
+    if app.config.get("GEOCODING_ENABLED"):
+        scheduler.add_job(
+            run_geocode_listings,
+            IntervalTrigger(minutes=30),
+            id="geocode_listings",
+            replace_existing=True,
+        )
     scheduler.add_job(
         run_listing_retention,
         CronTrigger(hour=3, minute=30, timezone="UTC"),

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Kohteet kartalla — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet-1.9.4/leaflet.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet-1.9.4/MarkerCluster.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet-1.9.4/MarkerCluster.Default.css') }}">
+{% endblock %}
+{% block content %}
+<section class="leads-page targets-page">
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">Kohteet kartalla</h1>
+      <p class="leads-header__sub">
+        {{ total }} {{ 'kohde' if total == 1 else 'kohdetta' }}{% if tab == 'hidden' %} piilotettuna{% endif %}{% if filters or search %} näillä rajauksilla{% endif %}.
+        {% if approximate %}{{ approximate }} on sijoitettu kunnan tai maakunnan keskustaan, koska tarkkaa osoitetta ei ole paikannettu.{% endif %}
+      </p>
+    </div>
+    <div class="leads-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.index', **dict(org_query, **list_params)) }}">Takaisin listaan</a>
+    </div>
+  </header>
+
+  {% if filters or search %}
+  <p class="targets-map__filters">
+    Rajaukset:
+    {% if search %}<span class="badge">Haku: {{ search }}</span>{% endif %}
+    {% for key, value in filters.items() if key != 'sort' %}<span class="badge">{{ value if key != 'contact' else 'Vain yhteystiedolliset' }}</span>{% endfor %}
+    · Muuta rajauksia listanäkymässä.
+  </p>
+  {% endif %}
+  {% if truncated %}<p class="targets-reserve-note">Kartalla näytetään {{ points|length }} parasta kohdetta. Rajaa listaa, niin näet loput.</p>{% endif %}
+  {% if missing %}<p class="targets-reserve-note">{{ missing }} kohteelta puuttuu kunta ja maakunta, joten niitä ei voi näyttää kartalla.</p>{% endif %}
+
+  <div class="targets-map" id="targets-map" role="region" aria-label="Kohteet kartalla"
+       data-tile-url="{{ tile_url }}" data-card-url="{{ url_for('insights.company_card', listing_id=0, **org_query) }}">
+    {% if not points %}<p class="targets-map__empty">Ei näytettäviä kohteita näillä rajauksilla.</p>{% endif %}
+  </div>
+  <ul class="targets-map__legend" aria-label="Selite">
+    <li><span class="targets-map__dot targets-map__dot--high"></span>Pisteet 75–100</li>
+    <li><span class="targets-map__dot targets-map__dot--good"></span>55–74</li>
+    <li><span class="targets-map__dot targets-map__dot--mid"></span>35–54</li>
+    <li><span class="targets-map__dot targets-map__dot--low"></span>alle 35</li>
+    <li><span class="targets-map__dot targets-map__dot--approx"></span>likimääräinen sijainti</li>
+  </ul>
+
+  {# rows for screen readers and for checking the map against the list #}
+  <details class="targets-map__table">
+    <summary>Näytä kohteet taulukkona</summary>
+    <table class="insights-table">
+      <thead><tr><th>Taloyhtiö</th><th>Sijainti</th><th>Pisteet</th><th>Remontit</th></tr></thead>
+      <tbody>
+        {% for point in points %}
+        <tr>
+          <td><a href="{{ url_for('insights.company_card', listing_id=point.listing_id, **org_query) }}">{{ point.title }}</a></td>
+          <td>{{ point.location }} <span class="text-secondary text-sm">({{ point.precision_label }})</span></td>
+          <td>{{ point.score }}</td>
+          <td>{{ point.renovations|join(', ') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+<script type="application/json" id="targets-map-data">{{ points|tojson }}</script>
+<script type="application/json" id="targets-map-attribution">{{ tile_attribution|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet-1.9.4/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/leaflet-1.9.4/leaflet.markercluster.js') }}"></script>
+<script src="{{ url_for('static', filename='js/targets-map.js') }}"></script>
+{% endblock %}

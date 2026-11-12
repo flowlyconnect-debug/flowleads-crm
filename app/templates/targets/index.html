@@ -41,6 +41,7 @@
         </button>
       </span>
       {% endif %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.map_view', tab=(tab if is_hidden_tab else none), **dict(org_query, **current_params)) }}" title="Näytä nämä kohteet kartalla">Kartta</a>
       {% if can_edit_profiles %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}" title="Mistä urakoista kohteita haetaan">Urakat</a>
       {% endif %}

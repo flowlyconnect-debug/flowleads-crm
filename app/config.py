@@ -113,6 +113,20 @@ class Config:
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
+    # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default
+    # OpenStreetMap server suits light use only (tile usage policy), switch to a
+    # commercial provider (e.g. MapTiler with a key in the URL) for heavy use.
+    MAP_TILE_URL = os.environ.get("MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+    MAP_TILE_ATTRIBUTION = os.environ.get(
+        "MAP_TILE_ATTRIBUTION",
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-tekijät',
+    )
+    # Address geocoding of matched listings (scheduler job "geocode_listings").
+    # Off by default: it sends housing-company street addresses to the
+    # geocoder. Without it the map places targets at their town's centre.
+    GEOCODING_ENABLED = os.environ.get("GEOCODING_ENABLED", "false").lower() in ("1", "true", "yes")
+    GEOCODER_URL = os.environ.get("GEOCODER_URL", "https://nominatim.openstreetmap.org/search")
+    GEOCODING_BATCH = int(os.environ.get("GEOCODING_BATCH", "40"))
     LISTING_STALE_HOURS = int(os.environ.get("LISTING_STALE_HOURS", "6"))
     LISTING_ALERT_INTERVAL_HOURS = int(os.environ.get("LISTING_ALERT_INTERVAL_HOURS", "24"))
     FORM_SUBMISSION_RATE_LIMIT = os.environ.get("FORM_SUBMISSION_RATE_LIMIT", "10/hour")
@@ -208,6 +222,7 @@ class TestingConfig(Config):
     # the older Kohteet tests expect matches to be visible at once; the fetch
     # button's own tests switch this on
     TARGET_FETCH_ENABLED = False
+    GEOCODING_ENABLED = False
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

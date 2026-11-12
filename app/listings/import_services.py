@@ -66,6 +66,8 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "building_type": ("talotyyppi", "building_type"),
     "url": ("url", "linkki", "lahde"),
     "published_at": ("julkaistu", "published_at", "paivamaara"),
+    "lat": ("lat", "latitude", "leveysaste", "leveys"),
+    "lon": ("lon", "lng", "longitude", "pituusaste", "pituus"),
     # other people of the housing company (app/listings/contacts.py)
     "hallitus_pj": ("hallituksen_puheenjohtaja", "hallituksen_pj", "hallitus_pj", "puheenjohtaja"),
     "hallitus_pj_puh": ("hallituksen_pj_puh", "hallitus_pj_puh", "puheenjohtajan_puhelin", "puheenjohtaja_puh"),
@@ -371,6 +373,12 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
             if value is not None:
                 setattr(listing, field, value)
         _office_from_row(raw, source)
+        from app.listings.geo import valid_position
+
+        where = valid_position(raw.get("lat"), raw.get("lon")) if raw.get("lat") and raw.get("lon") else None
+        if where:
+            listing.lat, listing.lon = where
+            listing.geo_precision = "source"
         db.session.flush()
         reconcile_company_key(listing)
         db.session.commit()
