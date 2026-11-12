@@ -1,0 +1,47 @@
+/* Public price list (templates/billing/pricing.html). Standalone: no app chrome. */
+:root { --ink: #111827; --muted: #4B5563; --line: #E5E7EB; --brand: #6846DC; --brand-dark: #4C2FB8; --soft: #F5F3FF; }
+* { box-sizing: border-box; }
+body.pricing { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #FAFAFB; line-height: 1.55; }
+.pricing a { color: var(--brand-dark); }
+.pricing-top { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto; padding: 18px 20px; }
+.pricing-top__logo img { display: block; height: 40px; width: auto; }
+.pricing main { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; }
+.pricing-hero { max-width: 760px; margin: 24px auto 32px; text-align: center; }
+.pricing-hero h1 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 42px); line-height: 1.15; letter-spacing: -0.02em; }
+.pricing-hero p { margin: 0 auto; color: var(--muted); font-size: 17px; }
+.pricing-promises { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; list-style: none; margin: 18px 0 0; padding: 0; font-weight: 600; font-size: 14px; }
+.pricing-promises li::before { content: "✓ "; color: #059669; }
+.pricing-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; align-items: stretch; }
+.pricing-plan { position: relative; display: flex; flex-direction: column; padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.pricing-plan--highlight { border: 2px solid var(--brand); box-shadow: 0 14px 40px rgba(104, 70, 220, .14); }
+.pricing-plan__badge { position: absolute; top: -12px; left: 24px; padding: 3px 10px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 700; }
+.pricing-plan h2 { margin: 0; font-size: 20px; }
+.pricing-plan__tagline { margin: 4px 0 14px; color: var(--muted); font-size: 14px; }
+.pricing-plan__price { margin: 0 0 16px; }
+.pricing-plan__amount { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
+.pricing-plan__amount--small { font-size: 22px; }
+.pricing-plan__per { margin-left: 6px; color: var(--muted); font-size: 14px; }
+.pricing-plan__features { flex: 1; list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.pricing-plan__features li { padding-left: 22px; position: relative; }
+.pricing-plan__features li::before { content: "✓"; position: absolute; left: 0; color: var(--brand); font-weight: 700; }
+.pricing-btn { display: inline-flex; justify-content: center; align-items: center; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 15px; text-decoration: none; border: 1px solid transparent; cursor: pointer; font-family: inherit; }
+.pricing .pricing-btn--primary { background: var(--brand); color: #fff; }
+.pricing .pricing-btn--primary:hover { background: var(--brand-dark); }
+.pricing .pricing-btn--secondary { background: var(--soft); color: var(--brand-dark); }
+.pricing .pricing-btn--ghost { border-color: var(--line); color: var(--ink); background: #fff; }
+.pricing-terms, .pricing-contact { max-width: 760px; margin: 40px auto 0; padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.pricing-terms h2, .pricing-contact h2 { margin: 0 0 12px; font-size: 20px; }
+.pricing-terms ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); }
+.pricing-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.pricing-form label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+.pricing-form input, .pricing-form select, .pricing-form textarea { width: 100%; padding: 9px 11px; border: 1px solid #D1D5DB; border-radius: 8px; font: inherit; font-weight: 400; }
+.pricing-form__wide { grid-column: 1 / -1; }
+.pricing-form__hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.pricing-form__privacy { margin: 0; color: var(--muted); font-size: 13px; }
+.pricing-contact__thanks { padding: 12px 14px; border-radius: 10px; background: #ECFDF5; color: #065F46; font-weight: 600; }
+.pricing-contact__error { padding: 10px 12px; border-radius: 8px; background: #FEF2F2; color: #991B1B; }
+.pricing-footer { padding: 24px 20px 40px; text-align: center; color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) {
+  .pricing-form { grid-template-columns: 1fr; }
+  .pricing-terms, .pricing-contact { padding: 18px 16px; }
+}

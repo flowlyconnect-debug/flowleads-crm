@@ -26,6 +26,7 @@
               <th>Hakuprofiilit</th>
               <th>Liidejä</th>
               <th>Viimeisin liidi</th>
+              <th>Tilaus</th>
               <th>Toiminnot käytössä</th>
               <th></th>
             </tr>
@@ -79,6 +80,24 @@
               </td>
               <td>{{ row.last_search_label }}</td>
               <td>
+                {% set sub = row.subscription %}
+                <span class="badge {{ 'badge-active' if sub.can_use else 'badge-inactive' }}">{{ sub.label }}</span>
+                <div class="text-muted text-sm">
+                  {{ sub.plan_name }}
+                  {% if sub.status == 'trial' and sub.last_day %}· päättyy {{ sub.last_day }}{% endif %}
+                  {% if sub.status == 'cancelled' %}· käytössä {{ sub.last_day }} asti{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('billing.admin_subscription_route', organization_id=row.org.id) }}" class="customer-sub-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="plan" class="form-input form-input--compact" aria-label="Paketti">
+                    {% for plan in plans %}<option value="{{ plan.key }}"{% if row.org.plan == plan.key %} selected{% endif %}>{{ plan.name }}</option>{% endfor %}
+                  </select>
+                  <button type="submit" name="action" value="activate" class="btn btn-secondary btn-sm">Sopimus voimaan</button>
+                  <button type="submit" name="action" value="extend_trial" class="btn btn-secondary btn-sm">Kokeilu +14 pv</button>
+                  {% if sub.can_use %}<button type="submit" name="action" value="end" class="btn btn-secondary btn-sm" onclick="return confirm('Päätetäänkö sopimus heti?');">Päätä</button>{% endif %}
+                </form>
+              </td>
+              <td>
                 <form method="post" action="{{ url_for('admin.update_customer_features_route', organization_id=row.org.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   {% for key, label in feature_catalog.items() %}
@@ -121,4 +140,5 @@
     </div>
   </div>
 </div>
+<style>.customer-sub-form { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }</style>
 {% endblock %}

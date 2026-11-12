@@ -1,0 +1,14 @@
+{# Trial / ended-contract notice (app/billing/routes.py::subscription_banner). #}
+{% set sub = subscription_banner() if subscription_banner is defined else none %}
+{% if sub %}
+<div class="subscription-banner subscription-banner--{{ 'ok' if sub.can_use else 'ended' }}" role="status">
+  {% if sub.status == 'trial' %}
+  <span><strong>Kokeilujakso:</strong> {{ sub.days_left }} {{ 'päivä' if sub.days_left == 1 else 'päivää' }} jäljellä. Kaikki toiminnot ovat käytössäsi.</span>
+  {% elif sub.status == 'cancelled' %}
+  <span><strong>Sopimus irtisanottu.</strong> Palvelu on käytössäsi {{ sub.last_day }} asti.</span>
+  {% else %}
+  <span><strong>{{ sub.label }}.</strong> Näet tietosi ja voit viedä ne ulos, mutta uusia kohteita ei haeta eikä siirretä liideiksi.</span>
+  {% endif %}
+  <a class="btn btn-sm {{ 'btn-secondary' if sub.can_use else 'btn-primary' }}" href="{{ url_for('billing.subscription_page') }}">{{ 'Tilaus' if sub.status == 'cancelled' else 'Valitse kuukausisopimus' }}</a>
+</div>
+{% endif %}

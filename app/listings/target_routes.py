@@ -282,9 +282,20 @@ def index():
     )
 
 
+def _subscription_ended(organization_id: int) -> bool:
+    """A trial or contract that has ended: the targets stay visible, but no
+    new ones are fetched or moved to leads (app/billing)."""
+    from app.billing.services import organization_can_use
+
+    return not current_user.is_superadmin() and not organization_can_use(organization_id)
+
+
 @targets_bp.route("/transfer", methods=["POST"])
 def transfer():
     organization_id = resolve_organization_id()
+    if _subscription_ended(organization_id):
+        flash("The subscription has ended.", "warning")
+        return _back(organization_id)
     match_ids = _selected_ids()
     if not match_ids:
         flash("Valitse vähintään yksi kohde.", "warning")
@@ -378,6 +389,10 @@ def fetch():
     organization_id = resolve_organization_id()
     if not fetch_enabled():
         return jsonify({"success": False, "message": "Toiminto ei ole käytössä."}), 404
+    if _subscription_ended(organization_id):
+        from app.core.messages_fi import fi_message
+
+        return jsonify({"success": False, "code": "subscription", "message": fi_message("The subscription has ended.")}), 402
     try:
         # the platform's own superadmin can demo the button without waiting an hour
         result = fetch_targets(organization_id, ignore_cooldown=current_user.is_superadmin())

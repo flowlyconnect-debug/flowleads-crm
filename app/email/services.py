@@ -784,6 +784,7 @@ def send_system_message(message) -> bool:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            reply_to=getattr(message, "reply_to", None) or None,
         )
         if not ok:
             all_ok = False

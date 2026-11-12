@@ -98,6 +98,7 @@ _TWO_FA_EXEMPT_PREFIXES = (
     "n8n_search.",
     "listings_n8n.",
     "webhooks.",  # Mailgun events
+    "billing.pricing",  # public price list and its trial request form
 )
 
 

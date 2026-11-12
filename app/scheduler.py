@@ -355,6 +355,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Monthly report failed")
 
+    def run_trial_reminders():
+        """Tell admins three days before their free trial ends."""
+        with app.app_context():
+            from app.billing.services import send_trial_reminders
+            from app.extensions import db
+
+            try:
+                count = send_trial_reminders()
+                if count:
+                    logger.info("Trial reminders sent to %s organization(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Trial reminders failed")
+
     def run_catalogue_health_check():
         """Email superadmins when crawling or analysis has stopped."""
         with app.app_context():
@@ -545,6 +559,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_target_digest,
         CronTrigger(hour=7, minute=30, timezone="Europe/Helsinki"),
         id="target_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_trial_reminders,
+        CronTrigger(hour=9, minute=15, timezone="Europe/Helsinki"),
+        id="trial_reminders",
         replace_existing=True,
     )
     scheduler.add_job(

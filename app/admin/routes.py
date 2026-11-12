@@ -8,6 +8,7 @@ from app.admin.constants import FEATURE_CATALOG
 from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
 from app.admin.services import get_accessible_organizations, get_dashboard_stats, list_customers_summary
+from app.billing.plans import TRIAL_DAYS
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
@@ -107,8 +108,15 @@ def dashboard():
 @require_role("superadmin")
 @require_2fa
 def customers_list():
+    from app.billing.plans import PLANS
+    from app.billing.services import subscription_state
+
     customers = list_customers_summary()
-    return render_template("admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG)
+    for row in customers:
+        row["subscription"] = subscription_state(row["org"])
+    return render_template(
+        "admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG, plans=PLANS
+    )
 
 
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
@@ -374,6 +382,7 @@ def create_customer_route():
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
             form_data={},
+            trial_days=TRIAL_DAYS,
         )
 
     types = request.form.getlist("remonttityypit") or [request.form.get("remonttityyppi", "")]
@@ -386,6 +395,7 @@ def create_customer_route():
         "remonttityypit": [t.strip() for t in types if t.strip()],
         "source": (request.form.get("source") or "oikotie").strip(),
         "is_active": request.form.get("is_active") == "y",
+        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -399,6 +409,7 @@ def create_customer_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             is_active=form_data["is_active"],
+            trial=form_data["trial"],
         )
         db.session.commit()
     except CustomerOnboardingError as exc:
@@ -407,6 +418,7 @@ def create_customer_route():
         return render_template(
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
+            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 
@@ -508,6 +520,7 @@ def create_invite_route():
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
             form_data={},
+            trial_days=TRIAL_DAYS,
         )
 
     allowed_features = request.form.getlist("allowed_features")
@@ -522,6 +535,7 @@ def create_invite_route():
         ],
         "source": (request.form.get("source") or "oikotie").strip(),
         "allowed_features": allowed_features,
+        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -533,6 +547,7 @@ def create_invite_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             allowed_features=allowed_features,
+            trial=form_data["trial"],
         )
         db.session.commit()
     except InviteServiceError as exc:
@@ -542,6 +557,7 @@ def create_invite_route():
             "admin/customer_invite.html",
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
+            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 

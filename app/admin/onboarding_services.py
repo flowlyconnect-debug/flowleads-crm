@@ -108,6 +108,7 @@ def create_customer(
     min_confidence: int = 50,
     daily_lead_limit: int = 50,
     cities: list[str] | None = None,
+    trial: bool = False,
 ) -> CustomerOnboardingResult:
     """Create organization + admin + search profile in one go.
 
@@ -145,6 +146,10 @@ def create_customer(
     try:
         organization = create_organization(organization_name, org_slug)
         organization.is_active = is_active
+        if trial:
+            from app.billing.services import start_trial
+
+            start_trial(organization)  # app/billing: free trial, then the monthly contract
 
         admin_user = create_user(
             admin_email,

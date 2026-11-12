@@ -179,6 +179,15 @@ _MESSAGES: dict[str, str] = {
     "You cannot change your own role.": "Et voi vaihtaa omaa rooliasi.",
     "Password must be at least 12 characters.": "Salasanan pitää olla vähintään 12 merkkiä.",
     "Two-factor sign-in required.": "Kaksivaiheinen tunnistautuminen vaaditaan.",
+    # --- billing (app/billing) ---
+    "Choose a plan with a monthly price.": "Valitse paketti, jolla on kuukausihinta. Yritys-paketista sovitaan erikseen.",
+    "This plan is already in use.": "Tämä paketti on jo käytössä.",
+    "Only an active monthly contract can be cancelled.": "Vain voimassa olevan kuukausisopimuksen voi irtisanoa.",
+    "Only a cancelled contract that is still running can be resumed.": "Vain irtisanotun, vielä voimassa olevan sopimuksen voi jatkaa.",
+    "Unknown plan.": "Tuntematon paketti.",
+    "Unknown action.": "Tuntematon toiminto.",
+    "Name and company are required.": "Kirjoita nimesi ja yrityksesi nimi.",
+    "The subscription has ended.": "Kokeilujakso tai sopimus on päättynyt. Valitse kuukausisopimus Tilaus-sivulta jatkaaksesi.",
     # --- CRM export (app/integrations) ---
     "Unknown CRM.": "Tuntematon CRM-järjestelmä.",
     "The API token looks incomplete.": "API-avain näyttää vajaalta. Kopioi koko avain.",
