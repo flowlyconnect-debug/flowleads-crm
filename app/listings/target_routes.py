@@ -166,6 +166,9 @@ def index():
         current_params["profile_id"] = str(profile_id)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
+    from app.listings.fit_services import learn_preferences, score_matches
+
+    fits = score_matches(pagination.items, learn_preferences(organization_id, wanted_types))
     return render_template(
         "targets/index.html",
         saved_searches=saved_searches,
@@ -186,7 +189,7 @@ def index():
         transferred_leads=transferred_leads,
         assignees=assignees,
         transfer_sequences=sequences_for_transfer(organization_id) if TABS[tab] == "pending" else [],
-        rows=[target_row(match, wanted_types) for match in pagination.items],
+        rows=[target_row(match, wanted_types, fits.get(match.id)) for match in pagination.items],
         pagination=pagination,
         tab=tab,
         search=search,

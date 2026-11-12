@@ -112,6 +112,10 @@ def list_targets(
     query = _apply_target_filters(query, filters or {})
     newest = func.coalesce(Listing.published_at, Listing.first_seen_at)
     sort = (filters or {}).get("sort")
+    if sort not in {key for key, _ in SORT_OPTIONS}:
+        sort = ""
+    if sort == "":
+        return _list_by_fit(organization_id, query, page=page, per_page=per_page)
     if sort == "oldest":
         query = query.order_by(newest.asc(), Listing.id.asc())
     elif sort == "city":
@@ -123,10 +127,27 @@ def list_targets(
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
 
 
+def _list_by_fit(organization_id: int, query, *, page: int, per_page: int):
+    """"Sopivimmat ensin": every visible target scored (app/listings/fit_services.py),
+    best first, newest first among equals."""
+    from app.listings.fit_services import ListPage, learn_preferences, score_matches
+
+    matches = query.all()
+    prefs = learn_preferences(organization_id, organization_wanted_types(organization_id))
+    scores = score_matches(matches, prefs)
+
+    def key(match):
+        seen = match.listing.published_at or match.listing.first_seen_at
+        return (-scores[match.id][0], -(seen.timestamp() if seen else 0), -match.id)
+
+    return ListPage(sorted(matches, key=key), page, per_page)
+
+
 # Query-string keys of the Kohteet filter bar (kept across actions and pages).
 FILTER_KEYS = ("renovation", "region", "city", "year", "building", "contact", "sort")
 SORT_OPTIONS = (
-    ("", "Uusimmat ensin"),
+    ("", "Sopivimmat ensin"),
+    ("newest", "Uusimmat ensin"),
     ("oldest", "Vanhimmat ensin"),
     ("confidence", "Varmimmat ensin"),
     ("city", "Kaupungin mukaan"),
@@ -232,8 +253,9 @@ def target_filter_options(organization_id: int, status: str = "pending", filters
     }
 
 
-def target_row(match: ListingMatch, wanted_types: set[str] | None = None) -> dict:
-    """What the page shows for one target."""
+def target_row(match: ListingMatch, wanted_types: set[str] | None = None, fit: tuple | None = None) -> dict:
+    """What the page shows for one target. `fit` is (score, reasons) from
+    app/listings/fit_services.py."""
     listing = match.listing
     renovation = _best_renovation(match.profile, listing) if match.profile else None
     if renovation is None and listing.renovations:
@@ -254,6 +276,8 @@ def target_row(match: ListingMatch, wanted_types: set[str] | None = None) -> dic
         "renovation": renovation,
         "renovations": renovations,
         "seen_at": listing.published_at or listing.first_seen_at,
+        "fit": fit[0] if fit else None,
+        "fit_reasons": fit[1] if fit else [],
     }
 
 

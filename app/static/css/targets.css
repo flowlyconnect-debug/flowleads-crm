@@ -456,3 +456,23 @@
 .targets-save-form input[type=text] { height: 30px; width: 190px; font-size: 13px; padding: 0 10px; }
 .target-row__name a, .target-row__contact a { color: inherit; text-decoration: none; }
 .target-row__name a:hover, .target-row__contact a:hover { color: var(--color-primary, #6846DC); text-decoration: underline; }
+
+/* Sopivuus (app/listings/fit_services.py) */
+.target-fit {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.target-fit--high { background: #ECFDF3; color: #166534; }
+.target-fit--low { color: var(--color-text-muted, #6B7280); }
+
+.target-row__why {
+  margin: 2px 0 0;
+  color: var(--color-text-muted, #6B7280);
+  font-size: 12px;
+}

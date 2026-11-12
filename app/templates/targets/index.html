@@ -274,7 +274,14 @@
               <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a></span>
               {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
               {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
+              {% if row.fit is not none %}
+              <span class="target-fit{% if row.fit >= 75 %} target-fit--high{% elif row.fit < 45 %} target-fit--low{% endif %}"
+                    title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut.">Sopivuus {{ row.fit }}</span>
+              {% endif %}
             </div>
+            {% if row.fit_reasons %}
+            <p class="target-row__why">{{ row.fit_reasons[:3]|join(' · ') }}</p>
+            {% endif %}
             <div class="target-row__facts">
               {% for item in row.renovations %}
               <span class="target-row__reno">

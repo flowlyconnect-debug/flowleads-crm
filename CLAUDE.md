@@ -38,7 +38,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   (`fetch_targets()`), which releases a batch of varying size once per hour per organization. The page shows
   a 10-15 s progress animation; the batch gets a `released_at` that far in the future. `count_targets()` and
   everything built on it count released targets only; `count_reserve()` is the rest.
-- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
+- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the default sort
+  "Sopivimmat ensin" and the score chip come from `app/listings/fit_services.py`, which learns from the
+  organization's transferred and hidden targets, tests `tests/test_target_fit.py`) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
   `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner and start an email sequence
   for the new leads in the same action (`sequences_for_transfer()`, `enroll_transferred_leads()`; leads without
