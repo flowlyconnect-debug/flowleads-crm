@@ -1,6 +1,7 @@
 """Smoke tests for primary CRM UI pages."""
 
 from __future__ import annotations
+from app.core.permissions import TWO_FA_SESSION_KEY
 
 import pytest
 
@@ -27,6 +28,8 @@ def _login(client, email: str, password: str = "securepassword1") -> None:
         data={"email": email, "password": password},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
     assert response.status_code == 302
 
 

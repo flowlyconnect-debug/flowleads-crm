@@ -80,12 +80,23 @@ def _format_last_search(dt: datetime | None) -> str:
 
 def list_customers_summary() -> list[dict]:
     """One row per organization with ALL of its search profiles."""
-    from app.listings.target_services import count_targets
+    from sqlalchemy import func
+
+    from app.admin.models import CustomerInvite
+    from app.extensions import db
+    from app.listings.target_services import count_reserve, count_targets
 
     customers = []
     for org in get_accessible_organizations():
         profiles = list_profiles(org.id)
-        last_run = max((p.last_run_at for p in profiles if p.last_run_at), default=None)
+        # newest lead of the organization (profile.last_run_at is only set by
+        # the old automatic lead creation, so the column was always empty)
+        last_run = db.session.query(func.max(Lead.created_at)).filter(Lead.organization_id == org.id).scalar()
+        open_invite = (
+            CustomerInvite.query.filter_by(organization_id=org.id, accepted_at=None, revoked_at=None)
+            .order_by(CustomerInvite.id.desc())
+            .first()
+        )
         # targets waiting on the customer's Kohteet page
         pending = count_targets(org.id) if profiles else 0
         admin = (
@@ -101,6 +112,8 @@ def list_customers_summary() -> list[dict]:
                 "profile_is_active": first.is_active if first else None,
                 "lead_count": Lead.query.filter_by(organization_id=org.id).count(),
                 "pending_matches": pending,
+                "reserve_matches": count_reserve(org.id) if profiles else 0,
+                "open_invite": open_invite,
                 "last_search_label": _format_last_search(last_run),
                 "is_active": org.is_active,
                 "admin_email": admin.email if admin else None,

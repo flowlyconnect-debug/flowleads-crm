@@ -250,7 +250,14 @@ def preview_proposal(proposal_id: int):
         proposal = get_proposal_for_org(proposal_id, organization_id)
     except ProposalServiceError:
         abort(404)
-    html = ProposalPDFService.render_html(proposal)
+    # the same header, footer and logo as the PDF
+    template = ProposalService.get_template(proposal.organization_id)
+    html = ProposalPDFService.render_html(
+        proposal,
+        template_header=template.header_html if template else None,
+        template_footer=template.footer_html if template else None,
+        logo_url=template.logo_url if template else None,
+    )
     return Response(html, mimetype="text/html")
 
 
@@ -323,9 +330,6 @@ def register_proposal_settings_routes(settings_bp):
             form.proposal_default_tax_percent.data = settings.proposal_default_tax_percent
             form.proposal_default_notes.data = settings.proposal_default_notes
             if template:
-                form.default_valid_days.data = template.default_valid_days
-                form.default_tax_percent.data = template.default_tax_percent
-                form.default_notes.data = template.default_notes
                 form.header_html.data = template.header_html
                 form.footer_html.data = template.footer_html
                 form.logo_url.data = template.logo_url
@@ -343,9 +347,10 @@ def register_proposal_settings_routes(settings_bp):
                 ProposalService.save_template(
                     organization_id,
                     {
-                        "default_valid_days": form.default_valid_days.data or 30,
-                        "default_tax_percent": form.default_tax_percent.data or 25.5,
-                        "default_notes": form.default_notes.data,
+                        # the template's own defaults mirror the organization settings
+                        "default_valid_days": form.proposal_default_valid_days.data,
+                        "default_tax_percent": form.proposal_default_tax_percent.data,
+                        "default_notes": form.proposal_default_notes.data,
                         "header_html": form.header_html.data,
                         "footer_html": form.footer_html.data,
                         "logo_url": form.logo_url.data,
@@ -354,9 +359,12 @@ def register_proposal_settings_routes(settings_bp):
                 )
                 db.session.commit()
                 flash("Tarjousasetukset tallennettu.", "success")
-                return redirect(url_for("settings.proposals_settings"))
+                return redirect(url_for("settings.proposals_settings", **_org_query_suffix(organization_id)))
             except Exception as exc:
                 db.session.rollback()
                 flash(str(exc), "danger")
+        else:
+            errors = [e for field_errors in form.errors.values() for e in field_errors]
+            flash(errors[0] if errors else "Tarkista kentät.", "danger")
 
         return render_template("settings/proposals.html", form=form)

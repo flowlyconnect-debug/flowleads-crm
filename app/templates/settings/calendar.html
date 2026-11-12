@@ -34,10 +34,14 @@
         <pre id="calendar-test-result" class="form-code hidden mt-3" aria-live="polite"></pre>
         {% else %}
         <p class="form-helper mb-4">Ei aktiivista kalenteriyhteyttä.</p>
+        {% if google_ready or microsoft_ready %}
         <div class="form-actions">
-          <a class="btn btn-primary" href="{{ url_for('settings.calendar_connect_google') }}">Yhdistä Google Calendar</a>
-          <a class="btn btn-secondary" href="{{ url_for('settings.calendar_connect_microsoft') }}">Yhdistä Microsoft Outlook</a>
+          {% if google_ready %}<a class="btn btn-primary" href="{{ url_for('settings.calendar_connect_google') }}">Yhdistä Google Calendar</a>{% endif %}
+          {% if microsoft_ready %}<a class="btn btn-secondary" href="{{ url_for('settings.calendar_connect_microsoft') }}">Yhdistä Microsoft Outlook</a>{% endif %}
         </div>
+        {% else %}
+        <p class="form-helper">Kalenterin yhdistäminen (Google / Outlook) ei ole vielä käytössä. Tapaamiset ja tehtävät näkyvät FlowLeadsin omassa Kalenteri-näkymässä.</p>
+        {% endif %}
         {% endif %}
       </div>
     </div>

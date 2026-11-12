@@ -10,7 +10,7 @@
       <div class="settings-panel">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">API-avaimet</h1>
-          <p class="settings-panel__subtitle">Hallitse integraatioavaimia (esim. n8n).</p>
+          <p class="settings-panel__subtitle">Avaimet omille järjestelmillenne (esim. verkkosivun lomake tai Zapier), jotka lisäävät liidejä FlowLeadsin rajapinnan kautta. Jos ette käytä integraatioita, tätä ei tarvita.</p>
         </header>
 
         {% if has_pending_key %}
@@ -28,7 +28,7 @@
           <input type="hidden" name="organization_id" value="{{ organization_id }}">
           {% endif %}
           <label class="form-label" for="api-key-name">Nimi
-            <input type="text" id="api-key-name" name="name" class="form-input" maxlength="100" required placeholder="n8n production">
+            <input type="text" id="api-key-name" name="name" class="form-input" maxlength="100" required placeholder="esim. Verkkosivun lomake">
           </label>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Luo API-avain</button>
@@ -56,13 +56,13 @@
                 <td>{{ key.name }}</td>
                 <td><code>{{ key.key_prefix }}…</code></td>
                 <td>{{ 'kyllä' if key.is_active and not key.revoked_at else 'ei' }}</td>
-                <td>{{ key.last_used_at or '—' }}</td>
+                <td>{{ (key.last_used_at|helsinki).strftime('%d.%m.%Y %H.%M') if key.last_used_at else '—' }}</td>
                 <td>{{ key.expires_at or '—' }}</td>
                 <td>{{ key.request_count }}</td>
-                <td>{{ key.created_at }}</td>
+                <td>{{ (key.created_at|helsinki).strftime('%d.%m.%Y %H.%M') if key.created_at else '—' }}</td>
                 <td>
                   {% if key.is_active and not key.revoked_at %}
-                  <form method="post" action="{{ url_for('settings.revoke_api_key_route', key_id=key.id) }}" class="form-row-inline">
+                  <form method="post" action="{{ url_for('settings.revoke_api_key_route', key_id=key.id, **({'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {})) }}" class="form-row-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-secondary btn-sm">Peruuta</button>
                   </form>

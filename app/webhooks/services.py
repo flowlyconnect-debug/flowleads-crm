@@ -27,6 +27,17 @@ WEBHOOK_TIMEOUT_SECONDS = 10
 WEBHOOK_USER_AGENT = "FlowLeads-Webhooks/1.0"
 
 
+def crm_base_url() -> str:
+    """The CRM's public address for links in webhook messages."""
+    from flask import current_app
+
+    try:
+        base = (current_app.config.get("APP_BASE_URL") or "").strip()
+    except RuntimeError:
+        base = ""
+    return base.rstrip("/") or "https://flowleads-crm-zv0a.onrender.com"
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -105,7 +116,7 @@ class WebhookService:
             company = (lead.get("company") or "").strip() or "Lead"
             score = lead.get("score")
             source = lead.get("source") or "unknown"
-            crm_url = lead.get("crm_url") or "https://app.flowleads.fi"
+            crm_url = lead.get("crm_url") or crm_base_url()
             text = (
                 f"*Uusi liidi: {company}* 🎯\n"
                 f"*Kontakti:* {contact}\n"
@@ -136,7 +147,7 @@ class WebhookService:
 
         if provider == "teams":
             lead = (raw_payload.get("data") or {}).get("lead") or {}
-            crm_url = lead.get("crm_url") or "https://app.flowleads.fi"
+            crm_url = lead.get("crm_url") or crm_base_url()
             facts = [
                 {"title": "Event", "value": event_type},
                 {"title": "Lead", "value": lead.get("name") or lead.get("company") or "-"},
@@ -238,14 +249,20 @@ class WebhookService:
         status_code = None
         body_text = ""
         try:
+            from app.webhooks.url_safety import check_webhook_url
+
+            # checked again at send time: DNS may have changed since saving
+            check_webhook_url(url)
             response = requests.post(
                 url,
                 data=raw_body,
                 headers=headers,
                 timeout=WEBHOOK_TIMEOUT_SECONDS,
+                allow_redirects=False,
             )
             status_code = response.status_code
-            body_text = (response.text or "")[:5000]
+            # only a short excerpt is kept: the page shows it to the admin
+            body_text = (response.text or "")[:300]
             if 200 <= response.status_code < 300:
                 delivery.status = "delivered"
                 delivery.delivered_at = _utc_now()
@@ -256,7 +273,7 @@ class WebhookService:
                 endpoint.failure_count = (endpoint.failure_count or 0) + 1
         except Exception as exc:
             delivery.status = "failed"
-            body_text = str(exc)[:5000]
+            body_text = str(exc)[:300]
             endpoint.failure_count = (endpoint.failure_count or 0) + 1
         finally:
             delivery.response_status = status_code
@@ -308,7 +325,7 @@ class WebhookService:
                 "company": "Acme Corp",
                 "score": 82,
                 "source": "n8n",
-                "crm_url": "https://app.flowleads.fi/leads/123",
+                "crm_url": crm_base_url() + "/leads/123",
             }
         }
         payload = WebhookService.format_payload(

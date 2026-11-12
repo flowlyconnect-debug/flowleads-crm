@@ -58,6 +58,8 @@ def _validate_profile_fields(
 ) -> None:
     if not name or len(name) > 100:
         raise SearchProfileServiceError("Nimi on pakollinen (max 100 merkkiä).")
+    if not remonttityyppi:
+        raise SearchProfileServiceError("Valitse vähintään yksi remonttityyppi.")
     if remonttityyppi not in REMONTTITYYPIT:
         raise SearchProfileServiceError("Valitse kelvollinen remonttityyppi.")
     if not regions:
@@ -254,6 +256,11 @@ def build_profile(
     remonttityyppi = (remonttityyppi or "").strip()
     if not remonttityyppi and remonttityypit:
         remonttityyppi = next((t for t in remonttityypit if (t or "").strip()), "")
+    if not name and remonttityyppi:
+        # an empty name: the chosen urakat, like at onboarding
+        from app.admin.onboarding_services import default_profile_name
+
+        name = default_profile_name([t for t in (remonttityypit or [remonttityyppi]) if t])
     _validate_profile_fields(
         name=name,
         remonttityyppi=remonttityyppi,

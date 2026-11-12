@@ -39,7 +39,7 @@ def _profile(slug="imp-org", *, rtype="Putkiremontti", regions=("Pirkanmaa",), *
 
 def _row(**overrides):
     row = {
-        "taloyhtio": "As Oy Esimerkkikatu 1",
+        "taloyhtio": "As Oy Testikatu 1",
         "osoite": "Esimerkkikatu 1",
         "kaupunki": "Tampere",
         "maakunta": "Pirkanmaa",
@@ -68,7 +68,7 @@ def test_row_with_renovation_type_becomes_a_lead_immediately(app):
         lead = Lead.query.filter_by(organization_id=org.id).one()
         assert lead.source == "import"
         assert lead.source_ref == listing.source_ref
-        assert lead.company == "As Oy Esimerkkikatu 1"
+        assert lead.company == "As Oy Testikatu 1"
         assert lead.title.startswith("Isännöitsijä: Isännöinti Esimerkki Oy")
         assert lead.email == "isannointi@esimerkki.fi"
         assert ListingMatch.query.filter_by(profile_id=profile.id).one().status == "lead_created"
@@ -124,7 +124,7 @@ def test_text_only_row_waits_for_the_analyzer_without_a_page_fetch(app):
         assert len(claimed) == 1
         assert claimed[0]["fetch_detail"] is False
         assert claimed[0]["description"] == text
-        assert claimed[0]["taloyhtio"] == "As Oy Esimerkkikatu 1"
+        assert claimed[0]["taloyhtio"] == "As Oy Testikatu 1"
 
         saved = save_analysis(
             claimed[0]["listing_id"],
@@ -189,10 +189,17 @@ def test_csv_semicolon_and_windows_encoding(app):
     ]
 
 
-def test_csv_template_round_trips_through_the_importer(app):
+def test_csv_template_parses_but_its_examples_are_never_imported(app):
+    """The template's example rows must not reach real customers."""
     with app.app_context():
         _profile()
         rows = parse_listing_csv(("﻿" + csv_template()).encode("utf-8"))
+        assert len(rows) == 2 and rows[0]["remonttityyppi"] == "Putkiremontti"
+        result = import_listings(rows)
+        assert result["created"] == 0 and len(result["errors"]) == 2
+        # the same rows with a real name go in (one analysed, one queued)
+        for i, row in enumerate(rows):
+            row["taloyhtio"] = f"As Oy Oikea {i}"
         result = import_listings(rows)
         assert result["errors"] == []
         assert result["analysed"] == 1 and result["queued"] == 1 and result["leads_created"] == 1
@@ -247,9 +254,12 @@ def test_superadmin_csv_upload(app, client):
     template = client.get("/admin/catalogue/import-template.csv")
     assert template.status_code == 200 and b"maakunta" in template.data
 
+    real = template.data.replace("As Oy Esimerkkikatu 1".encode(), b"As Oy Oikea 1").replace(
+        "As Oy Mallitie 5".encode(), b"As Oy Oikea 2"
+    )
     response = client.post(
         "/admin/catalogue/import",
-        data={"file": (io.BytesIO(template.data), "kohteet.csv")},
+        data={"file": (io.BytesIO(real), "kohteet.csv")},
         content_type="multipart/form-data",
         follow_redirects=True,
     )

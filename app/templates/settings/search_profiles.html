@@ -112,7 +112,7 @@
                        placeholder="esim. Helsinki, Espoo, Vantaa"
                        value="{{ (selected_profile.cities or [])|join(', ') if selected_profile else '' }}">
               </label>
-              <p class="form-helper">Erota pilkulla. Tyhjä = kaikki valittujen alueiden kaupungit. Kirjoita nimi kuten Oikotiessä.</p>
+              <p class="form-helper">Erota pilkulla. Tyhjä = kaikki valittujen alueiden kaupungit. Kirjoita kaupungin nimi, esim. Espoo.</p>
               <datalist id="city-suggestions">
                 {% for city in city_suggestions %}<option value="{{ city }}">{% endfor %}
               </datalist>
@@ -312,14 +312,10 @@
           out.textContent = data.error || "Esikatselu epäonnistui.";
           return;
         }
-        let text = "Näillä ehdoilla katalogista löytyy nyt " + data.count + " osumaa viimeisen " +
-          data.history_days + " päivän kohteista.";
-        if (data.sample && data.sample.length) {
-          text += " Esim. " + data.sample.map(function (s) {
-            return s.osoite + " (" + s.kaupunki + ", " + s.confidence + " %)";
-          }).join("; ") + ".";
-        }
-        out.textContent = text;
+        // addresses are not shown: unreleased targets stay hidden until "Hae kohteita"
+        out.textContent = "Näillä ehdoilla sopivia kohteita on nyt " + data.count +
+          " (viimeisen " + data.history_days + " päivän kohteista, ilman jo siirrettyjä ja piilotettuja). " +
+          "Ne tulevat näkyviin Kohteet-sivulla Hae kohteita -painikkeella.";
       } catch (err) {
         out.textContent = "Esikatselu epäonnistui.";
       }

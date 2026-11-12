@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, SelectField, StringField, SubmitField
-from wtforms.validators import DataRequired, Length, Optional, URL
+from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
 
 from app.webhooks.models import WEBHOOK_PROVIDERS
 
@@ -18,4 +18,12 @@ class WebhookEndpointForm(FlaskForm):
     secret = StringField("Secret", validators=[Optional(), Length(max=1000)])
     is_active = BooleanField("Active", default=True)
     submit = SubmitField("Save")
+
+    def validate_url(self, field):
+        from app.webhooks.url_safety import UnsafeWebhookUrl, check_webhook_url
+
+        try:
+            check_webhook_url(field.data or "")
+        except UnsafeWebhookUrl as exc:
+            raise ValidationError(str(exc)) from exc
 

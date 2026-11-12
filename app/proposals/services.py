@@ -829,7 +829,8 @@ class ProposalService:
             db.session.add(template)
         template.default_valid_days = int(data.get("default_valid_days") or 30)
         template.default_notes = (data.get("default_notes") or "").strip() or None
-        template.default_tax_percent = _dec(data.get("default_tax_percent") or DEFAULT_TAX_PERCENT)
+        template_tax = data.get("default_tax_percent")
+        template.default_tax_percent = _dec(DEFAULT_TAX_PERCENT if template_tax in (None, "") else template_tax)
         template.header_html = (data.get("header_html") or "").strip() or None
         template.footer_html = (data.get("footer_html") or "").strip() or None
         if "logo_url" in data:
@@ -854,7 +855,9 @@ class ProposalService:
         if "proposal_default_valid_days" in data:
             settings.proposal_default_valid_days = int(data["proposal_default_valid_days"] or 30)
         if "proposal_default_tax_percent" in data:
-            settings.proposal_default_tax_percent = _dec(data["proposal_default_tax_percent"] or DEFAULT_TAX_PERCENT)
+            value = data["proposal_default_tax_percent"]
+            # 0 % is a real choice (reverse charge), only a missing value falls back
+            settings.proposal_default_tax_percent = _dec(DEFAULT_TAX_PERCENT if value in (None, "") else value)
         if "proposal_default_notes" in data:
             settings.proposal_default_notes = (data.get("proposal_default_notes") or "").strip() or None
         db.session.flush()

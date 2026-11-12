@@ -8,7 +8,7 @@
     <div class="settings-content">
 <div class="card settings-panel--wide">
   <h1>Varmuuskopiot</h1>
-  <p>Full backups include database dump, email templates, system settings (no secrets), and uploaded files.</p>
+  <p>Varmuuskopio sisältää tietokannan, sähköpostimallit, järjestelmäasetukset (ei salaisuuksia) ja ladatut tiedostot.</p>
 
   <form method="post" action="{{ url_for('backups.backups_create') }}" style="margin-bottom: 1.5rem;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -33,7 +33,7 @@
         <td>{{ (b.created_at|helsinki).strftime('%Y-%m-%d %H:%M') }}</td>
         <td>
           <a class="btn secondary" href="{{ url_for('backups.backups_download', filename=b.filename) }}">Lataa</a>
-          <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--danger); color: #fff;">Restore</a>
+          <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--danger); color: #fff;">Palauta</a>
         </td>
       </tr>
       {% endfor %}

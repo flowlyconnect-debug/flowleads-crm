@@ -175,6 +175,10 @@ _MESSAGES: dict[str, str] = {
     "2FA must be enabled for restore.": "Palautus vaatii kaksivaiheisen tunnistautumisen.",
     "BACKUP_S3_BUCKET is not configured.": "Varmuuskopioiden tallennuspaikkaa (BACKUP_S3_BUCKET) ei ole määritetty.",
     "You must confirm that you understand data will be overwritten.": "Vahvista, että ymmärrät nykyisten tietojen korvautuvan.",
+    "The organization must keep at least one active admin.": "Organisaatiolla pitää olla vähintään yksi aktiivinen ylläpitäjä.",
+    "You cannot change your own role.": "Et voi vaihtaa omaa rooliasi.",
+    "Password must be at least 12 characters.": "Salasanan pitää olla vähintään 12 merkkiä.",
+    "Two-factor sign-in required.": "Kaksivaiheinen tunnistautuminen vaaditaan.",
 }
 
 # Messages that carry a variable part: (English prefix, Finnish prefix).

@@ -172,3 +172,160 @@ def test_sent_invite_is_logged(app, client):
     assert "Kutsu lähti sähköpostilla" in page
     with app.app_context():
         assert AuditLog.query.filter_by(action="account_email_sent").count() == 1
+
+
+# --- settings audit fixes ---------------------------------------------------------
+
+
+def _admin(app, slug, role="admin"):
+    with app.app_context():
+        from app.users.services import create_organization
+
+        org = create_organization(f"Org {slug}", slug)
+        db.session.flush()
+        user = create_user(f"{role}-{slug}@test.com", PASSWORD, role=role, organization_id=org.id)
+        user.totp_enabled = True
+        db.session.commit()
+        return org.id, user.id, user.email
+
+
+def test_two_factor_is_required_on_every_page_for_admins(app, client):
+    org_id, _, email = _admin(app, "twofa")
+    client.post("/auth/login", data={"email": email, "password": PASSWORD})
+    for path in ("/settings/search-profiles", "/settings/proposals", "/targets", "/leads", "/settings/calendar"):
+        response = client.get(path)
+        assert response.status_code == 302 and "/auth/2fa" in response.headers["Location"], path
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+    assert client.get("/settings/search-profiles").status_code == 200
+
+
+def test_org_admin_manages_other_admins_but_keeps_one(app, client):
+    from app.users.services import UserServiceError, change_user_role, set_user_active
+
+    org_id, admin_id, _ = _admin(app, "admins")
+    with app.app_context():
+        admin = db.session.get(User, admin_id)
+        other = create_user("admin2-admins@test.com", PASSWORD, role="admin", organization_id=org_id)
+        db.session.commit()
+        set_user_active(other, False, actor=admin)  # allowed now
+        db.session.commit()
+        set_user_active(other, True, actor=admin)
+        change_user_role(other, "user", actor=admin)
+        db.session.commit()
+        assert other.role == "user"
+        try:
+            change_user_role(admin, "user", actor=admin)
+            raise AssertionError("own role")
+        except UserServiceError:
+            pass
+        # the last active admin cannot be removed by a superadmin either
+        sa = create_user("sa-admins@test.com", PASSWORD, role="superadmin")
+        db.session.commit()
+        try:
+            set_user_active(admin, False, actor=sa)
+            raise AssertionError("last admin")
+        except UserServiceError as exc:
+            assert exc.code == "last_admin"
+
+
+def test_webhook_url_must_be_public_https():
+    from app.webhooks.url_safety import UnsafeWebhookUrl, check_webhook_url
+
+    for bad in (
+        "http://hooks.example.com/x",
+        "https://169.254.169.254/latest/meta-data/",
+        "https://127.0.0.1/x",
+        "https://10.0.0.5/x",
+        "https://localhost/x",
+        "https://db.internal/x",
+    ):
+        try:
+            check_webhook_url(bad, resolve=False)
+            raise AssertionError(bad)
+        except UnsafeWebhookUrl:
+            pass
+    assert check_webhook_url("https://hooks.slack.com/services/x", resolve=False)
+
+
+def test_proposal_settings_accept_zero_vat_and_decimal_comma(app, client):
+    org_id, _, email = _admin(app, "vat")
+    client.post("/auth/login", data={"email": email, "password": PASSWORD})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+    from app.proposals.settings import get_proposal_settings
+
+    for value, expected in (("0", 0), ("25,5", 25.5)):
+        client.post(
+            "/settings/proposals",
+            data={"proposal_default_valid_days": "14", "proposal_default_tax_percent": value},
+        )
+        with app.app_context():
+            assert float(get_proposal_settings(org_id).proposal_default_tax_percent) == expected
+    page = client.post(
+        "/settings/proposals",
+        data={"proposal_default_valid_days": "0", "proposal_default_tax_percent": "24"},
+        follow_redirects=True,
+    ).get_data(as_text=True)
+    assert "Voimassaolo 1–365 päivää." in page
+
+
+def test_privacy_settings_validate_inputs(app, client):
+    org_id, _, email = _admin(app, "privacy")
+    client.post("/auth/login", data={"email": email, "password": PASSWORD})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+    from app.gdpr.settings import get_privacy_settings
+
+    page = client.post(
+        "/settings/privacy",
+        data={"gdpr_default_legal_basis": "legitimate_interest", "gdpr_retention_days": "1", "privacy_policy_url": ""},
+        follow_redirects=True,
+    ).get_data(as_text=True)
+    assert "Säilytysaika 180–3650 päivää." in page
+    client.post(
+        "/settings/privacy",
+        data={"gdpr_default_legal_basis": "consent", "gdpr_retention_days": "365", "privacy_policy_url": "javascript:alert(1)"},
+    )
+    with app.app_context():
+        assert get_privacy_settings(org_id).privacy_policy_url is None
+
+
+def test_organization_export_downloads_from_the_web_process(app, client):
+    org_id, _, email = _admin(app, "export")
+    client.post("/auth/login", data={"email": email, "password": PASSWORD})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
+    page = client.post("/settings/export/request", follow_redirects=True).get_data(as_text=True)
+    assert "Tietojen vienti on valmis" in page and "Lataa vienti" in page
+    with app.app_context():
+        from app.gdpr.models import DataExportRequest
+
+        req = DataExportRequest.query.filter_by(organization_id=org_id).one()
+        import os
+
+        os.remove(req.file_path)  # e.g. built before a redeploy
+        token = req.download_token
+    response = client.get(f"/settings/export/download/{token}")
+    assert response.status_code == 200 and response.mimetype == "application/zip"
+
+
+def test_new_lead_default_stage_and_webhook_from_kohteet(app):
+    from app.leads.models import PipelineStage
+    from app.streams.services import LeadRoutingService
+
+    with app.app_context():
+        actor = _superadmin()
+        a, _ = _with_data(actor)
+        org_id = a.organization.id
+        stages = PipelineStage.query.filter_by(organization_id=org_id).order_by(PipelineStage.order_index).all()
+        settings = LeadRoutingService.get_settings(org_id)
+        settings.default_pipeline_stage_id = stages[2].id
+        db.session.commit()
+        match = ListingMatch.query.filter_by(organization_id=org_id, status="pending").first()
+        with patch("app.webhooks.services.WebhookService.dispatch") as dispatch:
+            result = targets.transfer_targets(org_id, [match.id])
+        lead = db.session.get(Lead, result["lead_ids"][0])
+        assert lead.stage_id == stages[2].id
+        assert lead.region == match.listing.maakunta
+        assert [c.args[0] for c in dispatch.call_args_list] == ["lead.created"]

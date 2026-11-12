@@ -2,6 +2,7 @@
 
 from flask import (
     abort,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -21,6 +22,10 @@ from app.gdpr.services import GDPRService, GDPRServiceError
 from app.gdpr.settings import get_privacy_settings, privacy_settings_to_dict, update_privacy_settings
 from app.leads.permissions import resolve_organization_id
 from app.leads.services import get_lead_for_org, LeadServiceError
+
+
+def _org_kwargs(organization_id) -> dict:
+    return {"organization_id": organization_id} if current_user.is_superadmin() else {}
 
 
 def register_lead_gdpr_routes(leads_bp):
@@ -94,7 +99,10 @@ def register_settings_gdpr_routes(settings_bp):
 
         settings = get_privacy_settings(organization_id)
         form = PrivacySettingsForm()
-        if form.validate_on_submit():
+        if request.method == "POST" and not form.validate():
+            errors = [e for field_errors in form.errors.values() for e in field_errors]
+            flash(errors[0] if errors else "Tarkista kentät.", "danger")
+        elif form.validate_on_submit():
             update_privacy_settings(
                 organization_id,
                 {
@@ -102,8 +110,6 @@ def register_settings_gdpr_routes(settings_bp):
                     "gdpr_retention_days": form.gdpr_retention_days.data or 730,
                     "gdpr_auto_anonymize_inactive": request.form.get("gdpr_auto_anonymize_inactive") == "on",
                     "privacy_policy_url": form.privacy_policy_url.data,
-                    "data_controller_name": form.data_controller_name.data,
-                    "data_controller_email": form.data_controller_email.data,
                 },
             )
             db.session.commit()
@@ -111,17 +117,31 @@ def register_settings_gdpr_routes(settings_bp):
             return redirect(url_for("settings.privacy_settings", organization_id=organization_id))
 
         if request.method == "GET":
-            form.gdpr_default_legal_basis.data = settings.gdpr_default_legal_basis
-            form.gdpr_retention_days.data = str(settings.gdpr_retention_days or 730)
+            form.gdpr_default_legal_basis.data = settings.gdpr_default_legal_basis or "legitimate_interest"
+            form.gdpr_retention_days.data = settings.gdpr_retention_days or 730
             form.privacy_policy_url.data = settings.privacy_policy_url
-            form.data_controller_name.data = settings.data_controller_name
-            form.data_controller_email.data = settings.data_controller_email
 
+        from datetime import datetime, timezone
+
+        from app.gdpr.models import DataExportRequest
+
+        exports = (
+            DataExportRequest.query.filter(
+                DataExportRequest.organization_id == organization_id,
+                DataExportRequest.export_type == "organization",
+                DataExportRequest.status == "completed",
+                DataExportRequest.expires_at > datetime.now(timezone.utc),
+            )
+            .order_by(DataExportRequest.created_at.desc())
+            .limit(3)
+            .all()
+        )
         return render_template(
             "settings/privacy.html",
             form=form,
             settings=settings,
             organization_id=organization_id,
+            exports=exports,
         )
 
     @settings_bp.route("/export", methods=["GET"])
@@ -141,20 +161,22 @@ def register_settings_gdpr_routes(settings_bp):
     @login_required
     @require_role("admin", "superadmin")
     def gdpr_export_request():
-        organization_id = current_user.organization_id
+        # The ZIP is built right here in the web process: the scheduler's disk
+        # (where the background job used to write it) is not visible to the
+        # web service on Render, so those downloads never worked.
+        organization_id = resolve_organization_id()
         try:
             req = DataExportService.create_organization_export_request(
                 organization_id, current_user.id
             )
+            DataExportService._process_single_export(req)
             db.session.commit()
-            flash(
-                "Organisaation tietojen vienti käynnistetty. Saat sähköpostiin latauslinkin kun valmis.",
-                "success",
-            )
+            flash("Tietojen vienti on valmis. Lataa ZIP alta (linkki on voimassa 48 tuntia).", "success")
         except Exception:
             db.session.rollback()
+            current_app.logger.exception("Organization export failed for org=%s", organization_id)
             flash("Viennin luonti epäonnistui.", "danger")
-        return redirect(url_for("settings.privacy_settings"))
+        return redirect(url_for("settings.privacy_settings", **_org_kwargs(organization_id)))
 
     @settings_bp.route("/export/download/<token>", methods=["GET"])
     @login_required
@@ -169,6 +191,7 @@ def register_settings_gdpr_routes(settings_bp):
         if req.organization_id != current_user.organization_id and not current_user.is_superadmin():
             abort(403)
 
+        db.session.commit()  # a rebuilt ZIP's new path
         return send_file(
             req.file_path,
             as_attachment=True,

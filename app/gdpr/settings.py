@@ -21,19 +21,22 @@ def privacy_settings_to_dict(settings: OrganizationSettings) -> dict:
 def update_privacy_settings(organization_id: int, data: dict) -> OrganizationSettings:
     settings = get_organization_settings(organization_id)
     if "gdpr_default_legal_basis" in data:
-        val = data.get("gdpr_default_legal_basis")
-        settings.gdpr_default_legal_basis = (val or "").strip() or None
+        val = (data.get("gdpr_default_legal_basis") or "").strip()
+        if val and val not in ("legitimate_interest", "consent", "contract"):
+            val = "legitimate_interest"
+        settings.gdpr_default_legal_basis = val or None
     if "gdpr_retention_days" in data:
         try:
             days = int(data.get("gdpr_retention_days") or 730)
         except (TypeError, ValueError):
             days = 730
-        settings.gdpr_retention_days = max(1, min(days, 3650))
+        # never shorter than 180 days: the monthly job anonymizes irreversibly
+        settings.gdpr_retention_days = max(180, min(days, 3650))
     if "gdpr_auto_anonymize_inactive" in data:
         settings.gdpr_auto_anonymize_inactive = bool(data.get("gdpr_auto_anonymize_inactive"))
     if "privacy_policy_url" in data:
-        val = data.get("privacy_policy_url")
-        settings.privacy_policy_url = (val or "").strip()[:500] or None
+        val = (data.get("privacy_policy_url") or "").strip()[:500]
+        settings.privacy_policy_url = val if val.lower().startswith("https://") else None
     if "data_controller_name" in data:
         val = data.get("data_controller_name")
         settings.data_controller_name = (val or "").strip()[:255] or None

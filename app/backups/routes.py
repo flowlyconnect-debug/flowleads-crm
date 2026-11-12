@@ -68,7 +68,11 @@ def backups_download(filename: str):
 @require_2fa
 def backups_restore(filename: str):
     form = RestoreBackupForm()
-    if not backup_exists(filename):
+    try:
+        exists = backup_exists(filename)
+    except BackupServiceError:
+        exists = False  # an invalid name, e.g. a hand-typed URL
+    if not exists:
         flash("Backup file not found.", "danger")
         return redirect(url_for("backups.backups_list"))
 

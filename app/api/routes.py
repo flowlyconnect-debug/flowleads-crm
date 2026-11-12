@@ -125,7 +125,9 @@ def create_lead():
     try:
         lead, action = upsert_lead(g.organization_id, payload)
         settings = LeadRoutingService.get_settings(g.organization_id)
-        LeadRoutingService.apply_to_lead(lead, settings)
+        if action == "created":
+            # defaults and counters are for new leads; an update keeps its stage and tags
+            LeadRoutingService.apply_to_lead(lead, settings, new=True)
         if not lead.stage_id:
             fallback = LeadRoutingService.get_fallback_stage(g.organization_id)
             if fallback:
@@ -143,6 +145,10 @@ def create_lead():
         )
         if action == "created":
             record_job_token_lead(getattr(g, "n8n_job_id", None), created=1)
+            from app.leads.services import announce_new_lead
+
+            db.session.flush()
+            announce_new_lead(lead, g.organization_id)
         db.session.commit()
     except ApiServiceError as exc:
         db.session.rollback()

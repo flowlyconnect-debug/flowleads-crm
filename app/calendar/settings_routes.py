@@ -18,6 +18,25 @@ def _oauth_serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="calendar-oauth")
 
 
+def provider_ready(provider: str) -> bool:
+    """OAuth keys exist for the provider (GOOGLE_* / MICROSOFT_* env vars)."""
+    from flask import current_app
+
+    prefix = "GOOGLE" if provider == "google" else "MICROSOFT"
+    return all(
+        (current_app.config.get(f"{prefix}_{key}") or "").strip()
+        for key in ("CLIENT_ID", "CLIENT_SECRET", "REDIRECT_URI")
+    )
+
+
+def _oauth_failed(label: str, exc: Exception) -> None:
+    """Log the technical reason, show the user a plain message."""
+    from flask import current_app
+
+    current_app.logger.warning("Calendar %s failed: %s", label, exc)
+    flash(f"{label}-yhteys epäonnistui. Yritä uudelleen hetken kuluttua.", "danger")
+
+
 def register_calendar_settings_routes(settings_bp):
     @settings_bp.route("/calendar", methods=["GET"])
     @login_required
@@ -29,19 +48,24 @@ def register_calendar_settings_routes(settings_bp):
         return render_template(
             "settings/calendar.html",
             connection=connection,
+            google_ready=provider_ready("google"),
+            microsoft_ready=provider_ready("microsoft"),
         )
 
     @settings_bp.route("/calendar/connect/google", methods=["GET"])
     @login_required
     @require_role("admin", "superadmin", "user")
     def calendar_connect_google():
+        if not provider_ready("google"):
+            flash("Google Calendar -liitos ei ole vielä käytössä tässä palvelussa.", "warning")
+            return redirect(url_for("settings.calendar_settings"))
         signed = _oauth_serializer().dumps(
             {"user_id": current_user.id, "provider": "google"}
         )
         try:
             auth_url = GoogleCalendarProvider.get_authorization_url(signed)
         except Exception as exc:
-            flash(f"Google Calendar -yhteys epäonnistui: {exc}", "danger")
+            _oauth_failed("Google Calendar", exc)
             return redirect(url_for("settings.calendar_settings"))
         return redirect(auth_url)
 
@@ -84,20 +108,23 @@ def register_calendar_settings_routes(settings_bp):
             flash("Google Calendar yhdistetty.", "success")
         except Exception as exc:
             db.session.rollback()
-            flash(f"Google Calendar -yhteys epäonnistui: {exc}", "danger")
+            _oauth_failed("Google Calendar", exc)
         return redirect(url_for("settings.calendar_settings"))
 
     @settings_bp.route("/calendar/connect/microsoft", methods=["GET"])
     @login_required
     @require_role("admin", "superadmin", "user")
     def calendar_connect_microsoft():
+        if not provider_ready("microsoft"):
+            flash("Microsoft Outlook -liitos ei ole vielä käytössä tässä palvelussa.", "warning")
+            return redirect(url_for("settings.calendar_settings"))
         signed = _oauth_serializer().dumps(
             {"user_id": current_user.id, "provider": "microsoft"}
         )
         try:
             auth_url = MicrosoftCalendarProvider.get_authorization_url(signed)
         except Exception as exc:
-            flash(f"Microsoft Outlook -yhteys epäonnistui: {exc}", "danger")
+            _oauth_failed("Microsoft Outlook", exc)
             return redirect(url_for("settings.calendar_settings"))
         return redirect(auth_url)
 
@@ -140,7 +167,7 @@ def register_calendar_settings_routes(settings_bp):
             flash("Microsoft Outlook yhdistetty.", "success")
         except Exception as exc:
             db.session.rollback()
-            flash(f"Microsoft Outlook -yhteys epäonnistui: {exc}", "danger")
+            _oauth_failed("Microsoft Outlook", exc)
         return redirect(url_for("settings.calendar_settings"))
 
     @settings_bp.route("/calendar/disconnect", methods=["POST"])
@@ -153,7 +180,7 @@ def register_calendar_settings_routes(settings_bp):
             flash("Kalenteriyhteys katkaistu.", "success")
         except Exception as exc:
             db.session.rollback()
-            flash(f"Yhteyden katkaisu epäonnistui: {exc}", "danger")
+            _oauth_failed("Kalenterin katkaisu", exc)
         return redirect(url_for("settings.calendar_settings"))
 
     @settings_bp.route("/calendar/test", methods=["GET"])
@@ -164,7 +191,7 @@ def register_calendar_settings_routes(settings_bp):
             current_user.id, current_user.organization_id
         )
         if not connection:
-            return jsonify({"success": False, "error": "no_connection", "calendars": []}), 400
+            return jsonify({"success": False, "error": "no_connection", "message": "Kalenteria ei ole yhdistetty.", "calendars": []}), 400
         try:
             calendars = CalendarService.test_connection(connection)
             db.session.commit()
@@ -174,4 +201,4 @@ def register_calendar_settings_routes(settings_bp):
             return jsonify({"success": False, "error": exc.code, "message": exc.message}), 400
         except Exception as exc:
             db.session.rollback()
-            return jsonify({"success": False, "error": "provider_error", "message": str(exc)}), 500
+            return jsonify({"success": False, "error": "provider_error", "message": "Kalenteripalvelu ei vastannut. Yritä myöhemmin uudelleen."}), 500

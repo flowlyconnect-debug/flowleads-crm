@@ -750,6 +750,8 @@ def test_admin_can_create_own_org_key(client, app):
         "/auth/login",
         data={"email": ctx["admin_email"], "password": "securepassword1"},
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.post(
         "/settings/api-keys",
         data={"name": "n8n prod"},
@@ -799,6 +801,8 @@ def test_normal_user_cannot_create_key(client, app):
         "/auth/login",
         data={"email": ctx["user_email"], "password": "securepassword1"},
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/settings/api-keys")
     assert response.status_code == 403
 
@@ -809,6 +813,8 @@ def test_admin_can_open_streams_settings(client, app):
         "/auth/login",
         data={"email": ctx["admin_email"], "password": "securepassword1"},
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/settings/streams")
     assert response.status_code == 302
     assert "/settings/leads" in response.headers.get("Location", "")
@@ -848,6 +854,8 @@ def test_full_key_shown_only_once(client, app):
         "/auth/login",
         data={"email": ctx["admin_email"], "password": "securepassword1"},
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     first = client.post(
         "/settings/api-keys",
         data={"name": "once"},

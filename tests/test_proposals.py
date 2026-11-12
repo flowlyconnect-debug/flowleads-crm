@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.core.permissions import TWO_FA_SESSION_KEY
 
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -52,6 +53,8 @@ def _setup_org(app, slug="prop-org"):
 def _login(client, email):
     r = client.post("/auth/login", data={"email": email, "password": "securepassword1"})
     assert r.status_code == 302
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
 
 
 def _create_lead(app, org_id, stage_id, email="lead@test.com", **kwargs):

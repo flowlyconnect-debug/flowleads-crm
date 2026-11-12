@@ -125,6 +125,27 @@ def set_customer_active_route(organization_id: int):
     if organization is None:
         abort(404)
     organization.is_active = request.form.get("active") == "1"
+    reactivated_users = 0
+    if organization.is_active:
+        # A customer created as inactive also had its admin and profiles
+        # switched off; "Ota käyttöön" turns the whole customer on. Users an
+        # admin deactivated later are left alone (an audit entry exists).
+        from app.core.audit import AuditLog
+        from app.search.models import SearchProfile
+        from app.search.profile_services import activate_profile
+        from app.users.models import User
+
+        deactivated_by_hand = {
+            row.target_id
+            for row in AuditLog.query.filter_by(action="user_deactivated", organization_id=organization.id)
+        }
+        for user in User.query.filter_by(organization_id=organization.id, is_active=False):
+            if user.id not in deactivated_by_hand:
+                user.is_active = True
+                reactivated_users += 1
+        if reactivated_users:
+            for profile in SearchProfile.query.filter_by(organization_id=organization.id, is_active=False):
+                activate_profile(profile)
     log_audit(
         "organization_activated" if organization.is_active else "organization_deactivated",
         user_id=current_user.id,
@@ -134,7 +155,9 @@ def set_customer_active_route(organization_id: int):
     )
     db.session.commit()
     flash(
-        f"{organization.name}: " + ("otettu käyttöön." if organization.is_active else "poistettu käytöstä."),
+        f"{organization.name}: "
+        + ("otettu käyttöön" if organization.is_active else "poistettu käytöstä")
+        + (f" ({reactivated_users} käyttäjää aktivoitu)." if reactivated_users else "."),
         "success",
     )
     return redirect(url_for("admin.customers_list"))
@@ -184,7 +207,6 @@ AUDIT_ACTION_LABELS_FI = {
     "login_failed": "Epäonnistunut kirjautuminen",
     "logout": "Uloskirjautuminen",
     "customer_invited": "Asiakas kutsuttu",
-    "customer_created": "Asiakas luotu",
     "targets_transferred": "Kohteita siirretty liideiksi",
     "targets_fetched": "Kohteita haettu (Hae kohteita)",
     "leads_imported": "Liidejä tuotu tiedostosta",
@@ -201,6 +223,50 @@ AUDIT_ACTION_LABELS_FI = {
     "email_template_updated": "Sähköpostimalli muokattu",
     "api_key_created": "API-avain luotu",
     "api_key_revoked": "API-avain poistettu käytöstä",
+    "customer_onboarded": "Asiakas luotu",
+    "customer_invite_accepted": "Asiakas hyväksyi kutsun",
+    "customer_invite_renewed": "Asiakaskutsu uusittu",
+    "organization_deleted": "Organisaatio poistettu pysyvästi",
+    "organization_features_updated": "Asiakkaan toiminnot muutettu",
+    "source_activated": "Hakuprofiili aktivoitu",
+    "catalogue_import": "Kohteita tuotu katalogiin",
+    "catalogue_alert_sent": "Katalogihälytys lähetetty",
+    "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",
+    "account_email_failed": "Tiliviestin lähetys epäonnistui",
+    "email_test_sent": "Testiviesti lähetetty",
+    "email_test_failed": "Testiviestin lähetys epäonnistui",
+    "email_sent": "Sähköposti lähetetty liidille",
+    "email_failed": "Sähköposti liidille epäonnistui",
+    "email_reply_received": "Vastaus saapui",
+    "email_webhook_received": "Mailgun-tapahtuma",
+    "email_settings_updated": "Sähköpostiasetukset muutettu",
+    "email_template_deleted": "Sähköpostimalli poistettu",
+    "mailgun_domain_registered": "Lähetysdomain rekisteröity",
+    "mailgun_domain_verified": "Lähetysdomain tarkistettu",
+    "user_created": "Käyttäjä luotu",
+    "user_deleted": "Käyttäjä poistettu",
+    "user_activated": "Käyttäjä aktivoitu",
+    "user_deactivated": "Käyttäjä poistettu käytöstä",
+    "role_changed": "Rooli vaihdettu",
+    "password_changed": "Salasana vaihdettu",
+    "2fa_enabled": "2FA otettu käyttöön",
+    "2fa_backup_code_used": "2FA-varakoodi käytetty",
+    "lead_created": "Liidi luotu",
+    "lead_updated": "Liidi muokattu",
+    "lead_lost": "Liidi merkitty hävityksi",
+    "lead_routing_applied": "Uuden liidin oletukset asetettu",
+    "lead_settings_updated": "Liidien oletukset muutettu",
+    "search_profile_created": "Hakuprofiili luotu",
+    "search_profile_updated": "Hakuprofiili muokattu",
+    "search_profile_deleted": "Hakuprofiili poistettu",
+    "search_test_job_created": "Testihaku luotu (vanha)",
+    "proposal_accepted": "Tarjous hyväksytty",
+    "gdpr_anonymization_requested": "Anonymisointi pyydetty",
+    "gdpr_consent_given": "Suostumus annettu",
+    "gdpr_data_exported": "Tiedot viety",
+    "gdpr_retention_anonymized": "Säilytysajan ylittäneet anonymisoitu",
+    "backup_restored": "Varmuuskopio palautettu",
+    "backup_restore_failed": "Varmuuskopion palautus epäonnistui",
 }
 
 
@@ -407,6 +473,7 @@ def fi_email_error(error: str | None) -> str | None:
 
 
 def _send_invite_and_store_result(*, organization, invite, token) -> None:
+    from app import to_helsinki
     from app.admin.models import INVITE_DEFAULT_TTL_DAYS
     from app.email.services import EmailService
 
@@ -424,7 +491,7 @@ def _send_invite_and_store_result(*, organization, invite, token) -> None:
             "email_sent": bool(sent and sent.get("success")),
             "email_error": fi_email_error((sent or {}).get("error")),
             "invite_url": invite_url,
-            "expires_at_label": invite.expires_at.strftime("%d.%m.%Y %H:%M UTC"),
+            "expires_at_label": to_helsinki(invite.expires_at).strftime("%d.%m.%Y klo %H.%M"),
         }
     )
 
@@ -504,6 +571,9 @@ def renew_invite_route(invite_id: int):
     invite = db.session.get(CustomerInvite, invite_id)
     if invite is None:
         abort(404)
+    if invite.accepted_at is not None:
+        flash("Kutsu on jo hyväksytty: asiakkaalla on tunnukset.", "info")
+        return redirect(url_for("admin.customers_list"))
 
     result = renew_invite(invite, actor=current_user)
     db.session.commit()
@@ -525,8 +595,8 @@ def activate_source_route(profile_id: int):
         activate_source(profile, actor=current_user)
         db.session.commit()
         flash(
-            f"Hakuprofiili aktivoitu: {profile.name}. Osumat katalogin viime viikoilta "
-            "ilmestyvät asiakkaan Kohteet-sivulle noin 10 minuutin kuluessa.",
+            f"Hakuprofiili aktivoitu: {profile.name}. Osumat ovat asiakkaan haettavissa "
+            "Kohteet-sivun Hae kohteita -painikkeella noin 10 minuutin kuluttua.",
             "success",
         )
     except InviteServiceError as exc:
@@ -635,7 +705,7 @@ def catalogue_import_template():
     # BOM so Excel opens the file as UTF-8
     return Response(
         "﻿" + csv_template(),
-        mimetype="text/csv; charset=utf-8",
+        mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=flowleads-kohteet-malli.csv"},
     )
 

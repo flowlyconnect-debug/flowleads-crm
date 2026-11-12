@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from app.core.permissions import TWO_FA_SESSION_KEY
 
 from app.ai.services import apply_score_tags
 from app.extensions import db
@@ -53,6 +54,8 @@ def _login(client, email):
         data={"email": email, "password": "securepassword1"},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
     assert response.status_code == 302
 
 
@@ -376,6 +379,8 @@ def test_superadmin_can_switch_organization_on_lead_settings(client, app):
         db.session.commit()
 
     client.post("/auth/login", data={"email": "sa-leads-switch@test.com", "password": "securepassword1"})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get(f"/settings/leads?organization_id={org_id}")
     assert response.status_code == 200
 
@@ -386,6 +391,8 @@ def test_lead_settings_404_for_nonexistent_organization(client, app):
         db.session.commit()
 
     client.post("/auth/login", data={"email": "sa-leads-404@test.com", "password": "securepassword1"})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/settings/leads?organization_id=999999")
     # an unknown organization sends the superadmin back to the organization picker
     assert response.status_code == 302

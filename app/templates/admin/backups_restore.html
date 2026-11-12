@@ -1,12 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Restore backup — FlowLeads{% endblock %}
+{% block title %}Palauta varmuuskopio — FlowLeads{% endblock %}
 {% block content %}
 <div class="card">
   <h1>Palauta varmuuskopio</h1>
   <div class="flash danger">
-    <strong>Danger:</strong> Restoring <code>{{ filename }}</code> will overwrite the current database and uploaded files.
-    A safety backup is created automatically before restore begins.
-    This action requires your password and 2FA code.
+    <strong>Vaara:</strong> varmuuskopion <code>{{ filename }}</code> palautus korvaa nykyisen tietokannan ja ladatut tiedostot.
+    Ennen palautusta otetaan automaattisesti turvakopio. Palautus vaatii salasanasi ja 2FA-koodin.
   </div>
 
   <form method="post">

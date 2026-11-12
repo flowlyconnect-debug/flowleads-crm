@@ -469,5 +469,10 @@ class DataExportService:
         if req.status != "completed" or not req.file_path:
             raise DataExportServiceError("Export is not ready.", "not_ready")
         if not os.path.isfile(req.file_path):
-            raise DataExportServiceError("Export file missing.", "not_found")
+            if req.export_type != "organization":
+                raise DataExportServiceError("Export file missing.", "not_found")
+            # built on another machine (the scheduler) or before a redeploy:
+            # the web process builds the organization ZIP again
+            req.file_path = str(DataExportService.build_organization_zip(req.organization_id))
+            db.session.flush()
         return req

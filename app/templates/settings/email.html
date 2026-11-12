@@ -9,7 +9,7 @@
       <div class="settings-panel">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Sähköpostiasetukset</h1>
-          <p class="settings-panel__subtitle">Lähettäjän tiedot ja Mailgun-verkkotunnus. Varmista, että lähettäjä on vahvistettu Mailgunissa.</p>
+          <p class="settings-panel__subtitle">Millä nimellä ja osoitteella liideille lähetetyt sähköpostit lähtevät.</p>
         </header>
 
         <form method="post" action="{{ url_for('settings.email_settings', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_settings') }}">
@@ -24,10 +24,12 @@
             <label class="form-label">{{ form.email_from_email.label.text }}
               {{ form.email_from_email(placeholder='myynti@domain.com', class='form-input') }}
             </label>
-            <label class="form-label">{{ form.mailgun_domain.label.text }}
+            <p class="form-helper">Viestit lähtevät nimelläsi. Oma osoitteesi on lähettäjänä vasta, kun yrityksesi lähetysdomain on vahvistettu; siihen asti viestit lähtevät FlowLeadsin osoitteesta ja vastaukset tulevat sinun osoitteeseesi.</p>
+            {% if current_user.is_superadmin() %}
+            <label class="form-label">{{ form.mailgun_domain.label.text }} (vain ylläpito)
               {{ form.mailgun_domain(placeholder='mg.domain.com', class='form-input') }}
             </label>
-            <p class="form-helper">Organisaatiokohtaisia Mailgun API-avaimia ei tallenneta ennen salausimplementaatiota; järjestelmän Mailgun-avainta käytetään.</p>
+            {% endif %}
           </div>
           <div class="form-actions form-actions--sticky">
             {{ form.submit(class_='btn btn-primary') }}
@@ -42,16 +44,18 @@
           {% else %}
           <p class="form-helper">
             Domain <code>{{ organization.mailgun_domain }}</code> ei ole vielä vahvistettu. Myyntisähköposti
-            lähtee toistaiseksi FlowLeadsin jaetulta domainilta (From-nimi/-osoite näyttävät kuitenkin omasi).
+            lähtee toistaiseksi FlowLeadsin osoitteesta nimelläsi, ja vastaukset tulevat omaan osoitteeseesi.
           </p>
           {% endif %}
 
           <div style="display:flex;gap:0.75rem;margin-top:0.75rem;">
-            <form method="post" action="{{ url_for('settings.email_domain_register', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_domain_register') }}">
+            {% if current_user.is_superadmin() %}
+            <form method="post" action="{{ url_for('settings.email_domain_register', organization_id=organization_id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              {% if current_user.is_superadmin() %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
+              <input type="hidden" name="organization_id" value="{{ organization_id }}">
               <button type="submit" class="btn btn-secondary btn-sm">Rekisteröi Mailguniin</button>
             </form>
+            {% endif %}
             <form method="post" action="{{ url_for('settings.email_domain_verify', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_domain_verify') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               {% if current_user.is_superadmin() %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}

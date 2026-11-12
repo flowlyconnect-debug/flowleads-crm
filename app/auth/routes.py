@@ -88,6 +88,42 @@ def _force_password_change():
     return redirect(url_for("auth.change_password_route"))
 
 
+# Pages a signed-in admin may open before finishing two-factor sign-in.
+_TWO_FA_EXEMPT_PREFIXES = (
+    "auth.",
+    "invite.",
+    "proposals_public.",
+    "forms_public",
+    "api.",  # API keys
+    "n8n_search.",
+    "listings_n8n.",
+    "webhooks.",  # Mailgun events
+)
+
+
+@auth_bp.before_app_request
+def _force_two_factor():
+    """Admins and superadmins must complete 2FA before ANY page. This used to
+    be a per-view decorator, and views without it (search profiles, proposal
+    and calendar settings, Kohteet, leads...) opened with the password alone."""
+    if not current_user.is_authenticated or not current_user.requires_mandatory_2fa():
+        return None
+    from app.core.permissions import is_2fa_verified
+
+    if is_2fa_verified():
+        return None
+    endpoint = request.endpoint or ""
+    if endpoint == "static" or endpoint.startswith(_TWO_FA_EXEMPT_PREFIXES):
+        return None
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        from flask import jsonify
+
+        return jsonify({"success": False, "error": {"code": "two_factor_required", "message": "Two-factor sign-in required."}}), 401
+    if not current_user.totp_enabled:
+        return redirect(url_for("auth.two_fa_setup"))
+    return redirect(url_for("auth.two_fa_verify", next=request.full_path if request.method == "GET" else None))
+
+
 @auth_bp.app_context_processor
 def _inject_feature_helpers():
     from app.core.features import current_user_has_feature

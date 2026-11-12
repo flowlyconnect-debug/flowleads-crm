@@ -38,8 +38,16 @@
                 {% if not row.is_active %}<span class="badge badge-inactive">Ei aktiivinen</span>{% endif %}
                 {% if row.admin_email %}
                 <div class="text-muted text-sm">{{ row.admin_email }}</div>
+                {% elif row.open_invite %}
+                <div class="text-muted text-sm">
+                  Kutsu lähetetty {{ row.open_invite.email }}, ei vielä hyväksytty{% if not row.open_invite.is_valid() %} (vanhentunut){% endif %}
+                  <form method="post" action="{{ url_for('admin.renew_invite_route', invite_id=row.open_invite.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Lähetä uusi kutsu</button>
+                  </form>
+                </div>
                 {% else %}
-                <div class="text-muted text-sm">Kutsua ei ole vielä hyväksytty</div>
+                <div class="text-muted text-sm">Ei käyttäjiä</div>
                 {% endif %}
                 {% if row.password_pending %}
                 <div class="text-muted text-sm">Väliaikainen salasana vaihtamatta</div>
@@ -66,7 +74,7 @@
               <td>
                 {{ row.lead_count }}
                 <div class="text-muted text-sm">
-                  <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>
+                  <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>{% if row.reserve_matches %}, {{ row.reserve_matches }} varastossa{% endif %}
                 </div>
               </td>
               <td>{{ row.last_search_label }}</td>
@@ -88,7 +96,8 @@
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', organization_id=row.org.id) }}">Muokkaa</a>
                 <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.team_members', organization_id=row.org.id) }}">Käyttäjät</a>
                 <form method="post" action="{{ url_for('admin.set_customer_active_route', organization_id=row.org.id) }}" style="display:inline;"
-                      {% if row.org.is_active %}onsubmit="return confirm('Poistetaanko {{ row.org.name|e }} käytöstä? Sen käyttäjät eivät pääse kirjautumaan. Tiedot säilyvät.');"{% endif %}>
+                      data-name="{{ row.org.name }}"
+                      {% if row.org.is_active %}onsubmit="return confirm('Poistetaanko ' + this.dataset.name + ' käytöstä? Sen käyttäjät eivät pääse kirjautumaan. Tiedot säilyvät.');"{% endif %}>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <input type="hidden" name="active" value="{{ '0' if row.org.is_active else '1' }}">
                   <button type="submit" class="btn btn-secondary btn-sm">{{ 'Poista käytöstä' if row.org.is_active else 'Ota käyttöön' }}</button>
