@@ -108,7 +108,9 @@
   color: var(--color-text-muted);
 }
 
-.target-row__contact-ok { color: var(--color-success-emphasis); }
+.target-row__contact-ok { color: var(--color-success-emphasis); margin-left: 6px; }
+.target-row__reno { display: inline-flex; align-items: center; gap: 6px; }
+.target-row__fact--strong { color: var(--color-text-primary); font-weight: 600; }
 
 .target-row__more {
   margin-top: 6px;

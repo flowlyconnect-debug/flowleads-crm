@@ -52,7 +52,7 @@ class SearchProfile(db.Model):
     # profile's remonttityyppi; daily_lead_limit caps leads created per UTC day
     # (0 = unlimited); needs_rematch makes the scheduler rebuild matches after
     # the filter changes.
-    min_confidence: Mapped[int] = mapped_column(Integer, default=60, server_default="60", nullable=False)
+    min_confidence: Mapped[int] = mapped_column(Integer, default=50, server_default="50", nullable=False)
     daily_lead_limit: Mapped[int] = mapped_column(Integer, default=50, server_default="50", nullable=False)
     needs_rematch: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=sa.true(), nullable=False

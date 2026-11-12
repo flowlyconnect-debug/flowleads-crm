@@ -80,8 +80,9 @@ def create_invite(
     actor: User,
     organization_name: str,
     admin_email: str,
-    search_profile_name: str,
-    remonttityyppi: str,
+    search_profile_name: str | None = None,
+    remonttityyppi: str | None = None,
+    remonttityypit: list[str] | None = None,
     source: str = "oikotie",
     allowed_features: list[str] | None = None,
     slug: str | None = None,
@@ -104,12 +105,12 @@ def create_invite(
         raise InviteServiceError(
             "Tällä sähköpostiosoitteella on jo käyttäjätili.", "email_taken"
         )
-    if not (search_profile_name or "").strip():
-        raise InviteServiceError("Hakuprofiilin nimi on pakollinen.", "invalid_profile")
-    if remonttityyppi not in REMONTTITYYPIT:
-        raise InviteServiceError("Valitse kelvollinen remonttityyppi.", "invalid_type")
+    from app.admin.onboarding_services import _slug_from_name, clean_renovation_types, default_profile_name
 
-    from app.admin.onboarding_services import _slug_from_name
+    types = clean_renovation_types(remonttityypit or ([remonttityyppi] if remonttityyppi else []))
+    if not types or (remonttityyppi and not remonttityypit and remonttityyppi not in REMONTTITYYPIT):
+        raise InviteServiceError("Valitse kelvollinen remonttityyppi.", "invalid_type")
+    search_profile_name = (search_profile_name or "").strip() or default_profile_name(types)
 
     org_slug = (slug or "").strip().lower() or _slug_from_name(organization_name)
     source = (source or "oikotie").strip() or "oikotie"
@@ -124,7 +125,7 @@ def create_invite(
         email=admin_email,
         invited_by=actor,
         search_profile_name=search_profile_name,
-        remonttityyppi=remonttityyppi,
+        remonttityyppi="; ".join(types),
         source=source,
         allowed_features=valid_feature_keys(allowed_features),
         ttl_days=ttl_days,
@@ -218,9 +219,14 @@ def accept_invite(
     invite: CustomerInvite,
     *,
     password: str,
-    regions: list[str],
-    enabled_features: list[str] | None,
+    regions: list[str] | None = None,
+    enabled_features: list[str] | None = None,
 ) -> InviteAcceptanceResult:
+    """The customer only sets a password: the profile covers the whole country
+    (regions are narrowed with the Kohteet filters, or later in settings)."""
+    from app.search.constants import ALL_FINLAND_REGION
+
+    regions = list(regions or []) or [ALL_FINLAND_REGION]
     if not invite.is_valid():
         raise InviteServiceError("Kutsu ei ole enää voimassa.", "invite_invalid")
 
@@ -243,7 +249,8 @@ def accept_invite(
         profile = create_profile(
             organization.id,
             name=invite.search_profile_name,
-            remonttityyppi=invite.remonttityyppi,
+            remonttityyppi=invite.types[0],
+            remonttityypit=invite.types,
             regions=regions,
             is_active=True,
             source=invite.source,

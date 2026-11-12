@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
 {% from "_macros.html" import empty_state %}
-{% block title %}Tiimi — Asetukset{% endblock %}
+{% block title %}Käyttäjät — Asetukset{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
@@ -9,8 +9,8 @@
     <div class="settings-content">
       <div class="settings-panel">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Tiimi</h1>
-          <p class="settings-panel__subtitle">Kutsu kollegoita organisaatioosi ja hallinnoi heidän käyttöoikeuksiaan.</p>
+          <h1 class="settings-panel__title">Käyttäjät</h1>
+          <p class="settings-panel__subtitle">Kutsu kollega antamalla hänen sähköpostiosoitteensa. Hän saa linkin, jolla asettaa oman salasanan, ja näkee heti organisaatiosi kohteet ja liidit.</p>
         </header>
 
         <h2 class="form-section-title">Kutsu käyttäjä</h2>
@@ -25,9 +25,10 @@
           <label class="form-label" for="team-invite-role">Rooli
             <select id="team-invite-role" name="role" class="form-select">
               {% for role in invite_roles %}
-              <option value="{{ role }}">{{ 'Ylläpitäjä' if role == 'admin' else 'Käyttäjä' }}</option>
+              <option value="{{ role }}">{{ 'Ylläpitäjä' if role == 'admin' else 'Myyjä' }}</option>
               {% endfor %}
             </select>
+            <span class="form-helper">Myyjä: kohteet, liidit, tehtävät ja tarjoukset; omat siirrot tulevat hänen nimiinsä. Ylläpitäjä: lisäksi käyttäjät ja asetukset.</span>
           </label>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Lähetä kutsu</button>
@@ -50,7 +51,7 @@
               {% for member in members %}
               <tr>
                 <td>{{ member.email }}</td>
-                <td>{{ 'Ylläpitäjä' if member.role == 'admin' else ('Superadmin' if member.role == 'superadmin' else 'Käyttäjä') }}</td>
+                <td>{{ 'Ylläpitäjä' if member.role == 'admin' else ('Superadmin' if member.role == 'superadmin' else 'Myyjä') }}</td>
                 <td>{{ 'Aktiivinen' if member.is_active else 'Ei käytössä' }}</td>
                 <td>{{ (member.created_at|helsinki).strftime('%d.%m.%Y') if member.created_at else '—' }}</td>
                 <td>
@@ -63,10 +64,12 @@
                       <button type="submit" class="btn btn-secondary btn-sm">Nollaa 2FA</button>
                     </form>
                     {% endif %}
+                    {% if member.is_active %}
                     <form method="post" action="{{ url_for('settings.resend_team_invite', user_id=member.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-secondary btn-sm">Lähetä kutsu uudelleen</button>
+                      <button type="submit" class="btn btn-secondary btn-sm" title="Lähettää uuden salasanan asetuslinkin">Lähetä kirjautumislinkki</button>
                     </form>
+                    {% endif %}
                     {% if member.is_active %}
                     <form method="post" action="{{ url_for('settings.deactivate_team_member', user_id=member.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

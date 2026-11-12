@@ -84,11 +84,12 @@
     <span class="dash-targets__text">
       <span class="dash-targets__title">{{ 'kohde saatavilla' if targets_available == 1 else 'kohdetta saatavilla' }}</span>
       <span class="dash-targets__sub">
-        {% if targets_available %}Hakuprofiiliisi osuvia taloyhtiöitä, joita ei ole vielä siirretty liideiksi.
-        {% else %}Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät Kohteet-sivulle.{% endif %}
+        {% if targets_available %}Taloyhtiöitä, joissa on tulossa urakkasi remontti. Siirrä kiinnostavat liideiksi.
+        {% elif targets_reserve|default(0) %}Uusia kohteita on haettavissa: avaa Kohteet ja paina Hae kohteita.
+        {% else %}Uudet taloyhtiöt, joissa on tulossa urakkasi remontti, ilmestyvät Kohteet-sivulle.{% endif %}
       </span>
     </span>
-    <span class="dash-targets__cta">{{ 'Avaa kohteet' if targets_available else 'Kohteet' }}<span aria-hidden="true"> →</span></span>
+    <span class="dash-targets__cta">{{ 'Avaa kohteet' if targets_available else ('Hae kohteita' if targets_reserve|default(0) else 'Kohteet') }}<span aria-hidden="true"> →</span></span>
   </a>
 
   {# The one dark surface in the app: the item the user should handle first. #}

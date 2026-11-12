@@ -9,7 +9,6 @@ from app.admin.invite_services import InviteServiceError, get_valid_invite
 from app.admin.invite_services import accept_invite as accept_invite_service
 from app.core.security import validate_password
 from app.extensions import db
-from app.search.constants import ALL_FINLAND_REGION, FINNISH_REGIONS
 
 invite_bp = Blueprint("invite", __name__, url_prefix="/invite")
 
@@ -27,8 +26,6 @@ def accept_invite(token: str):
     if request.method == "POST":
         password = request.form.get("password", "")
         password_confirm = request.form.get("password_confirm", "")
-        region_mode = request.form.get("region_mode", "specific")
-        selected_regions = [r for r in request.form.getlist("regions") if r in FINNISH_REGIONS]
         enabled_features = request.form.getlist("enabled_features")
 
         if password != password_confirm:
@@ -38,32 +35,27 @@ def accept_invite(token: str):
             if not ok:
                 flash(msg or "Salasana ei kelpaa.", "danger")
             else:
-                regions = [ALL_FINLAND_REGION] if region_mode == "all_finland" else selected_regions
-                if not regions:
-                    flash("Valitse vähintään yksi alue, tai valitse Koko Suomi.", "danger")
-                else:
-                    try:
-                        accept_invite_service(
-                            invite,
-                            password=password,
-                            regions=regions,
-                            enabled_features=enabled_features,
-                        )
-                        db.session.commit()
-                        flash(
-                            "Tili on käyttövalmis. Kirjaudu sisään sähköpostiosoitteellasi ja "
-                            "uudella salasanallasi.",
-                            "success",
-                        )
-                        return redirect(url_for("auth.login"))
-                    except InviteServiceError as exc:
-                        db.session.rollback()
-                        flash(exc.message, "danger")
+                # No region choice: the profile covers the whole country and
+                # the customer narrows the list on the Kohteet page.
+                try:
+                    accept_invite_service(
+                        invite,
+                        password=password,
+                        enabled_features=enabled_features,
+                    )
+                    db.session.commit()
+                    flash(
+                        "Tili on käyttövalmis. Kirjaudu sisään sähköpostiosoitteellasi ja "
+                        "uudella salasanallasi.",
+                        "success",
+                    )
+                    return redirect(url_for("auth.login"))
+                except InviteServiceError as exc:
+                    db.session.rollback()
+                    flash(exc.message, "danger")
 
     return render_template(
         "admin/invite_accept.html",
         invite=invite,
-        finnish_regions=FINNISH_REGIONS,
-        all_finland_region=ALL_FINLAND_REGION,
         allowed_features=allowed_features,
     )

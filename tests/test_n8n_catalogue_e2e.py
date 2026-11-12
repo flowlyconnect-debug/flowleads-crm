@@ -155,7 +155,8 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         assert ListingMatch.query.count() == 2
         leads = Lead.query.filter_by(organization_id=org_id).order_by(Lead.source_ref).all()
         assert [l.source_ref for l in leads] == ["oikotie-1001", "oikotie-1002"]
-        assert leads[0].company == "Isännöinti Testi Oy"
+        assert leads[0].company == "As Oy Lukkotesti"  # named after the taloyhtiö
+        assert leads[0].title == "Isännöitsijä: Isännöinti Testi Oy"
         assert leads[0].phone == "040 123 4567"
         assert leads[0].email == "testi@isannointi.fi"
         assert not leads[1].phone
@@ -171,7 +172,7 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         assert l2.contact_source == "finder"
         lead = Lead.query.filter_by(organization_id=org_id, source_ref="oikotie-1002").one()
         assert lead.phone == "0409998888"
-        assert lead.company == "Avaimeton Isännöinti Oy"
+        assert lead.title == "Isännöitsijä: Avaimeton Isännöinti Oy"
 
 
 def test_crawler_stops_the_whole_run_when_oikotie_blocks_it(live_crm, tmp_path):

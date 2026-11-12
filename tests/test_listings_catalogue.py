@@ -303,7 +303,8 @@ def test_analysed_listing_becomes_lead_only_for_matching_profiles(app):
         lead_a = Lead.query.filter_by(organization_id=org_a.id).one()
         assert lead_a.source == "oikotie"
         assert lead_a.source_ref == "oikotie-11"
-        assert lead_a.company == "Isännöinti Lappi Oy"
+        assert lead_a.company == "As Oy Koski"  # the lead is named after the taloyhtiö
+        assert lead_a.title == "Isännöitsijä: Isännöinti Lappi Oy"
         assert lead_a.phone == "0401234567"
         assert lead_a.email == "info@isannointi.fi"
         assert lead_a.gdpr_legal_basis == "legitimate_interest"
@@ -499,7 +500,8 @@ def test_matched_listing_without_contacts_is_enriched_and_lead_updated(app):
         lead = Lead.query.filter_by(organization_id=org.id).one()
         assert lead.phone == "+358401111111"
         assert lead.email == "toimisto@koski.fi"
-        assert lead.company == "Isännöinti Koski Oy"
+        assert lead.company == "As Oy Ei Yhteystietoja"
+        assert lead.title == "Isännöitsijä: Isännöinti Koski Oy"
         assert lead.ai_contact_info["yhteystieto_lahde"] == "finder"
         assert svc.claim_contacts(limit=10)["listings"] == []
 
@@ -579,4 +581,4 @@ def test_listing_api_end_to_end(client, app):
     with app.app_context():
         lead = Lead.query.filter_by(organization_id=org_id).one()
         assert lead.phone == "0405555555"
-        assert lead.company == "Lapin Isännöinti Oy"
+        assert lead.title == "Isännöitsijä: Lapin Isännöinti Oy"

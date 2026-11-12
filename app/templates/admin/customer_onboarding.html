@@ -38,49 +38,29 @@
             <span class="form-helper">Jätä tyhjäksi, niin järjestelmä luo turvallisen salasanan. Asiakas joutuu vaihtamaan sen ensimmäisellä kirjautumisella. Jos haluat, että asiakas asettaa salasanan itse, käytä Kutsu asiakas -toimintoa.</span>
           </label>
 
-          <h2 style="margin-top:1.5rem;">Hakuprofiili</h2>
-          <label class="form-label">Hakuprofiilin nimi
-            <input type="text" name="search_profile_name" class="form-input" maxlength="100" required
-                   placeholder="esim. Lukkoremontti Uusimaa"
-                   value="{{ form_data.get('search_profile_name', '') }}">
-          </label>
-
-          <label class="form-label">Remonttityyppi
-            <select name="remonttityyppi" class="form-select" required>
-              <option value="">Valitse…</option>
+          <h2 style="margin-top:1.5rem;">Urakat</h2>
+          <fieldset style="margin-top:1rem;">
+            <legend class="form-label">Urakat (remonttityypit), joista asiakas haluaa kohteita</legend>
+            {% set chosen_types = form_data.get('remonttityypit', []) %}
+            <div class="search-profiles-regions__grid">
               {% for option in remonttityypit %}
-              <option value="{{ option }}"
-                {% if form_data.get('remonttityyppi') == option %}selected{% endif %}>{{ option }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <fieldset class="search-profiles-regions" style="margin-top:1rem;">
-            <legend class="form-label">Alueet</legend>
-            <label class="form-check">
-              <input type="radio" name="region_mode" value="all_finland" id="region-mode-all"
-                {% if 'Koko Suomi' in form_data.get('regions', []) %}checked{% endif %}>
-              Koko Suomi
-            </label>
-            <label class="form-check">
-              <input type="radio" name="region_mode" value="specific" id="region-mode-specific"
-                {% if 'Koko Suomi' not in form_data.get('regions', []) %}checked{% endif %}>
-              Valitse maakunnat (vähintään yksi)
-            </label>
-            <div class="search-profiles-regions__grid" id="regions-grid">
-              {% set selected_regions = form_data.get('regions', []) %}
-              {% for region in finnish_regions %}
               <label class="form-check">
-                <input type="checkbox" name="regions" value="{{ region }}"
-                  {% if region in selected_regions %}checked{% endif %}>
-                {{ region }}
+                <input type="checkbox" name="remonttityypit" value="{{ option }}"{% if option in chosen_types %} checked{% endif %}>
+                {{ option }}
               </label>
               {% endfor %}
             </div>
+            <span class="form-helper">Valitse vähintään yksi. Asiakas näkee vain näiden urakoiden kohteet koko Suomesta ja rajaa alueen itse Kohteet-sivulla.</span>
           </fieldset>
 
+          <label class="form-label" style="margin-top:1rem;">Hakuprofiilin nimi (valinnainen)
+            <input type="text" name="search_profile_name" class="form-input" maxlength="100"
+                   placeholder="Jätä tyhjäksi → urakoiden nimet"
+                   value="{{ form_data.get('search_profile_name', '') }}">
+          </label>
+
           <input type="hidden" name="source" value="oikotie">
-          <p class="form-helper">Muut suodattimet (useampi remonttityyppi, kaupungit, talotyyppi, rakennusvuosi, päiväraja) voi säätää luonnin jälkeen hakuprofiilin asetuksista.</p>
+          <p class="form-helper">Tarkemmat rajaukset (maakunnat, kaupungit, talotyyppi, rakennusvuosi) voi tarvittaessa säätää myöhemmin hakuprofiilin asetuksista.</p>
 
           <label class="form-check" style="margin-top:1rem;">
             <input type="checkbox" name="is_active" value="y"
@@ -97,16 +77,4 @@
     </div>
   </div>
 </div>
-<script>
-  (function () {
-    const allRadio = document.getElementById("region-mode-all");
-    const specificRadio = document.getElementById("region-mode-specific");
-    const grid = document.getElementById("regions-grid");
-    if (!allRadio || !specificRadio || !grid) return;
-    const sync = function () { grid.style.display = allRadio.checked ? "none" : ""; };
-    allRadio.addEventListener("change", sync);
-    specificRadio.addEventListener("change", sync);
-    sync();
-  })();
-</script>
 {% endblock %}

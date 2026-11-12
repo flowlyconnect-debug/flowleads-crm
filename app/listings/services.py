@@ -16,7 +16,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app
-from sqlalchemy import func, or_, update
+from sqlalchemy import and_, func, or_, update
 
 from app.extensions import db
 from app.listings.models import CrawlState, Listing, ListingMatch, ListingRenovation
@@ -657,12 +657,24 @@ def _ensure_contact_queued(listing: Listing) -> None:
 def match_listing(listing: Listing, *, now: datetime | None = None) -> list[ListingMatch]:
     """Record a match for every active profile this freshly analysed listing
     satisfies. Leads are created separately (materialize_pending_matches)."""
-    if not listing.is_active or listing.analysis_status != "done" or not listing.renovations:
+    if listing.analysis_status != "done":
         return []
     now = now or _now()
-    existing = {
-        m.profile_id for m in ListingMatch.query.filter_by(listing_id=listing.id).all()
-    }
+    existing: set[int] = set()
+    for match in ListingMatch.query.filter_by(listing_id=listing.id).all():
+        if (
+            match.status == "pending"
+            and match.profile is not None
+            and _profile_wants(match.profile, listing, now=now) is None
+        ):
+            # re-analysed / re-imported and no longer what the profile wants
+            # (e.g. the renovation type changed): not a target any more
+            db.session.delete(match)
+            continue
+        existing.add(match.profile_id)
+    if not listing.is_active or not listing.renovations:
+        db.session.flush()
+        return []
     created: list[ListingMatch] = []
     for profile in _active_profiles():
         if profile.id in existing:
@@ -779,6 +791,12 @@ def lead_source(listing: Listing) -> str:
     return SOURCE if listing.source == SOURCE else IMPORT_SOURCE
 
 
+def _manager_title(listing: Listing) -> str:
+    """'Isännöitsijä: Retta Isännöinti Oy, Hannu Räsänen' (max 150 chars)."""
+    parts = [p for p in (listing.isannoitsija, listing.isannoitsija_henkilo) if p]
+    return ("Isännöitsijä: " + ", ".join(parts))[:150] if parts else "Isännöitsijä"
+
+
 def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
     manager = listing.isannoitsija or ""
     source = lead_source(listing)
@@ -791,6 +809,8 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
         part
         for part in (
             listing.taloyhtio and f"Taloyhtiö: {listing.taloyhtio}",
+            listing.ytunnus and f"Taloyhtiön Y-tunnus: {listing.ytunnus}",
+            listing.isannoitsija_henkilo and f"Yhteyshenkilö: {listing.isannoitsija_henkilo}",
             f"Kohde: {', '.join(p for p in (listing.osoite, listing.kaupunki) if p)}",
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
@@ -803,8 +823,11 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
     return {
         "source": source,
         "source_ref": listing.source_ref,
-        "company": manager or listing.taloyhtio or None,
-        "title": "Isännöitsijä" if manager else None,
+        # The lead is the housing company's renovation: it is named after the
+        # taloyhtiö (one manager serves dozens of them) and the manager is the
+        # contact, shown under the name.
+        "company": listing.taloyhtio or manager or None,
+        "title": _manager_title(listing) if manager else None,
         "phone": listing.isannoitsija_puh or None,
         "email": _valid_email_or_none(listing.isannoitsija_email),
         "website": website,
@@ -818,6 +841,8 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
 def _lead_metadata(listing: Listing, profile: SearchProfile | None, renovation) -> dict:
     meta = {
         "isannoitsija_yritys": listing.isannoitsija or "",
+        "isannoitsija_henkilo": listing.isannoitsija_henkilo or "",
+        "taloyhtio_ytunnus": listing.ytunnus or "",
         "isannoitsija_puh": listing.isannoitsija_puh or "",
         "isannoitsija_email": listing.isannoitsija_email or "",
         "taloyhtio": listing.taloyhtio or "",
@@ -1121,6 +1146,7 @@ def save_contacts(listing_id: int, payload: dict, *, now: datetime | None = None
         else:
             patch["metadata"] = {
                 "isannoitsija_yritys": listing.isannoitsija or "",
+                "isannoitsija_henkilo": listing.isannoitsija_henkilo or "",
                 "isannoitsija_puh": listing.isannoitsija_puh or "",
                 "isannoitsija_email": listing.isannoitsija_email or "",
                 "yhteystieto_lahde": listing.contact_source or "",
@@ -1129,9 +1155,10 @@ def save_contacts(listing_id: int, payload: dict, *, now: datetime | None = None
             patch["phone"] = listing.isannoitsija_puh
         if not lead.email and listing.isannoitsija_email:
             patch["email"] = listing.isannoitsija_email
-        if listing.isannoitsija and (not lead.company or lead.company == listing.taloyhtio):
-            patch["company"] = listing.isannoitsija
-            patch["title"] = "Isännöitsijä"
+        if not lead.company and (listing.taloyhtio or listing.isannoitsija):
+            patch["company"] = listing.taloyhtio or listing.isannoitsija
+        if listing.isannoitsija and (not lead.title or lead.title.startswith("Isännöitsijä")):
+            patch["title"] = _manager_title(listing)
         if not lead.website and (listing.isannoitsija_website or "").startswith("http"):
             patch["website"] = listing.isannoitsija_website
         try:
@@ -1149,16 +1176,31 @@ def save_contacts(listing_id: int, payload: dict, *, now: datetime | None = None
 # ---------------------------------------------------------------------------
 
 
-def profile_match_stats(profile: SearchProfile) -> dict:
+def profile_match_stats(profile: SearchProfile, *, include_reserve: bool = True) -> dict:
+    """Match counts of a profile. include_reserve=False (what the customer
+    sees): pending matches still in the "Hae kohteita" reserve are left out,
+    so the settings page never shows more than the Kohteet page."""
+    criteria = [ListingMatch.profile_id == profile.id]
+    try:
+        reserve_on = bool(current_app.config.get("TARGET_FETCH_ENABLED"))
+    except RuntimeError:
+        reserve_on = False
+    if reserve_on and not include_reserve:
+        criteria.append(
+            or_(
+                ListingMatch.status != "pending",
+                and_(ListingMatch.released_at.isnot(None), ListingMatch.released_at <= _now()),
+            )
+        )
     rows = (
         db.session.query(ListingMatch.status, func.count(ListingMatch.id))
-        .filter(ListingMatch.profile_id == profile.id)
+        .filter(*criteria)
         .group_by(ListingMatch.status)
         .all()
     )
     counts = {status: count for status, count in rows}
     recent = (
-        ListingMatch.query.filter_by(profile_id=profile.id)
+        ListingMatch.query.filter(*criteria)
         .order_by(ListingMatch.created_at.desc(), ListingMatch.id.desc())
         .limit(10)
         .all()

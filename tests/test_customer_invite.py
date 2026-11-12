@@ -283,7 +283,9 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
         org_b = Organization.query.filter_by(slug="toka-oy").one()
         profile_a = SearchProfile.query.filter_by(organization_id=org_a.id).one()
         profile_b = SearchProfile.query.filter_by(organization_id=org_b.id).one()
-        assert profile_a.regions == ["Uusimaa"]
+        # region fields in the form are ignored: every invited customer covers
+        # the whole country and narrows the list on the Kohteet page
+        assert profile_a.regions == [ALL_FINLAND_REGION]
         assert profile_b.regions == [ALL_FINLAND_REGION]
         assert profile_a.is_active is True
         assert profile_b.is_active is True

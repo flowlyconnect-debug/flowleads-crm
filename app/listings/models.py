@@ -84,10 +84,14 @@ class Listing(db.Model):
     taloyhtio: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tulevat_remontit: Mapped[str | None] = mapped_column(Text, nullable=True)
     isannoitsija: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # contact person at the property management office (isännöitsijä by name)
+    isannoitsija_henkilo: Mapped[str | None] = mapped_column(String(255), nullable=True)
     isannoitsija_puh: Mapped[str | None] = mapped_column(String(50), nullable=True)
     isannoitsija_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     isannoitsija_website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     contact_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # the housing company's business ID (Y-tunnus), when the source gives it
+    ytunnus: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     contact_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     contact_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

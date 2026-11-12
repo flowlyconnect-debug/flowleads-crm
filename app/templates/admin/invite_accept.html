@@ -9,7 +9,7 @@
 <a href="{{ url_for('auth.login') }}" class="lp-btn lp-btn--primary">Kirjautumiseen</a>
 {% else %}
 <h1 class="lp-card__title">Tervetuloa, {{ invite.organization.name }}</h1>
-<p class="lp-card__lead">Aseta salasana ja valitse alueet, joilta haluat liidejä. Tämä vie noin minuutin.</p>
+<p class="lp-card__lead">Aseta salasana, niin tili on käyttövalmis.</p>
 
 <form method="post" class="lp-form" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -23,29 +23,11 @@
     <input type="password" id="invite-password-confirm" name="password_confirm" class="lp-field__input" minlength="12" required autocomplete="new-password">
   </div>
 
-  <div>
-    <h2 class="lp-solo__section-title">Hakualueet</h2>
-    <label class="lp-solo__check">
-      <input type="radio" name="region_mode" value="all_finland" id="region-mode-all">
-      Koko Suomi
-    </label>
-    <label class="lp-solo__check">
-      <input type="radio" name="region_mode" value="specific" id="region-mode-specific" checked>
-      Valitse maakunnat
-    </label>
-    <div class="lp-solo__checks" id="regions-fieldset" style="margin-top:10px;">
-      {% for region in finnish_regions %}
-      <label class="lp-solo__check">
-        <input type="checkbox" name="regions" value="{{ region }}">
-        {{ region }}
-      </label>
-      {% endfor %}
-    </div>
-    <p class="lp-solo__hint" style="margin-top:10px;">
-      Näet Kohteet-sivulla taloyhtiöt, joissa on tulossa <strong>{{ invite.remonttityyppi }}</strong> valitsemillasi alueilla, ja siirrät kiinnostavat liideiksi.
-      Ensimmäiset kohteet ovat haettavissa noin 10 minuutin kuluttua Kohteet-sivun Hae kohteita -painikkeella, ja voit tarkentaa hakua myöhemmin asetuksista.
-    </p>
-  </div>
+  <p class="lp-solo__hint">
+    Näet Kohteet-sivulla taloyhtiöt, joissa on tulossa <strong>{{ invite.types|join(', ') }}</strong>, ja siirrät kiinnostavat liideiksi.
+    Kohteet tulevat koko Suomesta; rajaat ne omalle alueellesi Kohteet-sivun suodattimilla.
+    Ensimmäiset kohteet ovat haettavissa noin 10 minuutin kuluttua Kohteet-sivun Hae kohteita -painikkeella.
+  </p>
 
   {% if allowed_features %}
   <div>
@@ -63,20 +45,4 @@
   <button type="submit" class="lp-btn lp-btn--primary lp-btn--block">Viimeistele käyttöönotto</button>
 </form>
 {% endif %}
-{% endblock %}
-{% block scripts %}
-<script>
-  (function () {
-    const allRadio = document.getElementById("region-mode-all");
-    const specificRadio = document.getElementById("region-mode-specific");
-    const fieldset = document.getElementById("regions-fieldset");
-    if (!allRadio || !specificRadio || !fieldset) return;
-    function sync() {
-      fieldset.style.display = allRadio.checked ? "none" : "";
-    }
-    allRadio.addEventListener("change", sync);
-    specificRadio.addEventListener("change", sync);
-    sync();
-  })();
-</script>
 {% endblock %}

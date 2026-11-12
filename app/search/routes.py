@@ -85,7 +85,9 @@ def _render_search_profiles(
         selected_profile = get_profile(organization_id, selected_id)
         if selected_profile:
             latest_job = get_latest_job(selected_profile.id)
-            match_stats = profile_match_stats(selected_profile)
+            match_stats = profile_match_stats(
+                selected_profile, include_reserve=current_user.is_superadmin()
+            )
 
     now = datetime.now(timezone.utc)
     org_query = org_query_suffix(organization_id)
@@ -149,7 +151,7 @@ def _profile_form_data() -> dict:
         "schedule_description": schedule,
         "crm_api_key": (request.form.get("crm_api_key") or "").strip() or None,
         "is_active": request.form.get("is_active") == "y",
-        "min_confidence": _form_int("min_confidence", 60),
+        "min_confidence": _form_int("min_confidence", 50),
         "daily_lead_limit": _form_int("daily_lead_limit", 50),
         "cities": request.form.get("cities") or "",
         "timing_within_years": (request.form.get("timing_within_years") or "").strip(),

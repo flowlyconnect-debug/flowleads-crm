@@ -7,9 +7,9 @@
      settings page (e.g. settings.email_settings) would 403 here. #}
   {% set settings_home_ep = 'admin.customers_list' %}
 {% elif current_user.role == 'admin' %}
-  {% set settings_home_ep = 'settings.email_settings' %}
+  {% set settings_home_ep = 'settings.team_members' %}
 {% else %}
-  {% set settings_home_ep = 'settings.email_templates_list' %}
+  {% set settings_home_ep = 'settings.calendar_settings' %}
 {% endif %}
 {% set settings_active = ep and (
   ep.startswith('settings.')
@@ -25,8 +25,11 @@
     {{- url_for(endpoint) -}}
   {%- endif -%}
 {%- endmacro %}
-{% set companies_enabled = has_endpoint('companies.list_companies') %}
-{% set contacts_enabled = has_endpoint('contacts.list_contacts') %}
+{# Yritykset, Kontaktit and Lomakkeet are generic CRM pages a renovation
+   contractor working from Kohteet does not need: kept reachable by URL for
+   superadmins, out of the customer's menu. #}
+{% set companies_enabled = current_user.is_superadmin() and has_endpoint('companies.list_companies') %}
+{% set contacts_enabled = current_user.is_superadmin() and has_endpoint('contacts.list_contacts') %}
 
 <aside class="sidebar" id="app-sidebar" aria-label="Päänavigaatio">
   <div class="sidebar-logo">
@@ -161,6 +164,7 @@
             <span class="sidebar-item__label">Tarjoukset</span>
           </a>
         </li>
+        {% if current_user.is_superadmin() %}
         <li>
           <a href="{{ nav_url('forms.list_forms') }}"
              class="sidebar-item{% if ep and ep.startswith('forms.') %} active{% endif %}"
@@ -169,6 +173,7 @@
             <span class="sidebar-item__label">Lomakkeet</span>
           </a>
         </li>
+        {% endif %}
         {% if has_feature('sequences') %}
         <li>
           <a href="{{ nav_url('sequences.list_sequences') }}"

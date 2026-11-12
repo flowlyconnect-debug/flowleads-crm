@@ -124,7 +124,7 @@ def list_targets(
 
 
 # Query-string keys of the Kohteet filter bar (kept across actions and pages).
-FILTER_KEYS = ("renovation", "city", "region", "building", "contact", "sort")
+FILTER_KEYS = ("renovation", "region", "city", "year", "building", "contact", "sort")
 SORT_OPTIONS = (
     ("", "Uusimmat ensin"),
     ("oldest", "Vanhimmat ensin"),
@@ -151,6 +151,22 @@ def _apply_target_filters(query, filters: dict):
     region = (filters.get("region") or "").strip()
     if region:
         query = query.filter(Listing.maakunta == region)
+    year = (filters.get("year") or "").strip()
+    if year.isdigit():
+        # renovation known to start by the end of that year
+        query = query.filter(
+            Listing.id.in_(
+                db.session.query(ListingRenovation.listing_id).filter(
+                    ListingRenovation.timing_year.isnot(None),
+                    ListingRenovation.timing_year <= int(year),
+                    *(
+                        [ListingRenovation.remonttityyppi == renovation]
+                        if renovation
+                        else []
+                    ),
+                )
+            )
+        )
     building = (filters.get("building") or "").strip()
     if building:
         query = query.filter(Listing.building_type == building)
@@ -164,42 +180,70 @@ def _apply_target_filters(query, filters: dict):
     return query
 
 
-def target_filter_options(organization_id: int, status: str = "pending") -> dict:
+def organization_wanted_types(organization_id: int) -> set[str]:
+    """Every renovation type the organization's profiles ask for. A listing
+    often lists several renovations; the customer only sees and filters by the
+    ones it actually does."""
+    from app.search.models import SearchProfile
+
+    types: set[str] = set()
+    for profile in SearchProfile.query.filter_by(organization_id=organization_id).all():
+        types.update(profile.wanted_types)
+    return types
+
+
+def target_filter_options(organization_id: int, status: str = "pending", filters: dict | None = None) -> dict:
     """The values that actually occur among the organization's targets, so the
-    filter bar offers only choices that lead somewhere."""
+    filter bar offers only choices that lead somewhere. Cities follow the
+    chosen region."""
+    filters = filters or {}
     visible = _visible_match_ids(organization_id, status)
     listing_ids = db.session.query(ListingMatch.listing_id).filter(ListingMatch.id.in_(visible))
+    wanted = organization_wanted_types(organization_id)
 
-    def distinct(column):
+    def distinct(column, *criteria):
         rows = (
             db.session.query(column)
-            .filter(Listing.id.in_(listing_ids), column.isnot(None), column != "")
+            .filter(Listing.id.in_(listing_ids), column.isnot(None), column != "", *criteria)
             .distinct()
             .all()
         )
         return sorted({str(value).strip() for (value,) in rows if str(value).strip()}, key=str.lower)
 
-    renovations = (
-        db.session.query(ListingRenovation.remonttityyppi)
-        .filter(ListingRenovation.listing_id.in_(listing_ids))
-        .distinct()
-        .all()
+    renovation_query = db.session.query(ListingRenovation.remonttityyppi, ListingRenovation.timing_year).filter(
+        ListingRenovation.listing_id.in_(listing_ids)
     )
+    renovations: set[str] = set()
+    years: set[int] = set()
+    for rtype, timing_year in renovation_query.distinct().all():
+        if wanted and rtype not in wanted:
+            continue
+        renovations.add(rtype)
+        if timing_year:
+            # a plan that started in the past ("2024-2028") is "by this year"
+            years.add(max(int(timing_year), _now().year))
+    region = (filters.get("region") or "").strip()
     return {
-        "renovations": sorted({r for (r,) in renovations if r}),
-        "cities": distinct(Listing.kaupunki),
+        "renovations": sorted(renovations),
+        "cities": distinct(Listing.kaupunki, *([Listing.maakunta == region] if region else [])),
         "regions": distinct(Listing.maakunta),
         "buildings": distinct(Listing.building_type),
+        "years": [str(y) for y in sorted(years)],
     }
 
 
-def target_row(match: ListingMatch) -> dict:
+def target_row(match: ListingMatch, wanted_types: set[str] | None = None) -> dict:
     """What the page shows for one target."""
     listing = match.listing
     renovation = _best_renovation(match.profile, listing) if match.profile else None
     if renovation is None and listing.renovations:
         # the profile's filter changed and the match has not been rebuilt yet
         renovation = max(listing.renovations, key=lambda r: r.confidence)
+    # every renovation on the listing the organization does, best first
+    renovations = sorted(
+        (r for r in listing.renovations if not wanted_types or r.remonttityyppi in wanted_types),
+        key=lambda r: (r is not renovation, -r.confidence),
+    ) or ([renovation] if renovation else [])
     return {
         "match": match,
         "listing": listing,
@@ -208,6 +252,7 @@ def target_row(match: ListingMatch) -> dict:
             p for p in ((listing.osoite if listing.taloyhtio else None), listing.kaupunki or listing.maakunta) if p
         ),
         "renovation": renovation,
+        "renovations": renovations,
         "seen_at": listing.published_at or listing.first_seen_at,
     }
 
@@ -465,6 +510,36 @@ def _reserve_listing_ids(organization_id: int) -> list[int]:
     return [listing_id for (listing_id,) in rows]
 
 
+def _interleave_by_type(organization_id: int, listing_ids: list[int]) -> list[int]:
+    """Newest first, but taking turns between the organization's renovation
+    types, so a customer with several urakat gets a mix in every batch (a
+    file import gives hundreds of listings the same timestamp)."""
+    if len(listing_ids) < 2:
+        return listing_ids
+    wanted = organization_wanted_types(organization_id)
+    best: dict[int, tuple[int, str]] = {}
+    rows = db.session.query(
+        ListingRenovation.listing_id, ListingRenovation.remonttityyppi, ListingRenovation.confidence
+    ).filter(ListingRenovation.listing_id.in_(listing_ids))
+    for listing_id, rtype, confidence in rows.all():
+        if wanted and rtype not in wanted:
+            continue
+        if listing_id not in best or confidence > best[listing_id][0]:
+            best[listing_id] = (confidence, rtype)
+    queues: dict[str, list[int]] = {}
+    for listing_id in listing_ids:
+        queues.setdefault(best.get(listing_id, (0, ""))[1], []).append(listing_id)
+    if len(queues) < 2:
+        return listing_ids
+    ordered: list[int] = []
+    lanes = list(queues.values())
+    while lanes:
+        for lane in lanes:
+            ordered.append(lane.pop(0))
+        lanes = [lane for lane in lanes if lane]
+    return ordered
+
+
 def count_reserve(organization_id: int) -> int:
     return len(_reserve_listing_ids(organization_id)) if fetch_enabled() else 0
 
@@ -519,7 +594,7 @@ def fetch_targets(
     wait_low, wait_high = config.get("TARGET_FETCH_WAIT_SECONDS", (10, 15))
     wait_seconds = rng.randint(int(wait_low), int(wait_high))
 
-    reserve = _reserve_listing_ids(organization_id)
+    reserve = _interleave_by_type(organization_id, _reserve_listing_ids(organization_id))
     chosen = reserve[: min(len(reserve), rng.randint(low, high))]
     if chosen:
         # every match of the organization for these listings: a listing that

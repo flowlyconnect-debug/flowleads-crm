@@ -137,7 +137,12 @@ def test_targets_can_be_filtered_and_sorted(app):
 
         options = targets.target_filter_options(org.id)
         assert options["cities"] == ["Espoo", "Helsinki"]
-        assert options["renovations"] == sorted([PIPE, ROOF])
+        # only the organization's own urakat are offered (the profile wants PIPE;
+        # ROOF is just another renovation on one of the listings)
+        assert options["renovations"] == [PIPE]
+        profile.remonttityypit = [PIPE, ROOF]
+        db.session.commit()
+        assert targets.target_filter_options(org.id)["renovations"] == sorted([PIPE, ROOF])
         assert options["buildings"] == ["kerrostalo", "rivitalo"]
 
 
