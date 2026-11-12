@@ -52,6 +52,9 @@ class Config:
 
     BACKUP_DIR = os.environ.get("BACKUP_DIR", "./backups")
     BACKUP_RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", 30))
+    # auto = pg_dump when it is at least the server's version, otherwise the
+    # Python dump (app/backups/logical.py); "python" / "pg_dump" force one
+    BACKUP_DB_FORMAT = os.environ.get("BACKUP_DB_FORMAT", "auto")
     UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "./uploads")
     # Largest request body the app accepts (Flask answers 413 above it). The
     # biggest legitimate bodies are the n8n listing import and the CSV upload.
