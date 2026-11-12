@@ -185,6 +185,44 @@ def register_cli(app):
         if not yes:
             click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
 
+    @app.cli.command("purge-organizations")
+    @click.option("--org", "org_ids", type=int, multiple=True, help="Organization id (repeatable).")
+    @click.option("--all-customers", is_flag=True, help="Every organization without a superadmin.")
+    @click.option("--yes", is_flag=True, help="Actually delete. Without it only the counts are shown.")
+    @with_appcontext
+    def purge_organizations_cmd(org_ids, all_customers, yes):
+        """Permanently delete customer organizations with all their data (dry run by default)."""
+        from app.admin.org_purge import OrganizationPurgeError, customer_organization_ids, purge_organization
+        from app.core.audit import log_audit
+        from app.users.models import Organization
+
+        ids = customer_organization_ids() if all_customers else list(org_ids)
+        if not ids:
+            click.echo("Anna --org ID tai --all-customers.")
+            return
+        for org_id in ids:
+            org = db.session.get(Organization, org_id)
+            name = org.name if org else f"#{org_id}"
+            try:
+                counts = purge_organization(org_id, dry_run=not yes)
+                if yes:
+                    log_audit(
+                        "organization_deleted",
+                        target_type="organization",
+                        target_id=org_id,
+                        metadata={"name": name, "rows": counts},
+                    )
+                    db.session.commit()
+            except OrganizationPurgeError as exc:
+                db.session.rollback()
+                click.echo(f"{name}: {exc.message}", err=True)
+                continue
+            click.echo(f"{name} ({'poistettu' if yes else 'kuiva-ajo, poistettaisiin'}):")
+            for table, n in sorted(counts.items()):
+                click.echo(f"  {table}: {n}")
+        if not yes:
+            click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
+
     @app.cli.command("run-scheduler")
     @with_appcontext
     def run_scheduler_cmd():

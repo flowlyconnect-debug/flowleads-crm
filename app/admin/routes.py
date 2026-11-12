@@ -256,6 +256,47 @@ def create_organization_route():
     return redirect(url_for("admin.dashboard"))
 
 
+@admin_bp.route("/customers/<int:organization_id>/delete", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def delete_customer_route(organization_id: int):
+    """Permanently delete a customer organization with all its data. The
+    operator types the organization's name to confirm."""
+    from app.admin.org_purge import OrganizationPurgeError, purge_organization
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    typed = " ".join((request.form.get("confirm_name") or "").split())
+    if typed != " ".join(organization.name.split()):
+        flash("Organisaatiota ei poistettu: kirjoita sen nimi täsmälleen vahvistukseksi.", "warning")
+        return redirect(url_for("admin.customers_list"))
+    name = organization.name
+    try:
+        counts = purge_organization(organization_id, dry_run=False)
+        log_audit(
+            "organization_deleted",
+            user_id=current_user.id,
+            target_type="organization",
+            target_id=organization_id,
+            metadata={"name": name, "rows": counts},
+        )
+        db.session.commit()
+    except OrganizationPurgeError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return redirect(url_for("admin.customers_list"))
+    flash(
+        f"Organisaatio {name} poistettu pysyvästi ({counts.get('users', 0)} käyttäjää, "
+        f"{counts.get('leads', 0)} liidiä, {counts.get('listing_matches', 0)} kohdeosumaa).",
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/customers/new", methods=["GET", "POST"])
 @login_required
 @require_role("superadmin")
@@ -353,12 +394,24 @@ def _consume_invite_result() -> dict | None:
     return entry
 
 
+def fi_email_error(error: str | None) -> str | None:
+    """Why an account e-mail did not go out, in Finnish for the operator."""
+    if not error:
+        return None
+    known = {
+        "sending_disabled": "Sähköpostin lähetys on kytketty pois (EMAIL_SENDING_ENABLED).",
+        "invalid_email": "Sähköpostiosoite ei kelpaa.",
+        "Email sending is not configured.": "Mailgunia ei ole määritetty (MAILGUN_API_KEY / MAILGUN_DOMAIN puuttuu).",
+    }
+    return known.get(error, f"Mailgun: {error}")
+
+
 def _send_invite_and_store_result(*, organization, invite, token) -> None:
     from app.admin.models import INVITE_DEFAULT_TTL_DAYS
     from app.email.services import EmailService
 
     invite_url = url_for("invite.accept_invite", token=token, _external=True)
-    EmailService.send_customer_invite_email(
+    sent = EmailService.send_customer_invite_email(
         to_email=invite.email,
         invite_url=invite_url,
         organization_name=organization.name,
@@ -368,6 +421,8 @@ def _send_invite_and_store_result(*, organization, invite, token) -> None:
         {
             "organization_name": organization.name,
             "admin_email": invite.email,
+            "email_sent": bool(sent and sent.get("success")),
+            "email_error": fi_email_error((sent or {}).get("error")),
             "invite_url": invite_url,
             "expires_at_label": invite.expires_at.strftime("%d.%m.%Y %H:%M UTC"),
         }

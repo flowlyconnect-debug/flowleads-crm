@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
-{% block title %}Kutsu lähetetty — Hallinta{% endblock %}
+{% block title %}Asiakaskutsu — Hallinta{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
     {{ settings_nav('customer_invite') }}
     <div class="settings-content">
       <div class="card settings-panel--wide">
+        {% if result.email_sent or result.email_sent is not defined %}
         <h1>Kutsu lähetetty</h1>
-        <p class="text-muted">Linkki näytetään tässä vain kerran — tallenna se tarvittaessa.</p>
+        <p class="text-muted">Kutsu lähti sähköpostilla osoitteeseen {{ result.admin_email }}. Linkki näytetään tässä vain kerran — tallenna se tarvittaessa.</p>
+        {% else %}
+        <h1>Kutsu luotu, sähköposti ei lähtenyt</h1>
+        <div class="flash warning" role="alert" style="margin-top:0.75rem;">
+          Kutsusähköpostia ei voitu lähettää{% if result.email_error %}: {{ result.email_error }}{% else %}.{% endif %}
+          Kopioi alla oleva linkki ja lähetä se asiakkaalle itse. Syy on myös Audit-lokissa (account_email_failed).
+        </div>
+        {% endif %}
 
         <dl class="onboarding-result" style="margin-top:1.5rem;">
           <dt>Asiakas</dt>

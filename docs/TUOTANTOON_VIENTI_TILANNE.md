@@ -180,6 +180,23 @@ Migraatio `e9f0a1b2c3d4`, testit `tests/test_customer_simplification.py`.
   ei enää näytä asiakkaalle varaston kokoa eikä varastossa olevia osoitteita.
 - **Kojelauta** ohjaa painamaan Hae kohteita, kun näkyviä kohteita ei ole mutta haettavaa on.
 
+## Tehty 12.11.2026: kutsusähköpostien näkyvyys ja organisaation poisto
+
+Testit: `tests/test_org_purge_and_invite_mail.py`.
+
+- **Kutsusähköpostit.** Asiakaskutsun lähetystulos jätettiin huomiotta, eikä epäonnistumista kirjattu
+  minnekään. Mailgunin 401/403-vastaus korvattiin tekstillä "authentication failed". Nyt kaikista
+  tiliviesteistä (asiakaskutsu, tiimikutsu, salasanan palautus, käyttöönotto valmis) jää Audit-lokiin
+  `account_email_sent` tai `account_email_failed` syineen, ja sovellusloki saa varoitusrivin
+  ("Mailgun send failed ..."). Asiakaskutsun tulossivu kertoo, lähtikö viesti; tiimikutsun ilmoitus kertoo
+  syyn. Varsinaista syytä ei saatu selville ilman tuotannon lokia: todennäköisiä ovat Mailgunin
+  sandbox-domain (lähettää vain valtuutetuille vastaanottajille) tai roskapostikansio. Seuraava kutsu
+  kertoo syyn.
+- **Organisaation pysyvä poisto** (`app/admin/org_purge.py`): asiakaslistan "Poista pysyvästi" (vahvistus
+  kirjoittamalla organisaation nimi) ja `flask purge-organizations --all-customers [--yes]` (kuiva-ajo
+  ilman --yes). Poistaa käyttäjät, profiilit, osumat, liidit ja muun datan; kohdekatalogi, superadminit ja
+  Audit-loki (viittaus tyhjennetään) jäävät.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

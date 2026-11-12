@@ -93,6 +93,13 @@
                   <input type="hidden" name="active" value="{{ '0' if row.org.is_active else '1' }}">
                   <button type="submit" class="btn btn-secondary btn-sm">{{ 'Poista käytöstä' if row.org.is_active else 'Ota käyttöön' }}</button>
                 </form>
+                <form method="post" action="{{ url_for('admin.delete_customer_route', organization_id=row.org.id) }}" style="display:inline;"
+                      data-name="{{ row.org.name }}"
+                      onsubmit="var n = prompt('Poistetaanko ' + this.dataset.name + ' PYSYVÄSTI käyttäjineen, liideineen ja kohteineen? Tätä ei voi perua. Kirjoita organisaation nimi vahvistukseksi:'); if (n === null) return false; this.confirm_name.value = n; return true;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="confirm_name" value="">
+                  <button type="submit" class="btn btn-danger btn-sm">Poista pysyvästi</button>
+                </form>
               </td>
             </tr>
             {% endfor %}

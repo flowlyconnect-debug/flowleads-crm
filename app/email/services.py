@@ -115,8 +115,10 @@ def plaintext_to_html(text: str | None) -> str:
 
 def _safe_mailgun_error(exc: Exception) -> str:
     msg = str(exc)
-    if "401" in msg or "403" in msg or "Forbidden" in msg:
-        return "Email provider authentication failed."
+    if msg in ("Mailgun HTTP 401", "Unauthorized") or msg.startswith("HTTP Error 401"):
+        return "Email provider authentication failed (check MAILGUN_API_KEY and region)."
+    if msg in ("Mailgun HTTP 403", "Forbidden") or msg.startswith("HTTP Error 403"):
+        return "Email provider refused the message (Mailgun 403)."
     if "timeout" in msg.lower():
         return "Email provider request timed out."
     if len(msg) > 500:
@@ -164,6 +166,7 @@ def _mailgun_send(
     domain = (domain or "").strip() or current_app.config.get("MAILGUN_DOMAIN")
 
     if not api_key or not domain:
+        current_app.logger.warning("Email not sent: MAILGUN_API_KEY or MAILGUN_DOMAIN is not set.")
         return False, None, "Email sending is not configured."
 
     from_header = f"{from_name} <{from_email}>"
@@ -196,9 +199,50 @@ def _mailgun_send(
             err_msg = err_json.get("message", "Mailgun request failed.")
         except (json.JSONDecodeError, ValueError):
             err_msg = f"Mailgun HTTP {exc.code}"
-        return False, None, _safe_mailgun_error(Exception(err_msg))
+        error = _safe_mailgun_error(Exception(err_msg))
+        current_app.logger.warning(
+            "Mailgun send failed: HTTP %s domain=%s to=*@%s: %s",
+            exc.code, domain, to_email.rpartition("@")[2], error,
+        )
+        return False, None, error
     except Exception as exc:
-        return False, None, _safe_mailgun_error(exc)
+        error = _safe_mailgun_error(exc)
+        current_app.logger.warning(
+            "Mailgun send failed: domain=%s to=*@%s: %s", domain, to_email.rpartition("@")[2], error
+        )
+        return False, None, error
+
+
+def _record_account_email(kind: str, to_email: str, result: dict) -> dict:
+    """Account e-mails (invites, password resets) have no EmailLog row: put
+    the outcome in the audit log so a missing invite can be traced on
+    /admin/audit-log, with Mailgun's own reason."""
+    log_audit(
+        "account_email_sent" if result.get("success") else "account_email_failed",
+        metadata={
+            "kind": kind,
+            "to": to_email,
+            "message_id": result.get("message_id"),
+            "error": (result.get("error") or "")[:300] or None,
+        },
+    )
+    if not result.get("success"):
+        current_app.logger.warning("Account e-mail %s to %s not sent: %s", kind, to_email, result.get("error"))
+    return result
+
+
+def _account_email(kind: str):
+    def decorate(fn):
+        from functools import wraps
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            return _record_account_email(kind, kwargs.get("to_email") or "", result)
+
+        return wrapped
+
+    return decorate
 
 
 class EmailService:
@@ -368,6 +412,7 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    @_account_email("password_reset")
     def send_password_reset_email(*, to_email: str, reset_url: str) -> dict:
         if not email_sending_enabled():
             return {"success": False, "error": "sending_disabled"}
@@ -405,6 +450,7 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    @_account_email("teammate_invite")
     def send_teammate_invite_email(
         *, to_email: str, set_password_url: str, organization_name: str
     ) -> dict:
@@ -443,6 +489,7 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    @_account_email("onboarding_complete")
     def send_onboarding_complete_email(
         *, to_email: str, organization_name: str, login_url: str
     ) -> dict:
@@ -477,6 +524,7 @@ class EmailService:
         return {"success": ok, "message_id": message_id, "error": error}
 
     @staticmethod
+    @_account_email("customer_invite")
     def send_customer_invite_email(
         *, to_email: str, invite_url: str, organization_name: str, ttl_days: int
     ) -> dict:
@@ -490,7 +538,7 @@ class EmailService:
             "<div style='font-family:Inter,Arial,sans-serif;color:#111827;'>"
             f"<h2>Tervetuloa, {html.escape(organization_name)}</h2>"
             "<p>Sinut on kutsuttu FlowLeads-CRM:ään. Viimeistele käyttöönotto alla olevasta "
-            "linkistä: aseta salasana ja valitse hakualueet.</p>"
+            "linkistä asettamalla salasana.</p>"
             f"<p style='margin:20px 0;'><a href='{html.escape(invite_url)}' "
             "style='background:#2563EB;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;'>"
             "Aloita käyttöönotto</a></p>"
