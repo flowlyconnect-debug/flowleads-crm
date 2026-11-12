@@ -147,6 +147,9 @@ class Config:
         "AI_ENRICHMENT_MODEL", "gpt-4o-mini"
     )
     AI_AUTO_ENRICH_ON_CREATE = os.environ.get("AI_AUTO_ENRICH_ON_CREATE", "true").lower() == "true"
+    # Kohteet "Kerro mitä etsit": also ask the model (OPENAI_API_KEY) to read the
+    # text. Off = the rule-based reader only (app/listings/nl_search.py).
+    NL_SEARCH_AI_ENABLED = os.environ.get("NL_SEARCH_AI_ENABLED", "false").lower() in ("1", "true", "yes")
     AI_MAX_CONCURRENT_ENRICHMENTS = int(os.environ.get("AI_MAX_CONCURRENT_ENRICHMENTS", 3))
     AI_ENRICHMENT_MAX_RETRIES = int(os.environ.get("AI_ENRICHMENT_MAX_RETRIES", 2))
     AI_ENRICHMENT_RETRY_DELAY_SECONDS = int(os.environ.get("AI_ENRICHMENT_RETRY_DELAY_SECONDS", 60))

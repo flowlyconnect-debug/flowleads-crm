@@ -502,3 +502,10 @@
 .targets-map__table summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 .targets-map__table table { margin-top: 8px; width: 100%; }
 @media (max-width: 640px) { .targets-map { height: 60vh; } }
+
+/* "Kerro mitä etsit" */
+.targets-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.targets-ask__label { font-weight: 600; font-size: 14px; }
+.targets-ask__input { flex: 1 1 320px; min-width: 0; }
+.targets-ask__result { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; font-size: 13px; color: #374151; }
+.targets-ask__unknown { color: #6B7280; }

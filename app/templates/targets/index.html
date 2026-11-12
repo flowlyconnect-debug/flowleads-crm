@@ -94,6 +94,31 @@
       </form>
     </div>
 
+    {# Plain-language search: the text becomes the filters below (app/listings/nl_search.py). #}
+    <form method="get" action="{{ url_for('targets.ask', **org_query) }}" class="targets-ask" role="search" aria-label="Kerro mitä etsit">
+      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+      <label class="targets-ask__label" for="targets-ask-input">Kerro mitä etsit</label>
+      <input type="search" id="targets-ask-input" name="q" class="form-input targets-ask__input" maxlength="300"
+             value="{{ asked.text if asked else '' }}"
+             placeholder="esim. putkiremontit Tampereella 2027 mennessä, joilla on yhteystiedot">
+      <button type="submit" class="btn btn-secondary btn-sm">Hae</button>
+    </form>
+    {% if asked %}
+    <p class="targets-ask__result" role="status">
+      {% if asked.recognized %}
+      Tulkittiin: {% for label in asked.recognized %}<span class="badge badge-accent">{{ label }}</span>{% endfor %}
+      {% elif not asked.unknown %}
+      Haettiin nimellä tai osoitteella: <strong>{{ asked.text }}</strong>
+      {% else %}
+      Hakua ei tunnistettu.
+      {% endif %}
+      {% if asked.unknown %}<span class="targets-ask__unknown">Ei tunnistettu: {{ asked.unknown|join(', ') }}</span>{% endif %}
+      {% if asked.source == 'ai' %}<span class="targets-ask__unknown">(tekoälyn tulkinta)</span>{% endif %}
+      · Voit tarkentaa rajauksia alta.
+    </p>
+    {% endif %}
+
     {# Saved searches: one click applies a stored filter combination; the bell turns its notifications on or off. #}
     {% if (saved_searches or current_params) and not is_hidden_tab %}
     <div class="targets-saved">

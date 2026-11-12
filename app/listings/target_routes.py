@@ -114,6 +114,37 @@ def _current_params(search: str, profile_id, filters: dict) -> dict:
     return params
 
 
+_ASK_KEY = "targets_ask"
+
+
+@targets_bp.route("/ask", methods=["GET"])
+def ask():
+    """"Kerro mitä etsit": turn the text into the filter bar's filters and show
+    the list with them. The page tells how the text was read."""
+    from app.listings.nl_search import interpret
+
+    organization_id, tab, _profiles, profile_id, _search, _filters = _page_state()
+    text = " ".join((request.args.get("q") or "").split())[:300]
+    params = dict(org_query_suffix(organization_id))
+    if tab != "available":
+        params["tab"] = tab
+    if profile_id:
+        params["profile_id"] = profile_id
+    if not text:
+        return redirect(url_for("targets.index", **params))
+    result = interpret(text, target_filter_options(organization_id, TABS[tab]))
+    params.update(result["params"])
+    if result["search"]:
+        params["search"] = result["search"]
+    session[_ASK_KEY] = {
+        "text": text,
+        "recognized": result["recognized"][:8],
+        "unknown": result["unknown"][:8],
+        "source": result["source"],
+    }
+    return redirect(url_for("targets.index", **params))
+
+
 @targets_bp.route("/map", methods=["GET"])
 def map_view():
     """The same targets as the list (same tab, search and filters) on a map."""
@@ -214,11 +245,13 @@ def index():
                 if now - released < timedelta(minutes=5):
                     new_ids.add(match.id)
     current_params = _current_params(search, profile_id, filters)
+    asked = session.pop(_ASK_KEY, None)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
     return render_template(
         "targets/index.html",
         saved_searches=saved_searches,
+        asked=asked,
         current_params=current_params,
         active_saved_id=next(
             (s.id for s in saved_searches if (s.params or {}) == current_params and current_params), None
