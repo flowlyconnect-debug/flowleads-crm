@@ -147,7 +147,7 @@
 
 .lp-logo__img {
   display: block;
-  height: 28px;
+  height: 36px;
   width: auto; /* keep original aspect ratio */
 }
 
@@ -862,7 +862,7 @@
   .login-page { --lp-gutter: 32px; }
 
   .lp-header__inner { min-height: 68px; }
-  .lp-logo__img { height: 34px; }
+  .lp-logo__img { height: 42px; }
 
   .lp-header__site { display: inline-flex; }
   .lp-header__login { display: none; }

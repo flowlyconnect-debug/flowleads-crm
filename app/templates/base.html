@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}FlowLeads CRM{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/flowly-mark.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/inter.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <style>
@@ -80,6 +81,9 @@
           </svg>
           <span class="sr-only">Valikko</span>
         </button>
+        <a href="{{ url_for('analytics.dashboard') }}" class="app-main__topbar-logo" aria-label="FlowLeads etusivu">
+          <img src="{{ url_for('static', filename='img/flowly-logo.svg') }}" alt="Flowly Solutions" width="192" height="62">
+        </a>
       </div>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
