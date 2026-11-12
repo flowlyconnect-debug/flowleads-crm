@@ -21,7 +21,6 @@
   "phone_href": None,
   "privacy_url": None,
   "terms_url": None,
-  "price_month": None,
 } %}
 {% set demo_href = ("mailto:" ~ flowly.email ~ "?subject=FlowLeads%20CRM%20-esittely") if flowly.email else (flowly.contact_page_url or flowly.website_url) %}
 {% set help_href = ("mailto:" ~ flowly.email ~ "?subject=Apua%20FlowLeads-kirjautumiseen") if flowly.email else (flowly.contact_page_url or flowly.website_url) %}
@@ -71,12 +70,15 @@
   {"item": "Putkiremontin hankesuunnittelu", "qty": "1 kpl", "sum": "4 800,00 €"},
   {"item": "Viemärien kuntotutkimus (kuvaus)", "qty": "1 kpl", "sum": "2 400,00 €"},
 ] %}
+{# Urakkatyypit seuraavat app/search/constants.py::REMONTTITYYPIT-listaa ("Muu remontti" pois). #}
 {% set segments = [
   {"title": "Putkiremontit", "text": "Taloyhtiöt, joissa linjasaneeraus tai sukitus on suunnitteilla."},
-  {"title": "Katot", "text": "Vesikaton uusimiset ja korjaukset ennen kuin ne kilpailutetaan."},
-  {"title": "Julkisivut", "text": "Julkisivu-, parveke- ja ikkunaremontit samasta näkymästä."},
-  {"title": "Sähkö", "text": "Sähköverkon saneeraukset, latauspisteet ja nousukaapelit."},
-  {"title": "LVI", "text": "Ilmanvaihto, lämmitysmuodon vaihdot ja maalämpöhankkeet."},
+  {"title": "Katto- ja vesikattoremontit", "text": "Vesikaton uusimiset ja korjaukset ennen kuin ne kilpailutetaan."},
+  {"title": "Julkisivuremontit", "text": "Julkisivun korjaukset ja uusimiset, usein parvekkeiden ja ikkunoiden kanssa."},
+  {"title": "Sähkö- ja tietoliikennejärjestelmät", "text": "Sähköverkon saneeraukset, nousukaapelit, latauspisteet ja kuituyhteydet."},
+  {"title": "Lämmitysjärjestelmät", "text": "Lämmitysmuodon vaihdot, maalämpö ja lämmönjaon uusimiset."},
+  {"title": "Lukot ja kulunvalvonta", "text": "Lukituksen uusimiset ja sähköiset kulunvalvontajärjestelmät."},
+  {"title": "Huoneistoremontit", "text": "Osakkaiden huoneistoremontit taloyhtiöissä, joissa iso remontti on tulossa."},
 ] %}
 
 {% block title %}Kirjaudu — FlowLeads CRM | Flowly Solutions{% endblock %}
@@ -121,7 +123,7 @@
         <p class="lp-hero__lead">FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja asettaa ne järjestykseen sen mukaan, mitkä sopivat sinulle parhaiten. Vie kohteet liideiksi ja sähköpostisekvenssiin yhdellä painalluksella, soita soittolista läpi ja lähetä tarjous samasta näkymästä.</p>
         <ul class="lp-hero__points">
           <li>Putki-, katto-, julkisivu-, sähkö- ja LVI-urakoitsijoille</li>
-          <li>{% if flowly.price_month %}Julkinen kuukausihinta{% else %}Selkeä kuukausihinta{% endif %}, ei datapaketteja</li>
+          <li>Priorisointi, joka oppii valinnoistasi</li>
           <li>Maksuton kokeilu omalla alueellasi</li>
         </ul>
         <div class="lp-hero__actions">
@@ -321,46 +323,22 @@
         <h2 class="lp-section__title" id="lp-segments-title">Tehty pienille remonttiurakoitsijoille</h2>
         <p class="lp-section__lead">FlowLeads on rakennettu 1–20 hengen urakoitsijoille, jotka myyvät taloyhtiöille. Valitset omat urakkasi ja alueesi, ja näet vain sinulle sopivat kohteet.</p>
       </div>
-      <ul class="lp-segments__list">
-        {% for s in segments %}
-        <li class="lp-segment">
-          <h3 class="lp-segment__title">{{ s.title }}</h3>
-          <p>{{ s.text }}</p>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-  </section>
-
-  <section class="lp-section lp-pricing" aria-labelledby="lp-pricing-title">
-    <div class="lp-container">
-      <div class="lp-section__head">
-        <h2 class="lp-section__title" id="lp-pricing-title">Selkeä kuukausihinta ja maksuton kokeilu</h2>
-        <p class="lp-section__lead">Yksi kuukausihinta, ei datapaketteja. Näet ensin omalta alueeltasi muutaman oikean kohteen ja päätät vasta sitten.</p>
-      </div>
-      <div class="lp-pricing__grid">
-        <div class="lp-plan">
-          <p class="lp-plan__name">FlowLeads</p>
-          <p class="lp-plan__price">
-            {% if flowly.price_month %}<strong>{{ flowly.price_month }} €</strong> / kk + alv{% else %}<strong>Kiinteä kuukausihinta</strong>{% endif %}
-          </p>
-          <ul class="lp-plan__list">
-            <li>Kohteet omista urakoistasi ja alueiltasi</li>
-            <li>Oppiva priorisointi</li>
-            <li>CRM, sähköpostisekvenssit, soittolista ja tarjoukset</li>
-            <li>Päivittäinen kooste uusista kohteista</li>
-          </ul>
-          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary lp-btn--block"{% if not flowly.email %}{{ ext | safe }}{% endif %}>{% if flowly.price_month %}Aloita{% else %}Kysy hinta{% endif %}<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
-        </div>
-        <div class="lp-plan lp-plan--trial">
-          <p class="lp-plan__name">Maksuton kokeilu</p>
-          <p class="lp-plan__price"><strong>0 €</strong></p>
-          <ul class="lp-plan__list">
-            <li>Muutama oikea kohde omalta alueeltasi</li>
-            <li>Vie ne liideiksi ja kokeile koko ketjua tarjoukseen asti</li>
-            <li>Ei sitoutumista</li>
-          </ul>
-          <a href="{{ demo_href }}" class="lp-btn lp-btn--ghost lp-btn--block"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä kokeilu<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
+      <div class="lp-carousel" data-lp-carousel>
+        <ul class="lp-segments__list lp-carousel__track" data-lp-carousel-track tabindex="0" aria-label="Urakkatyypit">
+          {% for s in segments %}
+          <li class="lp-segment">
+            <h3 class="lp-segment__title">{{ s.title }}</h3>
+            <p>{{ s.text }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="lp-carousel__nav">
+          <button type="button" class="lp-carousel__btn" data-lp-carousel-prev aria-label="Edelliset urakkatyypit">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 15-5-5 5-5"/></svg>
+          </button>
+          <button type="button" class="lp-carousel__btn" data-lp-carousel-next aria-label="Seuraavat urakkatyypit">
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 5 5 5-5 5"/></svg>
+          </button>
         </div>
       </div>
     </div>

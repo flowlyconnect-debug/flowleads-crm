@@ -124,3 +124,61 @@
 
   sync();
 })();
+
+// Urakkatyyppien karuselli: nuolet vierittävät yhden kortin kerrallaan, ja rivi kiertää
+// itsestään, kunnes käyttäjä koskee siihen. Ilman JavaScriptiä rivi on vieritettävä lista.
+(function () {
+  var root = document.querySelector("[data-lp-carousel]");
+  if (!root) return;
+  var track = root.querySelector("[data-lp-carousel-track]");
+  var prev = root.querySelector("[data-lp-carousel-prev]");
+  var next = root.querySelector("[data-lp-carousel-next]");
+  var timer = null;
+
+  function step() {
+    var card = track.firstElementChild;
+    if (!card) return track.clientWidth;
+    var gap = parseFloat(window.getComputedStyle(track).columnGap) || 0;
+    return card.getBoundingClientRect().width + gap;
+  }
+
+  function atEnd() {
+    return track.scrollLeft + track.clientWidth >= track.scrollWidth - 2;
+  }
+
+  function update() {
+    prev.disabled = track.scrollLeft <= 2;
+    next.disabled = atEnd();
+  }
+
+  function move(dir) {
+    track.scrollBy({ left: dir * step(), behavior: "smooth" });
+  }
+
+  function stop() {
+    if (timer) window.clearInterval(timer);
+    timer = null;
+  }
+
+  prev.addEventListener("click", function () { stop(); move(-1); });
+  next.addEventListener("click", function () { stop(); move(1); });
+  track.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); stop(); move(1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); stop(); move(-1); }
+  });
+  track.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduced) {
+    timer = window.setInterval(function () {
+      if (atEnd()) track.scrollTo({ left: 0, behavior: "smooth" });
+      else move(1);
+    }, 3500);
+    root.addEventListener("pointerenter", stop);
+    root.addEventListener("focusin", stop);
+    track.addEventListener("touchstart", stop, { passive: true });
+  }
+
+  update();
+})();
