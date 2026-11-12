@@ -47,6 +47,18 @@
 
 .targets-bulk__count { color: var(--color-text-primary); font-weight: var(--font-weight-medium); }
 
+.targets-bulk__warn { color: #B45309; font-size: 12px; }
+.targets-bulk__warn:empty { display: none; }
+
+.targets-transferred__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.targets-transferred .targets-transferred__actions a.btn-primary { color: #fff; }
+
 .targets-bulk__actions {
   display: flex;
   flex: 0 0 auto;

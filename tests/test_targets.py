@@ -445,3 +445,23 @@ def test_unknown_sequence_stops_the_transfer(app, client):
     with app.app_context():
         assert Lead.query.filter_by(organization_id=org_id).count() == 0
         assert targets.count_targets(org_id) == 1
+
+
+def test_transfer_banner_opens_the_lead_and_rows_carry_contact_flags(app, client):
+    with app.app_context():
+        org, user = _org("banner")
+        _profile(org)
+        _listing(1, taloyhtio="As Oy Banneri", isannoitsija_email="a@example.com")
+        _listing(2, taloyhtio="As Oy Ilman")
+        org_id, email = org.id, user.email
+        ids = _match_ids(org)
+
+    _login(client, email)
+    html = client.get("/targets").get_data(as_text=True)
+    assert 'data-has-email="1"' in html and 'data-has-email="0"' in html and 'data-has-phone="0"' in html
+    assert 'id="targets-selected-warn"' in html
+
+    page = client.post("/targets/transfer", data={"match_ids": ids[:1]}, follow_redirects=True).get_data(as_text=True)
+    with app.app_context():
+        lead = Lead.query.filter_by(organization_id=org_id).one()
+    assert "Avaa liidi" in page and f'href="/leads/{lead.id}"' in page
