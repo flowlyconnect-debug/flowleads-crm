@@ -25,7 +25,8 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   taloyhtiö, the manager goes to `Lead.title`; leads are never merged by email (`match_by_email=False`); another apartment of the same taloyhtiö joins the existing
   lead (`ListingMatch.status == "merged"`).
 - Onboarding (`app/admin/onboarding_services.py`, `invite_services.py`) creates an **active** profile and
-  nothing else per customer: no API key, no SearchJob. It asks only the renovation types (urakat); regions
+  the ready-made email sequence (`app/sequences/defaults.py::ensure_default_sequences`) per customer: no API key,
+  no SearchJob. It asks only the renovation types (urakat); regions
   default to "Koko Suomi" and the customer narrows the list with the Kohteet filters. Turning a profile on must go through
   `activate_profile()` so it is rematched. Billing is manual for now.
 - **Oikotie blocks n8n Cloud since 11/2026** (DataDome 403 + captcha, the old Lead Worker too). The Crawler stops

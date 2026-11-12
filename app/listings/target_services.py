@@ -333,8 +333,13 @@ def transfer_targets(
 
 def sequences_for_transfer(organization_id: int) -> list:
     """Active email sequences with at least one step: the ones a transfer can
-    start for the new leads."""
+    start for the new leads. None when the organization does not have the
+    Sähköpostisekvenssit module."""
+    from app.core.features import organization_has_feature
     from app.sequences.models import EmailSequence, EmailSequenceStep
+
+    if not organization_has_feature(organization_id, "sequences"):
+        return []
 
     has_steps = (
         db.session.query(EmailSequenceStep.id)
