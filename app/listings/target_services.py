@@ -330,6 +330,62 @@ def transfer_targets(
     return result
 
 
+
+def sequences_for_transfer(organization_id: int) -> list:
+    """Active email sequences with at least one step: the ones a transfer can
+    start for the new leads."""
+    from app.sequences.models import EmailSequence, EmailSequenceStep
+
+    has_steps = (
+        db.session.query(EmailSequenceStep.id)
+        .filter(EmailSequenceStep.sequence_id == EmailSequence.id)
+        .exists()
+    )
+    return (
+        EmailSequence.query.filter(
+            EmailSequence.organization_id == organization_id,
+            EmailSequence.is_active.is_(True),
+            has_steps,
+        )
+        .order_by(EmailSequence.name.asc())
+        .all()
+    )
+
+
+def enroll_transferred_leads(
+    organization_id: int, lead_ids, sequence_id: int, *, enrolled_by: int | None = None
+) -> dict:
+    """Start one sequence for the leads a transfer created or joined. A lead
+    without an email address, an unsubscribed one and one already in the
+    sequence are skipped and counted. Returns the counts."""
+    from app.leads.models import Lead
+    from app.sequences.services import SequenceService, SequenceServiceError
+
+    result = {"enrolled": 0, "no_email": 0, "already": 0, "unsubscribed": 0}
+    sequence = next((s for s in sequences_for_transfer(organization_id) if s.id == sequence_id), None)
+    if sequence is None or not lead_ids:
+        return result
+    leads = Lead.query.filter(Lead.organization_id == organization_id, Lead.id.in_(list(lead_ids))).all()
+    for lead in leads:
+        if not (lead.email or "").strip():
+            result["no_email"] += 1
+            continue
+        try:
+            SequenceService.enroll_lead(
+                lead.id, sequence.id, enrolled_by=enrolled_by, organization_id=organization_id
+            )
+        except SequenceServiceError as exc:
+            if exc.code == "duplicate_enrollment":
+                result["already"] += 1
+            elif exc.code == "unsubscribed":
+                result["unsubscribed"] += 1
+            else:
+                raise
+            continue
+        result["enrolled"] += 1
+    db.session.commit()
+    return result
+
 def _set_status(organization_id: int, match_ids, *, from_status: str, to_status: str) -> int:
     changed = 0
     for match in _own_matches(organization_id, match_ids, (from_status,)):

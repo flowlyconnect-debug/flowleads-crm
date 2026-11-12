@@ -26,6 +26,8 @@ from app.listings.target_services import (
     organization_wanted_types,
     count_targets,
     dismiss_targets,
+    enroll_transferred_leads,
+    sequences_for_transfer,
     list_targets,
     restore_targets,
     target_row,
@@ -183,6 +185,7 @@ def index():
         sort_options=SORT_OPTIONS,
         transferred_leads=transferred_leads,
         assignees=assignees,
+        transfer_sequences=sequences_for_transfer(organization_id) if TABS[tab] == "pending" else [],
         rows=[target_row(match, wanted_types) for match in pagination.items],
         pagination=pagination,
         tab=tab,
@@ -205,6 +208,13 @@ def transfer():
         flash("Valitse vähintään yksi kohde.", "warning")
         return _back(organization_id)
     assigned_to = _valid_assignee(organization_id, request.form.get("assigned_to", type=int))
+    sequence_id = request.form.get("sequence_id", type=int)
+    sequence = None
+    if sequence_id:
+        sequence = next((s for s in sequences_for_transfer(organization_id) if s.id == sequence_id), None)
+        if sequence is None:
+            flash("Valittua sekvenssiä ei löytynyt tai se ei ole käytössä.", "warning")
+            return _back(organization_id)
     result = transfer_targets(organization_id, match_ids, assigned_to=assigned_to)
     if result["lead_ids"]:
         session[_TRANSFERRED_KEY] = result["lead_ids"][:25]
@@ -235,7 +245,45 @@ def transfer():
         flash(f"{result['failed']} kohteen siirto epäonnistui.", "danger")
     if not parts and not result["failed"]:
         flash("Kohteet oli jo käsitelty.", "info")
+    if sequence is not None and result["lead_ids"]:
+        _start_sequence(organization_id, sequence, result["lead_ids"])
     return _back(organization_id)
+
+
+def _start_sequence(organization_id: int, sequence, lead_ids: list[int]) -> None:
+    """Second half of "Siirrä liideiksi ja lisää sekvenssiin": the new leads go
+    into the chosen email sequence, and the user is told who was left out."""
+    enrolled = enroll_transferred_leads(organization_id, lead_ids, sequence.id, enrolled_by=current_user.id)
+    log_audit(
+        "targets_sequence_started",
+        user_id=current_user.id,
+        organization_id=organization_id,
+        target_type="email_sequence",
+        target_id=sequence.id,
+        metadata=enrolled,
+    )
+    db.session.commit()
+    if enrolled["enrolled"]:
+        flash(
+            _plural(enrolled["enrolled"], "liidi lisätty", "liidiä lisätty") + f" sekvenssiin {sequence.name}.",
+            "success",
+        )
+    if enrolled["no_email"]:
+        count = enrolled["no_email"]
+        flash(
+            f"{count} liidiltä puuttuu sähköpostiosoite, joten "
+            + ("sitä" if count == 1 else "niitä")
+            + " ei lisätty sekvenssiin. Lisää osoite liidille ja käynnistä sekvenssi liidin sivulta.",
+            "warning",
+        )
+    if enrolled["already"]:
+        flash(_plural(enrolled["already"], "liidi oli", "liidiä oli") + " jo tässä sekvenssissä.", "info")
+    if enrolled["unsubscribed"]:
+        flash(
+            _plural(enrolled["unsubscribed"], "liidi on", "liidiä on")
+            + " perunut viestit, joten sekvenssiä ei käynnistetty niille.",
+            "info",
+        )
 
 
 @targets_bp.route("/searches", methods=["POST"])

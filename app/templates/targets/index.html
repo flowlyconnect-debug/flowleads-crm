@@ -244,7 +244,16 @@
             {% endfor %}
           </select>
           {% endif %}
-          <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled>Siirrä valitut liideiksi</button>
+          {% if transfer_sequences %}
+          <label class="targets-assignee__label" for="targets-sequence">Sekvenssi</label>
+          <select name="sequence_id" id="targets-sequence" class="form-input targets-assignee" title="Sähköpostisekvenssi, joka käynnistetään uusille liideille" data-transfer-sequence>
+            <option value="">Ei sekvenssiä</option>
+            {% for sequence in transfer_sequences %}
+            <option value="{{ sequence.id }}">{{ sequence.name }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+          <button type="submit" class="btn btn-primary btn-sm" data-bulk disabled data-transfer-button>Siirrä valitut liideiksi</button>
           {% endif %}
         </span>
       </div>
@@ -438,6 +447,28 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   boxes.forEach(function (b) { b.addEventListener('change', refresh); });
   refresh();
+
+  // "Siirrä liideiksi ja lisää sekvenssiin": the button names the second step,
+  // and the last chosen sequence is remembered in this browser.
+  var sequence = form.querySelector('[data-transfer-sequence]');
+  var transferButton = form.querySelector('[data-transfer-button]');
+  if (sequence && transferButton) {
+    var storageKey = 'flowleads.targets.sequence';
+    try {
+      var saved = window.localStorage.getItem(storageKey);
+      if (saved && sequence.querySelector('option[value="' + saved + '"]')) sequence.value = saved;
+    } catch (e) {}
+    var syncLabel = function () {
+      transferButton.textContent = sequence.value
+        ? 'Siirrä valitut liideiksi ja lisää sekvenssiin'
+        : 'Siirrä valitut liideiksi';
+    };
+    sequence.addEventListener('change', function () {
+      try { window.localStorage.setItem(storageKey, sequence.value); } catch (e) {}
+      syncLabel();
+    });
+    syncLabel();
+  }
 });
 </script>
 {% endblock %}

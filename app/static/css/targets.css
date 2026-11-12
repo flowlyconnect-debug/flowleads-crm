@@ -49,8 +49,15 @@
 
 .targets-bulk__actions {
   display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+/* With an owner and a sequence picker the actions no longer fit on one line. */
+@media (max-width: 1100px) {
+  .targets-bulk__actions { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; }
 }
 
 .targets-list {
@@ -161,7 +168,10 @@
     grid-column: 2;
     justify-content: flex-start;
   }
-  .targets-bulk__actions { margin-left: 0; }
+  .targets-bulk__actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .targets-bulk__actions .targets-assignee { flex: 1 1 160px; max-width: none; }
+  .targets-bulk__actions .targets-assignee__label { margin-left: 0; }
+  .targets-bulk__actions [data-transfer-button] { flex: 1 1 100%; white-space: normal; }
 }
 
 /* Filter bar */

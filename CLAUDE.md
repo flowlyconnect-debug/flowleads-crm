@@ -39,7 +39,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   everything built on it count released targets only; `count_reserve()` is the rest.
 - Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
-  `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner.
+  `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner and start an email sequence
+  for the new leads in the same action (`sequences_for_transfer()`, `enroll_transferred_leads()`; leads without
+  an email are skipped and reported).
 - Read models over what an organization already sees (`app/listings/insight_services.py`,
   `insight_routes.py`, never the reserve): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
   (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).
