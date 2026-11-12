@@ -594,7 +594,9 @@ def dashboard_today():
                 "ai_recommendations": [],
             }
         )
-    data = DashboardTodayService.get_today_data(organization_id)
+    data = DashboardTodayService.get_today_data(
+        organization_id, None if current_user.is_superadmin() else current_user.id
+    )
     return json_success(data)
 
 
@@ -623,7 +625,11 @@ def dashboard_metrics():
                 "pipeline_value": None,
             }
         )
-    return json_success(DashboardTodayService.get_dashboard_metrics(organization_id))
+    return json_success(
+        DashboardTodayService.get_dashboard_metrics(
+            organization_id, None if current_user.is_superadmin() else current_user.id
+        )
+    )
 
 
 @analytics_bp.route("/api/dashboard/pipeline-distribution", methods=["GET"])

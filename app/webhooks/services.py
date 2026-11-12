@@ -42,6 +42,55 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def chat_summary(event_type: str, raw_payload: dict) -> tuple[str, str, list[tuple[str, str]], str]:
+    """(title, subject, facts, crm_url) of an event for a chat message, in
+    Finnish. The title is the event itself ("Liidin vaihe muuttui", "Tarjous
+    hyväksytty", ...), not always "Uusi liidi"; the lead's details are looked
+    up when the event carries only its id."""
+    from app.leads.models import Lead
+
+    data = raw_payload.get("data") or {}
+    organization_id = raw_payload.get("organization_id")
+    title = WEBHOOK_EVENTS.get(event_type, {}).get("label") or event_type
+    lead_data = data.get("lead") or {}
+    task = data.get("task") or {}
+    proposal = data.get("proposal") or {}
+    sequence = data.get("sequence") or {}
+    lead_id = lead_data.get("id") or task.get("lead_id") or proposal.get("lead_id")
+    lead = None
+    if lead_id and organization_id:
+        try:
+            lead = Lead.query.filter_by(id=lead_id, organization_id=organization_id).first()
+        except Exception:
+            lead = None
+    company = (lead_data.get("company") or (lead.company if lead else "") or "").strip()
+    name = (lead_data.get("name") or (lead.display_name if lead else "") or "").strip()
+    subject = company or name
+    facts: list[tuple[str, str]] = []
+    if name and name != subject:
+        facts.append(("Kontakti", name))
+    if lead is not None and lead.stage is not None and event_type in ("lead.stage_changed", "lead.created"):
+        from app import stage_label_fi
+
+        facts.append(("Vaihe", stage_label_fi(lead.stage.name)))
+    score = lead_data.get("score", lead.score if lead else None)
+    if score is not None:
+        facts.append(("Pisteet", str(score)))
+    if task.get("title"):
+        facts.append(("Tehtävä", str(task["title"])))
+    if proposal.get("title"):
+        facts.append(("Tarjous", str(proposal["title"])))
+    if proposal.get("total") is not None:
+        facts.append(("Summa", f"{proposal['total']} €"))
+    if sequence.get("name"):
+        facts.append(("Sekvenssi", str(sequence["name"])))
+    source = lead_data.get("source") or (lead.source if lead else None)
+    if source and event_type == "lead.created":
+        facts.append(("Lähde", str(source)))
+    crm_url = lead_data.get("crm_url") or (f"{crm_base_url()}/leads/{lead_id}" if lead_id else crm_base_url())
+    return title, subject, facts, crm_url
+
+
 class WebhookService:
     @staticmethod
     def dispatch(event_type, payload, organization_id, triggered_by=None):
@@ -110,50 +159,27 @@ class WebhookService:
 
     @staticmethod
     def format_payload(event_type, raw_payload, provider):
-        if provider == "slack":
-            lead = (raw_payload.get("data") or {}).get("lead") or {}
-            contact = (lead.get("name") or "").strip() or "N/A"
-            company = (lead.get("company") or "").strip() or "Lead"
-            score = lead.get("score")
-            source = lead.get("source") or "unknown"
-            crm_url = lead.get("crm_url") or crm_base_url()
-            text = (
-                f"*Uusi liidi: {company}* 🎯\n"
-                f"*Kontakti:* {contact}\n"
-                f"*Score:* {score if score is not None else '-'}\n"
-                f"*Lähde:* {source}"
-            )
-            return {
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {"type": "mrkdwn", "text": text},
-                    },
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "Avaa CRM:ssä",
-                                },
-                                "url": crm_url,
-                            }
-                        ],
-                    },
-                ]
-            }
-
-        if provider == "teams":
-            lead = (raw_payload.get("data") or {}).get("lead") or {}
-            crm_url = lead.get("crm_url") or crm_base_url()
-            facts = [
-                {"title": "Event", "value": event_type},
-                {"title": "Lead", "value": lead.get("name") or lead.get("company") or "-"},
-                {"title": "Score", "value": str(lead.get("score") or "-")},
-                {"title": "Source", "value": str(lead.get("source") or "-")},
-            ]
+        if provider in ("slack", "teams"):
+            title, subject, facts, crm_url = chat_summary(event_type, raw_payload)
+            if provider == "slack":
+                lines = [f"*{title}: {subject}*" if subject else f"*{title}*"]
+                lines += [f"*{label}:* {value}" for label, value in facts]
+                return {
+                    "text": f"{title}: {subject}" if subject else title,  # notification preview
+                    "blocks": [
+                        {"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}},
+                        {
+                            "type": "actions",
+                            "elements": [
+                                {
+                                    "type": "button",
+                                    "text": {"type": "plain_text", "text": "Avaa CRM:ssä"},
+                                    "url": crm_url,
+                                }
+                            ],
+                        },
+                    ],
+                }
             return {
                 "type": "message",
                 "attachments": [
@@ -167,20 +193,12 @@ class WebhookService:
                                     "type": "TextBlock",
                                     "size": "Medium",
                                     "weight": "Bolder",
-                                    "text": f"FlowLeads event: {event_type}",
+                                    "wrap": True,
+                                    "text": f"{title}: {subject}" if subject else title,
                                 },
-                                {
-                                    "type": "FactSet",
-                                    "facts": facts,
-                                },
+                                {"type": "FactSet", "facts": [{"title": k, "value": v} for k, v in facts]},
                             ],
-                            "actions": [
-                                {
-                                    "type": "Action.OpenUrl",
-                                    "title": "Avaa CRM:ssä",
-                                    "url": crm_url,
-                                }
-                            ],
+                            "actions": [{"type": "Action.OpenUrl", "title": "Avaa CRM:ssä", "url": crm_url}],
                         },
                     }
                 ],

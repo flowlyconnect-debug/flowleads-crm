@@ -52,6 +52,17 @@ class Config:
 
     BACKUP_DIR = os.environ.get("BACKUP_DIR", "./backups")
     BACKUP_RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", 30))
+    # Content-Security-Policy of every HTML page. Scripts and styles only from
+    # this server (libraries are vendored in app/static/vendor). 'unsafe-inline'
+    # stays until the templates' inline <script> blocks and on*-attributes are
+    # moved to static files; img-src allows https images (proposal logos, map
+    # tiles). Set to "" to switch the header off.
+    CONTENT_SECURITY_POLICY = os.environ.get(
+        "CONTENT_SECURITY_POLICY",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'self'",
+    )
     # auto = pg_dump when it is at least the server's version, otherwise the
     # Python dump (app/backups/logical.py); "python" / "pg_dump" force one
     BACKUP_DB_FORMAT = os.environ.get("BACKUP_DB_FORMAT", "auto")

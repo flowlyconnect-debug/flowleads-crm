@@ -74,7 +74,7 @@
       {% if next_task %}
       <span class="lead-focus__next-label">Kirjattu seuraava toimi</span>
       <span class="lead-focus__next-text">{{ next_task.title }}</span>
-      {% if next_task.due_date %}<span class="lead-focus__next-meta">Eräpäivä {{ next_task.due_date.strftime('%d.%m.%Y') }}</span>{% endif %}
+      {% if next_task.due_date %}<span class="lead-focus__next-meta">Eräpäivä {{ (next_task.due_date|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
       {% elif is_closed_lead %}
       <span class="lead-focus__next-label">Tila</span>
       <span class="lead-focus__next-text">{{ 'Kauppa voitettu' if lead.status == 'won' else 'Kauppa hävitty' }}</span>
@@ -359,7 +359,7 @@
                       <span class="badge priority-{{ task.priority }}">{{ task.priority }}</span>
                     </div>
                     <div class="activity-time">
-                      {{ task.due_date.strftime('%Y-%m-%d %H:%M') if task.due_date else '' }}
+                      {{ (task.due_date|helsinki).strftime('%d.%m.%Y %H.%M') if task.due_date else '' }}
                     </div>
                     {% if task.status != 'completed' %}
                     <form method="post" action="{{ url_for('tasks.complete_task', task_id=task.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('tasks.complete_task', task_id=task.id) }}">

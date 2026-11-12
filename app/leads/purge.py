@@ -9,7 +9,7 @@ with the reference cleared.
 
 from __future__ import annotations
 
-from sqlalchemy import Table, delete, func, select, true, update
+from sqlalchemy import Table, and_, delete, func, not_, or_, select, true, update
 
 from app.extensions import db
 
@@ -21,6 +21,17 @@ def _count(table: Table, condition) -> int:
     return db.session.execute(select(func.count()).select_from(table).where(condition)).scalar() or 0
 
 
+def _count_new(table: Table, condition, key: str, seen: dict, dry_run: bool) -> int:
+    """Rows matching `condition` not counted before under `key`. A real run
+    has deleted the earlier rows already; a dry run must not count a row that
+    two paths reach (a listing match is both a lead's and a listing's child)
+    twice."""
+    previous = seen.setdefault(key, [])
+    effective = and_(condition, not_(or_(*previous))) if (dry_run and previous) else condition
+    previous.append(condition)
+    return _count(table, effective)
+
+
 def _purge_table(
     table: Table,
     condition,
@@ -28,10 +39,12 @@ def _purge_table(
     dry_run: bool,
     stack: tuple = (),
     delete_with_parent: frozenset | set = frozenset(),
+    seen: dict | None = None,
 ) -> None:
     """Delete `table` rows matching `condition`, children first. A nullable
     reference keeps its row with the reference cleared, unless it is listed in
     _DELETE_WITH_PARENT or `delete_with_parent`."""
+    seen = {} if seen is None else seen
     always_delete = _DELETE_WITH_PARENT | set(delete_with_parent)
     if "id" in table.c:
         parent_ids = select(table.c.id).where(condition)
@@ -44,7 +57,7 @@ def _purge_table(
                 keep_row = column.nullable and (child.name, column.name) not in always_delete
                 if keep_row or child is table or child.name in stack:
                     key = f"{child.name}.{column.name} (viittaus tyhjennetty)"
-                    counts[key] = counts.get(key, 0) + _count(child, child_condition)
+                    counts[key] = counts.get(key, 0) + _count_new(child, child_condition, key, seen, dry_run)
                     if not dry_run:
                         db.session.execute(
                             update(child).where(child_condition).values({column.name: None}),
@@ -52,10 +65,10 @@ def _purge_table(
                         )
                 else:
                     _purge_table(
-                        child, child_condition, counts, dry_run, stack + (table.name,), delete_with_parent
+                        child, child_condition, counts, dry_run, stack + (table.name,), delete_with_parent, seen
                     )
 
-    counts[table.name] = counts.get(table.name, 0) + _count(table, condition)
+    counts[table.name] = counts.get(table.name, 0) + _count_new(table, condition, table.name, seen, dry_run)
     if not dry_run:
         db.session.execute(delete(table).where(condition), execution_options={"synchronize_session": False})
 
@@ -71,10 +84,11 @@ def purge_all_leads(*, with_listings: bool = False, dry_run: bool = True) -> dic
     if not dry_run:
         db.session.execute(delete(custom_values).where(lead_values), execution_options={"synchronize_session": False})
 
-    _purge_table(tables["leads"], true(), counts, dry_run)
+    seen: dict = {}
+    _purge_table(tables["leads"], true(), counts, dry_run, seen=seen)
 
     if with_listings:
-        _purge_table(tables["listings"], true(), counts, dry_run)
+        _purge_table(tables["listings"], true(), counts, dry_run, seen=seen)
 
     if not dry_run:
         # Running totals shown in the UI would otherwise still count the deleted leads.

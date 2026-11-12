@@ -35,6 +35,7 @@ def create_app(config_object=None):
     from app.listings.housing import install_listeners
 
     install_listeners()  # keeps Listing.company_key in step with the name / Y-tunnus
+    from app.core import one_time_secrets as _one_time_secrets  # noqa: F401  (model for db.create_all)
     _register_blueprints(app)
     register_error_handlers(app)
     _register_security_headers(app)
@@ -73,8 +74,14 @@ def _register_security_headers(app):
         headers.setdefault("X-Content-Type-Options", "nosniff")
         headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         # The web form embed page is meant to sit in an iframe on customer sites.
-        if request.endpoint != "forms.iframe_embed":
+        embed = request.endpoint == "forms.iframe_embed"
+        if not embed:
             headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        policy = app.config.get("CONTENT_SECURITY_POLICY")
+        if policy and (response.mimetype or "").startswith("text/html"):
+            if embed:
+                policy = policy.replace("frame-ancestors 'self'", "frame-ancestors *")
+            headers.setdefault("Content-Security-Policy", policy)
         if request.is_secure:
             headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response

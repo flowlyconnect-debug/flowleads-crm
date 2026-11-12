@@ -192,7 +192,7 @@
       <h3 class="text-sm font-semibold">Avoimet tehtävät</h3>
       <ul class="text-sm">
         {% for task in open_tasks %}
-        <li>{{ task.title }} — {{ task.due_date.strftime('%d.%m.%Y') }}</li>
+        <li>{{ task.title }} — {{ (task.due_date|helsinki).strftime('%d.%m.%Y') }}</li>
         {% endfor %}
       </ul>
     </div>

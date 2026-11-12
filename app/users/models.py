@@ -74,6 +74,8 @@ class User(UserMixin, db.Model):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Set when a superadmin created the account with a temporary password:
     # the user is forced to pick their own before using the app.
+    # last successful sign-in; NULL = invited, never signed in
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=sa_false(), nullable=False
     )

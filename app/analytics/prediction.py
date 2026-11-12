@@ -255,8 +255,9 @@ class PredictionService:
         ).all()
         durations = []
         for wl in won_leads:
-            if wl.created_at and wl.updated_at:
-                days = PredictionService._days_between(wl.created_at, wl.updated_at)
+            closed_at = wl.stage_changed_at or wl.updated_at
+            if wl.created_at and closed_at:
+                days = PredictionService._days_between(wl.created_at, closed_at)
                 if days is not None:
                     durations.append(days)
         avg_days = round(sum(durations) / len(durations), 1) if durations else None

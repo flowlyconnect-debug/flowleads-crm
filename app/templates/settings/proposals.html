@@ -29,6 +29,10 @@
             <label class="form-label">{{ form.proposal_default_notes.label.text }}
               {{ form.proposal_default_notes(rows=3, class='form-input') }}
             </label>
+            <label class="form-label">{{ form.proposal_number_prefix.label.text }}
+              {{ form.proposal_number_prefix(class='form-input', placeholder='FLW', maxlength=12) }}
+            </label>
+            <p class="form-helper">Vain kirjaimia ja numeroita. Koskee uusia tarjouksia; numerointi jatkuu vuoden sisällä.</p>
           </div>
           <h2 class="form-section-title">PDF-malli</h2>
           <div class="form-group">

@@ -1,5 +1,3 @@
-import secrets
-import time
 
 from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
@@ -17,76 +15,43 @@ from app.search.models import SearchProfile
 from app.users.services import UserServiceError, create_organization
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-_PENDING_ADMIN_API_KEYS_SESSION = "pending_admin_api_keys"
-_PENDING_ONBOARDING_RESULT_SESSION = "pending_onboarding_result"
-_PENDING_ADMIN_API_KEY_TTL_SECONDS = 15 * 60
+
+
+# Secrets shown once (new API key, temporary password, invite link) wait on
+# the server, not in the readable session cookie: app/core/one_time_secrets.py
 
 
 def _store_pending_admin_api_key(organization_id: int, full_key: str) -> None:
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    token = secrets.token_urlsafe(24)
-    pending[token] = {
-        "organization_id": int(organization_id),
-        "full_key": full_key,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember(
+        "admin_api_key", {"organization_id": int(organization_id), "full_key": full_key}, current_user.id
+    )
 
 
 def _pending_admin_api_key_exists() -> bool:
-    now = int(time.time())
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    changed = False
-    exists = False
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            changed = True
-            continue
-        exists = True
-    if changed:
-        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-        session.modified = True
-    return exists
+    from app.core import one_time_secrets
+
+    return bool(one_time_secrets.pending("admin_api_key", current_user.id))
 
 
 def _consume_pending_admin_api_key() -> str | None:
-    now = int(time.time())
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            continue
-        full_key = str(entry.get("full_key", "")).strip()
-        pending.pop(token, None)
-        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-        session.modified = True
-        return full_key or None
-    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-    session.modified = True
-    return None
+    from app.core import one_time_secrets
+
+    payload = one_time_secrets.consume("admin_api_key", current_user.id)
+    return (str(payload.get("full_key") or "").strip() or None) if payload else None
 
 
 def _store_onboarding_result(result: dict) -> None:
-    session[_PENDING_ONBOARDING_RESULT_SESSION] = {
-        **result,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember("onboarding_result", result, current_user.id)
 
 
 def _consume_onboarding_result() -> dict | None:
-    entry = session.get(_PENDING_ONBOARDING_RESULT_SESSION)
-    if not entry:
-        return None
-    if int(entry.get("expires_at", 0)) < int(time.time()):
-        session.pop(_PENDING_ONBOARDING_RESULT_SESSION, None)
-        session.modified = True
-        return None
-    session.pop(_PENDING_ONBOARDING_RESULT_SESSION, None)
-    session.modified = True
-    return entry
+    from app.core import one_time_secrets
+
+    return one_time_secrets.consume("onboarding_result", current_user.id)
 
 
 @admin_bp.route("/dashboard")
@@ -449,28 +414,16 @@ def create_customer_result():
     return render_template("admin/customer_onboarding_result.html", result=result)
 
 
-_PENDING_INVITE_RESULT_SESSION = "pending_invite_result"
-
-
 def _store_invite_result(result: dict) -> None:
-    session[_PENDING_INVITE_RESULT_SESSION] = {
-        **result,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember("invite_result", result, current_user.id)
 
 
 def _consume_invite_result() -> dict | None:
-    entry = session.get(_PENDING_INVITE_RESULT_SESSION)
-    if not entry:
-        return None
-    if int(entry.get("expires_at", 0)) < int(time.time()):
-        session.pop(_PENDING_INVITE_RESULT_SESSION, None)
-        session.modified = True
-        return None
-    session.pop(_PENDING_INVITE_RESULT_SESSION, None)
-    session.modified = True
-    return entry
+    from app.core import one_time_secrets
+
+    return one_time_secrets.consume("invite_result", current_user.id)
 
 
 def fi_email_error(error: str | None) -> str | None:
@@ -646,6 +599,21 @@ def update_customer_features_route(organization_id: int):
     db.session.commit()
     flash(f"Toiminnot päivitetty: {organization.name}.", "success")
     return redirect(url_for("admin.customers_list"))
+
+
+@admin_bp.route("/system")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def system_status():
+    """Järjestelmän tila: email, backups, keys and migrations at a glance."""
+    from app.admin.system_check import run_checks, summary
+
+    checks = run_checks()
+    groups: dict[str, list] = {}
+    for check in checks:
+        groups.setdefault(check["group"], []).append(check)
+    return render_template("admin/system.html", groups=groups, summary=summary(checks))
 
 
 @admin_bp.route("/catalogue")

@@ -1,5 +1,3 @@
-import secrets
-import time
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
@@ -9,56 +7,27 @@ from app.core.permissions import require_role
 from app.extensions import db
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
-_PENDING_API_KEYS_SESSION = "pending_api_keys"
-_PENDING_API_KEY_TTL_SECONDS = 15 * 60
 
 
 def _store_pending_api_key(org_id: int, full_key: str) -> None:
-    pending = session.get(_PENDING_API_KEYS_SESSION, {})
-    token = secrets.token_urlsafe(24)
-    pending[token] = {
-        "org_id": int(org_id),
-        "full_key": full_key,
-        "expires_at": int(time.time()) + _PENDING_API_KEY_TTL_SECONDS,
-    }
-    session[_PENDING_API_KEYS_SESSION] = pending
-    session.modified = True
+    """The new key waits on the server (app/core/one_time_secrets.py) until
+    the page shows it once; the session cookie only holds a token."""
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember("api_key", {"org_id": int(org_id), "full_key": full_key}, current_user.id)
 
 
 def _pending_api_key_exists(org_id: int) -> bool:
-    now = int(time.time())
-    pending = session.get(_PENDING_API_KEYS_SESSION, {})
-    changed = False
-    exists = False
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            changed = True
-            continue
-        if int(entry.get("org_id", -1)) == int(org_id):
-            exists = True
-    if changed:
-        session[_PENDING_API_KEYS_SESSION] = pending
-        session.modified = True
-    return exists
+    from app.core import one_time_secrets
+
+    return bool(one_time_secrets.pending("api_key", current_user.id, lambda p: int(p.get("org_id", -1)) == int(org_id)))
 
 
 def _consume_pending_api_key(org_id: int) -> str | None:
-    now = int(time.time())
-    pending = session.get(_PENDING_API_KEYS_SESSION, {})
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            continue
-        if int(entry.get("org_id", -1)) == int(org_id):
-            full_key = str(entry.get("full_key", "")).strip()
-            pending.pop(token, None)
-            session[_PENDING_API_KEYS_SESSION] = pending
-            session.modified = True
-            return full_key or None
-    session[_PENDING_API_KEYS_SESSION] = pending
-    session.modified = True
-    return None
+    from app.core import one_time_secrets
+
+    payload = one_time_secrets.consume("api_key", current_user.id, lambda p: int(p.get("org_id", -1)) == int(org_id))
+    return (str(payload.get("full_key") or "").strip() or None) if payload else None
 
 
 @settings_bp.route("/api-keys", methods=["GET"])

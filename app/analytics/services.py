@@ -138,6 +138,20 @@ def time_ago(dt: datetime | None) -> str:
     return dt.strftime("%Y-%m-%d")
 
 
+def _closed_at_column():
+    """When a deal was won or lost: the stage change, or the last edit for
+    leads closed before stage_changed_at existed. (updated_at alone moves
+    with every later note or edit.)"""
+    return func.coalesce(Lead.stage_changed_at, Lead.updated_at)
+
+
+def _closed_at(lead) -> datetime | None:
+    value = lead.stage_changed_at or lead.updated_at
+    if value is not None and value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
 def _lead_base(organization_id: int):
     return Lead.query.filter(Lead.organization_id == organization_id)
 
@@ -369,42 +383,21 @@ class AnalyticsService:
         )
         close_days: list[int] = []
         for lead in won_leads:
-            if lead.created_at and lead.updated_at:
+            closed_at = _closed_at(lead)
+            if lead.created_at and closed_at:
                 created = lead.created_at
-                updated = lead.updated_at
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
-                if updated.tzinfo is None:
-                    updated = updated.replace(tzinfo=timezone.utc)
-                close_days.append(max(0, (updated - created).days))
+                close_days.append(max(0, (closed_at - created).days))
 
         avg_days_to_close = round(sum(close_days) / len(close_days), 1) if close_days else None
         avg_deal_age = round(sum(age_days) / len(age_days), 1) if age_days else None
 
         month_start = _month_start(now)
         prev_month_start = _previous_month_start(month_start)
-        won_this_month = sum(
-            1
-            for lead in won_leads
-            if lead.updated_at
-            and (
-                lead.updated_at.replace(tzinfo=timezone.utc)
-                if lead.updated_at.tzinfo is None
-                else lead.updated_at
-            )
-            >= month_start
-        )
+        won_this_month = sum(1 for lead in won_leads if _closed_at(lead) and _closed_at(lead) >= month_start)
         won_last_month = sum(
-            1
-            for lead in won_leads
-            if lead.updated_at
-            and prev_month_start
-            <= (
-                lead.updated_at.replace(tzinfo=timezone.utc)
-                if lead.updated_at.tzinfo is None
-                else lead.updated_at
-            )
-            < month_start
+            1 for lead in won_leads if _closed_at(lead) and prev_month_start <= _closed_at(lead) < month_start
         )
 
         return {
@@ -430,8 +423,8 @@ class AnalyticsService:
                 _lead_base(organization_id)
                 .filter(
                     Lead.status == "won",
-                    Lead.updated_at >= start,
-                    Lead.updated_at <= end,
+                    _closed_at_column() >= start,
+                    _closed_at_column() <= end,
                 )
                 .all()
             )
@@ -667,8 +660,8 @@ class AnalyticsService:
             _lead_base(organization_id)
             .filter(
                 Lead.status == "won",
-                Lead.updated_at >= start_date,
-                Lead.updated_at <= end_date,
+                _closed_at_column() >= start_date,
+                _closed_at_column() <= end_date,
             )
             .count()
         )
@@ -676,8 +669,8 @@ class AnalyticsService:
             _lead_base(organization_id)
             .filter(
                 Lead.status == "lost",
-                Lead.updated_at >= start_date,
-                Lead.updated_at <= end_date,
+                _closed_at_column() >= start_date,
+                _closed_at_column() <= end_date,
             )
             .count()
         )
@@ -687,7 +680,7 @@ class AnalyticsService:
         for lead in (
             _lead_base(organization_id)
             .filter(Lead.status.in_(("won", "lost")), Lead.score_reason.isnot(None))
-            .filter(Lead.updated_at >= start_date, Lead.updated_at <= end_date)
+            .filter(_closed_at_column() >= start_date, _closed_at_column() <= end_date)
             .limit(50)
         ):
             if lead.score_reason:
