@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from app.core.permissions import TWO_FA_SESSION_KEY
 
 from app.extensions import db
 from app.leads.models import Lead
@@ -54,6 +55,8 @@ def _login(client, email):
         data={"email": email, "password": "securepassword1"},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
     assert resp.status_code == 302
 
 

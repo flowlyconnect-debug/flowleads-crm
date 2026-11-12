@@ -1,4 +1,5 @@
 import json
+from app.core.permissions import TWO_FA_SESSION_KEY
 
 from app.extensions import db
 from app.leads.services import LeadService, get_default_stage
@@ -43,6 +44,8 @@ def _login(client, email):
         data={"email": email, "password": "securepassword1"},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
     assert response.status_code == 302
 
 

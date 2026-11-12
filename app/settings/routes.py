@@ -151,6 +151,9 @@ def revoke_api_key_route(key_id: int):
     except APIKeyServiceError as exc:
         db.session.rollback()
         flash(exc.message, "danger")
+    org_id = request.args.get("organization_id", type=int) or request.form.get("organization_id", type=int)
+    if current_user.is_superadmin() and org_id:
+        return redirect(url_for("settings.api_keys", organization_id=org_id))
     return redirect(url_for("settings.api_keys"))
 
 

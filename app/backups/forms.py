@@ -4,17 +4,17 @@ from wtforms.validators import DataRequired, Length, Optional
 
 
 class RestoreBackupForm(FlaskForm):
-    password = PasswordField("Password", validators=[DataRequired()])
+    password = PasswordField("Salasana", validators=[DataRequired()])
     totp_code = StringField(
-        "2FA code",
+        "2FA-koodi",
         validators=[DataRequired(), Length(min=6, max=8)],
     )
     target_database_url = StringField(
-        "Restore drill target database URL (leave empty to restore into production)",
+        "Harjoituspalautuksen kohdetietokanta (tyhjä = palautus tuotantoon)",
         validators=[Optional(), Length(max=500)],
     )
     confirm_overwrite = BooleanField(
-        "I understand this will overwrite current data",
+        "Ymmärrän, että nykyiset tiedot korvautuvat",
         validators=[DataRequired()],
     )
-    submit = SubmitField("Restore backup")
+    submit = SubmitField("Palauta varmuuskopio")

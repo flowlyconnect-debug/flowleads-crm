@@ -126,12 +126,38 @@ def _safe_mailgun_error(exc: Exception) -> str:
     return msg or "Email send failed."
 
 
+def _own_address_allowed(organization: Organization, address: str) -> bool:
+    """The organization's own From address is used only when its domain is
+    the organization's Mailgun-verified sending domain (or that domain's
+    parent, e.g. mg.yritys.fi -> yritys.fi). Anything else would be sent from
+    the platform's account under somebody else's name and fail DMARC."""
+    domain = (organization.mailgun_domain or "").strip().lower()
+    if not domain or organization.mailgun_domain_verified_at is None:
+        return False
+    addr_domain = address.rpartition("@")[2].lower()
+    return bool(addr_domain) and (domain == addr_domain or domain.endswith("." + addr_domain))
+
+
+def organization_reply_to(organization: Organization) -> str | None:
+    """The organization's address as Reply-To when it cannot be the sender:
+    replies still reach the customer."""
+    address = (organization.email_from_email or "").strip()
+    if address and validate_email(address) and not _own_address_allowed(organization, address):
+        return address
+    return None
+
+
 def _resolve_sender(organization: Organization) -> tuple[str, str]:
     from_name = (organization.email_from_name or "").strip()
     from_email = (organization.email_from_email or "").strip()
-    if from_email and validate_email(from_email):
+    if from_email and validate_email(from_email) and _own_address_allowed(organization, from_email):
         name = from_name or current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
         return name, from_email
+    if from_name:
+        # the customer's name with the platform address (Reply-To = their own)
+        return from_name, (current_app.config.get("MAILGUN_FROM_EMAIL") or "").strip() or (
+            "test@example.com" if current_app.config.get("TESTING") else ""
+        )
     default_email = (current_app.config.get("MAILGUN_FROM_EMAIL") or "").strip()
     default_name = current_app.config.get("MAILGUN_FROM_NAME", "FlowLeads")
     if not default_email and current_app.config.get("TESTING"):
@@ -161,6 +187,7 @@ def _mailgun_send(
     from_name: str,
     from_email: str,
     domain: str | None = None,
+    reply_to: str | None = None,
 ) -> tuple[bool, str | None, str | None]:
     api_key = current_app.config.get("MAILGUN_API_KEY")
     domain = (domain or "").strip() or current_app.config.get("MAILGUN_DOMAIN")
@@ -177,6 +204,7 @@ def _mailgun_send(
             "subject": subject,
             "html": body_html,
             "text": body_text,
+            **({"h:Reply-To": reply_to} if reply_to else {}),
         }
     ).encode("utf-8")
 
@@ -326,6 +354,7 @@ class EmailService:
             from_name=from_name,
             from_email=from_email,
             domain=_resolve_sending_domain(org),
+            reply_to=organization_reply_to(org),
         )
 
         if ok:
@@ -1154,9 +1183,9 @@ def send_test_email_to_address(email: str, *, user_id: int | None = None) -> dic
         )
         return {"success": True, "message_id": message_id}
     log_audit(
-        "email_test_sent",
+        "email_test_failed",
         user_id=user_id,
-        metadata={"success": False, "error": (error or "")[:200]},
+        metadata={"to": email, "error": (error or "")[:200]},
     )
     return {"success": False, "error": error}
 

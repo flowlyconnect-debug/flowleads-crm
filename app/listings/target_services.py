@@ -314,6 +314,11 @@ def transfer_targets(
         result["created" if outcome == "created" else "merged"] += 1
         if outcome == "created" and assigned_to:
             lead.assigned_to = assigned_to  # the owner picked in the transfer bar
+        if outcome == "created":
+            from app.leads.services import announce_new_lead
+
+            db.session.flush()
+            announce_new_lead(lead, organization_id)
         if lead.id not in result["lead_ids"]:
             result["lead_ids"].append(lead.id)
         match = db.session.get(ListingMatch, match_id)

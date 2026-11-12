@@ -62,6 +62,8 @@ def _setup_org(app, slug="email-org"):
 
 def _login(client, email):
     client.post("/auth/login", data={"email": email, "password": "securepassword1"})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
 
 
 def _create_lead_with_email(app, org_id, stage_id, user_id, email="lead@test.com"):
@@ -634,6 +636,9 @@ def test_send_to_lead_uses_verified_domain(mock_send, app):
             lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
         )
         assert mock_send.call_args.kwargs["domain"] == "mg.verified.com"
+        # the address is on the verified domain: it is the sender, no Reply-To
+        assert mock_send.call_args.kwargs["from_email"] == "sales@verified.com"
+        assert mock_send.call_args.kwargs["reply_to"] is None
 
 
 @patch("app.email.services._mailgun_send")
@@ -652,6 +657,9 @@ def test_send_to_lead_falls_back_to_shared_domain_when_unverified(mock_send, app
             lead_id, ctx["admin_id"], "Subject", "<p>Hi</p>", None, organization_id=ctx["org_id"]
         )
         assert mock_send.call_args.kwargs["domain"] is None
+        # an unverified address is never the sender: platform address + Reply-To
+        assert mock_send.call_args.kwargs["from_email"] != "sales@unverified.com"
+        assert mock_send.call_args.kwargs["reply_to"] == "sales@unverified.com"
 
 
 def test_email_settings_404_for_nonexistent_organization(client, app):
@@ -660,6 +668,8 @@ def test_email_settings_404_for_nonexistent_organization(client, app):
         db.session.commit()
 
     client.post("/auth/login", data={"email": "sa-email-404@test.com", "password": "securepassword1"})
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/settings/email?organization_id=999999")
     # an unknown organization sends the superadmin back to the organization picker
     assert response.status_code == 302

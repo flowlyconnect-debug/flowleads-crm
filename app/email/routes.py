@@ -202,6 +202,7 @@ def admin_email_logs():
         pagination=pagination,
         logs=pagination.items,
         organizations=organizations,
+        org_names={o.id: o.name for o in organizations},
         org_filter=org_filter,
     )
 
@@ -231,7 +232,7 @@ def admin_email_test():
             )
         else:
             flash(
-                "Testiviestin lähetys epäonnistui: " + (result.get("error") or "tuntematon virhe"),
+                "Testiviestin lähetys epäonnistui. " + (_fi_email_error(result.get("error")) or "Tuntematon virhe."),
                 "danger",
             )
     except EmailServiceError as exc:
@@ -304,3 +305,9 @@ def mailgun_inbound_webhook():
     handle_inbound_reply(request.form.to_dict())
     db.session.commit()
     return "", 200
+
+
+def _fi_email_error(error):
+    from app.admin.routes import fi_email_error
+
+    return fi_email_error(error)

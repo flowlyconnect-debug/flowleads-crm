@@ -19,23 +19,20 @@
           {% endif %}
           <div class="form-group">
             <label class="form-label">{{ form.gdpr_default_legal_basis.label.text }}
-              {{ form.gdpr_default_legal_basis(placeholder='consent / legitimate_interest / contract', class='form-input') }}
+              {{ form.gdpr_default_legal_basis(class='form-select') }}
+              <span class="form-helper">Isännöitsijöiden yhteystiedot taloyhtiön remonttia varten: yleensä oikeutettu etu.</span>
             </label>
             <label class="form-label">{{ form.gdpr_retention_days.label.text }}
-              {{ form.gdpr_retention_days(class='form-input') }}
+              {{ form.gdpr_retention_days(class='form-input', min=180, max=3650) }}
             </label>
             <label class="form-check">
-              <input type="checkbox" name="gdpr_auto_anonymize_inactive" {% if settings.gdpr_auto_anonymize_inactive %}checked{% endif %}>
-              Automaattinen anonymisointi passiivisille liideille
+              <input type="checkbox" name="gdpr_auto_anonymize_inactive" {% if settings.gdpr_auto_anonymize_inactive %}checked{% endif %}
+                     onchange="if (this.checked && !confirm('Liidit, joihin ei ole ollut toimintaa säilytysajan aikana, anonymisoidaan pysyvästi kerran kuussa. Jatketaanko?')) this.checked = false;">
+              Anonymisoi automaattisesti liidit, joihin ei ole ollut toimintaa säilytysajan aikana (pysyvä)
             </label>
             <label class="form-label">{{ form.privacy_policy_url.label.text }}
-              {{ form.privacy_policy_url(class='form-input') }}
-            </label>
-            <label class="form-label">{{ form.data_controller_name.label.text }}
-              {{ form.data_controller_name(class='form-input') }}
-            </label>
-            <label class="form-label">{{ form.data_controller_email.label.text }}
-              {{ form.data_controller_email(class='form-input') }}
+              {{ form.privacy_policy_url(class='form-input', placeholder='https://yritys.fi/tietosuoja') }}
+              <span class="form-helper">Linkki lisätään liideille lähtevien sähköpostien loppuun.</span>
             </label>
           </div>
           <div class="form-actions form-actions--sticky">
@@ -45,11 +42,18 @@
 
         <hr class="form-divider">
         <h2 class="form-section-title">Organisaation tietojen vienti</h2>
-        <p class="form-helper">Pyydä ZIP-vienti kaikista organisaation tiedoista. Latauslinkki lähetetään sähköpostiin (48 h voimassa).</p>
-        <form method="post" action="{{ url_for('settings.gdpr_export_request') }}" class="form-actions">
+        <p class="form-helper">Lataa ZIP-tiedosto kaikista organisaation tiedoista (liidit, tehtävät, tarjoukset, sähköpostit). Latauslinkki on voimassa 48 tuntia.</p>
+        <form method="post" action="{{ url_for('settings.gdpr_export_request', **({'organization_id': organization_id} if current_user.is_superadmin() else {})) }}" class="form-actions">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-secondary">Pyydä organisaation vienti</button>
+          <button type="submit" class="btn btn-secondary">Tee vienti nyt</button>
         </form>
+        {% if exports %}
+        <ul class="text-sm" style="margin-top:0.75rem;">
+          {% for export in exports %}
+          <li><a href="{{ url_for('settings.gdpr_export_download', token=export.download_token) }}">Lataa vienti {{ (export.created_at|helsinki).strftime('%d.%m.%Y %H.%M') }}</a> (voimassa {{ (export.expires_at|helsinki).strftime('%d.%m. klo %H.%M') }} asti)</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
       </div>
     </div>
   </div>

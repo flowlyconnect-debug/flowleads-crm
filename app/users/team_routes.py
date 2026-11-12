@@ -4,7 +4,7 @@ from flask_login import current_user, login_required
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
 from app.users.models import Organization, User
-from app.users.services import UserServiceError, set_user_active
+from app.users.services import UserServiceError, change_user_role, set_user_active
 from app.users.team_services import (
     TEAM_INVITE_ROLES,
     invite_teammate,
@@ -21,13 +21,14 @@ def _resolve_organization_id():
     return current_user.organization_id
 
 
-def _flash_invite_result(delivery, success_message: str) -> None:
+def _flash_invite_result(delivery, success_message: str, *, created: bool = True) -> None:
     if delivery and not delivery.get("sent"):
         from app.admin.routes import fi_email_error
 
         reason = fi_email_error(delivery.get("error"))
         flash(
-            "Käyttäjä on luotu, mutta kutsusähköpostia ei voitu lähettää"
+            ("Käyttäjä on luotu, mutta kutsusähköpostia" if created else "Kirjautumislinkkiä")
+            + " ei voitu lähettää"
             + (f" ({reason})" if reason else "")
             + ". Välitä hänelle tämä salasanan asetuslinkki (voimassa 7 päivää): "
             + f"{delivery.get('url')}",
@@ -101,7 +102,7 @@ def register_team_settings_routes(settings_bp):
         try:
             delivery = resend_teammate_invite(target, actor=current_user)
             db.session.commit()
-            _flash_invite_result(delivery, "Kutsu lähetetty uudelleen.")
+            _flash_invite_result(delivery, "Kirjautumislinkki lähetetty.", created=False)
         except UserServiceError as exc:
             db.session.rollback()
             flash(exc.message, "danger")
@@ -117,6 +118,22 @@ def register_team_settings_routes(settings_bp):
             set_user_active(target, False, actor=current_user)
             db.session.commit()
             flash("Käyttäjä poistettu käytöstä.", "success")
+        except UserServiceError as exc:
+            db.session.rollback()
+            flash(exc.message, "danger")
+        return _redirect_to_team(target.organization_id)
+
+    @settings_bp.route("/team/<int:user_id>/role", methods=["POST"])
+    @login_required
+    @require_role("admin", "superadmin")
+    @require_2fa
+    def change_team_member_role(user_id):
+        target = _load_team_target(user_id)
+        role = request.form.get("role") or ""
+        try:
+            change_user_role(target, role, actor=current_user)
+            db.session.commit()
+            flash(f"Rooli vaihdettu: {target.email} on nyt {'ylläpitäjä' if role == 'admin' else 'myyjä'}.", "success")
         except UserServiceError as exc:
             db.session.rollback()
             flash(exc.message, "danger")

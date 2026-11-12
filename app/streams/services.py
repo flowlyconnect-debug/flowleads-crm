@@ -120,8 +120,11 @@ class LeadRoutingService:
         return settings
 
     @staticmethod
-    def apply_to_lead(lead, settings: OrgLeadSettings) -> None:
-        if not getattr(lead, "stage_id", None) and settings.default_pipeline_stage_id:
+    def apply_to_lead(lead, settings: OrgLeadSettings, *, new: bool = False) -> None:
+        """Organization defaults for an incoming lead. new=True: the lead was
+        just created, so the chosen default stage replaces the automatic first
+        stage (upsert_lead always puts a new lead in the first stage)."""
+        if settings.default_pipeline_stage_id and (new or not getattr(lead, "stage_id", None)):
             lead.stage_id = settings.default_pipeline_stage_id
 
         if not getattr(lead, "assigned_to", None) and settings.default_owner_id:
@@ -174,9 +177,16 @@ class LeadHealthService:
 
         now = datetime.now(timezone.utc)
         stale_orgs = LeadHealthService.get_stale_org_settings()
+        from app.search.models import SearchProfile
+
         for org_settings in stale_orgs:
             org = org_settings.organization
             if not org:
+                continue
+            if SearchProfile.query.filter_by(organization_id=org.id).first() is not None:
+                # catalogue customers create their leads themselves from Kohteet:
+                # a quiet week is their choice, not a broken integration
+                org_settings.last_alert_sent_at = now
                 continue
             admins = User.query.filter_by(
                 organization_id=org.id, role="admin", is_active=True

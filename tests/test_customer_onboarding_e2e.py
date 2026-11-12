@@ -52,6 +52,8 @@ def _login(client, email, password="securepassword1"):
         data={"email": email, "password": password},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     assert response.status_code == 302
 
 

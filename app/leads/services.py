@@ -68,6 +68,40 @@ LOST_REASON_LABELS = {
 LOST_REASON_LABEL_TO_KEY = {label.lower(): key for key, label in LOST_REASON_LABELS.items()}
 
 
+def crm_base_url() -> str:
+    from app.webhooks.services import crm_base_url as _base
+
+    return _base()
+
+
+def announce_new_lead(lead, organization_id: int, *, user_id: int | None = None) -> None:
+    """lead.created (+ lead.assigned when it has an owner) webhooks. Every way a
+    lead is born calls this: the form, Kohteet transfers and the API."""
+    triggered_by = {"id": user_id} if user_id else "system"
+    _safe_dispatch_webhook(
+        "lead.created",
+        {
+            "lead": {
+                "id": lead.id,
+                "name": lead.display_name,
+                "company": lead.company,
+                "score": lead.score,
+                "source": lead.source,
+                "crm_url": f"{crm_base_url()}/leads/{lead.id}",
+            }
+        },
+        organization_id,
+        triggered_by=triggered_by,
+    )
+    if lead.assigned_to:
+        _safe_dispatch_webhook(
+            "lead.assigned",
+            {"lead": {"id": lead.id, "assigned_to": lead.assigned_to}},
+            organization_id,
+            triggered_by=triggered_by,
+        )
+
+
 def _safe_dispatch_webhook(event_type: str, payload: dict, organization_id: int, triggered_by=None) -> None:
     try:
         from app.webhooks.services import WebhookService
@@ -374,28 +408,7 @@ class LeadService:
             {"lead_id": lead.id},
             organization_id,
         )
-        _safe_dispatch_webhook(
-            "lead.created",
-            {
-                "lead": {
-                    "id": lead.id,
-                    "name": lead.display_name,
-                    "company": lead.company,
-                    "score": lead.score,
-                    "source": lead.source,
-                    "crm_url": f"https://app.flowleads.fi/leads/{lead.id}",
-                }
-            },
-            organization_id,
-            triggered_by={"id": user_id} if user_id else "system",
-        )
-        if lead.assigned_to:
-            _safe_dispatch_webhook(
-                "lead.assigned",
-                {"lead": {"id": lead.id, "assigned_to": lead.assigned_to}},
-                organization_id,
-                triggered_by={"id": user_id} if user_id else "system",
-            )
+        announce_new_lead(lead, organization_id, user_id=user_id)
 
         return lead
 

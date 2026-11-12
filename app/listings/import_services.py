@@ -88,6 +88,7 @@ CSV_TEMPLATE_COLUMNS = (
     "taloyhtion_ytunnus",
 )
 
+_TEMPLATE_EXAMPLES = {"as oy esimerkkikatu 1", "as oy mallitie 5"}
 _REGIONS_BY_KEY: dict[str, str] = {}
 _TYPES_BY_KEY: dict[str, str] = {}
 
@@ -253,6 +254,10 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
             continue
         maakunta = _region(raw.get("maakunta"))
         taloyhtio = _clean(raw.get("taloyhtio"), 255)
+        if _fold(taloyhtio) in _TEMPLATE_EXAMPLES:
+            # the downloadable template's example rows must never reach customers
+            result["errors"].append({"row": index, "error": "Mallitiedoston esimerkkirivi ohitettu."})
+            continue
         osoite = _clean(raw.get("osoite"), 255)
         kaupunki = _clean(raw.get("kaupunki"), 100)
         description = _clean(raw.get("description"), MAX_TEXT_LENGTH)

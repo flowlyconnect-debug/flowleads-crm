@@ -877,8 +877,9 @@ def _create_lead(listing: Listing, profile: SearchProfile):
         profile.organization_id, _lead_payload(listing, profile), match_by_email=False
     )
     if action == "created":
+        lead.region = listing.maakunta  # the housing company's region, not an org default
         settings = LeadRoutingService.get_settings(profile.organization_id)
-        LeadRoutingService.apply_to_lead(lead, settings)
+        LeadRoutingService.apply_to_lead(lead, settings, new=True)
         if not lead.stage_id:
             fallback = LeadRoutingService.get_fallback_stage(profile.organization_id)
             if fallback:
@@ -1205,18 +1206,35 @@ def profile_match_stats(profile: SearchProfile, *, include_reserve: bool = True)
         .limit(10)
         .all()
     )
+    from app.listings.target_services import _visible_match_ids
+
+    # the same rule as the Kohteet page (one target per listing, not already a
+    # lead or hidden through another profile, active listing)
+    available = _visible_match_ids(
+        profile.organization_id, "pending", profile_id=profile.id, include_reserve=include_reserve
+    ).count()
     return {
         "total": sum(counts.values()),
         "lead_created": counts.get("lead_created", 0),
-        "pending": counts.get("pending", 0),
+        "pending": available,
         "merged": counts.get("merged", 0),
         "recent": recent,
     }
 
 
 def preview_profile(profile: SearchProfile, *, now: datetime | None = None) -> dict:
-    """How many catalogue listings an (unsaved) filter would match right now."""
+    """How many catalogue listings an (unsaved) filter would match right now,
+    leaving out what the organization already moved to leads or hid."""
     wanted = wanted_listings(profile, now=now)
+    if profile.organization_id and wanted:
+        handled = {
+            listing_id
+            for (listing_id,) in db.session.query(ListingMatch.listing_id).filter(
+                ListingMatch.organization_id == profile.organization_id,
+                ListingMatch.status.in_(("lead_created", "merged", "dismissed")),
+            )
+        }
+        wanted = {k: v for k, v in wanted.items() if k not in handled}
     sample = sorted(wanted.values(), key=lambda pair: (-pair[1], -pair[0].id))[:5]
     return {
         "count": len(wanted),
@@ -1336,6 +1354,10 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
     matches = dict(
         db.session.query(ListingMatch.status, func.count(ListingMatch.id)).group_by(ListingMatch.status).all()
     )
+    # pending matches still waiting for the customer's "Hae kohteita"
+    reserve = (
+        ListingMatch.query.filter(ListingMatch.status == "pending", ListingMatch.released_at.is_(None)).count()
+    )
     recent_failures = (
         Listing.query.filter(Listing.analysis_status == "failed", Listing.is_active.is_(True))
         .order_by(Listing.id.desc())
@@ -1348,7 +1370,7 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
     if states and (last_crawl is None or now - last_crawl > stale_after):
         problems.append(
             f"Keruu (Crawler) ei ole tuonut yhtään sivua yli {hours} tuntiin"
-            + (f" (viimeksi {last_crawl:%d.%m.%Y %H:%M} UTC)." if last_crawl else ".")
+            + (f" (viimeksi {_helsinki_label(last_crawl)})." if last_crawl else ".")
         )
     errored = [r["maakunta"] for r in regions if r["last_error"]]
     if errored:
@@ -1370,6 +1392,8 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
         "contacts": contacts,
         "matches": {
             "pending": matches.get("pending", 0),
+            "reserve": reserve,
+            "released": max(0, matches.get("pending", 0) - reserve),
             "lead_created": matches.get("lead_created", 0),
             "merged": matches.get("merged", 0),
         },
@@ -1381,6 +1405,15 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
         "problems": problems,
         "started": bool(states),
     }
+
+
+def _helsinki_label(value: datetime) -> str:
+    try:
+        from zoneinfo import ZoneInfo
+
+        return _aware(value).astimezone(ZoneInfo("Europe/Helsinki")).strftime("%d.%m.%Y %H.%M")
+    except Exception:
+        return value.strftime("%d.%m.%Y %H:%M UTC")
 
 
 def alert_catalogue_problems(*, now: datetime | None = None) -> int:

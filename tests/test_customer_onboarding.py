@@ -256,5 +256,7 @@ def test_admin_cannot_access_customers_list(app, client):
         "/auth/login",
         data={"email": "admin-customers@test.com", "password": "securepassword1"},
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/admin/customers")
     assert response.status_code == 403

@@ -64,6 +64,13 @@
                       <button type="submit" class="btn btn-secondary btn-sm">Nollaa 2FA</button>
                     </form>
                     {% endif %}
+                    {% if member.role in ('user', 'admin') %}
+                    <form method="post" action="{{ url_for('settings.change_team_member_role', user_id=member.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="role" value="{{ 'user' if member.role == 'admin' else 'admin' }}">
+                      <button type="submit" class="btn btn-secondary btn-sm">{{ 'Tee myyjäksi' if member.role == 'admin' else 'Tee ylläpitäjäksi' }}</button>
+                    </form>
+                    {% endif %}
                     {% if member.is_active %}
                     <form method="post" action="{{ url_for('settings.resend_team_invite', user_id=member.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

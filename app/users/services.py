@@ -114,12 +114,26 @@ def delete_user(user: User, *, actor: User) -> None:
     db.session.delete(user)
 
 
+def _other_active_admins(user: User) -> int:
+    return User.query.filter(
+        User.organization_id == user.organization_id,
+        User.role == "admin",
+        User.is_active.is_(True),
+        User.id != user.id,
+    ).count()
+
+
 def set_user_active(user: User, is_active: bool, *, actor: User) -> User:
+    """An organization admin manages everyone in their own organization,
+    other admins included, but never a superadmin, never themselves, and the
+    organization always keeps at least one active admin."""
     if actor.id == user.id:
         raise UserServiceError("You cannot deactivate your own account.", "self_deactivate")
     ensure_same_organization(actor, user)
-    if actor.role != "superadmin" and user.role in ("superadmin", "admin"):
+    if actor.role != "superadmin" and user.role == "superadmin":
         raise UserServiceError("Insufficient permissions.", "forbidden")
+    if not is_active and user.role == "admin" and user.organization_id and _other_active_admins(user) == 0:
+        raise UserServiceError("The organization must keep at least one active admin.", "last_admin")
 
     user.is_active = is_active
     log_audit(
@@ -138,7 +152,13 @@ def change_user_role(user: User, new_role: str, *, actor: User) -> User:
         raise UserServiceError("Invalid role.", "invalid_role")
     ensure_same_organization(actor, user)
     if actor.role != "superadmin":
-        raise UserServiceError("Insufficient permissions.", "forbidden")
+        # an organization admin switches people between seller and admin
+        if actor.role != "admin" or new_role not in ("user", "admin") or user.role == "superadmin":
+            raise UserServiceError("Insufficient permissions.", "forbidden")
+        if actor.id == user.id:
+            raise UserServiceError("You cannot change your own role.", "self_role")
+    if user.role == "admin" and new_role != "admin" and user.is_active and _other_active_admins(user) == 0:
+        raise UserServiceError("The organization must keep at least one active admin.", "last_admin")
 
     old_role = user.role
     user.role = new_role

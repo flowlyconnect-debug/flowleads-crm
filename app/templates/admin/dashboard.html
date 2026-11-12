@@ -8,40 +8,19 @@
     <div class="settings-content">
 <div class="card settings-panel--wide">
   <h1>Hallintapaneeli</h1>
-  <p>Organizations: {{ stats.organization_count }}</p>
-  <p>Users: {{ stats.user_count }}</p>
+  <p>Asiakasorganisaatioita: {{ stats.organization_count }} · Käyttäjiä: {{ stats.user_count }}</p>
 
   {% if current_user.is_superadmin() %}
-  <h2 style="margin-top:1.5rem;">Asiakkaat</h2>
-  <p><a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo uusi asiakas</a></p>
-
-  <h2 style="margin-top:1.5rem;">Organisaatiot</h2>
-  {% if organizations %}
-  <ul>
-    {% for org in organizations %}
-    <li>{{ org.name }} ({{ org.slug }})</li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p>Ei organisaatioita vielä. Luo ensimmäinen organisaatio alla.</p>
-  {% endif %}
-  <h3 style="margin-top:1rem;">Luo organisaatio</h3>
-  <form method="post" action="{{ url_for('admin.create_organization_route') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Nimi
-      <input type="text" name="name" maxlength="255" required placeholder="Acme Oy">
-    </label>
-    <label>Slug
-      <input type="text" name="slug" maxlength="120" required placeholder="acme-oy" pattern="[a-z0-9]+(?:-[a-z0-9]+)*">
-    </label>
-    <button type="submit">Luo organisaatio</button>
-  </form>
+  <p style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+    <a href="{{ url_for('admin.customers_list') }}" class="btn btn-secondary">Asiakaslista</a>
+    <a href="{{ url_for('admin.create_customer_route') }}" class="btn btn-primary">Luo asiakas</a>
+    <a href="{{ url_for('admin.create_invite_route') }}" class="btn btn-secondary">Kutsu asiakas</a>
+    <a href="{{ url_for('admin.catalogue_status') }}" class="btn btn-secondary">Kohdekatalogi</a>
+  </p>
   {% endif %}
   {% if stats.ai_usage %}
   <h2 style="margin-top:1.5rem;">AI-rikastuksen käyttö</h2>
-  <p>Total enrichments: {{ stats.ai_usage.total_enrichments }}</p>
-  <p>Estimated tokens used: {{ stats.ai_usage.total_tokens }}</p>
-  <p>Failed enrichments: {{ stats.ai_usage.failed_count }}</p>
+  <p>Rikastuksia yhteensä: {{ stats.ai_usage.total_enrichments }} · Arvioidut tokenit: {{ stats.ai_usage.total_tokens }} · Epäonnistuneet: {{ stats.ai_usage.failed_count }}</p>
   {% endif %}
 </div>
     </div>

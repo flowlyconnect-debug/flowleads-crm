@@ -197,6 +197,43 @@ Testit: `tests/test_org_purge_and_invite_mail.py`.
   ilman --yes). Poistaa käyttäjät, profiilit, osumat, liidit ja muun datan; kohdekatalogi, superadminit ja
   Audit-loki (viittaus tyhjennetään) jäävät.
 
+## Tehty 12.11.2026 (2): asetussivujen läpikäynti
+
+Jokainen asetussivu (asiakkaan ylläpitäjä, myyjä ja superadmin) käytiin läpi koodista ja oikeilla pyynnöillä.
+Testit: `tests/test_org_purge_and_invite_mail.py` (osio "settings audit fixes").
+
+- **2FA kaikille sivuille.** Ylläpitäjä pääsi pelkällä salasanalla mm. hakuprofiiliin, tarjous- ja
+  kalenteriasetuksiin, Kohteisiin ja liideihin, koska 2FA tarkistettiin vain osassa näkymiä. Nyt
+  `app/auth/routes.py::_force_two_factor` vaatii sen kaikilta admin/superadmin-pyynnöiltä (paitsi kirjautuminen,
+  kutsu, julkiset lomakkeet ja tarjoukset sekä avaimilla toimivat API:t).
+- **Webhookit:** SSRF estetty (`app/webhooks/url_safety.py`: vain https ja julkiset osoitteet, ei
+  uudelleenohjauksia, vastauksesta näytetään 300 merkkiä); Kohteista ja API:sta luodut liidit lähettävät nyt
+  `lead.created`/`lead.assigned`; CRM-linkki tulee `APP_BASE_URL`:sta; muokkaus esitäyttää osoitteen.
+- **Uusien liidien oletukset** (ent. Liidiasetukset): oletusvaihe toimii nyt; Toimiala/Alue-kentät poistettu
+  (leimasivat väärän maakunnan); kohdeliidin maakunta tulee kohteesta; API ei enää aja oletuksia päivityksille;
+  "ei uusia liidejä" -hälytys ei koske kohdeasiakkaita.
+- **Sähköpostin lähettäjä:** oma osoite on lähettäjänä vain vahvistetulla domainilla, muuten FlowLeadsin osoite +
+  Reply-To; virheilmoitukset näkyvät; Mailgun-domainin asettaa ja rekisteröi vain superadmin.
+- **Tietosuoja:** säilytysaika vähintään 180 pv, käsittelyperuste valintalistana, selosteen osoite vain https,
+  käyttämättömät rekisterinpitäjäkentät pois. Organisaation vienti tehdään heti web-palvelussa ja ladataan
+  sivulta (ennen ZIP jäi ajastimen levylle eikä lataus toiminut Renderissä).
+- **Käyttäjät:** ylläpitäjä voi poistaa käytöstä toisen ylläpitäjän ja vaihtaa roolin myyjä ↔ ylläpitäjä (ei
+  omaa, viimeinen aktiivinen ylläpitäjä säilyy); "Lähetä kirjautumislinkki" -ilmoitus korjattu.
+- **Tarjoukset:** 0 % ALV (käännetty verovelvollisuus) ja desimaalipilkku hyväksytään, virheet näkyvät,
+  esikatselussa logo ja ylä-/alatunniste.
+- **Urakat ja kohdehaku:** "Saatavilla"-luku ja esikatselu vastaavat Kohteet-sivua, esikatselu ei näytä
+  varaston osoitteita; tyhjä nimi = urakoiden nimet.
+- **Kalenteri:** ilman Google/Microsoft-avaimia yhdistämispainikkeet piilotetaan; virheet ilman raakatekstiä.
+- **Superadmin:** "Ota käyttöön" aktivoi myös passiivisena luodun asiakkaan käyttäjät ja profiilit; "Lähetä
+  uusi kutsu" -painike asiakaslistalla (ei hyväksytylle kutsulle); asiakaslistalla varaston koko ja oikea
+  "Viimeisin liidi"; katalogin luvut jaettu näkyviin ja varastoon, keruuvaroitus vain tyhjälle katalogille,
+  mallitiedoston esimerkkirivejä ei tuoda; varmuuskopion palautussivun 500 korjattu; Sähköpostiloki, Audit-loki,
+  Hallintapaneeli, Varmuuskopiot ja Raportit suomeksi ja Suomen ajassa.
+
+Jätetty ennalleen (pieniä tai vaativat erillisen päätöksen): tarjousnumeron etuliite on kiinteä `FLW-`,
+käyttäjälistalla ei ole "kutsuttu"-tilaa (ei viimeisen kirjautumisen kenttää), vanha testihaun reitti
+`create-test-job` on yhä olemassa, kuiva-ajon rivimäärät voivat laskea saman rivin kahdesti.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

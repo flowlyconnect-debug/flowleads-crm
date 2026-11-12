@@ -38,13 +38,18 @@ def email_settings():
     if org is None:
         abort(404)
     form = OrganizationEmailSettingsForm(obj=org)
-    if form.validate_on_submit():
+    if request.method == "POST" and not form.validate():
+        errors = [e for field_errors in form.errors.values() for e in field_errors]
+        flash(errors[0] if errors else "Tarkista kentät.", "danger")
+    elif form.validate_on_submit():
         try:
             update_organization_email_settings(
                 org,
                 email_from_name=form.email_from_name.data,
                 email_from_email=form.email_from_email.data,
-                mailgun_domain=form.mailgun_domain.data,
+                # the sending domain lives in the platform's Mailgun account:
+                # only a superadmin sets it
+                mailgun_domain=form.mailgun_domain.data if current_user.is_superadmin() else org.mailgun_domain,
                 user_id=current_user.id,
             )
             db.session.commit()
@@ -88,7 +93,7 @@ def _consume_dns_records(org_id: int) -> list[dict] | None:
 
 @settings_bp.route("/email/domain/register", methods=["POST"])
 @login_required
-@require_role("admin", "superadmin")
+@require_role("superadmin")
 def email_domain_register():
     org_id = _settings_org_id(require_admin=True)
     org = db.session.get(Organization, org_id)

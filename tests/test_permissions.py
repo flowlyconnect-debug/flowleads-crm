@@ -92,6 +92,7 @@ def test_organization_data_scoped(client, app, org_users):
         lead_a_id = lead_a.id
 
     _login(client, org_users["admin_b"])
+    _enable_2fa_session(client)
     response = client.get(f"/leads/{lead_a_id}")
     assert response.status_code in (403, 404)
 

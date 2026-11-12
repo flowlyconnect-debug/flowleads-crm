@@ -64,7 +64,7 @@
   {% set advanced_keys = ['lead_settings', 'email', 'email_templates', 'privacy', 'api_keys', 'webhooks'] %}
   <details class="settings-nav__more"{% if active in advanced_keys %} open{% endif %}>
     <summary class="settings-nav__group-label">Lisäasetukset</summary>
-    {{ org_link('settings.lead_settings', 'lead_settings', 'Liidien jako ja vaiheet') }}
+    {{ org_link('settings.lead_settings', 'lead_settings', 'Uusien liidien oletukset') }}
     {{ org_link('settings.email_settings', 'email', 'Sähköpostin lähettäjä') }}
     {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
     {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}

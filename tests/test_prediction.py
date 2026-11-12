@@ -58,6 +58,8 @@ def _login(client, email):
         follow_redirects=False,
     )
     assert r.status_code == 302
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
 
 
 def _bypass_2fa(client, app, email):

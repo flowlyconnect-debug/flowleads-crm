@@ -61,7 +61,7 @@
             <p style="font-size:0.85rem;color:#94a3b8;margin-bottom:0.25rem;">Lähetetty:</p>
             <pre style="white-space: pre-wrap; background:#0f172a; padding:0.75rem; border-radius:4px; font-size:0.8rem;">{{ delivery.payload | tojson(indent=2) }}</pre>
             <p style="font-size:0.85rem;color:#94a3b8;margin:0.75rem 0 0.25rem;">Vastaus:</p>
-            <pre style="white-space: pre-wrap; background:#0f172a; padding:0.75rem; border-radius:4px; font-size:0.8rem;">{{ delivery.response_body or '(ei vastausta)' }}</pre>
+            <pre style="white-space: pre-wrap; background:#0f172a; padding:0.75rem; border-radius:4px; font-size:0.8rem;">{{ (delivery.response_body or '(ei vastausta)')[:300] }}</pre>
           </details>
         </td>
       </tr>

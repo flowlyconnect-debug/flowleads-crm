@@ -10,11 +10,11 @@
       <div class="settings-panel settings-panel--wide">
         <header class="settings-panel__header">
           <h1 class="settings-panel__title">Kohdekatalogin tila</h1>
-          <p class="settings-panel__subtitle">Oikotie-keruu (n8n Crawler), AI-analyysi (Analyzer) ja yhteystietohaku (Enricher). Kellonajat ovat UTC-aikaa.</p>
+          <p class="settings-panel__subtitle">Kohteiden lähteet (tiedostotuonti ja n8n-keruu), AI-analyysi ja yhteystietohaku. Kellonajat Suomen aikaa.</p>
         </header>
 
-        {% if not health.started %}
-        <div class="flash warning">Keruu ei ole vielä käynnistynyt: yhtään Crawler-ajoa ei ole kirjattu. Tuo ja aktivoi n8n-workflowt.</div>
+        {% if not health.started and not health.total_active %}
+        <div class="flash warning">Katalogi on tyhjä. Tuo kohteita tiedostosta alta. (Oikotie estää n8n-keruun marraskuusta 2026 alkaen.)</div>
         {% elif health.problems %}
         <div class="flash danger" role="alert">
           <strong>Huomiota vaativat asiat</strong>
@@ -56,14 +56,17 @@
           </tbody>
         </table>
         <p class="text-muted text-sm mt-2">
-          Osumat: {{ health.matches.lead_created }} liidiä luotu, {{ health.matches.pending }} {{ "odottaa päivärajaa" if config.LISTING_AUTO_CREATE_LEADS else "odottaa asiakkaiden Kohteet-sivuilla" }},
+          Osumat: {{ health.matches.lead_created }} siirretty liideiksi,
+          {% if config.LISTING_AUTO_CREATE_LEADS %}{{ health.matches.pending }} odottaa päivärajaa,
+          {% else %}{{ health.matches.released }} näkyvissä asiakkaiden Kohteet-sivuilla, {{ health.matches.reserve }} varastossa (tulevat näkyviin Hae kohteita -painikkeella),{% endif %}
           {{ health.matches.merged }} yhdistetty saman taloyhtiön liidiin.
         </p>
 
         <h2 class="form-section-title" style="margin-top:1.5rem;">Tuo kohteita tiedostosta</h2>
         <p class="text-muted text-sm">
-          Kohteita voi tuoda myös muusta lähteestä kuin Oikotieltä. Rivi, jolla on remonttityyppi, täsmäytetään heti
-          hakuprofiileihin ja siitä syntyy liidit. Rivi, jolla on vain teksti, menee AI-analyysiin (Analyzer).
+          Rivi, jolla on remonttityyppi, täsmäytetään heti asiakkaiden hakuprofiileihin, ja se tulee asiakkaan
+          Kohteet-sivulle (Hae kohteita -painikkeella). Rivi, jolla on vain teksti, menee AI-analyysiin.
+          Mallitiedoston esimerkkirivit (As Oy Esimerkkikatu / Mallitie) ohitetaan tuonnissa.
           Pakolliset sarakkeet: <code>maakunta</code> sekä <code>taloyhtio</code> tai <code>osoite</code>.
         </p>
         <form method="post" action="{{ url_for('admin.catalogue_import') }}" enctype="multipart/form-data" style="margin-top:0.75rem;">

@@ -28,7 +28,7 @@
           </label>
           <label class="form-label" id="webhook-url-label">
             <span id="webhook-url-label-text">Webhook-URL</span>
-            <input type="url" name="url" class="form-input" maxlength="2000" required placeholder="https://..." value="">
+            <input type="url" name="url" class="form-input" maxlength="2000" required placeholder="https://..." value="{{ form.url.data or '' }}">
           </label>
           <p class="form-helper" id="webhook-url-hint">Slack Incoming Webhook URL</p>
           <div id="webhook-secret-row">

@@ -8,8 +8,8 @@
     <div class="settings-content">
       <div class="settings-panel">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Liidiasetukset</h1>
-          <p class="settings-panel__subtitle">Hallinnoi miten automaattisesti saapuvat liidit reititetään</p>
+          <h1 class="settings-panel__title">Uusien liidien oletukset</h1>
+          <p class="settings-panel__subtitle">Mihin vaiheeseen ja kenelle uusi liidi menee, kun se luodaan Kohteista, lomakkeelta tai rajapinnasta. Kohteiden siirrossa valittu vastuuhenkilö menee näiden edelle.</p>
         </header>
 
         <div class="card p-4">
@@ -43,23 +43,16 @@
               </select>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Toimiala</label>
-              <input class="form-input" type="text" name="default_industry" value="{{ settings.default_industry or '' }}"
-                     placeholder="esim. SaaS, Rakentaminen...">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Alue</label>
-              <input class="form-input" type="text" name="default_region" value="{{ settings.default_region or '' }}"
-                     placeholder="esim. Uusimaa, Koko Suomi...">
-            </div>
-
+            {# Toimiala / Alue were stamped on every lead (a Uusimaa target became
+               "Pirkanmaa"); catalogue leads carry their own region now. The saved
+               values are kept as hidden fields so nothing is lost. #}
+            <input type="hidden" name="default_industry" value="{{ settings.default_industry or '' }}">
+            <input type="hidden" name="default_region" value="">
             <div class="form-group">
               <label class="form-label">Oletustagit</label>
               <input class="form-input" type="text" name="default_tags"
                      value="{{ settings.default_tags|join(', ') if settings.default_tags else '' }}"
-                     placeholder="b2b, saas... (pilkulla erotettuna)">
+                     placeholder="esim. putkiremontti, 2027 (pilkulla erotettuna)">
               <p class="form-helper">Nämä tagit lisätään jokaiseen saapuvaan liidiin</p>
             </div>
 
@@ -67,9 +60,9 @@
               <label class="form-check">
                 <input type="checkbox" name="daily_digest_enabled" value="y"
                   {% if settings.daily_digest_enabled %}checked{% endif %}>
-                Lähetä päivittäinen sähköpostikooste uusista liideistä
+                Lähetä ylläpitäjille päivittäinen sähköpostikooste uusista liideistä
               </label>
-              <p class="form-helper">Lähetetään vain kun uusia liideja on todella saapunut.</p>
+              <p class="form-helper">Lähetetään vain, kun uusia liidejä on tullut. Uusista kohteista tulee oma kooste Kohteet-sivun asetuksesta.</p>
             </div>
 
             <button type="submit" class="btn btn-primary">Tallenna asetukset</button>

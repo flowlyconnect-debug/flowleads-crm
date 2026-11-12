@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from app.core.permissions import require_role
 from app.extensions import db
 from app.leads.permissions import resolve_organization_id
-from app.webhooks.encryption import WebhookEncryptionError, encrypt_webhook_secret
+from app.webhooks.encryption import WebhookEncryptionError, decrypt_webhook_secret, encrypt_webhook_secret
 from app.webhooks.forms import WebhookEndpointForm
 from app.webhooks.models import WebhookDelivery, WebhookEndpoint
 from app.webhooks.payloads import (
@@ -63,7 +63,8 @@ def register_settings_webhook_routes(settings_bp):
             flash("Select at least one event.", "danger")
             return redirect(url_for("settings.webhooks_list", **_org_query_suffix(organization_id)))
         if not form.validate_on_submit():
-            flash("Invalid webhook endpoint data.", "danger")
+            url_errors = form.errors.get("url") or []
+            flash(url_errors[0] if url_errors else "Invalid webhook endpoint data.", "danger")
             return redirect(url_for("settings.webhooks_list", **_org_query_suffix(organization_id)))
         try:
             endpoint = WebhookEndpoint(
@@ -102,9 +103,14 @@ def register_settings_webhook_routes(settings_bp):
             .order_by(WebhookEndpoint.created_at.desc())
             .all()
         )
+        try:
+            current_url = decrypt_webhook_secret(endpoint.url_encrypted)
+        except Exception:
+            current_url = ""
         form = WebhookEndpointForm(
             name=endpoint.name,
             provider=endpoint.provider,
+            url=current_url,
             is_active=endpoint.is_active,
         )
         return render_template(
@@ -135,7 +141,8 @@ def register_settings_webhook_routes(settings_bp):
             flash("Select at least one event.", "danger")
             return redirect(url_for("settings.webhooks_edit", endpoint_id=endpoint_id, **_org_query_suffix(organization_id)))
         if not form.validate_on_submit():
-            flash("Invalid webhook endpoint data.", "danger")
+            url_errors = form.errors.get("url") or []
+            flash(url_errors[0] if url_errors else "Invalid webhook endpoint data.", "danger")
             return redirect(url_for("settings.webhooks_edit", endpoint_id=endpoint_id, **_org_query_suffix(organization_id)))
         try:
             endpoint.name = (form.name.data or "").strip()
@@ -201,7 +208,11 @@ def register_settings_webhook_routes(settings_bp):
         if result.get("success"):
             flash("Test webhook sent successfully.", "success")
         else:
-            flash("Test webhook failed.", "danger")
+            code = result.get("response_status")
+            flash(
+                f"Testikutsu epäonnistui (vastaus HTTP {code})." if code else "Testikutsu epäonnistui: osoitteeseen ei saatu yhteyttä. Tarkista osoite toimitusloki-sivulta.",
+                "danger",
+            )
         return redirect(url_for("settings.webhooks_list", **_org_query_suffix(organization_id)))
 
     @settings_bp.route("/webhooks/<int:endpoint_id>/deliveries", methods=["GET"])

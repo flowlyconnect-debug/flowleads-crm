@@ -1,4 +1,5 @@
 import csv
+from app.core.permissions import TWO_FA_SESSION_KEY
 import io
 from datetime import datetime, timedelta, timezone
 
@@ -54,11 +55,14 @@ def _setup_org(app, slug="analytics-org"):
 
 
 def _login(client, email):
-    return client.post(
+    response = client.post(
         "/auth/login",
         data={"email": email, "password": "securepassword1"},
         follow_redirects=False,
     )
+    with client.session_transaction() as sess:
+        sess[TWO_FA_SESSION_KEY] = True  # admins must pass 2FA before any page
+    return response
 
 
 def _range():
