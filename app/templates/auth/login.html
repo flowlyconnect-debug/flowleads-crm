@@ -73,18 +73,18 @@
 {# Urakkatyypit seuraavat app/search/constants.py::REMONTTITYYPIT-listaa ("Muu remontti" pois). #}
 {% set segments = [
   {"title": "Putkiremontit", "text": "Taloyhtiöt, joissa linjasaneeraus tai sukitus on suunnitteilla."},
-  {"title": "Katto- ja vesikattoremontit", "text": "Vesikaton uusimiset ja korjaukset ennen kuin ne kilpailutetaan."},
+  {"title": "Kattoremontit", "text": "Vesikaton uusimiset ja korjaukset ennen kuin ne kilpailutetaan."},
   {"title": "Julkisivuremontit", "text": "Julkisivun korjaukset ja uusimiset, usein parvekkeiden ja ikkunoiden kanssa."},
-  {"title": "Sähkö- ja tietoliikennejärjestelmät", "text": "Sähköverkon saneeraukset, nousukaapelit, latauspisteet ja kuituyhteydet."},
+  {"title": "Sähkö ja tietoliikenne", "text": "Sähköverkon saneeraukset, nousukaapelit, latauspisteet ja kuituyhteydet."},
   {"title": "Lämmitysjärjestelmät", "text": "Lämmitysmuodon vaihdot, maalämpö ja lämmönjaon uusimiset."},
   {"title": "Lukot ja kulunvalvonta", "text": "Lukituksen uusimiset ja sähköiset kulunvalvontajärjestelmät."},
   {"title": "Huoneistoremontit", "text": "Osakkaiden huoneistoremontit taloyhtiöissä, joissa iso remontti on tulossa."},
 ] %}
 
-{% block title %}Kirjaudu — FlowLeads CRM | Flowly Solutions{% endblock %}
+{% block title %}Kirjaudu | FlowLeads CRM | Flowly Solutions{% endblock %}
 {% block body_class %} login-page{% endblock %}
 {% block head %}
-<meta name="description" content="FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja vie ne kaupaksi asti: liidit, sähköpostisekvenssit, soittolista ja tarjoukset samassa paikassa. Kirjaudu sisään tai pyydä maksuton kokeilu.">
+<meta name="description" content="FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja vie ne kaupaksi asti: liidit, sähköpostisekvenssit, soittolista ja tarjoukset samassa paikassa. Kirjaudu sisään tai pyydä esittely.">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 {% endblock %}
 
@@ -103,7 +103,7 @@
   <header class="lp-header">
     <div class="lp-container lp-header__inner">
       <a href="{{ url_for('auth.login') }}" class="lp-logo">
-        <img src="{{ url_for('static', filename='img/flowly-logo.svg') }}" alt="Flowly Solutions – FlowLeads CRM" width="192" height="62" class="lp-logo__img">
+        <img src="{{ url_for('static', filename='img/flowly-logo.svg') }}" alt="Flowly Solutions, FlowLeads CRM" width="192" height="62" class="lp-logo__img">
       </a>
       <nav class="lp-header__nav" aria-label="Sivun linkit">
         <a href="{{ flowly.website_url }}" class="lp-header__site"{{ ext | safe }}>
@@ -122,12 +122,12 @@
         <h1 class="lp-hero__title" id="lp-title">Kohteesta kauppaan yhdessä paikassa.</h1>
         <p class="lp-hero__lead">FlowLeads löytää taloyhtiöt, joissa remontti on tulossa, ja asettaa ne järjestykseen sen mukaan, mitkä sopivat sinulle parhaiten. Vie kohteet liideiksi ja sähköpostisekvenssiin yhdellä painalluksella, soita soittolista läpi ja lähetä tarjous samasta näkymästä.</p>
         <ul class="lp-hero__points">
-          <li>Putki-, katto-, julkisivu-, sähkö- ja LVI-urakoitsijoille</li>
+          <li>Kaikki taloyhtiöiden urakkatyypit putkista ja katoista lukituksiin ja huoneistoihin</li>
           <li>Priorisointi, joka oppii valinnoistasi</li>
-          <li>Maksuton kokeilu omalla alueellasi</li>
+          <li>Päivittäinen kooste uusista kohteista sähköpostiisi</li>
         </ul>
         <div class="lp-hero__actions">
-          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä maksuton kokeilu<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
+          <a href="{{ demo_href }}" class="lp-btn lp-btn--primary"{% if not flowly.email %}{{ ext | safe }}{% endif %}>Pyydä esittely<span class="sr-only"> (avautuu uuteen välilehteen)</span></a>
           <a href="#lp-flow-title" class="lp-btn lp-btn--ghost">Kokeile demoa</a>
         </div>
       </div>
@@ -321,7 +321,7 @@
     <div class="lp-container">
       <div class="lp-section__head">
         <h2 class="lp-section__title" id="lp-segments-title">Tehty pienille remonttiurakoitsijoille</h2>
-        <p class="lp-section__lead">FlowLeads on rakennettu 1–20 hengen urakoitsijoille, jotka myyvät taloyhtiöille. Valitset omat urakkasi ja alueesi, ja näet vain sinulle sopivat kohteet.</p>
+        <p class="lp-section__lead">FlowLeads on rakennettu enintään 20 hengen urakoitsijoille, jotka myyvät taloyhtiöille. Valitset omat urakkasi ja alueesi, ja näet vain sinulle sopivat kohteet.</p>
       </div>
       <div class="lp-carousel" data-lp-carousel>
         <ul class="lp-segments__list lp-carousel__track" data-lp-carousel-track tabindex="0" aria-label="Urakkatyypit">
@@ -381,7 +381,7 @@
 
   <footer class="lp-footer">
     <div class="lp-container lp-footer__inner">
-      <p class="lp-footer__company"><strong>{{ flowly.name }}</strong><span>FlowLeads CRM on {{ flowly.name }} -palvelu.</span></p>
+      <p class="lp-footer__company"><strong>{{ flowly.name }}</strong><span>FlowLeads CRM on {{ flowly.name }}in palvelu.</span></p>
       <ul class="lp-footer__links">
         <li><a href="{{ flowly.website_url }}"{{ ext | safe }}>{{ flowly.website_label }}</a></li>
         {% if flowly.contact_page_url %}<li><a href="{{ flowly.contact_page_url }}"{{ ext | safe }}>Yhteystiedot</a></li>{% endif %}

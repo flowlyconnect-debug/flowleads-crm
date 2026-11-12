@@ -227,6 +227,8 @@ def test_login_page_shows_form_and_public_product_intro(client):
     assert "Tehty pienille remonttiurakoitsijoille" in html
     assert "data-lp-carousel" in html and "Lukot ja kulunvalvonta" in html
     assert "kuukausihinta" not in html
+    assert "Maksuton kokeilu" not in html and "maksuton kokeilu" not in html
+    assert "Kaikki taloyhtiöiden urakkatyypit" in html
     assert "Pyydä esittely" in html
     assert 'href="https://flowlysolutions.net/yhteystiedot"' in html
     assert 'href="https://flowlysolutions.net"' in html
