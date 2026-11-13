@@ -67,7 +67,7 @@
     <div class="task-list">
       {% for task in overdue_tasks %}
       <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
-        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <button class="task-check" type="button" aria-label="Merkitse tehdyksi: {{ task.title }}" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"></button>
         <div class="task-row__main">
           <div class="task-row__title">{{ task.title }}</div>
           <div class="task-row__meta">
@@ -94,7 +94,7 @@
     <div class="task-list" id="today-list">
       {% for task in today_tasks %}
       <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
-        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <button class="task-check" type="button" aria-label="Merkitse tehdyksi: {{ task.title }}" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"></button>
         <div class="task-row__main">
           <div class="task-row__title">{{ task.title }}</div>
           <div class="task-row__meta">
@@ -123,7 +123,7 @@
     <div class="task-list" id="week-list">
       {% for task in week_tasks %}
       <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
-        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <button class="task-check" type="button" aria-label="Merkitse tehdyksi: {{ task.title }}" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"></button>
         <div class="task-row__main">
           <div class="task-row__title">{{ task.title }}</div>
           <div class="task-row__meta">
@@ -145,7 +145,7 @@
     <div class="task-list is-hidden" id="later-list">
       {% for task in later_tasks %}
       <article class="task-row priority-{{ task.priority }}" data-task-id="{{ task.id }}">
-        <button class="task-check" type="button" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}">○</button>
+        <button class="task-check" type="button" aria-label="Merkitse tehdyksi: {{ task.title }}" data-complete-url="{{ url_for('tasks.complete_task', task_id=task.id, **org_query) }}"></button>
         <div class="task-row__main">
           <div class="task-row__title">{{ task.title }}</div>
           <div class="task-row__meta">
@@ -244,7 +244,7 @@
     var action = task.lead_url ? '<a href="' + esc(task.lead_url) + '">Avaa liidi →</a>' : '';
     var priorityDot = (task.priority === 'high' || task.priority === 'urgent') ? '<span class="priority-dot" title="Korkea prioriteetti"></span>' : '';
     var html = '<article class="task-row priority-' + esc(task.priority) + '" data-task-id="' + esc(task.id) + '">' +
-      '<button class="task-check" type="button" data-complete-url="' + esc(task.complete_url) + '">○</button>' +
+      '<button class="task-check" type="button" aria-label="Merkitse tehdyksi: ' + esc(task.title) + '" data-complete-url="' + esc(task.complete_url) + '"></button>' +
       '<div class="task-row__main"><div class="task-row__title">' + esc(task.title) + '</div><div class="task-row__meta">' + leadHtml + '</div></div>' +
       '<div class="task-row__due' + (task.section === 'overdue' ? ' task-row__due--danger' : '') + '">' + dueText + '</div>' +
       '<div class="task-row__action">' + (task.section === 'today' ? priorityDot : action) + '</div>' +

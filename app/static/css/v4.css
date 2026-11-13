@@ -766,3 +766,48 @@ p, li, dd { text-wrap: pretty; }
 .tasks-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .tasks-header .page-header__actions { flex-wrap: wrap; }
 @media (max-width: 600px) { .tasks-header .page-header__actions select { max-width: 100%; } }
+
+/* ==========================================================================
+   Third pass: nongeneric / Gesso / avoid-ai-design rules on a phone
+   ========================================================================== */
+
+/* the shell fills the dynamic viewport on phones (legacy-viewport-height) */
+.app-layout { min-height: 100dvh; }
+
+/* search fields that drop the input outline show the ring on their wrapper */
+.dash-search:focus-within, .leads-opp-search:focus-within { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
+
+/* touch: inputs at 16px so iOS does not zoom on focus (ios-input-zoom),
+   controls at least 44px tall (tiny-tap-target, WCAG 2.5.5) */
+@media (max-width: 900px), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]), select, textarea, .form-input, .form-select { font-size: 16px !important; }
+  .btn, .btn-sm, .btn-lg, .target-row__act, .leads-opp-tab, .tab, .icon-close, .btn-link-plain,
+  .seg button, .app-main__topbar button, .sidebar-toggle, .lead-next, .lead-card__next,
+  .call-card__outcomes .btn, .dash-ledger__link, .head-link { min-height: 44px; }
+  .sidebar-item { min-height: 44px; align-items: center; }
+  .app-main__topbar-logo { min-height: 44px; display: inline-flex; align-items: center; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; }
+  .target-row__check { width: 22px; height: 22px; }
+  .targets-filter__select.form-input, .leads-quick-filter__select.form-input { min-height: 40px; }
+  .lead-next, .lead-card__next { display: inline-flex; align-items: center; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .btn, .btn-sm { min-height: 44px !important; }
+  .lead-list-head__col, .task-row__edit, .calls-scope__item, .dash-panel__link, .task-row__meta a,
+  .breadcrumbs a, .work-row__name, .dash-call, .dash-target { min-height: 44px; display: inline-flex; align-items: center; }
+  .task-row__check, .task-row button[aria-label] { min-width: 44px; min-height: 44px; }
+}
+/* the complete-task control: a drawn ring, named for screen readers */
+.task-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--color-text-secondary); background: var(--color-card); cursor: pointer; padding: 0; font-size: 0; position: relative; }
+.task-check:hover { border-color: var(--color-success); }
+.task-check::after { content: ""; position: absolute; inset: -11px; }
+input[type=checkbox] { width: 24px; height: 24px; }
+@media (max-width: 900px), (pointer: coarse) {
+  .pipeline-page-actions .btn { height: auto !important; min-height: 44px !important; }
+  .task-row__edit { min-width: 44px; justify-content: center; }
+  .task-toggle-btn { min-height: 44px; }
+  .contact-info-value { min-height: 44px; display: inline-flex; align-items: center; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .pipeline-add-lead, .lead-row__name { min-height: 44px; display: inline-flex; align-items: center; }
+}
