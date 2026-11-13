@@ -376,17 +376,14 @@
               </dd>
               {% endif %}
               {% set people = row.people %}
-              {% if people.chair %}
-              <dt>Hallituksen pj</dt>
-              <dd>{{ people.chair.name or '–' }}
+              {% if people.chair or people.maintenance %}
+              <dt>Hallitus ja huolto</dt>
+              <dd>
+                {% if people.chair %}<span>Hallituksen pj: {{ people.chair.name or '–' }}</span>
                 {% if people.chair.phone %}<a class="mono" href="tel:{{ people.chair.phone|replace(' ', '') }}">{{ people.chair.phone }}</a>{% endif %}
-                {% if people.chair.email %}<a href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}
-              </dd>
-              {% endif %}
-              {% if people.maintenance %}
-              <dt>Huolto</dt>
-              <dd>{{ people.maintenance.name or '–' }}
-                {% if people.maintenance.phone %}<a class="mono" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}
+                {% if people.chair.email %}<a href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}{% endif %}
+                {% if people.maintenance %}<span>Huolto: {{ people.maintenance.name or '–' }}</span>
+                {% if people.maintenance.phone %}<a class="mono" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}{% endif %}
               </dd>
               {% endif %}
               {% if row.fit_reasons %}<dt>Miksi sopii</dt><dd>{{ row.fit_reasons[:3]|join(' · ') }}</dd>{% endif %}
