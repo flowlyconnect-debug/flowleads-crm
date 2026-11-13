@@ -8,11 +8,14 @@
   {% set settings_home_ep = 'admin.customers_list' %}
 {% elif current_user.role == 'admin' %}
   {% set settings_home_ep = 'settings.team_members' %}
-{% else %}
+{% elif calendar_sync_available() %}
   {% set settings_home_ep = 'settings.calendar_settings' %}
+{% else %}
+  {% set settings_home_ep = 'settings.email_templates_list' %}
 {% endif %}
 {% set settings_active = ep and (
   ep.startswith('settings.')
+  or ep in ('integrations.settings_page', 'billing.subscription_page')
   or ep.startswith('backups.')
   or (ep.startswith('admin.') and ep != 'email.admin_email_logs')
   or ep == 'analytics.admin_reports'

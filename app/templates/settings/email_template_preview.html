@@ -10,7 +10,7 @@
         <h1 class="page-title">Esikatselu: {{ template.name }}</h1>
         <p class="page-subtitle">Näin viesti näyttää esimerkkiliidille.</p>
         <p><strong>Aihe:</strong> {{ rendered.subject }}</p>
-        <div style="background:#fff; color:#111; padding:1rem; border:1px solid #E2E7F0; border-radius:8px;">
+        <div style="background:var(--color-card); color:var(--color-text-primary); padding:1rem; border:1px solid var(--color-border); border-radius:8px;">
           {{ rendered.body_html|safe }}
         </div>
         <p style="margin-top:1rem;">

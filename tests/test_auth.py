@@ -174,8 +174,11 @@ def test_superadmin_with_2fa_session_can_access_dashboard(client, app):
         sess[TWO_FA_SESSION_KEY] = True
 
     response = client.get("/admin/dashboard")
+    assert response.status_code == 302
+    assert response.location.endswith("/admin/reports")
+    response = client.get("/admin/reports")
     assert response.status_code == 200
-    assert "Hallintapaneeli" in response.get_data(as_text=True)
+    assert "Järjestelmäraportit" in response.get_data(as_text=True)
 
 
 def test_audit_login_success_and_failed_and_logout(client, app):

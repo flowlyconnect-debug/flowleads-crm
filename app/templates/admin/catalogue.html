@@ -125,7 +125,7 @@
               </td>
               <td>
                 {% if region.last_error %}
-                <span style="color:#991B1B;">{{ region.last_error[:160] }}</span>
+                <span style="color:var(--color-danger-emphasis);">{{ region.last_error[:160] }}</span>
                 <div class="text-muted text-sm">{{ when(region.last_error_at) }}</div>
                 {% else %}—{% endif %}
               </td>

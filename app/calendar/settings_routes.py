@@ -37,7 +37,18 @@ def _oauth_failed(label: str, exc: Exception) -> None:
     flash(f"{label}-yhteys epäonnistui. Yritä uudelleen hetken kuluttua.", "danger")
 
 
+def calendar_sync_available() -> bool:
+    """Google or Outlook can be connected in this deployment. Without the
+    OAuth keys the Kalenteri settings page has nothing to set, so the
+    settings menu leaves it out."""
+    return provider_ready("google") or provider_ready("microsoft")
+
+
 def register_calendar_settings_routes(settings_bp):
+    @settings_bp.app_context_processor
+    def _calendar_helpers():
+        return {"calendar_sync_available": calendar_sync_available}
+
     @settings_bp.route("/calendar", methods=["GET"])
     @login_required
     @require_role("admin", "superadmin", "user")

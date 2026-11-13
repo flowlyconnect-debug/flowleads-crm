@@ -1031,9 +1031,15 @@ def admin_reports():
         end=request.args.get("end"),
     )
     stats = None if range_error else AnalyticsService.get_system_report(start_dt, end_dt)
+    from app.admin.services import get_ai_usage_stats
+    from app.users.models import User
+
+    # what used to be the separate "Hallintapaneeli" page
     return render_template(
         "admin/reports.html",
         stats=stats,
+        user_count=User.query.count(),
+        ai_usage=get_ai_usage_stats(),
         range_key=range_key,
         range_error=range_error,
         start_date=request.args.get("start") or start_dt.date().isoformat(),

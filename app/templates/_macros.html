@@ -16,44 +16,51 @@
 {% macro settings_nav(active) %}
 {% set org_id_param = active_org_id if current_user.is_superadmin() else none %}
 {% set use_org = current_user.is_superadmin() and org_id_param %}
+{# Kalenteri only when Google/Outlook can be connected here (or the user
+   already is on that page); the email templates live on the Sähköposti page. #}
+{% set show_calendar = calendar_sync_available() or active == 'calendar' %}
+{% set email_keys = ['email', 'email_templates'] %}
 <nav class="settings-nav" aria-label="Asetukset">
   <span class="settings-nav__label">Asetukset</span>
 
-  {% macro org_link(endpoint, key, label) -%}
-  <a href="{% if use_org %}{{ url_for(endpoint, organization_id=org_id_param) }}{% else %}{{ url_for(endpoint) }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if active == key %} is-active{% endif %}">{{ label }}</a>
+  {% macro org_link(endpoint, keys, label) -%}
+  {%- set is_active = active in (keys if keys is not string else [keys]) -%}
+  <a href="{% if use_org %}{{ url_for(endpoint, organization_id=org_id_param) }}{% else %}{{ url_for(endpoint) }}{% endif %}" class="settings-nav__item settings-nav__item--nested{% if is_active %} is-active{% endif %}"{% if is_active %} aria-current="page"{% endif %}>{{ label }}</a>
+  {%- endmacro %}
+  {% macro plain_link(endpoint, keys, label, nested=True) -%}
+  {%- set is_active = active in (keys if keys is not string else [keys]) -%}
+  <a href="{{ url_for(endpoint) }}" class="settings-nav__item{% if nested %} settings-nav__item--nested{% endif %}{% if is_active %} is-active{% endif %}"{% if is_active %} aria-current="page"{% endif %}>{{ label }}</a>
   {%- endmacro %}
 
   {% if current_user.is_superadmin() %}
 
   <span class="settings-nav__group-label" title="FlowLeadsia käyttävät organisaatiot — eri asia kuin CRM:n Yritykset">Asiakasorganisaatiot</span>
-  <a href="{{ url_for('admin.customers_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customers' %} is-active{% endif %}">Asiakaslista</a>
-  <a href="{{ url_for('admin.create_customer_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_onboarding' %} is-active{% endif %}">Luo asiakas</a>
-  <a href="{{ url_for('admin.create_invite_route') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'customer_invite' %} is-active{% endif %}">Kutsu asiakas</a>
-  <a href="{{ url_for('admin.catalogue_status') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'catalogue' %} is-active{% endif %}">Kohdekatalogi</a>
+  {{ plain_link('admin.customers_list', 'customers', 'Asiakaslista') }}
+  {{ plain_link('admin.create_customer_route', 'customer_onboarding', 'Luo asiakas') }}
+  {{ plain_link('admin.create_invite_route', 'customer_invite', 'Kutsu asiakas') }}
+  {{ plain_link('admin.catalogue_status', 'catalogue', 'Kohdekatalogi') }}
 
   {# Organization-scoped settings need a chosen organization. #}
   {% if use_org %}
   <span class="settings-nav__group-label">Valittu organisaatio</span>
   {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
   {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
-  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidiasetukset') }}
-  {{ org_link('settings.email_settings', 'email', 'Sähköpostiasetukset') }}
-  {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
-  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
-  {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
-  {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidit ja koosteet') }}
+  {{ org_link('settings.email_settings', email_keys, 'Sähköposti') }}
+  {{ org_link('settings.proposals_settings', 'proposals', 'Tarjoukset') }}
   {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot (HubSpot, Pipedrive)') }}
   {{ org_link('billing.subscription_page', 'billing', 'Tilaus') }}
-  {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
+  {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja ja tietojen vienti') }}
+  {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
+  {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
   {% endif %}
 
   <span class="settings-nav__group-label">Järjestelmä</span>
-  <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
-  <a href="{{ url_for('admin.system_status') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'system' %} is-active{% endif %}">Järjestelmän tila</a>
-  <a href="{{ url_for('admin.audit_log') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'audit_log' %} is-active{% endif %}">Audit-loki</a>
-  <a href="{{ url_for('email.admin_email_logs') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_logs' %} is-active{% endif %}">Sähköpostiloki</a>
-  <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Varmuuskopiot</a>
-  <a href="{{ url_for('analytics.admin_reports') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin_reports' %} is-active{% endif %}">Järjestelmäraportit</a>
+  {{ plain_link('analytics.admin_reports', 'admin_reports', 'Järjestelmäraportit') }}
+  {{ plain_link('admin.system_status', 'system', 'Järjestelmän tila') }}
+  {{ plain_link('email.admin_email_logs', 'email_logs', 'Sähköpostiloki') }}
+  {{ plain_link('backups.backups_list', 'backups', 'Varmuuskopiot') }}
+  {{ plain_link('admin.audit_log', 'audit_log', 'Audit-loki') }}
 
   {% elif current_user.role == 'admin' %}
 
@@ -61,27 +68,26 @@
      reachable under "Lisäasetukset" (open when one of them is active). #}
   {{ org_link('settings.team_members', 'team', 'Käyttäjät') }}
   {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
+  {{ org_link('settings.lead_settings', 'lead_settings', 'Liidit ja koosteet') }}
+  {{ org_link('settings.email_settings', email_keys, 'Sähköposti') }}
   {{ org_link('settings.proposals_settings', 'proposals', 'Tarjoukset') }}
-  {{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}
+  {% if show_calendar %}{{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}{% endif %}
   {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot') }}
   {{ org_link('billing.subscription_page', 'billing', 'Tilaus') }}
 
-  {% set advanced_keys = ['lead_settings', 'email', 'email_templates', 'privacy', 'api_keys', 'webhooks'] %}
+  {% set advanced_keys = ['privacy', 'api_keys', 'webhooks'] %}
   <details class="settings-nav__more"{% if active in advanced_keys %} open{% endif %}>
     <summary class="settings-nav__group-label">Lisäasetukset</summary>
-    {{ org_link('settings.lead_settings', 'lead_settings', 'Uusien liidien oletukset') }}
-    {{ org_link('settings.email_settings', 'email', 'Sähköpostin lähettäjä') }}
-    {{ org_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit') }}
-    {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
+    {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja ja tietojen vienti') }}
     {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
     {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
   </details>
 
   {% else %}
 
-  <a href="{{ url_for('settings.calendar_settings') }}" class="settings-nav__item{% if active == 'calendar' %} is-active{% endif %}">Kalenteri</a>
-  <a href="{{ url_for('billing.subscription_page') }}" class="settings-nav__item{% if active == 'billing' %} is-active{% endif %}">Tilaus</a>
-  <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
+  {% if show_calendar %}{{ plain_link('settings.calendar_settings', 'calendar', 'Kalenteri', nested=False) }}{% endif %}
+  {{ plain_link('settings.email_templates_list', 'email_templates', 'Sähköpostimallit', nested=False) }}
+  {{ plain_link('billing.subscription_page', 'billing', 'Tilaus', nested=False) }}
 
   {% endif %}
 </nav>

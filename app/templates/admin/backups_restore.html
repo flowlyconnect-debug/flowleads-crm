@@ -23,7 +23,7 @@
       {{ form.confirm_overwrite.label.text }}
     </label>
     {% for e in form.confirm_overwrite.errors %}<div class="errors">{{ e }}</div>{% endfor %}
-  <button type="submit" style="background: var(--danger); color: #fff;">{{ form.submit.label.text }}</button>
+  <button type="submit" style="background: var(--color-danger); color: var(--color-text-inverse);">{{ form.submit.label.text }}</button>
   <a class="btn secondary" href="{{ url_for('backups.backups_list') }}">Peruuta</a>
   </form>
 </div>

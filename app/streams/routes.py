@@ -54,6 +54,7 @@ def register_stream_settings_routes(settings_bp):
             default_industry = (request.form.get("default_industry") or "").strip() or None
             default_region = (request.form.get("default_region") or "").strip() or None
             daily_digest_enabled = request.form.get("daily_digest_enabled") == "y"
+            targets_digest_enabled = request.form.get("targets_digest_enabled") == "y"
 
             try:
                 stage_id = int(stage_raw) if stage_raw else None
@@ -89,6 +90,11 @@ def register_stream_settings_routes(settings_bp):
             settings.default_industry = default_industry
             settings.default_region = default_region
             settings.daily_digest_enabled = daily_digest_enabled
+            # the "new targets" digest (also switchable on Kohteet) lives in the
+            # organization's task settings; both digests are set here together
+            from app.tasks.settings import get_organization_settings
+
+            get_organization_settings(organization_id).targets_digest_enabled = targets_digest_enabled
             log_audit(
                 "lead_settings_updated",
                 user_id=current_user.id,
@@ -102,6 +108,7 @@ def register_stream_settings_routes(settings_bp):
                     "default_industry": default_industry,
                     "default_region": default_region,
                     "daily_digest_enabled": daily_digest_enabled,
+                    "targets_digest_enabled": targets_digest_enabled,
                 },
             )
             db.session.commit()
@@ -121,8 +128,11 @@ def register_stream_settings_routes(settings_bp):
         )
         user_display_map = {user.id: _format_user_label(user) for user in users}
         now = datetime.now(timezone.utc)
+        from app.tasks.settings import get_organization_settings
+
         return render_template(
             "settings/lead_settings.html",
+            targets_digest_enabled=get_organization_settings(organization_id).targets_digest_enabled,
             settings=settings,
             stages=stages,
             users=users,

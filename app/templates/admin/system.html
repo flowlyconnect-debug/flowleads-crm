@@ -37,13 +37,13 @@
 </div>
 <style>
   .system-checks { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
-  .system-check { display: grid; grid-template-columns: 24px minmax(150px, 220px) 1fr; gap: 8px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: #F9FAFB; font-size: 14px; }
-  .system-check__mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-weight: 700; font-size: 12px; color: #fff; background: #9CA3AF; }
-  .system-check--ok .system-check__mark { background: #059669; }
-  .system-check--warn .system-check__mark { background: #D97706; }
-  .system-check--fail { background: #FEF2F2; }
-  .system-check--fail .system-check__mark { background: #DC2626; }
-  .system-check__detail { color: #374151; }
+  .system-check { display: grid; grid-template-columns: 24px minmax(150px, 220px) 1fr; gap: 8px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: var(--color-neutral-soft); font-size: 14px; }
+  .system-check__mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-weight: 700; font-size: 12px; color: var(--color-text-inverse); background: var(--color-text-muted); }
+  .system-check--ok .system-check__mark { background: var(--color-success); }
+  .system-check--warn .system-check__mark { background: var(--color-warning); }
+  .system-check--fail { background: var(--color-danger-soft); }
+  .system-check--fail .system-check__mark { background: var(--color-danger); }
+  .system-check__detail { color: var(--color-neutral-emphasis); }
   .system-check strong { overflow-wrap: anywhere; min-width: 0; }
   @media (max-width: 640px) { .system-check { grid-template-columns: 24px 1fr; } .system-check__detail { grid-column: 2; } }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }

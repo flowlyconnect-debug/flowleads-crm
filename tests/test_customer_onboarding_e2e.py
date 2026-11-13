@@ -223,8 +223,9 @@ def test_e2e_admin_cannot_access_superadmin_routes(app, client):
         response = client.get(path)
         assert response.status_code == 403, path
 
-    dashboard_resp = client.get("/admin/dashboard")
+    dashboard_resp = client.get("/admin/dashboard", follow_redirects=True)
     assert dashboard_resp.status_code == 200
+    assert dashboard_resp.request.path == "/settings/team"
     dashboard_page = dashboard_resp.get_data(as_text=True)
     assert "Luo uusi asiakas" not in dashboard_page
     assert "Luo organisaatio" not in dashboard_page

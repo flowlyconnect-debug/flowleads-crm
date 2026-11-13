@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import settings_nav with context %}
-{% block title %}Liidiasetukset{% endblock %}
+{% block title %}Liidit ja koosteet — Asetukset{% endblock %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
@@ -8,8 +8,8 @@
     <div class="settings-content">
       <div class="settings-panel">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Uusien liidien oletukset</h1>
-          <p class="settings-panel__subtitle">Mihin vaiheeseen ja kenelle uusi liidi menee, kun se luodaan Kohteista, lomakkeelta tai rajapinnasta. Kohteiden siirrossa valittu vastuuhenkilö menee näiden edelle.</p>
+          <h1 class="settings-panel__title">Liidit ja koosteet</h1>
+          <p class="settings-panel__subtitle">Mihin vaiheeseen ja kenelle uusi liidi menee, kun se luodaan Kohteista, lomakkeelta tai rajapinnasta, ja mitkä päiväkoosteet lähetetään. Kohteiden siirrossa valittu vastuuhenkilö menee näiden edelle.</p>
         </header>
 
         <div class="card p-4">
@@ -56,13 +56,19 @@
               <p class="form-helper">Nämä tagit lisätään jokaiseen saapuvaan liidiin</p>
             </div>
 
+            <h2 class="form-section-title">Päiväkoosteet</h2>
             <div class="form-group">
+              <label class="form-check">
+                <input type="checkbox" name="targets_digest_enabled" value="y"
+                  {% if targets_digest_enabled %}checked{% endif %}>
+                Uudet kohteet: ilmoitus ja sähköposti aamuisin kaikille käyttäjille
+              </label>
               <label class="form-check">
                 <input type="checkbox" name="daily_digest_enabled" value="y"
                   {% if settings.daily_digest_enabled %}checked{% endif %}>
-                Lähetä ylläpitäjille päivittäinen sähköpostikooste uusista liideistä
+                Uudet liidit: sähköpostikooste ylläpitäjille
               </label>
-              <p class="form-helper">Lähetetään vain, kun uusia liidejä on tullut. Uusista kohteista tulee oma kooste Kohteet-sivun asetuksesta.</p>
+              <p class="form-helper">Kooste lähtee vain, kun uutta on tullut. Kohdekoosteen voi kytkeä myös Kohteet-sivulta.</p>
             </div>
 
             <button type="submit" class="btn btn-primary">Tallenna asetukset</button>
