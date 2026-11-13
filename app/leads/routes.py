@@ -405,8 +405,26 @@ def detail(lead_id):
         ).first():
             target_listing_id = listing_id
     manager_name = str(meta.get("isannoitsija_yritys") or "").strip()
+    # the housing company's renovation timeline and why the target was found
+    from app.listings.pts import pts_from_text, pts_strip
+
+    lead_pts, lead_evidence = None, None
+    if target_listing_id:
+        from app.extensions import db
+        from app.listings.models import Listing
+
+        listing = db.session.get(Listing, target_listing_id)
+        if listing is not None and listing.renovations:
+            lead_pts = pts_strip(listing.renovations)
+            best = max(listing.renovations, key=lambda r: r.confidence)
+            if best.evidence:
+                lead_evidence = {"text": best.evidence, "renovation": best, "listing": listing}
+    if lead_pts is None and meta.get("remonttityyppi"):
+        lead_pts = pts_from_text(meta.get("remonttityyppi"), meta.get("remontin_ajankohta"))
     return render_template(
         "leads/detail.html",
+        lead_pts=lead_pts,
+        lead_evidence=lead_evidence,
         lead=lead,
         playbook=playbook,
         property_info_rows=property_info_rows,

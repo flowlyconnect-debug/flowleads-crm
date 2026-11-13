@@ -15,6 +15,7 @@ from sqlalchemy.orm import contains_eager, joinedload
 
 from app.extensions import db
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
+from app.listings.pts import pts_strip
 from app.listings.services import _best_renovation, _now, materialize_match
 
 PER_PAGE = 25
@@ -122,6 +123,14 @@ def list_targets(
         query = query.order_by(func.lower(func.coalesce(Listing.kaupunki, "")).asc(), newest.desc())
     elif sort == "confidence":
         query = query.order_by(ListingMatch.confidence.desc(), newest.desc())
+    elif sort == "year":
+        first_year = (
+            db.session.query(func.min(ListingRenovation.timing_year))
+            .filter(ListingRenovation.listing_id == Listing.id)
+            .correlate(Listing)
+            .scalar_subquery()
+        )
+        query = query.order_by(first_year.is_(None), first_year.asc(), newest.desc(), Listing.id.desc())
     else:
         query = query.order_by(newest.desc(), Listing.id.desc())
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
@@ -151,6 +160,7 @@ SORT_OPTIONS = (
     ("oldest", "Vanhimmat ensin"),
     ("confidence", "Varmimmat ensin"),
     ("city", "Kaupungin mukaan"),
+    ("year", "Remontti alkaa ensin"),
 )
 
 
@@ -278,6 +288,7 @@ def target_row(match: ListingMatch, wanted_types: set[str] | None = None, fit: t
         "seen_at": listing.published_at or listing.first_seen_at,
         "fit": fit[0] if fit else None,
         "fit_reasons": fit[1] if fit else [],
+        "pts": pts_strip(renovations),
     }
 
 
@@ -837,3 +848,13 @@ def notify_saved_searches(*, now: datetime | None = None) -> int:
     if sent:
         db.session.commit()
     return sent
+
+
+def top_target_rows(organization_id: int, limit: int = 5) -> list[dict]:
+    """The best released targets for the dashboard, as Kohteet rows (fit order)."""
+    from app.listings.fit_services import learn_preferences, score_matches
+
+    page = list_targets(organization_id, page=1, per_page=limit)
+    wanted_types = organization_wanted_types(organization_id)
+    fits = score_matches(page.items, learn_preferences(organization_id, wanted_types))
+    return [target_row(match, wanted_types, fits.get(match.id)) for match in page.items]

@@ -6,7 +6,7 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}FlowLeads CRM{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/flowly-mark.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/inter.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/plex.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <style>
@@ -68,7 +68,7 @@
     .cmd-item-meta { font-size:11px; color:#8A94A6; }
   </style>
   {% block head %}{% endblock %}
-  {% if ui_redesign %}<link rel="stylesheet" href="{{ url_for('static', filename='css/redesign.css') }}">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v4.css') }}">
 </head>
 <body class="{% if current_user.is_authenticated %}app-authenticated{% else %}app-guest{% endif %}{% block body_class %}{% endblock %}">
   {% if current_user.is_authenticated %}
