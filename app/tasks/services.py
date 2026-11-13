@@ -39,6 +39,26 @@ def _ensure_tz(dt: datetime) -> datetime:
     return dt
 
 
+def local_to_utc(dt: datetime | None) -> datetime | None:
+    """A time a person typed (no offset) is Finnish time; store it as UTC.
+    Times with an offset (API "...Z") are only converted."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        from zoneinfo import ZoneInfo
+
+        dt = dt.replace(tzinfo=ZoneInfo("Europe/Helsinki"))
+    return dt.astimezone(timezone.utc)
+
+
+def _parse_user_time(value: str, field: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        raise TaskServiceError(f"Invalid {field} format.", "validation_error") from None
+    return local_to_utc(parsed)
+
+
 def get_task_for_org(task_id: int, organization_id: int) -> Task:
     task = (
         Task.query.filter_by(id=task_id, organization_id=organization_id)
@@ -78,13 +98,19 @@ def _validate_assignee(assigned_to: int, organization_id: int) -> User:
 
 
 def _start_of_day(dt: datetime | None = None) -> datetime:
-    now = _ensure_tz(dt or _utc_now())
-    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    """Start of the Finnish day containing `dt`, as UTC."""
+    from zoneinfo import ZoneInfo
+
+    local = _ensure_tz(dt or _utc_now()).astimezone(ZoneInfo("Europe/Helsinki"))
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
 
 def _end_of_day(dt: datetime | None = None) -> datetime:
-    now = _ensure_tz(dt or _utc_now())
-    return now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    """Last moment of the Finnish day containing `dt`, as UTC."""
+    from zoneinfo import ZoneInfo
+
+    local = _ensure_tz(dt or _utc_now()).astimezone(ZoneInfo("Europe/Helsinki"))
+    return local.replace(hour=23, minute=59, second=59, microsecond=999999).astimezone(timezone.utc)
 
 
 def _log_task_activity(
@@ -142,22 +168,15 @@ class TaskService:
         _validate_assignee(assigned_to, organization_id)
 
         due_date = data.get("due_date")
-        if due_date is None:
+        if due_date is None or (isinstance(due_date, str) and not due_date.strip()):
             raise TaskServiceError("due_date is required.", "validation_error")
-        if isinstance(due_date, str):
-            try:
-                due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-            except ValueError:
-                raise TaskServiceError("Invalid due_date format.", "validation_error") from None
-        due_date = _ensure_tz(due_date)
+        # text comes from a form or the API: no offset = Finnish time
+        due_date = _parse_user_time(due_date, "due_date") if isinstance(due_date, str) else _ensure_tz(due_date)
 
         reminder_at = data.get("reminder_at")
         if isinstance(reminder_at, str):
-            try:
-                reminder_at = datetime.fromisoformat(reminder_at.replace("Z", "+00:00"))
-            except ValueError:
-                raise TaskServiceError("Invalid reminder_at format.", "validation_error") from None
-        if reminder_at is not None:
+            reminder_at = _parse_user_time(reminder_at, "reminder_at") if reminder_at.strip() else None
+        elif reminder_at is not None:
             reminder_at = _ensure_tz(reminder_at)
 
         task = Task(
@@ -223,14 +242,9 @@ class TaskService:
             task.type = data["type"]
         if "due_date" in data:
             due_date = data["due_date"]
-            if isinstance(due_date, str):
-                try:
-                    due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-                except ValueError:
-                    raise TaskServiceError("Invalid due_date format.", "validation_error") from None
-            if due_date is None:
+            if due_date is None or (isinstance(due_date, str) and not due_date.strip()):
                 raise TaskServiceError("due_date is required.", "validation_error")
-            new_due = _ensure_tz(due_date)
+            new_due = _parse_user_time(due_date, "due_date") if isinstance(due_date, str) else _ensure_tz(due_date)
             if new_due != _ensure_tz(task.due_date):
                 task.due_date = new_due
                 task.reminder_sent = False  # a moved task may remind again

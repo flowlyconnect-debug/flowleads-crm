@@ -67,6 +67,11 @@
               {% if form_data.get('is_active', True) %}checked{% endif %}>
             Aktiivinen (organisaatio, admin ja hakuprofiili)
           </label>
+          <label class="form-check">
+            <input type="checkbox" name="trial" value="y"
+              {% if form_data.get('trial', True) %}checked{% endif %}>
+            Aloita maksuttomalla kokeilujaksolla ({{ trial_days }} päivää). Ilman: kuukausisopimus on voimassa heti.
+          </label>
 
           <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
             <button type="submit" class="btn btn-primary">Luo asiakas</button>

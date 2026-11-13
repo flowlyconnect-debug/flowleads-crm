@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     JSON,
@@ -48,6 +49,8 @@ class Listing(db.Model):
         Index("ix_listings_analysis_queue", "analysis_status", "is_active"),
         Index("ix_listings_contact_queue", "contact_status", "is_active"),
         Index("ix_listings_maakunta_active", "maakunta", "is_active"),
+        Index("ix_listings_company_key", "company_key"),
+        Index("ix_listings_company_name_key", "company_name_key"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -92,6 +95,26 @@ class Listing(db.Model):
     contact_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # the housing company's business ID (Y-tunnus), when the source gives it
     ytunnus: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # other people to reach at the housing company: the chair of the board
+    # (hallituksen puheenjohtaja; a natural person, processed on legitimate
+    # interest like the manager) and the maintenance company (huoltoyhtiö)
+    hallitus_pj: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    hallitus_pj_puh: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    hallitus_pj_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    huoltoyhtio: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    huoltoyhtio_puh: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    huoltoyhtio_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # map position (app/listings/geo.py). geo_precision: "source" (given by the
+    # import) or "address" (geocoded); NULL = not known, the map then uses the
+    # town's centre. geocoded_at = last geocoding attempt, also a failed one.
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    geo_precision: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    geocoded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # One housing company across listings and sources (app/listings/housing.py):
+    # "y:<Y-tunnus>" or "n:<name>|<city>"; NULL = the listing stands alone.
+    company_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    company_name_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     contact_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     contact_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -170,6 +193,10 @@ class ListingMatch(db.Model):
     # (TARGET_FETCH_ENABLED); a time in the near future = released by "Hae
     # kohteita" and appearing when its progress animation ends.
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 0-100, app/listings/housing.py::score_target over the housing company's
+    # listings; refreshed by the scheduler (timing and freshness drift)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing")
     profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821
@@ -216,3 +243,28 @@ class CrawlState(db.Model):
     last_incremental_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PropertyManagerOffice(db.Model):
+    """An isännöintitoimisto (property management office), shared by every
+    organization like the catalogue. Listings name the office in
+    `Listing.isannoitsija`; this row adds what a salesperson needs to work the
+    office as a whole: business ID, address, switchboard, email and website.
+    Filled from import files (listing rows or an office list) and the API."""
+
+    __tablename__ = "property_manager_offices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # app/listings/contacts.py::office_key(name): lowercase, no legal form
+    name_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ytunnus: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    osoite: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    postinumero: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    kaupunki: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    puhelin: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

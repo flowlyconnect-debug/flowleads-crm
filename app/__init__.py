@@ -32,6 +32,10 @@ def create_app(config_object=None):
         raise RuntimeError("DATABASE_URL environment variable is required.")
 
     _init_extensions(app)
+    from app.listings.housing import install_listeners
+
+    install_listeners()  # keeps Listing.company_key in step with the name / Y-tunnus
+    from app.core import one_time_secrets as _one_time_secrets  # noqa: F401  (model for db.create_all)
     _register_blueprints(app)
     register_error_handlers(app)
     _register_security_headers(app)
@@ -71,8 +75,14 @@ def _register_security_headers(app):
         headers.setdefault("X-Content-Type-Options", "nosniff")
         headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         # The web form embed page is meant to sit in an iframe on customer sites.
-        if request.endpoint != "forms.iframe_embed":
+        embed = request.endpoint == "forms.iframe_embed"
+        if not embed:
             headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        policy = app.config.get("CONTENT_SECURITY_POLICY")
+        if policy and (response.mimetype or "").startswith("text/html"):
+            if embed:
+                policy = policy.replace("frame-ancestors 'self'", "frame-ancestors *")
+            headers.setdefault("Content-Security-Policy", policy)
         if request.is_secure:
             headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
@@ -207,6 +217,8 @@ def _register_blueprints(app):
     from app.listings.routes import listings_n8n_bp
     from app.listings.target_routes import targets_bp
     from app.listings.insight_routes import insights_bp
+    from app.integrations.routes import integrations_bp
+    from app.billing.routes import billing_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(analytics_bp)
@@ -234,6 +246,8 @@ def _register_blueprints(app):
     app.register_blueprint(listings_n8n_bp)
     app.register_blueprint(targets_bp)
     app.register_blueprint(insights_bp)
+    app.register_blueprint(integrations_bp)
+    app.register_blueprint(billing_bp)
     csrf.exempt(api_bp)
     csrf.exempt(webhooks_bp)
     csrf.exempt(notifications_bp)

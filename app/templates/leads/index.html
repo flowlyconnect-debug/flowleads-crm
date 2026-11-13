@@ -79,7 +79,15 @@
     </div>
     <div class="leads-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.import_leads_route', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.import_leads_route') }}">Tuo CSV</a>
-      <a class="btn btn-secondary btn-sm leads-export" href="{{ export_url }}">Vie CSV</a>
+      {% set export_args = dict(filters, organization_id=organization_id) if current_user.is_superadmin() else filters %}
+      <details class="leads-export-menu">
+        <summary class="btn btn-secondary btn-sm leads-export">Vie</summary>
+        <div class="leads-export-menu__list" role="menu">
+          <a role="menuitem" href="{{ export_url }}">CSV (Excel)</a>
+          <a role="menuitem" href="{{ url_for('integrations.export_file', provider='hubspot', **export_args) }}">HubSpot-tuontitiedosto</a>
+          <a role="menuitem" href="{{ url_for('integrations.export_file', provider='pipedrive', **export_args) }}">Pipedrive-tuontitiedosto</a>
+        </div>
+      </details>
       <a class="btn btn-primary btn-sm" href="{{ url_for('leads.new_lead', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.new_lead') }}">+ Lisää liidi</a>
     </div>
   </header>
@@ -323,6 +331,11 @@
             {% endif %}
             {{ bulk_form.stage_id(class_="form-input form-input--compact") }}
             {{ bulk_form.submit(class_="btn btn-primary btn-sm") }}
+            {% for provider in crm_providers_for(organization_id) %}
+            <button type="submit" class="btn btn-secondary btn-sm"
+                    formaction="{{ url_for('integrations.push_many', provider=provider, organization_id=organization_id) if current_user.is_superadmin() else url_for('integrations.push_many', provider=provider) }}"
+                    title="Luo tai päivitä valitut {{ crm_labels[provider] }}issa">Vie {{ crm_labels[provider] }}iin</button>
+            {% endfor %}
           </div>
         </div>
 

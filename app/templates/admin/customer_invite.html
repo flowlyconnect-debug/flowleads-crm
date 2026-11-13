@@ -69,6 +69,12 @@
             {% endfor %}
           </fieldset>
 
+          <label class="form-check" style="margin-top:1rem;">
+            <input type="checkbox" name="trial" value="y"
+              {% if form_data.get('trial', True) %}checked{% endif %}>
+            Maksuton kokeilujakso ({{ trial_days }} päivää), alkaa kun asiakas hyväksyy kutsun. Ilman: kuukausisopimus on voimassa heti.
+          </label>
+
           <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
             <button type="submit" class="btn btn-primary">Lähetä kutsu</button>
             <a href="{{ url_for('admin.customers_list') }}" class="btn btn-secondary">Peruuta</a>

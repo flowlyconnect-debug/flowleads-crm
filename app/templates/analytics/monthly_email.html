@@ -1,0 +1,26 @@
+<div style="font-family:Inter,Arial,sans-serif;color:#111827;max-width:620px;">
+  <h2 style="margin:0 0 4px;">Kuukausiraportti: {{ report.month.label }}</h2>
+  <p style="margin:0 0 16px;color:#4B5563;">{{ organization.name }}</p>
+  {% set f = report.figures %}
+  <p style="margin:0 0 16px;">
+    Sait <strong>{{ f.received }}</strong> kohdetta, siirsit <strong>{{ f.transferred }}</strong> liideiksi,
+    lähetit <strong>{{ f.proposals_sent }}</strong> tarjousta ja voitit <strong>{{ f.won }}</strong>
+    {{ 'kaupan' if f.won == 1 else 'kauppaa' }} ({{ format_money(f.won_value) }}).
+  </p>
+  <table style="border-collapse:collapse;width:100%;font-size:14px;">
+    <tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #E5E7EB;">Mittari</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #E5E7EB;">{{ report.month.label }}</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #E5E7EB;color:#6B7280;">Edellinen kk</th>
+    </tr>
+    {% for row in report.rows %}
+    <tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #F3F4F6;">{{ row.label }}</td>
+      <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #F3F4F6;"><strong>{{ format_money(row.value) if row.kind == 'money' else row.value }}</strong></td>
+      <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #F3F4F6;color:#6B7280;">{{ format_money(row.previous) if row.kind == 'money' else row.previous }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p style="margin:20px 0;"><a href="{{ link }}" style="background:#6846DC;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">Avaa koko raportti</a></p>
+  <p style="color:#6B7280;font-size:12px;">Saat tämän viestin, koska olet organisaation ylläpitäjä. Raportin sähköpostin voi kytkeä pois kuukausiraportin sivulta.</p>
+</div>

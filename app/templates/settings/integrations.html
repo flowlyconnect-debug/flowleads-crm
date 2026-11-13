@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Integraatiot — Asetukset{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('integrations') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Integraatiot</h1>
+          <p class="settings-panel__subtitle">
+            Vie liidit omaan CRM-järjestelmääsi. Taloyhtiöstä tulee yritys, isännöitsijästä yhteyshenkilö ja
+            remontista kauppa (deal). Toinen vienti päivittää samat tiedot, eikä tee kaksoiskappaleita.
+          </p>
+        </header>
+
+        <h2 class="form-section-title">Ilman yhteyttä: tuontitiedosto</h2>
+        <p class="form-helper">
+          Liidilistan <strong>Vie</strong>-valikosta saat tiedoston, jonka HubSpotin tai Pipedriven oma tuontityökalu lukee
+          sellaisenaan (sarakkeiden nimet vastaavat järjestelmän kenttiä). Tämä ei vaadi API-avainta.
+        </p>
+
+        {% for provider in providers %}
+        {% set connection = connections.get(provider) %}
+        <section class="integration-card" aria-labelledby="integration-{{ provider }}">
+          <header class="integration-card__header">
+            <h2 class="form-section-title" id="integration-{{ provider }}">{{ labels[provider] }}</h2>
+            {% if connection %}
+            <span class="badge badge-success">Yhdistetty</span>
+            {% else %}
+            <span class="badge">Ei yhdistetty</span>
+            {% endif %}
+          </header>
+          {% if connection %}
+          <p class="form-helper">
+            Yhdistetty {{ (connection.connected_at|helsinki).strftime('%d.%m.%Y %H.%M') }}{% if connection.account_label and connection.account_label != labels[provider] %} ({{ connection.account_label }}){% endif %}.
+            {% if connection.last_used_at %}Viimeksi käytetty {{ (connection.last_used_at|helsinki).strftime('%d.%m.%Y %H.%M') }}.{% endif %}
+          </p>
+          {% if connection.last_error %}<p class="form-error">Viimeisin virhe: {{ connection.last_error|fi_msg }}</p>{% endif %}
+          <form method="post" action="{{ url_for('integrations.disconnect_route', provider=provider, **org_query) }}"
+                onsubmit="return confirm('Poistetaanko {{ labels[provider] }}-yhteys? Jo viedyt tiedot jäävät {{ labels[provider] }}iin.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary btn-sm">Poista yhteys</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('integrations.connect_route', provider=provider, **org_query) }}" class="form-group integration-card__form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="form-label">{{ 'Uusi API-avain' if connection else 'API-avain' }}
+              <input type="password" name="token" class="form-input" autocomplete="off" required maxlength="500"
+                     placeholder="{{ 'pat-eu1-…' if provider == 'hubspot' else '40 merkin avain' }}">
+            </label>
+            {% if provider == 'hubspot' %}
+            <p class="form-helper">
+              Luo HubSpotissa <em>Private app</em> (Settings → Integrations → Private Apps) ja anna sille oikeudet
+              <code>crm.objects.companies</code>, <code>crm.objects.contacts</code> ja <code>crm.objects.deals</code> (luku ja kirjoitus).
+              Kopioi sovelluksen access token tähän.
+            </p>
+            <details>
+              <summary class="form-helper">Kauppojen myyntiputki ja vaihe (valinnainen)</summary>
+              <label class="form-label">Pipeline-tunniste
+                <input type="text" name="pipeline" class="form-input" maxlength="64" placeholder="default" value="{{ (connection.settings or {}).get('pipeline', '') if connection else '' }}">
+              </label>
+              <label class="form-label">Vaiheen tunniste
+                <input type="text" name="dealstage" class="form-input" maxlength="64" placeholder="appointmentscheduled" value="{{ (connection.settings or {}).get('dealstage', '') if connection else '' }}">
+              </label>
+              <p class="form-helper">Oletuksena kaupat menevät HubSpotin oletusputken ensimmäiseen vaiheeseen.</p>
+            </details>
+            {% else %}
+            <p class="form-helper">
+              Löydät avaimen Pipedrivessa: profiilikuva → Personal preferences → API. Avain tallennetaan salattuna.
+            </p>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm">{{ 'Vaihda avain' if connection else 'Yhdistä ' ~ labels[provider] }}</button>
+          </form>
+        </section>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .integration-card { margin-top: 20px; padding: 16px 18px; border: 1px solid #E5E7EB; border-radius: 12px; }
+  .integration-card__header { display: flex; align-items: center; gap: 10px; }
+  .integration-card__header .form-section-title { margin: 0; }
+  .integration-card__form { margin-top: 12px; }
+  .form-error { color: #B91C1C; font-size: 13px; }
+</style>
+{% endblock %}

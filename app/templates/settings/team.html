@@ -52,7 +52,11 @@
               <tr>
                 <td>{{ member.email }}</td>
                 <td>{{ 'Ylläpitäjä' if member.role == 'admin' else ('Superadmin' if member.role == 'superadmin' else 'Myyjä') }}</td>
-                <td>{{ 'Aktiivinen' if member.is_active else 'Ei käytössä' }}</td>
+                <td>
+                  {% if not member.is_active %}Ei käytössä
+                  {% elif member.last_login_at %}Aktiivinen<div class="text-muted text-sm">Kirjautunut {{ (member.last_login_at|helsinki).strftime('%d.%m.%Y') }}</div>
+                  {% else %}<span class="badge">Kutsuttu</span><div class="text-muted text-sm">Ei vielä kirjautunut</div>{% endif %}
+                </td>
                 <td>{{ (member.created_at|helsinki).strftime('%d.%m.%Y') if member.created_at else '—' }}</td>
                 <td>
                   {% if member.id != current_user.id %}

@@ -176,6 +176,10 @@ class AutomationEngine:
     def trigger(event_type: str, payload: dict, organization_id: int) -> None:
         if event_type not in TRIGGER_TYPES:
             return
+        from app.core.features import organization_has_feature
+
+        if not organization_has_feature(organization_id, "automations"):
+            return  # also the scheduler's daily checks, not only live events
 
         payload = dict(payload or {})
         lead_id = payload.get("lead_id")
@@ -199,6 +203,11 @@ class AutomationEngine:
                 if not evaluate_trigger_conditions(
                     event_type, automation.trigger_config, payload, lead
                 ):
+                    continue
+                if event_type == "lead_no_activity" and AutomationEngine._already_ran_while_quiet(
+                    automation, lead_id, payload.get("quiet_since")
+                ):
+                    # once per quiet period, not every day until something happens
                     continue
 
                 context = dict(payload)
@@ -241,6 +250,23 @@ class AutomationEngine:
         except Exception:
             logger.exception("Failed to flush automation logs")
             db.session.rollback()
+
+    @staticmethod
+    def _already_ran_while_quiet(automation: Automation, lead_id, quiet_since) -> bool:
+        if not lead_id or not quiet_since:
+            return False
+        try:
+            since = _ensure_tz(datetime.fromisoformat(str(quiet_since)))
+        except ValueError:
+            return False
+        return (
+            AutomationLog.query.filter(
+                AutomationLog.automation_id == automation.id,
+                AutomationLog.lead_id == lead_id,
+                AutomationLog.created_at >= since,
+            ).first()
+            is not None
+        )
 
     @staticmethod
     def _log_run(
@@ -547,7 +573,7 @@ class AutomationEngine:
                 inactive_days = (now - last_at).days
                 AutomationEngine.trigger(
                     "lead_no_activity",
-                    {"lead_id": lead.id, "inactive_days": inactive_days},
+                    {"lead_id": lead.id, "inactive_days": inactive_days, "quiet_since": last_at.isoformat()},
                     org_id,
                 )
                 triggered += 1
@@ -647,8 +673,31 @@ class AutomationService:
             automation.trigger_config = data["trigger_config"] or {}
 
         if "actions" in data:
+            # The edit form never shows stored secret headers, so a saved
+            # webhook action comes back without them: keep the old encrypted
+            # headers unless new ones were typed (same URL, else same position).
+            old_webhooks = [
+                a
+                for a in AutomationAction.query.filter_by(automation_id=automation.id)
+                .order_by(AutomationAction.order_index.asc())
+                .all()
+                if a.action_type == "send_webhook" and (a.action_config or {}).get("encrypted_headers")
+            ]
+            by_url = {(a.action_config or {}).get("url"): a.action_config["encrypted_headers"] for a in old_webhooks}
             AutomationAction.query.filter_by(automation_id=automation.id).delete()
+            webhook_position = 0
             for idx, action_data in enumerate(data["actions"] or []):
+                action_data = dict(action_data or {})
+                if action_data.get("action_type") == "send_webhook":
+                    config = dict(action_data.get("action_config") or {})
+                    if not config.get("secret_headers") and not config.get("encrypted_headers"):
+                        kept = by_url.get(config.get("url"))
+                        if kept is None and webhook_position < len(old_webhooks):
+                            kept = old_webhooks[webhook_position].action_config["encrypted_headers"]
+                        if kept:
+                            config["encrypted_headers"] = kept
+                    action_data["action_config"] = config
+                    webhook_position += 1
                 AutomationService._add_action(automation, action_data, idx)
         db.session.flush()
         return automation

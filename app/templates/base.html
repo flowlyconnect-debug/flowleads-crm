@@ -87,6 +87,7 @@
           <img src="{{ url_for('static', filename='img/flowly-logo.svg') }}" alt="Flowly Solutions" width="192" height="62">
         </a>
       </div>
+      {% include "billing/_banner.html" %}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <div class="flash-messages" role="status" aria-live="polite">

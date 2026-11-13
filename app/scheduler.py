@@ -283,8 +283,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             )
 
             try:
+                from app.listings.housing import backfill_company_keys, refresh_scores
+
+                backfill_company_keys()  # listings stored before housing-company keys
                 matched = rematch_profiles()
                 merge_into_existing_leads()
+                refresh_scores()  # timing and freshness change with time
                 from app.listings.target_services import notify_saved_searches
 
                 notify_saved_searches()
@@ -294,6 +298,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Listing matching failed")
+
+    def run_geocode_listings():
+        """Street-address positions for the Kohteet map (GEOCODING_ENABLED)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.geo import geocode_listings
+
+            try:
+                found = geocode_listings()
+                if found:
+                    logger.info("Geocoded %s listing(s)", found)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Geocoding failed")
 
     def run_listing_retention():
         """Delete listings that left Oikotie long ago (LISTING_RETENTION_DAYS)."""
@@ -322,6 +340,34 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Target digest failed")
+
+    def run_monthly_report():
+        """Last month's results to each customer's admins (1st of the month)."""
+        with app.app_context():
+            from app.analytics.monthly import send_monthly_reports
+            from app.extensions import db
+
+            try:
+                count = send_monthly_reports()
+                if count:
+                    logger.info("Monthly report sent to %s organization(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Monthly report failed")
+
+    def run_trial_reminders():
+        """Tell admins three days before their free trial ends."""
+        with app.app_context():
+            from app.billing.services import send_trial_reminders
+            from app.extensions import db
+
+            try:
+                count = send_trial_reminders()
+                if count:
+                    logger.info("Trial reminders sent to %s organization(s)", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Trial reminders failed")
 
     def run_catalogue_health_check():
         """Email superadmins when crawling or analysis has stopped."""
@@ -496,6 +542,13 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="listing_matching",
         replace_existing=True,
     )
+    if app.config.get("GEOCODING_ENABLED"):
+        scheduler.add_job(
+            run_geocode_listings,
+            IntervalTrigger(minutes=30),
+            id="geocode_listings",
+            replace_existing=True,
+        )
     scheduler.add_job(
         run_listing_retention,
         CronTrigger(hour=3, minute=30, timezone="UTC"),
@@ -506,6 +559,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_target_digest,
         CronTrigger(hour=7, minute=30, timezone="Europe/Helsinki"),
         id="target_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_trial_reminders,
+        CronTrigger(hour=9, minute=15, timezone="Europe/Helsinki"),
+        id="trial_reminders",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_monthly_report,
+        CronTrigger(day=1, hour=8, minute=0, timezone="Europe/Helsinki"),
+        id="monthly_report",
         replace_existing=True,
     )
     scheduler.add_job(

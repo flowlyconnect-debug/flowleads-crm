@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, or_
-from sqlalchemy.orm import contains_eager, joinedload
+from sqlalchemy import String, cast, func, or_
+from sqlalchemy.orm import aliased, contains_eager, joinedload
 
 from app.extensions import db
+from app.listings.housing import company_group, org_company_listings, score_label, score_level, score_target
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
-from app.listings.services import _best_renovation, _now, materialize_match
+from app.listings.services import _best_renovation, _merge_into_lead, _now, materialize_match
 
 PER_PAGE = 25
 MAX_BULK = 200
@@ -38,9 +39,10 @@ def _visible_match_ids(
     profile_id: int | None = None,
     include_reserve: bool = False,
 ):
-    """One match id per listing: a listing matched by several of the
-    organization's profiles is one target, and a listing that already became a
-    lead through another profile is not a target at all."""
+    """One match id per housing company: a listing matched by several of the
+    organization's profiles is one target, so are several listings of the same
+    taloyhtiö (app/listings/housing.py), and a company that already has a lead
+    is not a target at all."""
     already_lead = db.session.query(ListingMatch.listing_id).filter(
         ListingMatch.organization_id == organization_id,
         ListingMatch.status.in_(_LEAD_STATUSES),
@@ -53,8 +55,9 @@ def _visible_match_ids(
             ListingMatch.status == status,
             Listing.is_active.is_(True),
             ListingMatch.listing_id.notin_(already_lead),
+            _not_in_companies(organization_id, _LEAD_STATUSES, with_lead=True),
         )
-        .group_by(ListingMatch.listing_id)
+        .group_by(_group_column())
     )
     if status == "pending" and fetch_enabled() and not include_reserve:
         # only what the customer has released with "Hae kohteita" (a release
@@ -69,10 +72,43 @@ def _visible_match_ids(
             ListingMatch.organization_id == organization_id,
             ListingMatch.status == "dismissed",
         )
-        query = query.filter(ListingMatch.listing_id.notin_(hidden))
+        query = query.filter(
+            ListingMatch.listing_id.notin_(hidden), _not_in_companies(organization_id, ("dismissed",))
+        )
     if profile_id:
         query = query.filter(ListingMatch.profile_id == profile_id)
     return query
+
+
+def _group_column():
+    """Housing company of a listing, or the listing itself when it names none."""
+    return func.coalesce(Listing.company_key, cast(Listing.id, String))
+
+
+def _not_in_companies(organization_id: int, statuses, *, with_lead: bool = False):
+    """Listings outside the housing companies of the organization's matches
+    in `statuses` (with an existing lead, when `with_lead`)."""
+    other = aliased(Listing)
+    keys = (
+        db.session.query(other.company_key)
+        .join(ListingMatch, ListingMatch.listing_id == other.id)
+        .filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status.in_(tuple(statuses)),
+            other.company_key.isnot(None),
+            *([ListingMatch.lead_id.isnot(None)] if with_lead else []),
+        )
+    )
+    return or_(Listing.company_key.is_(None), Listing.company_key.notin_(keys))
+
+
+def _company_wide(listing_ids):
+    """The listings in `listing_ids` and every listing of their housing
+    companies: a filter on renovations or contacts is true for the company
+    when any of its listings satisfies it."""
+    other = aliased(Listing)
+    keys = db.session.query(other.company_key).filter(other.id.in_(listing_ids), other.company_key.isnot(None))
+    return or_(Listing.id.in_(listing_ids), Listing.company_key.in_(keys))
 
 
 def count_targets(organization_id: int, status: str = "pending") -> int:
@@ -131,7 +167,7 @@ def list_targets(
             .scalar_subquery()
         )
         query = query.order_by(first_year.is_(None), first_year.asc(), newest.desc(), Listing.id.desc())
-    else:
+    else:  # "newest"
         query = query.order_by(newest.desc(), Listing.id.desc())
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
 
@@ -142,8 +178,9 @@ def _list_by_fit(organization_id: int, query, *, page: int, per_page: int):
     from app.listings.fit_services import ListPage, learn_preferences, score_matches
 
     matches = query.all()
-    prefs = learn_preferences(organization_id, organization_wanted_types(organization_id))
-    scores = score_matches(matches, prefs)
+    wanted = organization_wanted_types(organization_id)
+    prefs = learn_preferences(organization_id, wanted)
+    scores = score_matches(matches, prefs, wanted_types=wanted)
 
     def key(match):
         seen = match.listing.published_at or match.listing.first_seen_at
@@ -170,7 +207,7 @@ def _apply_target_filters(query, filters: dict):
     renovation = (filters.get("renovation") or "").strip()
     if renovation:
         query = query.filter(
-            Listing.id.in_(
+            _company_wide(
                 db.session.query(ListingRenovation.listing_id).filter(
                     ListingRenovation.remonttityyppi == renovation
                 )
@@ -186,7 +223,7 @@ def _apply_target_filters(query, filters: dict):
     if year.isdigit():
         # renovation known to start by the end of that year
         query = query.filter(
-            Listing.id.in_(
+            _company_wide(
                 db.session.query(ListingRenovation.listing_id).filter(
                     ListingRenovation.timing_year.isnot(None),
                     ListingRenovation.timing_year <= int(year),
@@ -202,13 +239,23 @@ def _apply_target_filters(query, filters: dict):
     if building:
         query = query.filter(Listing.building_type == building)
     if filters.get("contact") == "1":
-        query = query.filter(
-            or_(
-                func.length(func.trim(func.coalesce(Listing.isannoitsija_email, ""))) > 0,
-                func.length(func.trim(func.coalesce(Listing.isannoitsija_puh, ""))) > 0,
-            )
-        )
+        query = query.filter(_company_wide(db.session.query(Listing.id).filter(_has_contact_clause())))
     return query
+
+
+def _has_contact_clause():
+    def filled(column):
+        return func.length(func.trim(func.coalesce(column, ""))) > 0
+
+    return or_(
+        filled(Listing.isannoitsija_email),
+        filled(Listing.isannoitsija_puh),
+        *[filled(getattr(Listing, name)) for name in _EXTRA_CONTACT_COLUMNS if hasattr(Listing, name)],
+    )
+
+
+# other reachable people of the housing company (board chair, maintenance)
+_EXTRA_CONTACT_COLUMNS = ("hallitus_pj_puh", "hallitus_pj_email", "huoltoyhtio_puh", "huoltoyhtio_email")
 
 
 def organization_wanted_types(organization_id: int) -> set[str]:
@@ -263,33 +310,120 @@ def target_filter_options(organization_id: int, status: str = "pending", filters
     }
 
 
-def target_row(match: ListingMatch, wanted_types: set[str] | None = None, fit: tuple | None = None) -> dict:
-    """What the page shows for one target. `fit` is (score, reasons) from
-    app/listings/fit_services.py."""
+def target_row(
+    match: ListingMatch,
+    wanted_types: set[str] | None = None,
+    fit: tuple | None = None,
+    company_listings: list[Listing] | None = None,
+    *,
+    now: datetime | None = None,
+) -> dict:
+    """What the page shows for one target: the housing company behind the
+    match, with the renovations and contacts of all its listings, its score
+    breakdown (app/listings/housing.py) and the Sopivuus with its reasons
+    (`fit` = (score, reasons) from app/listings/fit_services.py)."""
     listing = match.listing
+    company = list(company_listings or [])
+    if all(other.id != listing.id for other in company):
+        company.insert(0, listing)
     renovation = _best_renovation(match.profile, listing) if match.profile else None
     if renovation is None and listing.renovations:
         # the profile's filter changed and the match has not been rebuilt yet
         renovation = max(listing.renovations, key=lambda r: r.confidence)
-    # every renovation on the listing the organization does, best first
-    renovations = sorted(
-        (r for r in listing.renovations if not wanted_types or r.remonttityyppi in wanted_types),
-        key=lambda r: (r is not renovation, -r.confidence),
-    ) or ([renovation] if renovation else [])
+    # every renovation of the company the organization does: one per type,
+    # the most confident mention, the match's own first
+    best: dict[str, ListingRenovation] = {}
+    for item in (r for other in company for r in other.renovations):
+        if wanted_types and item.remonttityyppi not in wanted_types:
+            continue
+        current = best.get(item.remonttityyppi)
+        if current is None or item.confidence > current.confidence:
+            best[item.remonttityyppi] = item
+    if renovation is not None and renovation.remonttityyppi in best:
+        if best[renovation.remonttityyppi].confidence <= renovation.confidence:
+            best[renovation.remonttityyppi] = renovation
+        renovation = best[renovation.remonttityyppi]
+    renovations = sorted(best.values(), key=lambda r: (r is not renovation, -r.confidence)) or (
+        [renovation] if renovation else []
+    )
+    # contacts: the first listing of the company that has them
+    contact = next((other for other in company if other.has_contact), None) or next(
+        (other for other in company if other.isannoitsija), listing
+    )
+    from app.listings.contacts import company_contacts
+
+    score = score_target(company, wanted_types, now=now)
+    seen = [other.published_at or other.first_seen_at for other in company if other.published_at or other.first_seen_at]
     return {
         "match": match,
         "listing": listing,
+        "contact": contact,
+        "people": company_contacts(company),
+        "company_listings": company,
+        "signal_count": len(company),
         "title": listing.taloyhtio or listing.osoite or listing.external_id,
         "location": ", ".join(
             p for p in ((listing.osoite if listing.taloyhtio else None), listing.kaupunki or listing.maakunta) if p
         ),
         "renovation": renovation,
         "renovations": renovations,
-        "seen_at": listing.published_at or listing.first_seen_at,
+        "seen_at": max(seen, key=lambda value: value.replace(tzinfo=None)) if seen else None,
+        "base_score": score["total"],
+        "score": fit[0] if fit else score["total"],
+        "score_parts": score["parts"],
+        "score_label": score_label(fit[0] if fit else score["total"]),
+        "score_level": score_level(fit[0] if fit else score["total"]),
         "fit": fit[0] if fit else None,
         "fit_reasons": fit[1] if fit else [],
         "pts": pts_strip(renovations),
     }
+
+
+def target_rows(organization_id: int, matches, wanted_types: set[str] | None = None, *, with_fit: bool = True) -> list[dict]:
+    """Rows for a page of targets, with the Sopivuus (learned from the
+    organization's earlier decisions). Stores the base score of each housing
+    company (ListingMatch.score, used by the scheduler and reports)."""
+    from app.listings.fit_services import learn_preferences, score_matches
+
+    now = _now()
+    matches = list(matches)
+    groups = {company_group(match.listing) for match in matches}
+    listings = org_company_listings(organization_id, groups)
+    fits = (
+        score_matches(matches, learn_preferences(organization_id, wanted_types), company_listings=listings, wanted_types=wanted_types)
+        if with_fit
+        else {}
+    )
+    rows = []
+    changed = False
+    for match in matches:
+        row = target_row(match, wanted_types, fits.get(match.id), listings.get(company_group(match.listing)), now=now)
+        if match.score != row["base_score"]:
+            match.score = row["base_score"]
+            changed = True
+        rows.append(row)
+    if changed:
+        db.session.commit()
+    return rows
+
+
+def _company_matches(match: ListingMatch, statuses) -> list[ListingMatch]:
+    """The organization's matches for the other listings of the same housing
+    company, in `statuses`."""
+    key = match.listing.company_key if match.listing is not None else None
+    if not key:
+        return []
+    return (
+        ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(
+            ListingMatch.organization_id == match.organization_id,
+            ListingMatch.listing_id != match.listing_id,
+            Listing.company_key == key,
+            ListingMatch.status.in_(tuple(statuses)),
+        )
+        .order_by(ListingMatch.id.asc())
+        .all()
+    )
 
 
 def _own_matches(organization_id: int, match_ids, statuses) -> list[ListingMatch]:
@@ -314,13 +448,14 @@ def _own_matches(organization_id: int, match_ids, statuses) -> list[ListingMatch
 
 def _siblings(match: ListingMatch) -> list[ListingMatch]:
     """The organization's other open matches for the same listing (it matched
-    several profiles)."""
-    return ListingMatch.query.filter(
+    several profiles) and for the other listings of the same housing company."""
+    same_listing = ListingMatch.query.filter(
         ListingMatch.organization_id == match.organization_id,
         ListingMatch.listing_id == match.listing_id,
         ListingMatch.id != match.id,
         ListingMatch.status.in_(("pending", "dismissed")),
     ).all()
+    return same_listing + _company_matches(match, ("pending", "dismissed"))
 
 
 def transfer_targets(
@@ -357,10 +492,17 @@ def transfer_targets(
         if lead.id not in result["lead_ids"]:
             result["lead_ids"].append(lead.id)
         match = db.session.get(ListingMatch, match_id)
+        logged: set[int] = {match.listing_id}
         for sibling in _siblings(match):
-            sibling.status = "merged"
-            sibling.lead_id = lead.id
-            sibling.lead_created_at = now
+            if sibling.listing_id in logged:
+                sibling.status = "merged"
+                sibling.lead_id = lead.id
+                sibling.lead_created_at = now
+            else:
+                # another listing of the same housing company: one lead, and
+                # the lead's history tells where the extra signal came from
+                _merge_into_lead(sibling, sibling.listing, lead, now)
+                logged.add(sibling.listing_id)
         db.session.commit()
     return result
 
@@ -427,13 +569,18 @@ def enroll_transferred_leads(
     return result
 
 def _set_status(organization_id: int, match_ids, *, from_status: str, to_status: str) -> int:
+    """Hide or restore whole housing companies: every match of the company's
+    listings changes with the one the user clicked."""
     changed = 0
+    now = _now()
     for match in _own_matches(organization_id, match_ids, (from_status,)):
-        match.status = to_status
+        if match.status != from_status:
+            continue  # already changed as a sibling of an earlier one
         changed += 1
-        for sibling in _siblings(match):
-            if sibling.status == from_status:
-                sibling.status = to_status
+        for item in [match, *_siblings(match)]:
+            if item.status == from_status:
+                item.status = to_status
+                item.dismissed_at = now if to_status == "dismissed" else None
     db.session.commit()
     return changed
 
@@ -597,6 +744,17 @@ def _reserve_listing_ids(organization_id: int) -> list[int]:
         ListingMatch.status == "pending",
         ListingMatch.released_at.isnot(None),
     )
+    other = aliased(Listing)
+    released_companies = (
+        db.session.query(other.company_key)
+        .join(ListingMatch, ListingMatch.listing_id == other.id)
+        .filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status == "pending",
+            ListingMatch.released_at.isnot(None),
+            other.company_key.isnot(None),
+        )
+    )
     rows = (
         db.session.query(Listing.id)
         .join(ListingMatch, ListingMatch.listing_id == Listing.id)
@@ -604,6 +762,7 @@ def _reserve_listing_ids(organization_id: int) -> list[int]:
             ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", include_reserve=True)),
             ListingMatch.released_at.is_(None),
             Listing.id.notin_(released),
+            or_(Listing.company_key.is_(None), Listing.company_key.notin_(released_companies)),
         )
         .order_by(func.coalesce(Listing.published_at, Listing.first_seen_at).desc(), Listing.id.desc())
         .all()
@@ -698,11 +857,23 @@ def fetch_targets(
     reserve = _interleave_by_type(organization_id, _reserve_listing_ids(organization_id))
     chosen = reserve[: min(len(reserve), rng.randint(low, high))]
     if chosen:
-        # every match of the organization for these listings: a listing that
-        # matched two profiles is one target
+        # every match of the organization for these listings and for the other
+        # listings of the same housing companies: a company is one target
+        keys = [
+            key
+            for (key,) in db.session.query(Listing.company_key)
+            .filter(Listing.id.in_(chosen), Listing.company_key.isnot(None))
+            .all()
+        ]
+        listing_ids = set(chosen)
+        if keys:
+            listing_ids.update(
+                listing_id
+                for (listing_id,) in db.session.query(Listing.id).filter(Listing.company_key.in_(keys)).all()
+            )
         ListingMatch.query.filter(
             ListingMatch.organization_id == organization_id,
-            ListingMatch.listing_id.in_(chosen),
+            ListingMatch.listing_id.in_(listing_ids),
             ListingMatch.status == "pending",
             ListingMatch.released_at.is_(None),
         ).update({"released_at": now + timedelta(seconds=wait_seconds)}, synchronize_session=False)

@@ -784,6 +784,7 @@ def send_system_message(message) -> bool:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            reply_to=getattr(message, "reply_to", None) or None,
         )
         if not ok:
             all_ok = False
@@ -1052,9 +1053,24 @@ def handle_mailgun_webhook(event_data: dict) -> bool:
         "clicked": "clicked",
     }
     new_status = status_map.get(event)
+    # Mailgun's events can arrive out of order: a late "delivered" must not
+    # turn an opened message back into merely delivered
+    progress = {"queued": 0, "sent": 1, "delivered": 2, "opened": 3, "clicked": 4}
     if new_status and new_status in EMAIL_LOG_STATUSES:
-        log.status = new_status
+        if new_status not in progress or progress.get(new_status, 0) >= progress.get(log.status, 0):
+            log.status = new_status
         log.updated_at = datetime.now(timezone.utc)
+
+    if event in ("opened", "clicked"):
+        # sequence step statistics (EmailSequenceSent); a click means it was opened too
+        from app.sequences.models import EmailSequenceSent
+
+        now = datetime.now(timezone.utc)
+        for sent in EmailSequenceSent.query.filter_by(email_log_id=log.id).all():
+            if sent.opened_at is None:
+                sent.opened_at = now
+            if event == "clicked" and sent.clicked_at is None:
+                sent.clicked_at = now
 
     if event == "opened":
         activity = Activity(

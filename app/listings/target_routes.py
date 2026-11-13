@@ -30,7 +30,7 @@ from app.listings.target_services import (
     sequences_for_transfer,
     list_targets,
     restore_targets,
-    target_row,
+    target_rows,
     transfer_targets,
 )
 from app.search.profile_services import list_profiles
@@ -87,8 +87,9 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-@targets_bp.route("", methods=["GET"])
-def index():
+def _page_state():
+    """The organization, tab, profile, search and filters of the request:
+    shared by the list and the map."""
     organization_id = resolve_organization_id()
     tab = request.args.get("tab")
     if tab not in TABS:
@@ -103,6 +104,92 @@ def index():
         for key in FILTER_KEYS
         if (request.args.get(key) or "").strip()
     }
+    return organization_id, tab, profiles, profile_id, search, filters
+
+
+def _current_params(search: str, profile_id, filters: dict) -> dict:
+    params = dict(filters)
+    if search:
+        params["search"] = search
+    if profile_id:
+        params["profile_id"] = str(profile_id)
+    return params
+
+
+_ASK_KEY = "targets_ask"
+
+
+@targets_bp.route("/ask", methods=["GET"])
+def ask():
+    """"Kerro mitä etsit": turn the text into the filter bar's filters and show
+    the list with them. The page tells how the text was read."""
+    from app.listings.nl_search import interpret
+
+    organization_id, tab, _profiles, profile_id, _search, _filters = _page_state()
+    text = " ".join((request.args.get("q") or "").split())[:300]
+    params = dict(org_query_suffix(organization_id))
+    if tab != "available":
+        params["tab"] = tab
+    if profile_id:
+        params["profile_id"] = profile_id
+    if not text:
+        return redirect(url_for("targets.index", **params))
+    result = interpret(text, target_filter_options(organization_id, TABS[tab]))
+    params.update(result["params"])
+    if result["search"]:
+        params["search"] = result["search"]
+    session[_ASK_KEY] = {
+        "text": text,
+        "recognized": result["recognized"][:8],
+        "unknown": result["unknown"][:8],
+        "source": result["source"],
+    }
+    return redirect(url_for("targets.index", **params))
+
+
+@targets_bp.route("/map", methods=["GET"])
+def map_view():
+    """The same targets as the list (same tab, search and filters) on a map."""
+    from flask import current_app
+
+    from app.listings.geo import MAX_MAP_POINTS, map_points
+
+    organization_id, tab, profiles, profile_id, search, filters = _page_state()
+    pagination = list_targets(
+        organization_id,
+        status=TABS[tab],
+        profile_id=profile_id,
+        search=search,
+        filters=filters,
+        page=1,
+        per_page=MAX_MAP_POINTS,
+    )
+    rows = target_rows(organization_id, pagination.items, organization_wanted_types(organization_id))
+    points = map_points(rows)
+    params = _current_params(search, profile_id, filters)
+    if tab != "available":
+        params["tab"] = tab
+    return render_template(
+        "targets/map.html",
+        points=points,
+        total=pagination.total,
+        truncated=pagination.total > MAX_MAP_POINTS,
+        approximate=sum(1 for p in points if p["precision"] in ("city", "region")),
+        missing=len(rows) - len(points),
+        tab=tab,
+        filters=filters,
+        search=search,
+        list_params=params,
+        tile_url=current_app.config.get("MAP_TILE_URL") or "",
+        tile_attribution=current_app.config.get("MAP_TILE_ATTRIBUTION") or "",
+        organization_id=organization_id,
+        org_query=org_query_suffix(organization_id),
+    )
+
+
+@targets_bp.route("", methods=["GET"])
+def index():
+    organization_id, tab, profiles, profile_id, search, filters = _page_state()
     pagination = list_targets(
         organization_id,
         status=TABS[tab],
@@ -159,19 +246,14 @@ def index():
                     released = released.replace(tzinfo=now.tzinfo)
                 if now - released < timedelta(minutes=5):
                     new_ids.add(match.id)
-    current_params = dict(filters)
-    if search:
-        current_params["search"] = search
-    if profile_id:
-        current_params["profile_id"] = str(profile_id)
+    current_params = _current_params(search, profile_id, filters)
+    asked = session.pop(_ASK_KEY, None)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
-    from app.listings.fit_services import learn_preferences, score_matches
-
-    fits = score_matches(pagination.items, learn_preferences(organization_id, wanted_types))
     return render_template(
         "targets/index.html",
         saved_searches=saved_searches,
+        asked=asked,
         current_params=current_params,
         active_saved_id=next(
             (s.id for s in saved_searches if (s.params or {}) == current_params and current_params), None
@@ -189,7 +271,7 @@ def index():
         transferred_leads=transferred_leads,
         assignees=assignees,
         transfer_sequences=sequences_for_transfer(organization_id) if TABS[tab] == "pending" else [],
-        rows=[target_row(match, wanted_types, fits.get(match.id)) for match in pagination.items],
+        rows=target_rows(organization_id, pagination.items, wanted_types),
         pagination=pagination,
         tab=tab,
         search=search,
@@ -203,9 +285,20 @@ def index():
     )
 
 
+def _subscription_ended(organization_id: int) -> bool:
+    """A trial or contract that has ended: the targets stay visible, but no
+    new ones are fetched or moved to leads (app/billing)."""
+    from app.billing.services import organization_can_use
+
+    return not current_user.is_superadmin() and not organization_can_use(organization_id)
+
+
 @targets_bp.route("/transfer", methods=["POST"])
 def transfer():
     organization_id = resolve_organization_id()
+    if _subscription_ended(organization_id):
+        flash("The subscription has ended.", "warning")
+        return _back(organization_id)
     match_ids = _selected_ids()
     if not match_ids:
         flash("Valitse vähintään yksi kohde.", "warning")
@@ -366,6 +459,10 @@ def fetch():
     organization_id = resolve_organization_id()
     if not fetch_enabled():
         return jsonify({"success": False, "message": "Toiminto ei ole käytössä."}), 404
+    if _subscription_ended(organization_id):
+        from app.core.messages_fi import fi_message
+
+        return jsonify({"success": False, "code": "subscription", "message": fi_message("The subscription has ended.")}), 402
     try:
         # the platform's own superadmin can demo the button without waiting an hour
         result = fetch_targets(organization_id, ignore_cooldown=current_user.is_superadmin())

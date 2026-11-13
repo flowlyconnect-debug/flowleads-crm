@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Kuukausiraportti — FlowLeads{% endblock %}
+{% block content %}
+{% set org_args = {'organization_id': organization_id} if current_user.is_superadmin() and organization_id else {} %}
+<div class="reports-page monthly-report">
+  <header class="page-header">
+    <div class="page-header__main">
+      <h1>Kuukausiraportti</h1>
+      <p class="page-subtitle">Mitä FlowLeadsista on saatu irti: kohteet, myyntityö ja kaupat kuukausittain.</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.reports', **org_args) }}">Muut raportit</a>
+    </div>
+  </header>
+
+  {% if report is none %}
+  <div class="report-card"><div class="report-card__body">
+    <p>Valitse organisaatio:</p>
+    <ul>
+      {% for org in organizations %}
+      <li><a class="text-accent font-medium" href="{{ url_for('analytics.monthly_report_page', organization_id=org.id, month=month.key) }}">{{ org.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div></div>
+  {% else %}
+
+  <nav class="monthly-report__nav" aria-label="Kuukausi">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('analytics.monthly_report_page', month=previous_month.key, **org_args) }}">← {{ previous_month.label }}</a>
+    <h2 class="monthly-report__month">{{ month.label }}</h2>
+    {% if next_month %}<a class="btn btn-ghost btn-sm" href="{{ url_for('analytics.monthly_report_page', month=next_month.key, **org_args) }}">{{ next_month.label }} →</a>{% else %}<span></span>{% endif %}
+  </nav>
+
+  {% set f = report.figures %}
+  <section class="monthly-report__highlights" aria-label="Tärkeimmät luvut">
+    <div class="monthly-report__tile"><span class="monthly-report__value">{{ f.received }}</span><span>kohdetta saatu</span></div>
+    <div class="monthly-report__tile"><span class="monthly-report__value">{{ f.transferred }}</span><span>siirretty liideiksi{% if f.transfer_rate is not none %} ({{ f.transfer_rate }} %){% endif %}</span></div>
+    <div class="monthly-report__tile"><span class="monthly-report__value">{{ f.proposals_sent }}</span><span>tarjousta lähetetty</span></div>
+    <div class="monthly-report__tile"><span class="monthly-report__value">{{ f.won }}</span><span>kauppaa voitettu · {{ format_money(f.won_value) }}</span></div>
+  </section>
+
+  {% if not report.has_activity %}
+  <p class="text-secondary">Tässä kuussa ei ole vielä kirjattua toimintaa.</p>
+  {% endif %}
+
+  <div class="report-card">
+    <div class="table-wrap">
+      <table class="monthly-report__table">
+        <thead><tr><th>Mittari</th><th>{{ month.label }}</th><th>{{ previous_month.label }}</th><th>Muutos</th></tr></thead>
+        <tbody>
+          {% for row in report.rows %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td><strong>{{ format_money(row.value) if row.kind == 'money' else row.value }}</strong></td>
+            <td>{{ format_money(row.previous) if row.kind == 'money' else row.previous }}</td>
+            <td class="monthly-report__change{% if row.change > 0 %} is-up{% elif row.change < 0 %} is-down{% endif %}">
+              {% if row.change > 0 %}+{% endif %}{{ format_money(row.change) if row.kind == 'money' else row.change }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if f.win_rate is not none %}<p class="text-sm text-secondary monthly-report__note">Voittoprosentti (voitetut / ratkenneet kaupat): {{ f.win_rate }} %.</p>{% endif %}
+  </div>
+
+  {% if report.people %}
+  <div class="report-card">
+    <h2 class="monthly-report__subtitle">Myyjät</h2>
+    <div class="table-wrap">
+      <table class="monthly-report__table">
+        <thead><tr><th>Käyttäjä</th><th>Soitot</th><th>Sähköpostit</th><th>Voitetut</th></tr></thead>
+        <tbody>
+          {% for person in report.people %}
+          <tr><td>{{ person.email }}</td><td>{{ person.calls }}</td><td>{{ person.emails }}</td><td>{{ person.won }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if report.won_deals %}
+  <div class="report-card">
+    <h2 class="monthly-report__subtitle">Voitetut kaupat</h2>
+    <ul class="monthly-report__deals">
+      {% for lead in report.won_deals %}
+      <li><a href="{{ url_for('leads.detail', lead_id=lead.id, **org_args) }}">{{ lead.company or lead.display_name }}</a>{% if lead.deal_value is not none %} · {{ format_money(lead.deal_value) }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if can_toggle_email %}
+  <form method="post" class="monthly-report__email" action="{{ url_for('analytics.monthly_report_email_setting', **org_args) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="month" value="{{ month.key }}">
+    <input type="hidden" name="enabled" value="{{ '0' if email_enabled else '1' }}">
+    <span>Raportti sähköpostilla ylläpitäjille kuun 1. päivänä: <strong>{{ 'päällä' if email_enabled else 'pois päältä' }}</strong></span>
+    <button type="submit" class="btn btn-ghost btn-sm">{{ 'Kytke pois' if email_enabled else 'Kytke päälle' }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+<style>
+  .monthly-report__nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 16px; }
+  .monthly-report__month { margin: 0; font-size: 20px; }
+  .monthly-report__highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .monthly-report__tile { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid #E5E7EB; border-radius: 12px; background: #fff; font-size: 13px; color: #4B5563; }
+  .monthly-report__value { font-size: 28px; font-weight: 700; color: #111827; line-height: 1.1; }
+  .monthly-report__table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .monthly-report__table th, .monthly-report__table td { padding: 8px 12px; border-bottom: 1px solid #F3F4F6; text-align: left; }
+  .monthly-report__table td + td, .monthly-report__table th + th { text-align: right; white-space: nowrap; }
+  .monthly-report__change.is-up { color: #047857; }
+  .monthly-report__change.is-down { color: #B91C1C; }
+  .monthly-report__subtitle { margin: 0 0 10px; font-size: 16px; padding: 14px 16px 0; }
+  .monthly-report__deals { margin: 0; padding: 0 16px 14px 34px; }
+  .monthly-report__note { padding: 0 16px 12px; }
+  .monthly-report .report-card { margin-bottom: 16px; }
+  .monthly-report__email { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; color: #374151; }
+</style>
+{% endblock %}

@@ -166,5 +166,63 @@ def target_renovation(match: ListingMatch) -> ListingRenovation | None:
     return renovation
 
 
-def score_matches(matches, prefs: Preferences) -> dict[int, tuple[int, list[str]]]:
-    return {m.id: score_target(m.listing, target_renovation(m), prefs) for m in matches}
+def learning_bonus(listing: Listing, renovation: ListingRenovation | None, prefs: Preferences) -> tuple[float, list[str]]:
+    """The +-25 points (and reasons) from the organization's earlier decisions."""
+    points = 0.0
+    reasons: list[str] = []
+    if not prefs.decisions:
+        return points, reasons
+    rtype = renovation.remonttityyppi if renovation is not None else None
+    features = (("type", rtype), ("region", listing.maakunta), ("decade", _decade(listing.build_year)))
+    for feature, value in features:
+        lean = prefs.lean(feature, value)
+        points += _WEIGHTS[feature] * lean
+        if value and prefs.evidence(feature, value) >= _MIN_EVIDENCE and abs(lean) >= 0.3:
+            label = f"{value}-luku" if feature == "decade" else str(value)
+            reasons.append(("Viet usein liideiksi: " if lean > 0 else "Piilotat usein: ") + label)
+    return points, reasons
+
+
+def company_fit(company: list, renovation: ListingRenovation | None, prefs: Preferences, wanted_types=None) -> dict:
+    """Sopivuus of a housing company: its target score (app/listings/housing.py,
+    all its listings: certainty, timing, contacts, signals, freshness) scaled to
+    90, plus the learned +-25. Returns {"fit", "reasons", "parts", "learned"}."""
+    from app.listings.housing import score_target as housing_score
+
+    types = set(wanted_types or ())
+    if types and renovation is not None:
+        types.add(renovation.remonttityyppi)  # the renovation the row shows always counts
+    base = housing_score(company, types or None)
+    learned, learned_reasons = learning_bonus(company[0], renovation, prefs)
+    reasons = list(learned_reasons)
+    parts = {p["key"]: p for p in base["parts"]}
+    if parts["timing"]["points"] >= 20:
+        reasons.append("Remontti " + parts["timing"]["detail"].replace("alkaa ", ""))
+    contact = parts["contact"]["detail"]
+    reasons.append({"puhelin ja sähköposti": "Puhelin ja sähköposti", "puhelin": "Puhelin", "sähköposti": "Sähköposti"}.get(contact, ""))
+    if len(company) > 1:
+        reasons.append(f"{len(company)} ilmoitusta samasta taloyhtiöstä")
+    fit = max(0, min(100, round(0.9 * base["total"] + learned)))
+    return {"fit": fit, "reasons": [r for r in reasons if r], "parts": base["parts"], "learned": round(learned), "base": base["total"]}
+
+
+def score_matches(matches, prefs: Preferences, *, company_listings: dict | None = None, wanted_types=None) -> dict[int, tuple[int, list[str]]]:
+    """{match id: (sopivuus, reasons)}. The housing companies' listings are
+    looked up when not given (the organization's visible ones)."""
+    from app.listings.housing import company_group, org_company_listings
+
+    matches = list(matches)
+    if not matches:
+        return {}
+    if company_listings is None:
+        company_listings = org_company_listings(
+            matches[0].organization_id, {company_group(m.listing) for m in matches}
+        )
+    result = {}
+    for m in matches:
+        company = list(company_listings.get(company_group(m.listing)) or [])
+        if all(other.id != m.listing.id for other in company):
+            company.insert(0, m.listing)
+        info = company_fit(company, target_renovation(m), prefs, wanted_types)
+        result[m.id] = (info["fit"], info["reasons"])
+    return result

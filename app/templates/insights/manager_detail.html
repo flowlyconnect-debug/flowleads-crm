@@ -18,6 +18,12 @@
         {% if manager.website and manager.website.startswith('http') %} · <a href="{{ manager.website }}" target="_blank" rel="noopener noreferrer">Verkkosivu</a>{% endif %}
         {% if not manager.phone and not manager.email %}Yhteystietoja ei ole tiedossa.{% endif %}
       </p>
+      {% if manager.office and (manager.office.ytunnus or manager.office.osoite or manager.office.puhelin) %}
+      <p class="leads-header__sub text-sm">
+        Isännöintitoimisto{% if manager.office.ytunnus %} · Y-tunnus {{ manager.office.ytunnus }}{% endif %}{% if manager.office.osoite %} · {{ manager.office.osoite }}{% endif %}
+        {% if manager.office.puhelin and manager.office.puhelin != manager.phone %} · Vaihde <a href="tel:{{ manager.office.puhelin|replace(' ', '') }}">{{ manager.office.puhelin }}</a>{% endif %}
+      </p>
+      {% endif %}
     </div>
     <div class="leads-header__actions">
       {% if manager.available_count %}

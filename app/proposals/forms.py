@@ -28,6 +28,9 @@ class ProposalSettingsForm(FlaskForm):
         validators=[InputRequired(message="Anna ALV-prosentti (esim. 25,5 tai 0)."), NumberRange(min=0, max=100, message="ALV 0–100 %.")],
     )
     proposal_default_notes = TextAreaField("Oletushuomautukset", validators=[Optional()])
+    proposal_number_prefix = StringField(
+        "Tarjousnumeron etuliite (esim. ABC → ABC-2026-001)", validators=[Optional(), Length(max=12)]
+    )
     logo_url = StringField("Logon osoite (https://…)", validators=[Optional(), Length(max=500)])
     header_html = TextAreaField("PDF/HTML ylätunniste", validators=[Optional()])
     footer_html = TextAreaField("PDF/HTML alatunniste", validators=[Optional()])

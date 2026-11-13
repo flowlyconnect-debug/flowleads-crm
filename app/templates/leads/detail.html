@@ -73,7 +73,7 @@
       {% if next_task %}
       <span class="lead-focus__next-label">Kirjattu seuraava toimi</span>
       <span class="lead-focus__next-text">{{ next_task.title }}</span>
-      {% if next_task.due_date %}<span class="lead-focus__next-meta">Eräpäivä {{ next_task.due_date.strftime('%d.%m.%Y') }}</span>{% endif %}
+      {% if next_task.due_date %}<span class="lead-focus__next-meta">Eräpäivä {{ (next_task.due_date|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
       {% elif is_closed_lead %}
       <span class="lead-focus__next-label">Tila</span>
       <span class="lead-focus__next-text">{{ 'Kauppa voitettu' if lead.status == 'won' else 'Kauppa hävitty' }}</span>
@@ -230,6 +230,22 @@
         </div>
       </section>
 
+      {% set crm_connected = crm_providers_for(organization_id) %}
+      {% if crm_connected %}
+      {% set crm_links = crm_links_for(lead.id) %}
+      <section class="card mt-4 lead-crm-export" aria-label="Vienti omaan CRM:ään">
+        <div class="card-body lead-crm-export__body">
+          {% for provider in crm_connected %}
+          <form method="post" action="{{ url_for('integrations.push_one', lead_id=lead.id, provider=provider, organization_id=organization_id) if current_user.is_superadmin() else url_for('integrations.push_one', lead_id=lead.id, provider=provider) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary btn-sm">{{ 'Päivitä' if crm_links.get(provider) else 'Vie' }} {{ crm_labels[provider] }}iin</button>
+            {% if crm_links.get(provider) %}<span class="text-sm text-secondary">Viety {{ (crm_links[provider].exported_at|helsinki).strftime('%d.%m.%Y %H.%M') }}</span>{% endif %}
+          </form>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if property_info_rows %}
       <section class="card mt-4">
         <header class="card-header">
@@ -346,7 +362,7 @@
                       <span class="badge priority-{{ task.priority }}">{{ task.priority|fi_label }}</span>
                     </div>
                     <div class="activity-time">
-                      {{ task.due_date.strftime('%Y-%m-%d %H:%M') if task.due_date else '' }}
+                      {{ (task.due_date|helsinki).strftime('%d.%m.%Y %H.%M') if task.due_date else '' }}
                     </div>
                     {% if task.status != 'completed' %}
                     <form method="post" action="{{ url_for('tasks.complete_task', task_id=task.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('tasks.complete_task', task_id=task.id) }}">

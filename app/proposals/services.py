@@ -860,6 +860,15 @@ class ProposalService:
             settings.proposal_default_tax_percent = _dec(DEFAULT_TAX_PERCENT if value in (None, "") else value)
         if "proposal_default_notes" in data:
             settings.proposal_default_notes = (data.get("proposal_default_notes") or "").strip() or None
+        if "proposal_number_prefix" in data:
+            import re
+
+            prefix = (data.get("proposal_number_prefix") or "").strip().upper()
+            if prefix and not re.fullmatch(r"[A-Z0-9ÅÄÖ]{1,12}", prefix):
+                raise ProposalServiceError(
+                    "The proposal number prefix may have 1-12 letters or digits.", "validation_error"
+                )
+            settings.proposal_number_prefix = prefix or None
         db.session.flush()
 
     @staticmethod

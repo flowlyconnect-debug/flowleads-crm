@@ -11,6 +11,11 @@ Served from our own origin so the app does not depend on third-party CDNs
 | `inter.css`, `fonts/inter-*.woff2` | @fontsource/inter 5.0.16 | SIL OFL 1.1 |
 | `plex.css`, `fonts/ibm-plex-sans-*.woff2` | @fontsource/ibm-plex-sans 5.2.5 | SIL OFL 1.1 |
 | `fonts/ibm-plex-mono-*.woff2` | @fontsource/ibm-plex-mono 5.1.1 | SIL OFL 1.1 |
+| `leaflet-1.9.4/leaflet.js`, `leaflet.css`, `images/` | leaflet 1.9.4 | BSD-2-Clause |
+| `leaflet-1.9.4/leaflet.markercluster.js`, `MarkerCluster*.css` | leaflet.markercluster 1.5.3 | MIT |
+
+The map tiles themselves come from the tile server in `MAP_TILE_URL` (default
+OpenStreetMap; see app/config.py).
 
 To upgrade: `npm pack <package>@<version>`, copy the dist file here under a
 versioned name and update the reference in the template.

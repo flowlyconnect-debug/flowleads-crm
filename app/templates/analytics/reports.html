@@ -9,6 +9,7 @@
       <p class="page-subtitle">Analytiikkatyötila — pipeline, lähteet, tiimi ja AI</p>
     </div>
     <div class="page-header__actions">
+      <a class="btn btn-primary btn-sm" href="{{ url_for('analytics.monthly_report_page', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.monthly_report_page') }}">Kuukausiraportti</a>
       <a class="btn btn-secondary btn-sm" href="{{ url_for('analytics.dashboard', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.dashboard') }}">Kojelauta</a>
     </div>
   </header>

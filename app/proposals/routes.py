@@ -329,6 +329,7 @@ def register_proposal_settings_routes(settings_bp):
             form.proposal_default_valid_days.data = settings.proposal_default_valid_days
             form.proposal_default_tax_percent.data = settings.proposal_default_tax_percent
             form.proposal_default_notes.data = settings.proposal_default_notes
+            form.proposal_number_prefix.data = getattr(settings, "proposal_number_prefix", None) or ""
             if template:
                 form.header_html.data = template.header_html
                 form.footer_html.data = template.footer_html
@@ -342,6 +343,7 @@ def register_proposal_settings_routes(settings_bp):
                         "proposal_default_valid_days": form.proposal_default_valid_days.data,
                         "proposal_default_tax_percent": form.proposal_default_tax_percent.data,
                         "proposal_default_notes": form.proposal_default_notes.data,
+                        "proposal_number_prefix": form.proposal_number_prefix.data,
                     },
                 )
                 ProposalService.save_template(
@@ -362,7 +364,7 @@ def register_proposal_settings_routes(settings_bp):
                 return redirect(url_for("settings.proposals_settings", **_org_query_suffix(organization_id)))
             except Exception as exc:
                 db.session.rollback()
-                flash(str(exc), "danger")
+                flash(getattr(exc, "message", None) or str(exc), "danger")
         else:
             errors = [e for field_errors in form.errors.values() for e in field_errors]
             flash(errors[0] if errors else "Tarkista kentät.", "danger")

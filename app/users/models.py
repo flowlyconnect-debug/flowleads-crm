@@ -32,6 +32,15 @@ class Organization(db.Model):
     # app/admin/constants.py FEATURE_CATALOG). Enforced by
     # app/core/features.py; a superadmin edits them on /admin/customers.
     enabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    # Subscription (app/billing): "active" for customers billed by agreement
+    # (every organization created before plans existed), "trial", "cancelled"
+    # (in use until cancel_at) or "expired". plan = app/billing/plans.py key.
+    subscription_status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    plan: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    subscription_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    trial_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -65,6 +74,8 @@ class User(UserMixin, db.Model):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Set when a superadmin created the account with a temporary password:
     # the user is forced to pick their own before using the app.
+    # last successful sign-in; NULL = invited, never signed in
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=sa_false(), nullable=False
     )

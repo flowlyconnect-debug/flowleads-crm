@@ -42,6 +42,7 @@
         </button>
       </span>
       {% endif %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.map_view', tab=(tab if is_hidden_tab else none), **dict(org_query, **current_params)) }}" title="Näytä nämä kohteet kartalla">Kartta</a>
       {% if can_edit_profiles %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}" title="Mistä urakoista kohteita haetaan">Urakat</a>
       {% endif %}
@@ -93,6 +94,31 @@
         {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
       </form>
     </div>
+
+    {# Plain-language search: the text becomes the filters below (app/listings/nl_search.py). #}
+    <form method="get" action="{{ url_for('targets.ask', **org_query) }}" class="targets-ask" role="search" aria-label="Kerro mitä etsit">
+      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+      <label class="targets-ask__label" for="targets-ask-input">Kerro mitä etsit</label>
+      <input type="search" id="targets-ask-input" name="q" class="form-input targets-ask__input" maxlength="300"
+             value="{{ asked.text if asked else '' }}"
+             placeholder="esim. putkiremontit Tampereella 2027 mennessä, joilla on yhteystiedot">
+      <button type="submit" class="btn btn-secondary btn-sm">Hae</button>
+    </form>
+    {% if asked %}
+    <p class="targets-ask__result" role="status">
+      {% if asked.recognized %}
+      Tulkittiin: {% for label in asked.recognized %}<span class="badge badge-accent">{{ label }}</span>{% endfor %}
+      {% elif not asked.unknown %}
+      Haettiin nimellä tai osoitteella: <strong>{{ asked.text }}</strong>
+      {% else %}
+      Hakua ei tunnistettu.
+      {% endif %}
+      {% if asked.unknown %}<span class="targets-ask__unknown">Ei tunnistettu: {{ asked.unknown|join(', ') }}</span>{% endif %}
+      {% if asked.source == 'ai' %}<span class="targets-ask__unknown">(tekoälyn tulkinta)</span>{% endif %}
+      · Voit tarkentaa rajauksia alta.
+    </p>
+    {% endif %}
 
     {# Saved searches: one click applies a stored filter combination; the bell turns its notifications on or off. #}
     {% if (saved_searches or current_params) and not is_hidden_tab %}
@@ -278,6 +304,7 @@
         {% set ns = namespace(last_year='-') %}
         {% for row in rows %}
         {% set listing = row.listing %}
+        {% set contact = row.contact %}
         {% set renovation = row.renovation %}
         {% if by_year and row.pts.start_year != ns.last_year %}
         {% set ns.last_year = row.pts.start_year %}
@@ -290,19 +317,38 @@
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
             <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}</span>
-            <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}</span>
+            <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}{% if row.signal_count > 1 %} · <a class="target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} ilmoitusta samasta taloyhtiöstä</a>{% endif %}</span>
           </div>
           <div class="target-row__pts">{{ pts_cells(row.pts) }}</div>
           <div class="target-row__who">
-            {% if listing.isannoitsija_henkilo %}<span class="target-row__person">{{ listing.isannoitsija_henkilo }}</span>{% endif %}
-            {% if listing.isannoitsija %}<a class="target-row__company" href="{{ url_for('insights.manager_detail', name=listing.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ listing.isannoitsija }}</a>
-            {% elif listing.contact_status in ('pending', 'processing') %}<span class="target-row__wait">isännöitsijä haussa</span>
+            {% if contact.isannoitsija_henkilo %}<span class="target-row__person">{{ contact.isannoitsija_henkilo }}</span>{% endif %}
+            {% if contact.isannoitsija %}<a class="target-row__company" href="{{ url_for('insights.manager_detail', name=contact.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ contact.isannoitsija }}</a>
+            {% elif contact.contact_status in ('pending', 'processing') %}<span class="target-row__wait">isännöitsijä haussa</span>
             {% else %}<span class="target-row__wait">isännöitsijää ei löytynyt</span>{% endif %}
           </div>
           <div class="target-row__fit">
-            {% if row.fit is not none %}
-            <span class="mono" title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut."><span class="sr-only">Sopivuus </span>{{ row.fit }}</span>
-            {% endif %}
+            <details class="target-score target-score--{{ row.score_level }}">
+              <summary title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot, saman taloyhtiön muut ilmoitukset sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut. Avaa erittely.">
+                <span class="target-score__label sr-only">Sopivuus </span>
+                <span class="target-score__value mono">{{ row.score }}</span>
+                <span class="sr-only">/100, {{ row.score_label }}</span>
+              </summary>
+              <div class="target-score__parts" role="list">
+                <strong>Sopivuus {{ row.score }} / 100 · {{ row.score_label }}</strong>
+                {% for part in row.score_parts %}
+                <span class="target-score__part" role="listitem">
+                  <span>{{ part.label }}</span>
+                  <span class="target-score__bar" aria-hidden="true"><span style="width: {{ (100 * part.points / part.max)|round|int }}%"></span></span>
+                  <span>{{ part.points }}/{{ part.max }}</span>
+                  <span class="target-score__detail">{{ part.detail }}</span>
+                </span>
+                {% endfor %}
+                {% if row.fit is not none %}
+                {% set learned = row.score - (0.9 * row.base_score)|round|int %}
+                <span class="target-score__detail">Kohteen pisteet {{ row.base_score }}/100 × 0,9{% if learned %} {{ '+' if learned > 0 else '−' }} {{ learned|abs }} aiempien valintojesi perusteella{% endif %}.</span>
+                {% endif %}
+              </div>
+            </details>
           </div>
           <div class="target-row__actions">
             {% if is_hidden_tab %}
@@ -322,17 +368,31 @@
               <dt>{{ item.remonttityyppi }}</dt>
               <dd>{{ item.timing or 'aikataulu auki' }}, varmuus <span class="mono">{{ item.confidence }} %</span></dd>
               {% endfor %}
-              {% if listing.has_contact %}
-              <dt>Yhteystiedot</dt>
+              {% if contact.has_contact %}
+              <dt>Isännöitsijä</dt>
               <dd>
-                {% if listing.isannoitsija_puh %}<a class="mono" href="tel:{{ listing.isannoitsija_puh|replace(' ', '') }}">{{ listing.isannoitsija_puh }}</a>{% endif %}
-                {% if listing.isannoitsija_email %}<a href="mailto:{{ listing.isannoitsija_email }}">{{ listing.isannoitsija_email }}</a>{% endif %}
+                {% if contact.isannoitsija_puh %}<a class="mono" href="tel:{{ contact.isannoitsija_puh|replace(' ', '') }}">{{ contact.isannoitsija_puh }}</a>{% endif %}
+                {% if contact.isannoitsija_email %}<a href="mailto:{{ contact.isannoitsija_email }}">{{ contact.isannoitsija_email }}</a>{% endif %}
+              </dd>
+              {% endif %}
+              {% set people = row.people %}
+              {% if people.chair %}
+              <dt>Hallituksen pj</dt>
+              <dd>{{ people.chair.name or '–' }}
+                {% if people.chair.phone %}<a class="mono" href="tel:{{ people.chair.phone|replace(' ', '') }}">{{ people.chair.phone }}</a>{% endif %}
+                {% if people.chair.email %}<a href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}
+              </dd>
+              {% endif %}
+              {% if people.maintenance %}
+              <dt>Huolto</dt>
+              <dd>{{ people.maintenance.name or '–' }}
+                {% if people.maintenance.phone %}<a class="mono" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}
               </dd>
               {% endif %}
               {% if row.fit_reasons %}<dt>Miksi sopii</dt><dd>{{ row.fit_reasons[:3]|join(' · ') }}</dd>{% endif %}
               {% if listing.tulevat_remontit %}<dt>Tulevat remontit</dt><dd>{{ listing.tulevat_remontit }}</dd>{% endif %}
               {% if renovation and renovation.evidence %}<dt>Peruste</dt><dd>{{ renovation.evidence }}</dd>{% endif %}
-              {% if row.seen_at %}<dt>Löydetty</dt><dd class="mono">{{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</dd>{% endif %}
+              {% if row.seen_at %}<dt>{{ 'Uusin signaali' if row.signal_count > 1 else 'Löydetty' }}</dt><dd class="mono">{{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</dd>{% endif %}
             </dl>
           </details>
         </li>

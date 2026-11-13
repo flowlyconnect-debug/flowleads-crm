@@ -27,8 +27,16 @@ def line_item_total(
     return money(sub)
 
 
+DEFAULT_REFERENCE_PREFIX = "FLW"
+
+
+def reference_prefix(settings) -> str:
+    return (getattr(settings, "proposal_number_prefix", None) or DEFAULT_REFERENCE_PREFIX).strip() or DEFAULT_REFERENCE_PREFIX
+
+
 def generate_reference_number(organization_id: int) -> str:
-    """FLW-{YEAR}-{SEQUENCE} per organization, sequence resets each year."""
+    """{PREFIX}-{YEAR}-{SEQUENCE} per organization (prefix from the proposal
+    settings, FLW by default), sequence resets each year."""
     settings = get_organization_settings(organization_id)
     year = datetime.now(timezone.utc).year
     key = f"proposal_sequence_{year}"
@@ -37,7 +45,7 @@ def generate_reference_number(organization_id: int) -> str:
     seq_map[key] = current
     settings.proposal_sequence_json = seq_map
     db.session.flush()
-    return f"FLW-{year}-{current:03d}"
+    return f"{reference_prefix(settings)}-{year}-{current:03d}"
 
 
 def get_sequence_for_year(organization_id: int, year: int) -> int:

@@ -42,11 +42,14 @@
   {{ org_link('settings.proposals_settings', 'proposals', 'Tarjousasetukset') }}
   {{ org_link('settings.api_keys', 'api_keys', 'API-avaimet') }}
   {{ org_link('settings.webhooks_list', 'webhooks', 'Webhookit') }}
+  {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot (HubSpot, Pipedrive)') }}
+  {{ org_link('billing.subscription_page', 'billing', 'Tilaus') }}
   {{ org_link('settings.privacy_settings', 'privacy', 'Tietosuoja') }}
   {% endif %}
 
   <span class="settings-nav__group-label">Järjestelmä</span>
   <a href="{{ url_for('admin.dashboard') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'admin' %} is-active{% endif %}">Hallintapaneeli</a>
+  <a href="{{ url_for('admin.system_status') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'system' %} is-active{% endif %}">Järjestelmän tila</a>
   <a href="{{ url_for('admin.audit_log') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'audit_log' %} is-active{% endif %}">Audit-loki</a>
   <a href="{{ url_for('email.admin_email_logs') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'email_logs' %} is-active{% endif %}">Sähköpostiloki</a>
   <a href="{{ url_for('backups.backups_list') }}" class="settings-nav__item settings-nav__item--nested{% if active == 'backups' %} is-active{% endif %}">Varmuuskopiot</a>
@@ -60,6 +63,8 @@
   {{ org_link('settings.search_profiles_list', 'search_profiles', 'Urakat ja kohdehaku') }}
   {{ org_link('settings.proposals_settings', 'proposals', 'Tarjoukset') }}
   {{ org_link('settings.calendar_settings', 'calendar', 'Kalenteri') }}
+  {{ org_link('integrations.settings_page', 'integrations', 'Integraatiot') }}
+  {{ org_link('billing.subscription_page', 'billing', 'Tilaus') }}
 
   {% set advanced_keys = ['lead_settings', 'email', 'email_templates', 'privacy', 'api_keys', 'webhooks'] %}
   <details class="settings-nav__more"{% if active in advanced_keys %} open{% endif %}>
@@ -75,6 +80,7 @@
   {% else %}
 
   <a href="{{ url_for('settings.calendar_settings') }}" class="settings-nav__item{% if active == 'calendar' %} is-active{% endif %}">Kalenteri</a>
+  <a href="{{ url_for('billing.subscription_page') }}" class="settings-nav__item{% if active == 'billing' %} is-active{% endif %}">Tilaus</a>
   <a href="{{ url_for('settings.email_templates_list') }}" class="settings-nav__item{% if active == 'email_templates' %} is-active{% endif %}">Sähköpostimallit</a>
 
   {% endif %}
