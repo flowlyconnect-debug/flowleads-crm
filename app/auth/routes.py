@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import SQLAlchemyError
@@ -98,6 +100,7 @@ _TWO_FA_EXEMPT_PREFIXES = (
     "n8n_search.",
     "listings_n8n.",
     "webhooks.",  # Mailgun events
+    "billing.pricing",  # public price list and its trial request form
 )
 
 
@@ -163,6 +166,7 @@ def login():
             flash(error or "Invalid email or password.", "danger")
         else:
             login_user(user)
+            user.last_login_at = datetime.now(timezone.utc)
             log_audit(
                 "login_success",
                 user_id=user.id,

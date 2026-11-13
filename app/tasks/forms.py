@@ -39,14 +39,13 @@ class TaskForm(FlaskForm):
     )
 
     def to_service_data(self) -> dict:
-        due = self.due_date.data
-        if due and due.tzinfo is None:
-            due = due.replace(tzinfo=timezone.utc)
+        from app.tasks.services import local_to_utc
+
+        # the browser's datetime-local value is Finnish time
+        due = local_to_utc(self.due_date.data)
         reminder = None
         if self.enable_reminder.data and self.reminder_at.data:
-            reminder = self.reminder_at.data
-            if reminder.tzinfo is None:
-                reminder = reminder.replace(tzinfo=timezone.utc)
+            reminder = local_to_utc(self.reminder_at.data)
         return {
             "title": self.title.data,
             "description": self.description.data,
@@ -73,9 +72,9 @@ class QuickTaskForm(FlaskForm):
     due_date = DateTimeLocalField("Eräpäivä", format="%Y-%m-%dT%H:%M", validators=[DataRequired()])
 
     def to_service_data(self) -> dict:
-        due = self.due_date.data
-        if due and due.tzinfo is None:
-            due = due.replace(tzinfo=timezone.utc)
+        from app.tasks.services import local_to_utc
+
+        due = local_to_utc(self.due_date.data)
         return {
             "title": self.title.data,
             "type": self.type.data,

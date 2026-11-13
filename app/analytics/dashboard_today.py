@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import exists, func, not_
+from sqlalchemy import exists, not_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -178,11 +178,12 @@ def _recommendation_type(text: str) -> str:
 
 class DashboardTodayService:
     @staticmethod
-    def get_dashboard_metrics(organization_id: int) -> dict:
+    def get_dashboard_metrics(organization_id: int, user_id: int | None = None) -> dict:
+        """`user_id`: count that user's tasks, like the Tasks page does (the
+        platform superadmin passes None and sees the whole organization)."""
         now = _utc_now()
         window_start = now - timedelta(days=7)
         prev_window_start = window_start - timedelta(days=7)
-        today_date = now.date()
 
         new_leads_7d = (
             Lead.query.filter(
@@ -216,11 +217,16 @@ class DashboardTodayService:
             or 0
         )
 
+        from app.tasks.services import _end_of_day, _start_of_day
+
+        own = [Task.assigned_to == user_id] if user_id else []
         tasks_today = (
             Task.query.filter(
                 Task.organization_id == organization_id,
                 Task.status.in_(("pending", "in_progress")),
-                func.date(Task.due_date) == today_date.isoformat(),
+                Task.due_date >= _start_of_day(now),
+                Task.due_date <= _end_of_day(now),
+                *own,
             )
             .with_entities(db.func.count(Task.id))
             .scalar()
@@ -231,6 +237,7 @@ class DashboardTodayService:
                 Task.organization_id == organization_id,
                 Task.status.in_(("pending", "in_progress")),
                 Task.due_date < now,
+                *own,
             )
             .with_entities(db.func.count(Task.id))
             .scalar()
@@ -266,10 +273,10 @@ class DashboardTodayService:
         }
 
     @staticmethod
-    def get_today_data(organization_id: int) -> dict:
+    def get_today_data(organization_id: int, user_id: int | None = None) -> dict:
         now = _utc_now()
         hot_leads = DashboardTodayService._get_hot_leads(organization_id, now)
-        overdue_tasks = DashboardTodayService._get_overdue_tasks(organization_id, now)
+        overdue_tasks = DashboardTodayService._get_overdue_tasks(organization_id, now, user_id)
         unprocessed_leads = DashboardTodayService._get_unprocessed_leads(organization_id, now)
         ai_recommendations = DashboardTodayService._get_ai_recommendations(organization_id, now)
         return {
@@ -311,13 +318,14 @@ class DashboardTodayService:
         return result
 
     @staticmethod
-    def _get_overdue_tasks(organization_id: int, now: datetime) -> list[dict]:
+    def _get_overdue_tasks(organization_id: int, now: datetime, user_id: int | None = None) -> list[dict]:
         rows = (
             Task.query.options(joinedload(Task.lead))
             .filter(
                 Task.organization_id == organization_id,
                 Task.status.in_(("pending", "in_progress")),
                 Task.due_date < now,
+                *([Task.assigned_to == user_id] if user_id else []),
             )
             .order_by(Task.due_date.asc())
             .limit(5)

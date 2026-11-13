@@ -193,9 +193,25 @@ def _uploads_dir() -> Path:
     return Path(raw).resolve()
 
 
-def _timestamp_filename() -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H%M%S")
+def _timestamp_filename(offset_seconds: int = 0) -> str:
+    from datetime import timedelta
+
+    ts = (datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)).strftime("%Y_%m_%d_%H%M%S")
     return f"backup_{ts}.tar.gz"
+
+
+def _free_filename() -> str:
+    """A name no backup has yet: two backups within one second (the safety
+    copy taken right before a restore) must not overwrite each other."""
+    for offset in range(60):
+        name = _timestamp_filename(offset)
+        try:
+            taken = backup_exists(name)
+        except Exception:
+            taken = False
+        if not taken:
+            return name
+    return _timestamp_filename(60)
 
 
 def sanitize_backup_filename(filename: str) -> str:
@@ -278,6 +294,43 @@ def _run_pg_dump(dest_sql_gz: Path) -> None:
         raise
     except OSError as exc:
         raise BackupServiceError("Database dump failed.", "pg_dump_failed") from exc
+
+
+def _pg_dump_major() -> int | None:
+    """Major version of the pg_dump on PATH, None when it is missing."""
+    import re
+
+    try:
+        out = subprocess.run(["pg_dump", "--version"], capture_output=True, text=True, timeout=10, check=False)
+    except (FileNotFoundError, OSError, subprocess.SubprocessError):
+        return None
+    match = re.search(r"(\d+)(?:\.\d+)?", out.stdout or "")
+    return int(match.group(1)) if match else None
+
+
+def _server_major() -> int | None:
+    try:
+        number = db.session.execute(db.text("SHOW server_version_num")).scalar()
+        return int(number) // 10000
+    except Exception:
+        db.session.rollback()
+        return None
+
+
+def _database_dump_format() -> str:
+    """"pg_dump" or "python" (app/backups/logical.py). BACKUP_DB_FORMAT:
+    auto (default) = pg_dump when it exists and is at least the server's
+    version (pg_dump cannot dump a newer server), python otherwise."""
+    wanted = (current_app.config.get("BACKUP_DB_FORMAT") or "auto").lower()
+    if wanted in ("python", "pg_dump"):
+        return wanted
+    if not _is_postgres_uri(current_app.config.get("SQLALCHEMY_DATABASE_URI")):
+        return "pg_dump"  # tests: placeholder dump; SQLite is never production
+    client, server = _pg_dump_major(), _server_major()
+    if client is None or (server is not None and client < server):
+        logger.info("Using the Python database dump (pg_dump %s, server %s)", client, server)
+        return "python"
+    return "pg_dump"
 
 
 def _sanitize_shell_error(text: str) -> str:
@@ -398,13 +451,19 @@ def _notify_superadmins(subject: str, body: str) -> None:
 def create_backup(*, triggered_by_user_id: int | None = None) -> str:
     """Create a full backup archive. Returns filename on success."""
     backup_dir = _backup_dir()
-    filename = _timestamp_filename()
+    filename = _free_filename()
     archive_path = backup_dir / filename
 
     work_dir = Path(tempfile.mkdtemp(prefix="flowleads_backup_"))
     try:
         db_dump = work_dir / "database.sql.gz"
-        if current_app.config.get("TESTING") and not _is_postgres_uri(
+        db_format = _database_dump_format()
+        dump_info: dict = {"format": db_format}
+        if db_format == "python":
+            from app.backups.logical import dump_database
+
+            dump_info.update(dump_database(db.engine, db.metadata, work_dir / "database.jsonl.gz"))
+        elif current_app.config.get("TESTING") and not _is_postgres_uri(
             current_app.config.get("SQLALCHEMY_DATABASE_URI")
         ):
             import gzip
@@ -433,6 +492,7 @@ def create_backup(*, triggered_by_user_id: int | None = None) -> str:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "triggered_by_user_id": triggered_by_user_id,
             "version": 1,
+            "database": dump_info,
         }
         (work_dir / "manifest.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
@@ -451,7 +511,7 @@ def create_backup(*, triggered_by_user_id: int | None = None) -> str:
             "backup_created",
             user_id=triggered_by_user_id,
             target_type="backup",
-            metadata={"filename": filename, "retention_removed": removed},
+            metadata={"filename": filename, "retention_removed": removed, "database_format": db_format},
         )
         db.session.commit()
 
@@ -616,7 +676,24 @@ def restore_backup(
             tar.extractall(extract_dir, filter="data")
 
         db_dump = extract_dir / "database.sql.gz"
-        if db_dump.is_file():
+        logical_dump = extract_dir / "database.jsonl.gz"
+        if logical_dump.is_file():
+            from app.backups.logical import LogicalBackupError, restore_database
+
+            import sqlalchemy as sa
+
+            engine = db.engine
+            if target_database_url is not None:
+                engine = sa.create_engine(target_database_url)
+            try:
+                restore_database(engine, db.metadata, logical_dump)
+            except LogicalBackupError as exc:
+                raise BackupServiceError(f"Database restore failed: {exc.message}", "restore_failed") from exc
+            finally:
+                if target_database_url is not None:
+                    engine.dispose()
+            db.session.expire_all()
+        elif db_dump.is_file():
             if current_app.config.get("TESTING") and not _is_postgres_uri(
                 target_database_url or current_app.config.get("SQLALCHEMY_DATABASE_URI")
             ):
@@ -637,7 +714,8 @@ def restore_backup(
 
         log_audit(
             "backup_restored",
-            user_id=confirmed_by_user_id,
+            # the restored data may not contain the user who restored it
+            user_id=confirmed_by_user_id if db.session.get(User, confirmed_by_user_id) else None,
             target_type="backup",
             metadata={
                 "filename": sanitize_backup_filename(backup_filename),

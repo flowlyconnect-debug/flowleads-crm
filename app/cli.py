@@ -135,6 +135,24 @@ def register_cli(app):
             click.echo(exc.message, err=True)
             sys.exit(1)
 
+    @app.cli.command("system-check")
+    def system_check_command():
+        """Email, backup, key and migration status (values are never printed)."""
+        from app.admin.system_check import run_checks, summary
+
+        marks = {"ok": "OK  ", "warn": "VAROITUS", "fail": "VIRHE", "info": "info"}
+        checks = run_checks()
+        group = None
+        for check in checks:
+            if check["group"] != group:
+                group = check["group"]
+                click.echo(f"\n{group}")
+            click.echo(f"  [{marks[check['status']]}] {check['name']}: {check['detail']}")
+        counts = summary(checks)
+        click.echo(f"\n{counts['fail']} virhettä, {counts['warn']} varoitusta.")
+        if counts["fail"]:
+            raise SystemExit(1)
+
     @app.cli.command("send-test-email")
     @click.argument("email")
     @with_appcontext

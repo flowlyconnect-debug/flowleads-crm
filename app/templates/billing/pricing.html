@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hinnasto — FlowLeads</title>
+  <meta name="description" content="FlowLeads-hinnasto: taloyhtiöiden tulevat remontit urakoitsijan myyntiin. Julkiset hinnat, {{ trial_days }} päivän maksuton kokeilu ja kuukausisopimus ilman määräaikaa.">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/flowly-mark.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/inter.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pricing.css') }}">
+</head>
+<body class="pricing">
+  <header class="pricing-top">
+    <a href="{{ url_for('billing.pricing') }}" class="pricing-top__logo" aria-label="FlowLeads">
+      <img src="{{ url_for('static', filename='img/flowly-logo.svg') }}" alt="Flowly Solutions" width="150" height="48">
+    </a>
+    <a class="pricing-btn pricing-btn--ghost" href="{{ url_for('auth.login') }}">Kirjaudu</a>
+  </header>
+
+  <main>
+    <section class="pricing-hero">
+      <h1>Taloyhtiöiden tulevat remontit suoraan myyntiisi</h1>
+      <p>
+        FlowLeads löytää taloyhtiöt, joissa sinun urakkasi on tulossa, pisteyttää ne ja kokoaa isännöitsijän,
+        hallituksen puheenjohtajan ja huoltoyhtiön yhteystiedot. Kaikki samassa työkalussa tarjoukseen asti.
+      </p>
+      <ul class="pricing-promises">
+        <li>Julkiset hinnat</li>
+        <li>{{ trial_days }} päivän maksuton kokeilu, ei maksukorttia</li>
+        <li>Kuukausisopimus, irtisanottavissa milloin tahansa</li>
+      </ul>
+    </section>
+
+    <section class="pricing-plans{% if plans|length == 1 %} pricing-plans--single{% endif %}" aria-label="Paketit">
+      {% for plan in plans %}
+      <article class="pricing-plan{% if plan.highlight %} pricing-plan--highlight{% endif %}" aria-labelledby="plan-{{ plan.key }}">
+        {% if plan.highlight and plans|length > 1 %}<span class="pricing-plan__badge">Suosituin</span>{% endif %}
+        <h2 id="plan-{{ plan.key }}">{{ plan.name }}</h2>
+        <p class="pricing-plan__tagline">{{ plan.tagline }}</p>
+        <p class="pricing-plan__price">
+          {% if plan.price is none %}<span class="pricing-plan__amount pricing-plan__amount--small">Sopimuksen mukaan</span>
+          {% else %}<span class="pricing-plan__amount">{{ plan.price }} €</span><span class="pricing-plan__per">/ kk + alv</span>{% endif %}
+        </p>
+        <ul class="pricing-plan__features">
+          {% for feature in plan.features %}<li>{{ feature }}</li>{% endfor %}
+        </ul>
+        <a class="pricing-btn {{ 'pricing-btn--primary' if plan.highlight else 'pricing-btn--secondary' }}" href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='kokeilu') }}">
+          {{ 'Pyydä tarjous' if plan.price is none else 'Aloita maksuton kokeilu' }}
+        </a>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="pricing-terms" aria-labelledby="terms-title">
+      <h2 id="terms-title">Sopimusehdot lyhyesti</h2>
+      <ul>
+        {% for term in terms %}<li>{{ term }}</li>{% endfor %}
+      </ul>
+    </section>
+
+    <section class="pricing-contact" id="kokeilu" aria-labelledby="contact-title">
+      <h2 id="contact-title">Aloita maksuton kokeilu</h2>
+      {% if sent %}
+      <p class="pricing-contact__thanks" role="status">Kiitos! Otamme yhteyttä yhden arkipäivän kuluessa ja lähetämme kokeilutunnukset sähköpostiisi.</p>
+      {% else %}
+      <p>Jätä yhteystietosi, niin avaamme sinulle kokeilutunnukset. Kokeilu kestää {{ trial_days }} päivää eikä muutu maksulliseksi itsestään.</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<p class="pricing-contact__error" role="alert">{{ message|fi_msg }}</p>{% endfor %}
+      {% endwith %}
+      <form method="post" action="{{ url_for('billing.pricing_contact') }}" class="pricing-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="pricing-form__hp" aria-hidden="true">
+          <label>Verkkosivu <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+        <label>Nimi <input type="text" name="name" required maxlength="120" autocomplete="name"></label>
+        <label>Yritys <input type="text" name="company" required maxlength="160" autocomplete="organization"></label>
+        <label>Sähköposti <input type="email" name="email" required maxlength="255" autocomplete="email"></label>
+        <label>Puhelin (vapaaehtoinen) <input type="tel" name="phone" maxlength="40" autocomplete="tel"></label>
+        <label>Paketti
+          <select name="plan">
+            {% for plan in plans %}<option value="{{ plan.key }}"{% if plan.key == chosen or (not chosen and plan.highlight) %} selected{% endif %}>{{ plan.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="pricing-form__wide">Mitä urakoita teet? (vapaaehtoinen)
+          <textarea name="message" rows="3" maxlength="2000" placeholder="esim. putkiremontit ja sukitukset Pirkanmaalla"></textarea>
+        </label>
+        <p class="pricing-form__privacy pricing-form__wide">Käytämme tietojasi vain yhteydenottoon tähän pyyntöön liittyen.</p>
+        <button type="submit" class="pricing-btn pricing-btn--primary pricing-form__wide">Lähetä</button>
+      </form>
+      {% endif %}
+    </section>
+  </main>
+  <footer class="pricing-footer">© Flowly Solutions · <a href="{{ url_for('auth.login') }}">Kirjaudu FlowLeadsiin</a></footer>
+</body>
+</html>

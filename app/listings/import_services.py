@@ -22,6 +22,7 @@ import unicodedata
 from datetime import datetime
 
 from app.extensions import db
+from app.listings.housing import reconcile_company_key
 from app.listings.models import Listing
 from app.listings.services import (
     IMPORT_SOURCE,
@@ -65,6 +66,23 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "building_type": ("talotyyppi", "building_type"),
     "url": ("url", "linkki", "lahde"),
     "published_at": ("julkaistu", "published_at", "paivamaara"),
+    "lat": ("lat", "latitude", "leveysaste", "leveys"),
+    "lon": ("lon", "lng", "longitude", "pituusaste", "pituus"),
+    # other people of the housing company (app/listings/contacts.py)
+    "hallitus_pj": ("hallituksen_puheenjohtaja", "hallituksen_pj", "hallitus_pj", "puheenjohtaja"),
+    "hallitus_pj_puh": ("hallituksen_pj_puh", "hallitus_pj_puh", "puheenjohtajan_puhelin", "puheenjohtaja_puh"),
+    "hallitus_pj_email": ("hallituksen_pj_email", "hallitus_pj_email", "puheenjohtajan_sahkoposti", "puheenjohtaja_email"),
+    "huoltoyhtio": ("huoltoyhtio", "huolto", "kiinteistohuolto"),
+    "huoltoyhtio_puh": ("huoltoyhtio_puh", "huolto_puh", "huollon_puhelin"),
+    "huoltoyhtio_email": ("huoltoyhtio_email", "huolto_email", "huollon_sahkoposti"),
+    # the manager's office (PropertyManagerOffice)
+    "isannointitoimisto_ytunnus": ("isannointitoimisto_ytunnus", "isannointitoimiston_ytunnus", "isannointitoimisto_y_tunnus"),
+    "isannointitoimisto_osoite": ("isannointitoimisto_osoite", "isannointitoimiston_osoite"),
+    "isannointitoimisto_postinumero": ("isannointitoimisto_postinumero", "isannointitoimiston_postinumero"),
+    "isannointitoimisto_kaupunki": ("isannointitoimisto_kaupunki", "isannointitoimiston_kaupunki"),
+    "isannointitoimisto_puh": ("isannointitoimisto_puh", "isannointitoimiston_puhelin", "isannointitoimisto_vaihde"),
+    "isannointitoimisto_email": ("isannointitoimisto_email", "isannointitoimiston_sahkoposti"),
+    "isannointitoimisto_www": ("isannointitoimisto_www", "isannointitoimiston_verkkosivut", "isannoitsija_www"),
 }
 _HEADER_TO_COLUMN = {alias: column for column, aliases in _COLUMN_ALIASES.items() for alias in aliases}
 
@@ -86,6 +104,16 @@ CSV_TEMPLATE_COLUMNS = (
     "yhteyshenkilo",
     "isannointitoimisto",
     "taloyhtion_ytunnus",
+    "hallituksen_puheenjohtaja",
+    "hallituksen_pj_puh",
+    "hallituksen_pj_email",
+    "huoltoyhtio",
+    "huoltoyhtio_puh",
+    "huoltoyhtio_email",
+    "isannointitoimisto_ytunnus",
+    "isannointitoimisto_osoite",
+    "isannointitoimisto_puh",
+    "isannointitoimisto_www",
 )
 
 _TEMPLATE_EXAMPLES = {"as oy esimerkkikatu 1", "as oy mallitie 5"}
@@ -131,6 +159,21 @@ def _manager(raw: dict) -> str | None:
     free-form `isannoitsija` cell ("Hannu Räsänen, Retta Isännöinti Oy"), so the
     Isännöitsijät page groups one office's housing companies together."""
     return _clean(raw.get("isannointitoimisto"), 255) or _clean(raw.get("isannoitsija"), 255)
+
+
+def _email(value) -> str | None:
+    text = _clean(value, 255)
+    return text if text and "@" in text and " " not in text else None
+
+
+def _office_from_row(raw: dict, source: str) -> None:
+    """The row's office details complete the shared office record."""
+    from app.listings.contacts import LISTING_OFFICE_FIELDS, upsert_office
+
+    details = {field: raw.get(column) for column, field in LISTING_OFFICE_FIELDS.items() if raw.get(column)}
+    name = _manager(raw)
+    if name and details:
+        upsert_office({"name": name, **details}, source=source)
 
 
 def _confidence(value) -> int:
@@ -320,9 +363,24 @@ def import_listings(rows: list, *, source: str = IMPORT_SOURCE, now: datetime | 
             ("building_type", _parse_building_type(raw.get("building_type"))),
             ("isannoitsija_henkilo", _clean(raw.get("isannoitsija_henkilo"), 255)),
             ("ytunnus", _clean(raw.get("ytunnus"), 20)),
+            ("hallitus_pj", _clean(raw.get("hallitus_pj"), 255)),
+            ("hallitus_pj_puh", _clean(raw.get("hallitus_pj_puh"), 50)),
+            ("hallitus_pj_email", _email(raw.get("hallitus_pj_email"))),
+            ("huoltoyhtio", _clean(raw.get("huoltoyhtio"), 255)),
+            ("huoltoyhtio_puh", _clean(raw.get("huoltoyhtio_puh"), 50)),
+            ("huoltoyhtio_email", _email(raw.get("huoltoyhtio_email"))),
         ):
             if value is not None:
                 setattr(listing, field, value)
+        _office_from_row(raw, source)
+        from app.listings.geo import valid_position
+
+        where = valid_position(raw.get("lat"), raw.get("lon")) if raw.get("lat") and raw.get("lon") else None
+        if where:
+            listing.lat, listing.lon = where
+            listing.geo_precision = "source"
+        db.session.flush()
+        reconcile_company_key(listing)
         db.session.commit()
 
         if not renovations:
@@ -389,6 +447,16 @@ def csv_template() -> str:
             "Matti Meikäläinen",
             "Isännöinti Esimerkki Oy",
             "1234567-8",
+            "Maija Esimerkki",
+            "040 765 4321",
+            "maija@example.com",
+            "Huolto Esimerkki Oy",
+            "010 555 1234",
+            "huolto@esimerkki.fi",
+            "7654321-0",
+            "Esimerkkikatu 10, 33100 Tampere",
+            "03 123 4567",
+            "www.esimerkki.fi",
         ]
     )
     writer.writerow(
@@ -401,16 +469,7 @@ def csv_template() -> str:
             "",
             "Taloyhtiössä on suunnitteilla lukituksen uusiminen ja kulunvalvonta vuonna 2026. "
             "Julkisivuremontti tehty 2019.",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
+            *([""] * (len(CSV_TEMPLATE_COLUMNS) - 7)),
         ]
     )
     return out.getvalue()

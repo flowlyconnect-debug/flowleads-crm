@@ -84,6 +84,23 @@ def import_route():
     return _run(import_listings, body.get("listings"), source=str(body.get("source") or "import"))
 
 
+@listings_n8n_bp.route("/managers/import", methods=["POST"])
+@require_n8n_secret
+def managers_import_route():
+    """Property management offices: {"offices": [{"name", "ytunnus", "osoite",
+    "postinumero", "kaupunki", "puhelin", "email", "website"}], "source": "..."}."""
+    from app.listings.contacts import OfficeImportError, import_offices
+
+    body = _body()
+    if body is None:
+        return _error("JSON body is required.")
+    try:
+        return jsonify(import_offices(body.get("offices"), source=str(body.get("source") or "import")[:50]))
+    except OfficeImportError as exc:
+        db.session.rollback()
+        return _error(exc.message)
+
+
 @listings_n8n_bp.route("/analysis/claim", methods=["POST"])
 @require_n8n_secret
 def analysis_claim():

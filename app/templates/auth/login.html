@@ -383,6 +383,7 @@
     <div class="lp-container lp-footer__inner">
       <p class="lp-footer__company"><strong>{{ flowly.name }}</strong><span>FlowLeads CRM on {{ flowly.name }}in palvelu.</span></p>
       <ul class="lp-footer__links">
+        <li><a href="{{ url_for('billing.pricing') }}">Hinnasto</a></li>
         <li><a href="{{ flowly.website_url }}"{{ ext | safe }}>{{ flowly.website_label }}</a></li>
         {% if flowly.contact_page_url %}<li><a href="{{ flowly.contact_page_url }}"{{ ext | safe }}>Yhteystiedot</a></li>{% endif %}
         {% if flowly.email %}<li><a href="mailto:{{ flowly.email }}">{{ flowly.email }}</a></li>{% endif %}

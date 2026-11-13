@@ -15,9 +15,18 @@ from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.leads.models import Lead
+from app.listings.housing import (
+    age_based_hints,
+    company_group,
+    company_timeline,
+    score_label,
+    score_level,
+    score_target,
+)
+from app.listings.contacts import company_contacts, office_dict, office_key, offices_for
 from app.listings.models import Listing, ListingMatch
 from app.listings.services import _norm
-from app.listings.target_services import _visible_match_ids
+from app.listings.target_services import _visible_match_ids, organization_wanted_types
 
 # How a listing relates to the organization, strongest first.
 STATE_LABELS_FI = {
@@ -49,11 +58,10 @@ def _state(match: ListingMatch) -> str:
     return "hidden" if match.status == "dismissed" else "available"
 
 
-def _company_key(listing: Listing) -> tuple[str, str]:
-    """A housing company is its name within a city; a listing without a
-    company name stands alone under its address."""
-    name = _norm(listing.taloyhtio) or _norm(listing.osoite) or f"#{listing.id}"
-    return name, _norm(listing.kaupunki)
+def _company_key(listing: Listing) -> str:
+    """A housing company across listings and sources (app/listings/housing.py);
+    a listing that names no company stands alone."""
+    return company_group(listing)
 
 
 def _best_state(states) -> str:
@@ -67,9 +75,9 @@ def _lead_meta(lead: Lead) -> dict:
     return lead.ai_contact_info if isinstance(lead.ai_contact_info, dict) else {}
 
 
-def _companies(organization_id: int) -> "OrderedDict[tuple[str, str], dict]":
-    """Housing companies the organization knows about, keyed by (name, city)."""
-    companies: OrderedDict[tuple[str, str], dict] = OrderedDict()
+def _companies(organization_id: int) -> "OrderedDict[str, dict]":
+    """Housing companies the organization knows about, keyed by company group."""
+    companies: OrderedDict[str, dict] = OrderedDict()
     lead_ids: set[int] = set()
     for match in _visible_matches(organization_id):
         listing = match.listing
@@ -86,8 +94,10 @@ def _companies(organization_id: int) -> "OrderedDict[tuple[str, str], dict]":
                 "lead_ids": set(),
                 "managers": OrderedDict(),
                 "pending_match_ids": [],
+                "matches": [],
             },
         )
+        company["matches"].append(match)
         company["listings"][listing.id] = listing
         company["listing_id"] = min(company["listing_id"], listing.id)
         company["states"].add(_state(match))
@@ -108,6 +118,9 @@ def _companies(organization_id: int) -> "OrderedDict[tuple[str, str], dict]":
             ).all()
         }
     for company in companies.values():
+        # the name as the oldest listing that names the company spells it
+        ordered = [company["listings"][i] for i in sorted(company["listings"])]
+        company["name"] = next((l.taloyhtio for l in ordered if l.taloyhtio), company["name"])
         company["leads"] = [leads[i] for i in sorted(company["lead_ids"]) if i in leads]
         company["state"] = _best_state(company["states"])
         company["renovations"] = _renovations(company["listings"].values())
@@ -186,7 +199,13 @@ def list_managers(organization_id: int, search: str | None = None) -> list[dict]
 
     result = []
     term = _norm(search)
+    offices = offices_for(m["name"] for m in managers.values())
     for manager in managers.values():
+        office = office_dict(offices.get(office_key(manager["name"])))
+        manager["office"] = office
+        manager["phone"] = manager["phone"] or office.get("puhelin", "")
+        manager["email"] = manager["email"] or office.get("email", "")
+        manager["website"] = manager["website"] or office.get("website", "")
         if term and term not in manager["key"]:
             continue
         manager_leads = [lead_by_id[i] for i in sorted(manager["lead_ids"]) if i in lead_by_id]
@@ -222,6 +241,7 @@ def get_company_card(organization_id: int, listing_id: int) -> dict | None:
     listing. None when the listing is not visible to the organization."""
     for company in _companies(organization_id).values():
         if listing_id in company["listings"]:
+            company["organization_id"] = organization_id
             return _card(company)
     return None
 
@@ -237,18 +257,35 @@ def _card(company: dict) -> dict:
     addresses = list(OrderedDict.fromkeys(l.osoite for l in listings if l.osoite))
     notes = list(OrderedDict.fromkeys(l.tulevat_remontit for l in listings if l.tulevat_remontit))
     manager_contacts = []
+    offices = offices_for(company["managers"].values())
     for key, name in company["managers"].items():
-        source = next((l for l in listings if _norm(l.isannoitsija) == key), None)
+        same = [l for l in listings if _norm(l.isannoitsija) == key]
+        source = next((l for l in same if l.has_contact), same[0] if same else None)
+        office = office_dict(offices.get(office_key(name)))
         manager_contacts.append(
             {
                 "name": name,
+                "person": next((l.isannoitsija_henkilo for l in same if l.isannoitsija_henkilo), ""),
                 "phone": (source.isannoitsija_puh or "").strip() if source else "",
                 "email": (source.isannoitsija_email or "").strip() if source else "",
-                "website": (source.isannoitsija_website or "").strip() if source else "",
+                "website": (source.isannoitsija_website or "").strip() if source and (source.isannoitsija_website or "").startswith("http") else office.get("website", ""),
+                "office": office,
             }
         )
+    wanted = organization_wanted_types(company["organization_id"]) if company.get("organization_id") else set()
+    score = score_target(listings, wanted)
+    known_types = {r["type"] for r in company["renovations"]}
+    timeline = company_timeline(
+        company.get("organization_id"), listings, company.get("matches", []), company.get("leads", [])
+    )
     return {
         **company,
+        "score": score["total"],
+        "score_parts": score["parts"],
+        "score_label": score_label(score["total"]),
+        "score_level": score_level(score["total"]),
+        "timeline": timeline,
+        "age_hints": age_based_hints(build_years[0] if build_years else None, known_types, wanted),
         "listing_list": listings,
         "addresses": addresses,
         "region": listings[0].maakunta if listings else "",
@@ -256,5 +293,7 @@ def _card(company: dict) -> dict:
         "building_type": ", ".join(building_types),
         "renovation_notes": notes,
         "manager_contacts": manager_contacts,
+        "people": company_contacts(listings),
+        "ytunnus": next((l.ytunnus for l in listings if l.ytunnus), ""),
         "state_label": STATE_LABELS_FI[company["state"]],
     }

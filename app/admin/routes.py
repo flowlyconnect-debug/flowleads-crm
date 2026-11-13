@@ -1,13 +1,12 @@
-import secrets
-import time
 
-from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.admin.constants import FEATURE_CATALOG
 from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
 from app.admin.services import get_accessible_organizations, get_dashboard_stats, list_customers_summary
+from app.billing.plans import TRIAL_DAYS
 from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
@@ -16,76 +15,43 @@ from app.search.models import SearchProfile
 from app.users.services import UserServiceError, create_organization
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-_PENDING_ADMIN_API_KEYS_SESSION = "pending_admin_api_keys"
-_PENDING_ONBOARDING_RESULT_SESSION = "pending_onboarding_result"
-_PENDING_ADMIN_API_KEY_TTL_SECONDS = 15 * 60
+
+
+# Secrets shown once (new API key, temporary password, invite link) wait on
+# the server, not in the readable session cookie: app/core/one_time_secrets.py
 
 
 def _store_pending_admin_api_key(organization_id: int, full_key: str) -> None:
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    token = secrets.token_urlsafe(24)
-    pending[token] = {
-        "organization_id": int(organization_id),
-        "full_key": full_key,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember(
+        "admin_api_key", {"organization_id": int(organization_id), "full_key": full_key}, current_user.id
+    )
 
 
 def _pending_admin_api_key_exists() -> bool:
-    now = int(time.time())
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    changed = False
-    exists = False
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            changed = True
-            continue
-        exists = True
-    if changed:
-        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-        session.modified = True
-    return exists
+    from app.core import one_time_secrets
+
+    return bool(one_time_secrets.pending("admin_api_key", current_user.id))
 
 
 def _consume_pending_admin_api_key() -> str | None:
-    now = int(time.time())
-    pending = session.get(_PENDING_ADMIN_API_KEYS_SESSION, {})
-    for token, entry in list(pending.items()):
-        if int(entry.get("expires_at", 0)) < now:
-            pending.pop(token, None)
-            continue
-        full_key = str(entry.get("full_key", "")).strip()
-        pending.pop(token, None)
-        session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-        session.modified = True
-        return full_key or None
-    session[_PENDING_ADMIN_API_KEYS_SESSION] = pending
-    session.modified = True
-    return None
+    from app.core import one_time_secrets
+
+    payload = one_time_secrets.consume("admin_api_key", current_user.id)
+    return (str(payload.get("full_key") or "").strip() or None) if payload else None
 
 
 def _store_onboarding_result(result: dict) -> None:
-    session[_PENDING_ONBOARDING_RESULT_SESSION] = {
-        **result,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember("onboarding_result", result, current_user.id)
 
 
 def _consume_onboarding_result() -> dict | None:
-    entry = session.get(_PENDING_ONBOARDING_RESULT_SESSION)
-    if not entry:
-        return None
-    if int(entry.get("expires_at", 0)) < int(time.time()):
-        session.pop(_PENDING_ONBOARDING_RESULT_SESSION, None)
-        session.modified = True
-        return None
-    session.pop(_PENDING_ONBOARDING_RESULT_SESSION, None)
-    session.modified = True
-    return entry
+    from app.core import one_time_secrets
+
+    return one_time_secrets.consume("onboarding_result", current_user.id)
 
 
 @admin_bp.route("/dashboard")
@@ -107,8 +73,15 @@ def dashboard():
 @require_role("superadmin")
 @require_2fa
 def customers_list():
+    from app.billing.plans import PLANS
+    from app.billing.services import subscription_state
+
     customers = list_customers_summary()
-    return render_template("admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG)
+    for row in customers:
+        row["subscription"] = subscription_state(row["org"])
+    return render_template(
+        "admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG, plans=PLANS
+    )
 
 
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
@@ -230,6 +203,7 @@ AUDIT_ACTION_LABELS_FI = {
     "organization_features_updated": "Asiakkaan toiminnot muutettu",
     "source_activated": "Hakuprofiili aktivoitu",
     "catalogue_import": "Kohteita tuotu katalogiin",
+    "catalogue_offices_import": "Isännöintitoimistoja tuotu",
     "catalogue_alert_sent": "Katalogihälytys lähetetty",
     "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",
     "account_email_failed": "Tiliviestin lähetys epäonnistui",
@@ -373,6 +347,7 @@ def create_customer_route():
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
             form_data={},
+            trial_days=TRIAL_DAYS,
         )
 
     types = request.form.getlist("remonttityypit") or [request.form.get("remonttityyppi", "")]
@@ -385,6 +360,7 @@ def create_customer_route():
         "remonttityypit": [t.strip() for t in types if t.strip()],
         "source": (request.form.get("source") or "oikotie").strip(),
         "is_active": request.form.get("is_active") == "y",
+        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -398,6 +374,7 @@ def create_customer_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             is_active=form_data["is_active"],
+            trial=form_data["trial"],
         )
         db.session.commit()
     except CustomerOnboardingError as exc:
@@ -406,6 +383,7 @@ def create_customer_route():
         return render_template(
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
+            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 
@@ -436,28 +414,16 @@ def create_customer_result():
     return render_template("admin/customer_onboarding_result.html", result=result)
 
 
-_PENDING_INVITE_RESULT_SESSION = "pending_invite_result"
-
-
 def _store_invite_result(result: dict) -> None:
-    session[_PENDING_INVITE_RESULT_SESSION] = {
-        **result,
-        "expires_at": int(time.time()) + _PENDING_ADMIN_API_KEY_TTL_SECONDS,
-    }
-    session.modified = True
+    from app.core import one_time_secrets
+
+    one_time_secrets.remember("invite_result", result, current_user.id)
 
 
 def _consume_invite_result() -> dict | None:
-    entry = session.get(_PENDING_INVITE_RESULT_SESSION)
-    if not entry:
-        return None
-    if int(entry.get("expires_at", 0)) < int(time.time()):
-        session.pop(_PENDING_INVITE_RESULT_SESSION, None)
-        session.modified = True
-        return None
-    session.pop(_PENDING_INVITE_RESULT_SESSION, None)
-    session.modified = True
-    return entry
+    from app.core import one_time_secrets
+
+    return one_time_secrets.consume("invite_result", current_user.id)
 
 
 def fi_email_error(error: str | None) -> str | None:
@@ -507,6 +473,7 @@ def create_invite_route():
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
             form_data={},
+            trial_days=TRIAL_DAYS,
         )
 
     allowed_features = request.form.getlist("allowed_features")
@@ -521,6 +488,7 @@ def create_invite_route():
         ],
         "source": (request.form.get("source") or "oikotie").strip(),
         "allowed_features": allowed_features,
+        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -532,6 +500,7 @@ def create_invite_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             allowed_features=allowed_features,
+            trial=form_data["trial"],
         )
         db.session.commit()
     except InviteServiceError as exc:
@@ -541,6 +510,7 @@ def create_invite_route():
             "admin/customer_invite.html",
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
+            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 
@@ -631,6 +601,21 @@ def update_customer_features_route(organization_id: int):
     return redirect(url_for("admin.customers_list"))
 
 
+@admin_bp.route("/system")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def system_status():
+    """Järjestelmän tila: email, backups, keys and migrations at a glance."""
+    from app.admin.system_check import run_checks, summary
+
+    checks = run_checks()
+    groups: dict[str, list] = {}
+    for check in checks:
+        groups.setdefault(check["group"], []).append(check)
+    return render_template("admin/system.html", groups=groups, summary=summary(checks))
+
+
 @admin_bp.route("/catalogue")
 @login_required
 @require_role("superadmin")
@@ -638,7 +623,14 @@ def update_customer_features_route(organization_id: int):
 def catalogue_status():
     from app.listings.services import catalogue_health
 
-    return render_template("admin/catalogue.html", health=catalogue_health(), remonttityypit=REMONTTITYYPIT)
+    from app.listings.models import PropertyManagerOffice
+
+    return render_template(
+        "admin/catalogue.html",
+        health=catalogue_health(),
+        remonttityypit=REMONTTITYYPIT,
+        office_count=PropertyManagerOffice.query.count(),
+    )
 
 
 @admin_bp.route("/catalogue/import", methods=["POST"])
@@ -691,6 +683,58 @@ def catalogue_import():
             "warning",
         )
     return redirect(url_for("admin.catalogue_status"))
+
+
+@admin_bp.route("/catalogue/offices/import", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_offices_import():
+    """CSV import of property management offices (isännöintitoimistot):
+    business ID, address, switchboard, email and website for the office pages."""
+    from app.core.audit import log_audit
+    from app.listings.contacts import OfficeImportError, import_offices, parse_office_csv
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Valitse CSV-tiedosto.", "danger")
+        return redirect(url_for("admin.catalogue_status"))
+    try:
+        result = import_offices(parse_office_csv(upload.read(5 * 1024 * 1024 + 1)[: 5 * 1024 * 1024]))
+    except OfficeImportError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+        return redirect(url_for("admin.catalogue_status"))
+    log_audit(
+        action="catalogue_offices_import",
+        user_id=current_user.id,
+        organization_id=None,
+        target_type="property_manager_office",
+        target_id=None,
+        metadata={"created": result["created"], "updated": result["updated"], "errors": len(result["errors"])},
+    )
+    db.session.commit()
+    flash(f"Isännöintitoimistoja: {result['created']} uutta, {result['updated']} päivitetty.", "success")
+    if result["errors"]:
+        shown = "; ".join(f"rivi {e['row'] + 1}: {e['error']}" for e in result["errors"][:8])
+        flash(f"{len(result['errors'])} riviä ohitettiin. {shown}", "warning")
+    return redirect(url_for("admin.catalogue_status"))
+
+
+@admin_bp.route("/catalogue/offices/import-template.csv")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def catalogue_offices_template():
+    from flask import Response
+
+    from app.listings.contacts import office_template
+
+    return Response(
+        "\ufeff" + office_template(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=flowleads-isannointitoimistot-malli.csv"},
+    )
 
 
 @admin_bp.route("/catalogue/import-template.csv")

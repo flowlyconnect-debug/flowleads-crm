@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Järjestelmän tila — Asetukset{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('system') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Järjestelmän tila</h1>
+          <p class="settings-panel__subtitle">
+            {{ summary.fail }} virhettä, {{ summary.warn }} varoitusta. Arvoja ei näytetä, vain onko ne asetettu.
+            Sama komentorivillä: <code>flask system-check</code>.
+          </p>
+        </header>
+        {% for group, checks in groups.items() %}
+        <h2 class="form-section-title">{{ group }}</h2>
+        <ul class="system-checks">
+          {% for check in checks %}
+          <li class="system-check system-check--{{ check.status }}">
+            <span class="system-check__mark" aria-hidden="true">{{ {'ok': '✓', 'warn': '!', 'fail': '✕', 'info': 'i'}[check.status] }}</span>
+            <span class="sr-only">{{ {'ok': 'Kunnossa', 'warn': 'Varoitus', 'fail': 'Virhe', 'info': 'Tieto'}[check.status] }}:</span>
+            <strong>{{ check.name }}</strong>
+            <span class="system-check__detail">{{ check.detail }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endfor %}
+        <p class="form-helper">
+          Testaa sähköposti <a href="{{ url_for('email.admin_email_logs') }}">Sähköpostiloki</a>-sivulta ja varmuuskopio
+          <a href="{{ url_for('backups.backups_list') }}">Varmuuskopiot</a>-sivulta.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .system-checks { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+  .system-check { display: grid; grid-template-columns: 24px minmax(150px, 220px) 1fr; gap: 8px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: #F9FAFB; font-size: 14px; }
+  .system-check__mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-weight: 700; font-size: 12px; color: #fff; background: #9CA3AF; }
+  .system-check--ok .system-check__mark { background: #059669; }
+  .system-check--warn .system-check__mark { background: #D97706; }
+  .system-check--fail { background: #FEF2F2; }
+  .system-check--fail .system-check__mark { background: #DC2626; }
+  .system-check__detail { color: #374151; }
+  .system-check strong { overflow-wrap: anywhere; min-width: 0; }
+  @media (max-width: 640px) { .system-check { grid-template-columns: 24px 1fr; } .system-check__detail { grid-column: 2; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+</style>
+{% endblock %}

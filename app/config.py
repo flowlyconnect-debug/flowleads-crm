@@ -52,6 +52,20 @@ class Config:
 
     BACKUP_DIR = os.environ.get("BACKUP_DIR", "./backups")
     BACKUP_RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", 30))
+    # Content-Security-Policy of every HTML page. Scripts and styles only from
+    # this server (libraries are vendored in app/static/vendor). 'unsafe-inline'
+    # stays until the templates' inline <script> blocks and on*-attributes are
+    # moved to static files; img-src allows https images (proposal logos, map
+    # tiles). Set to "" to switch the header off.
+    CONTENT_SECURITY_POLICY = os.environ.get(
+        "CONTENT_SECURITY_POLICY",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'self'",
+    )
+    # auto = pg_dump when it is at least the server's version, otherwise the
+    # Python dump (app/backups/logical.py); "python" / "pg_dump" force one
+    BACKUP_DB_FORMAT = os.environ.get("BACKUP_DB_FORMAT", "auto")
     UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "./uploads")
     # Largest request body the app accepts (Flask answers 413 above it). The
     # biggest legitimate bodies are the n8n listing import and the CSV upload.
@@ -113,6 +127,20 @@ class Config:
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
+    # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default
+    # OpenStreetMap server suits light use only (tile usage policy), switch to a
+    # commercial provider (e.g. MapTiler with a key in the URL) for heavy use.
+    MAP_TILE_URL = os.environ.get("MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+    MAP_TILE_ATTRIBUTION = os.environ.get(
+        "MAP_TILE_ATTRIBUTION",
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-tekijät',
+    )
+    # Address geocoding of matched listings (scheduler job "geocode_listings").
+    # Off by default: it sends housing-company street addresses to the
+    # geocoder. Without it the map places targets at their town's centre.
+    GEOCODING_ENABLED = os.environ.get("GEOCODING_ENABLED", "false").lower() in ("1", "true", "yes")
+    GEOCODER_URL = os.environ.get("GEOCODER_URL", "https://nominatim.openstreetmap.org/search")
+    GEOCODING_BATCH = int(os.environ.get("GEOCODING_BATCH", "40"))
     LISTING_STALE_HOURS = int(os.environ.get("LISTING_STALE_HOURS", "6"))
     LISTING_ALERT_INTERVAL_HOURS = int(os.environ.get("LISTING_ALERT_INTERVAL_HOURS", "24"))
     FORM_SUBMISSION_RATE_LIMIT = os.environ.get("FORM_SUBMISSION_RATE_LIMIT", "10/hour")
@@ -133,6 +161,9 @@ class Config:
         "AI_ENRICHMENT_MODEL", "gpt-4o-mini"
     )
     AI_AUTO_ENRICH_ON_CREATE = os.environ.get("AI_AUTO_ENRICH_ON_CREATE", "true").lower() == "true"
+    # Kohteet "Kerro mitä etsit": also ask the model (OPENAI_API_KEY) to read the
+    # text. Off = the rule-based reader only (app/listings/nl_search.py).
+    NL_SEARCH_AI_ENABLED = os.environ.get("NL_SEARCH_AI_ENABLED", "false").lower() in ("1", "true", "yes")
     AI_MAX_CONCURRENT_ENRICHMENTS = int(os.environ.get("AI_MAX_CONCURRENT_ENRICHMENTS", 3))
     AI_ENRICHMENT_MAX_RETRIES = int(os.environ.get("AI_ENRICHMENT_MAX_RETRIES", 2))
     AI_ENRICHMENT_RETRY_DELAY_SECONDS = int(os.environ.get("AI_ENRICHMENT_RETRY_DELAY_SECONDS", 60))
@@ -208,6 +239,7 @@ class TestingConfig(Config):
     # the older Kohteet tests expect matches to be visible at once; the fetch
     # button's own tests switch this on
     TARGET_FETCH_ENABLED = False
+    GEOCODING_ENABLED = False
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

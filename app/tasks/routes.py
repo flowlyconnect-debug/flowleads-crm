@@ -67,11 +67,17 @@ def list_tasks():
     else:
         assigned_filter = current_user.id
 
-    now = datetime.now(timezone.utc)
-    start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_today = start_today + timedelta(days=1)
-    start_week = start_today - timedelta(days=start_today.weekday())
-    end_week = start_week + timedelta(days=7)
+    # day and week boundaries in Finnish time, compared in UTC
+    from zoneinfo import ZoneInfo
+
+    helsinki = ZoneInfo("Europe/Helsinki")
+    local_now = datetime.now(helsinki)
+    local_today = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_today = local_today.astimezone(timezone.utc)
+    end_today = (local_today + timedelta(days=1)).astimezone(timezone.utc)
+    local_week = local_today - timedelta(days=local_today.weekday())
+    start_week = local_week.astimezone(timezone.utc)
+    end_week = (local_week + timedelta(days=7)).astimezone(timezone.utc)
     tomorrow = end_today
 
     open_query = Task.query.filter(
@@ -113,8 +119,7 @@ def list_tasks():
     )
 
     quick_form = QuickTaskForm()
-    default_due = datetime.now(timezone.utc)
-    quick_form.due_date.data = default_due.replace(tzinfo=None)
+    quick_form.due_date.data = local_now.replace(tzinfo=None, second=0, microsecond=0)
 
     users = _org_users(organization_id) if can_assign_to_others() else []
     leads = (
@@ -135,9 +140,9 @@ def list_tasks():
         week_tasks=week_tasks,
         later_tasks=later_tasks,
         completed_tasks=completed_tasks,
-        today_date=start_today.date(),
-        week_start=start_week,
-        week_end=end_week - timedelta(days=1),
+        today_date=local_today.date(),
+        week_start=local_week,
+        week_end=local_week + timedelta(days=6),
         organization_id=organization_id,
         assigned_filter=assigned_filter,
         can_assign_others=can_assign_to_others(),

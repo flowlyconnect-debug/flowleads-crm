@@ -605,8 +605,18 @@ class SequenceService:
             .all()
         )
 
+        from app.core.features import organization_has_feature
+
+        allowed: dict[int, bool] = {}
         processed = 0
         for enrollment in due:
+            org_id = enrollment.organization_id
+            if org_id not in allowed:
+                allowed[org_id] = organization_has_feature(org_id, "sequences")
+            if not allowed[org_id]:
+                # the module was switched off for the organization: nothing is
+                # sent; the enrollment waits and continues if it is switched on
+                continue
             try:
                 if SequenceService._process_single_enrollment(enrollment):
                     processed += 1

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Tilaus — Asetukset{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('billing') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Tilaus</h1>
+          <p class="settings-panel__subtitle">{{ organization.name }} · {{ user_count }} {{ 'käyttäjä' if user_count == 1 else 'käyttäjää' }}</p>
+        </header>
+
+        <section class="billing-status billing-status--{{ 'ok' if state.can_use else 'ended' }}" aria-label="Nykyinen tilanne">
+          <p class="billing-status__label">{{ state.label }}{% if state.status in ('active', 'cancelled') %} · {{ state.plan_name }}{% endif %}</p>
+          {% if state.status == 'trial' %}
+          <p>Maksuton kokeilu päättyy {{ state.last_day }} ({{ state.days_left }} {{ 'päivä' if state.days_left == 1 else 'päivää' }} jäljellä). Kokeilu ei muutu maksulliseksi itsestään.</p>
+          {% elif state.status == 'trial_expired' %}
+          <p>Kokeilujakso päättyi {{ state.last_day }}. Tietosi ovat tallessa. Valitse kuukausisopimus, niin kohteiden haku ja siirto liideiksi jatkuvat.</p>
+          {% elif state.status == 'cancelled' %}
+          <p>Sopimus on irtisanottu. Palvelu on käytössä {{ state.last_day }} asti, eikä seuraavaa kuukautta laskuteta.</p>
+          {% if can_manage %}
+          <form method="post" action="{{ url_for('billing.resume_route', **org_query) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary btn-sm">Peru irtisanominen</button>
+          </form>
+          {% endif %}
+          {% elif state.status == 'expired' %}
+          <p>Sopimus on päättynyt. Näet tietosi ja voit viedä ne ulos. Uuden sopimuksen voi aloittaa alta.</p>
+          {% else %}
+          <p>Kuukausisopimus on voimassa{% if organization.subscription_started_at %} {{ (organization.subscription_started_at|helsinki).strftime('%d.%m.%Y') }} alkaen{% endif %}. Lasku lähetetään kuukausittain sähköpostilla.</p>
+          {% endif %}
+        </section>
+
+        {% if can_manage %}
+        <h2 class="form-section-title">{{ 'Vaihda pakettia' if state.status == 'active' else 'Valitse kuukausisopimus' }}</h2>
+        <form method="post" action="{{ url_for('billing.subscribe_route', **org_query) }}" class="billing-plans">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% for plan in plans %}
+          <label class="billing-plan{% if plan.price is none %} billing-plan--contact{% endif %}">
+            {% if plan.price is not none %}
+            <input type="radio" name="plan" value="{{ plan.key }}"{% if organization.plan == plan.key or (not organization.plan and plan.highlight) %} checked{% endif %}>
+            {% endif %}
+            <span class="billing-plan__name">{{ plan.name }}</span>
+            <span class="billing-plan__price">{{ plan_price_label(plan) }}{% if plan.price is not none %} + alv{% endif %}</span>
+            <span class="billing-plan__features">{{ plan.features|join(' · ') }}</span>
+            {% if plan.price is none %}<span class="text-sm">Ota yhteyttä: <a href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='kokeilu') }}">pyydä tarjous</a></span>{% endif %}
+          </label>
+          {% endfor %}
+          <label class="form-check billing-accept">
+            <input type="checkbox" name="accept_terms" value="1" required>
+            Hyväksyn sopimusehdot: kuukausisopimus ilman määräaikaa, lasku kuukausittain etukäteen, irtisanottavissa milloin tahansa kuluvan kuukauden loppuun.
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm">{{ 'Vaihda paketti' if state.status == 'active' else 'Tilaa kuukausisopimus' }}</button>
+        </form>
+
+        {% if state.status == 'active' %}
+        <h2 class="form-section-title">Irtisanominen</h2>
+        <p class="form-helper">Palvelu on käytössä kuluvan kuukauden loppuun, eikä seuraavaa kuukautta laskuteta. Tietosi säilyvät, ja voit viedä ne ulos myös sopimuksen päätyttyä.</p>
+        <form method="post" action="{{ url_for('billing.cancel_route', **org_query) }}" onsubmit="return confirm('Irtisanotaanko sopimus kuluvan kuukauden loppuun?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-secondary btn-sm">Irtisano sopimus</button>
+        </form>
+        {% endif %}
+        {% else %}
+        <p class="form-helper">Tilausta hallinnoi organisaatiosi ylläpitäjä.</p>
+        {% endif %}
+
+        <h2 class="form-section-title">Sopimusehdot</h2>
+        <ul class="billing-terms">{% for term in terms %}<li>{{ term }}</li>{% endfor %}</ul>
+        <p class="form-helper"><a href="{{ url_for('billing.pricing') }}" target="_blank" rel="noopener">Julkinen hinnasto</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .billing-status { margin-bottom: 20px; padding: 14px 16px; border-radius: 12px; }
+  .billing-status p { margin: 4px 0; }
+  .billing-status--ok { background: #F5F3FF; }
+  .billing-status--ended { background: #FEF2F2; border: 1px solid #FECACA; }
+  .billing-status__label { font-weight: 700; font-size: 16px; }
+  .billing-plans { display: grid; gap: 10px; }
+  .billing-plan { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 12px; align-items: center; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px; cursor: pointer; }
+  .billing-plan--contact { grid-template-columns: 1fr auto; cursor: default; }
+  .billing-plan input { grid-row: span 2; }
+  .billing-plan__name { font-weight: 700; }
+  .billing-plan__price { font-weight: 600; text-align: right; }
+  .billing-plan__features { grid-column: 2 / -1; font-size: 13px; color: #4B5563; }
+  .billing-plan--contact .billing-plan__features { grid-column: 1 / -1; }
+  .billing-plan:has(input:checked) { border-color: #6846DC; background: #FAF8FF; }
+  .billing-accept { margin: 6px 0; font-size: 14px; }
+  .billing-terms { margin: 0 0 8px; padding-left: 20px; color: #4B5563; font-size: 14px; display: grid; gap: 4px; }
+</style>
+{% endblock %}

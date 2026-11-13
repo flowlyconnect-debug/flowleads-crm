@@ -76,7 +76,7 @@
             {% endif %}
           </div>
         </div>
-        <div class="task-row__due task-row__due--danger">Myöhässä {{ (today_date - task.due_date.date()).days }} pv</div>
+        <div class="task-row__due task-row__due--danger">Myöhässä {{ (today_date - (task.due_date|helsinki).date()).days }} pv</div>
         <div class="task-row__action">
           {% if task.lead %}<a href="{{ url_for('leads.detail', lead_id=task.lead.id, **org_query) }}">Avaa liidi →</a>{% endif %}
         </div>
@@ -103,7 +103,7 @@
             {% endif %}
           </div>
         </div>
-        <div class="task-row__due">{{ task.due_date.strftime('%H:%M') if task.due_date.strftime('%H:%M') != '00:00' else 'Tänään' }}</div>
+        <div class="task-row__due">{% set local_due = task.due_date|helsinki %}{{ local_due.strftime('%H.%M') if local_due.strftime('%H:%M') != '00:00' else 'Tänään' }}</div>
         <div class="task-row__action">
           {% if task.priority == 'high' or task.priority == 'urgent' %}
           <span class="priority-dot" title="Korkea prioriteetti"></span>
@@ -130,7 +130,7 @@
             {% if task.lead %}<span>{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
           </div>
         </div>
-        <div class="task-row__due">{{ weekday_names[task.due_date.weekday()] }} {{ task.due_date.strftime('%d.%m.') }}</div>
+        <div class="task-row__due">{% set local_due = task.due_date|helsinki %}{{ weekday_names[local_due.weekday()] }} {{ local_due.strftime('%d.%m.') }}</div>
         <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}
@@ -152,7 +152,7 @@
             {% if task.lead %}<span>{{ task.lead.company or task.lead.display_name }}</span>{% endif %}
           </div>
         </div>
-        <div class="task-row__due">{{ task.due_date.strftime('%d.%m.') }}</div>
+        <div class="task-row__due">{{ (task.due_date|helsinki).strftime('%d.%m.') }}</div>
         <a class="task-row__edit" href="{{ url_for('tasks.edit_task', task_id=task.id, **org_query) }}" title="Muokkaa, siirrä tai poista">Muokkaa</a>
       </article>
       {% endfor %}

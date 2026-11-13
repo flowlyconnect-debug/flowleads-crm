@@ -270,7 +270,12 @@ def test_task_can_be_edited_rescheduled_and_deleted(client, app):
     with app.app_context():
         task = db.session.get(Task, task_id)
         assert (task.title, task.priority, task.type) == ("Lähetä tarjous", "high", "email")
-        assert (task.due_date.year, task.due_date.month, task.due_date.hour) == (2027, 1, 9)
+        # typed in Finnish time, stored as UTC (09.30 EET = 07.30 UTC)
+        from app import to_helsinki
+
+        local_due = to_helsinki(task.due_date.replace(tzinfo=task.due_date.tzinfo or timezone.utc))
+        assert (local_due.year, local_due.month, local_due.hour) == (2027, 1, 9)
+        assert task.due_date.hour == 7
     assert client.post(f"/tasks/{task_id}/delete").status_code == 302
     with app.app_context():
         assert db.session.get(Task, task_id) is None

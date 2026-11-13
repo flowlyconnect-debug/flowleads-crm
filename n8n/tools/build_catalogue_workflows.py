@@ -372,12 +372,12 @@ Säännöt tuleville remonteille:
 - evidence = lyhyt suora lainaus tekstistä. timing = esim. "2027", "suunnitteilla", "PTS 2026–2028" tai "".
 - Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.
 
-Yhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (henkilö tai isännöintiyritys), isännöitsijän puhelin ja sähköposti. Muuten "".
+Yhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (isännöintiyritys tai, jos yritystä ei mainita, henkilö), isännöitsijän henkilön nimi (isannoitsija_henkilo, jos teksti nimeää sekä yrityksen että henkilön), isännöitsijän puhelin ja sähköposti sekä huoltoyhtiö (kiinteistöhuolto) ja sen puhelin. Muuten "".
 
 Rakennus: rakennusvuosi = rakennuksen valmistumis- tai rakennusvuosi numerona (esim. 1972), tai null jos tekstissä ei ole. talotyyppi = yksi näistä: "Kerrostalo", "Rivitalo", "Paritalo", "Omakotitalo", "Muu", tai "" jos tekstistä ei selviä (luhtitalo = "Kerrostalo", erillistalo = "Omakotitalo").
 
 Palauta VAIN validi JSON ilman markdownia:
-{"taloyhtio":"","isannoitsija":"","isannoitsija_puh":"","isannoitsija_email":"","rakennusvuosi":null,"talotyyppi":"","tulevat_remontit":"lyhyt tiivistelmä tulevista remonteista","renovations":[{"remonttityyppi":"","confidence":0,"timing":"","evidence":""}]}"""
+{"taloyhtio":"","isannoitsija":"","isannoitsija_henkilo":"","isannoitsija_puh":"","isannoitsija_email":"","huoltoyhtio":"","huoltoyhtio_puh":"","rakennusvuosi":null,"talotyyppi":"","tulevat_remontit":"lyhyt tiivistelmä tulevista remonteista","renovations":[{"remonttityyppi":"","confidence":0,"timing":"","evidence":""}]}"""
 
 
 def build_analyzer(lib):
@@ -534,8 +534,11 @@ return [{ json: { ...base, body: {
   status: 'done',
   taloyhtio: s(a.taloyhtio),
   isannoitsija: s(a.isannoitsija),
+  isannoitsija_henkilo: s(a.isannoitsija_henkilo),
   isannoitsija_puh: s(a.isannoitsija_puh),
   isannoitsija_email: s(a.isannoitsija_email),
+  huoltoyhtio: s(a.huoltoyhtio),
+  huoltoyhtio_puh: s(a.huoltoyhtio_puh),
   tulevat_remontit: s(a.tulevat_remontit),
   rakennusvuosi: Number.isFinite(Number(a.rakennusvuosi)) && Number(a.rakennusvuosi) > 0 ? Number(a.rakennusvuosi) : null,
   talotyyppi: s(a.talotyyppi),
