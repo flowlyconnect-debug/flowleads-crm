@@ -181,7 +181,7 @@ def test_playbook_ui_pending_state(client, app):
         (25, "playbook-score--low"),
     ],
 )
-def test_playbook_ui_score_bar_color(client, app, score, expected_class):
+def test_playbook_ui_shows_no_score_bar(client, app, score, expected_class):
     ctx = _setup_org(app, f"pb-score-{score}")
     _login(client, ctx["admin_email"])
     lead_id = _create_lead(
@@ -195,8 +195,10 @@ def test_playbook_ui_score_bar_color(client, app, score, expected_class):
 
     response = client.get(f"/leads/{lead_id}")
     html = response.data.decode()
-    assert expected_class in html
-    assert score_label(score) in html
+    # the AI score was removed from the lead page
+    assert expected_class not in html
+    assert score_label(score) not in html
+    assert "Voittotodennäköisyys" not in html
 
 
 def test_playbook_score_helpers():

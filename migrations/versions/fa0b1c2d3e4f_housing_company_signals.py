@@ -1,14 +1,14 @@
 """Housing-company keys on listings, target score and hide time on matches.
 
 Revision ID: fa0b1c2d3e4f
-Revises: f0a1b2c3d4e5
+Revises: f1a2b3c4d5e6
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "fa0b1c2d3e4f"
-down_revision = "f0a1b2c3d4e5"
+down_revision = "f1a2b3c4d5e6"
 branch_labels = None
 depends_on = None
 

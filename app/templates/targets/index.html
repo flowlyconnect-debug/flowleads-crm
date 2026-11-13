@@ -378,14 +378,11 @@
               {% endif %}
             </div>
             {% endif %}
-            {% if (renovation and renovation.evidence) or listing.tulevat_remontit or listing.url %}
+            {% if (renovation and renovation.evidence) or listing.tulevat_remontit %}
             <details class="target-row__more">
               <summary>Lisätiedot</summary>
               {% if listing.tulevat_remontit %}<p><strong>Tulevat remontit:</strong> {{ listing.tulevat_remontit }}</p>{% endif %}
               {% if renovation and renovation.evidence %}<p><strong>Peruste:</strong> {{ renovation.evidence }}</p>{% endif %}
-              {% if listing.url and listing.url.startswith('http') %}
-              <p><a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">Avaa alkuperäinen ilmoitus</a></p>
-              {% endif %}
             </details>
             {% endif %}
           </div>

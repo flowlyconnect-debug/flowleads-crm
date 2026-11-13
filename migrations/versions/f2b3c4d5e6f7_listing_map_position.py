@@ -1,14 +1,14 @@
 """Map position of listings.
 
 Revision ID: f2b3c4d5e6f7
-Revises: f1a2b3c4d5e6
+Revises: fb1c2d3e4f5a
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "f2b3c4d5e6f7"
-down_revision = "f1a2b3c4d5e6"
+down_revision = "fb1c2d3e4f5a"
 branch_labels = None
 depends_on = None
 

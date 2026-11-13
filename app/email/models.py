@@ -38,6 +38,13 @@ ALLOWED_TEMPLATE_VARIABLES = frozenset(
         "org_name",
         "last_lead_at",
         "days",
+        # leads from the Kohteet page (app/sequences/services.py::_catalogue_context)
+        "taloyhtio",
+        "remonttityyppi",
+        "ajankohta",
+        "kaupunki",
+        "isannoitsija",
+        "yritys",
     }
 )
 

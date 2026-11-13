@@ -125,3 +125,52 @@ window.flSubmitFilters = function (form) {
   });
   form.submit();
 };
+
+// Instant feedback on every ordinary form post: the pressed button shows a
+// spinner straight away and the form cannot be sent twice while the next page
+// loads. Forms handled by their own script (they call preventDefault) and
+// forms marked data-no-busy are left alone.
+(function () {
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
+    if (form.hasAttribute('data-no-busy') || form.target === '_blank') return;
+    if (form.dataset.busy === '1') {
+      event.preventDefault();
+      return;
+    }
+    form.dataset.busy = '1';
+    var button = event.submitter;
+    // disable only after the browser has read the pressed button's name/value
+    window.setTimeout(function () {
+      if (button && button.tagName === 'BUTTON') {
+        button.classList.add('is-busy');
+        button.setAttribute('aria-busy', 'true');
+      }
+      form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]').forEach(function (b) {
+        if (b.disabled) return; // was already off (e.g. nothing selected): leave it so
+        b.disabled = true;
+        b.setAttribute('data-busy-disabled', '1');
+      });
+    }, 0);
+    // a download or a validation error keeps the page: release the form again
+    window.setTimeout(function () { release(form); }, 8000);
+  });
+
+  function release(form) {
+    delete form.dataset.busy;
+    form.querySelectorAll('[aria-busy="true"]').forEach(function (b) {
+      b.classList.remove('is-busy');
+      b.removeAttribute('aria-busy');
+    });
+    form.querySelectorAll('[data-busy-disabled]').forEach(function (b) {
+      b.disabled = false;
+      b.removeAttribute('data-busy-disabled');
+    });
+  }
+
+  // coming back with the browser's back button shows the page from cache
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) document.querySelectorAll('form[data-busy="1"]').forEach(release);
+  });
+})();

@@ -101,7 +101,6 @@ class LeadFilterForm(FlaskForm):
             ("name", "Nimi"),
             ("company", "Yritys"),
             ("stage", "Vaihe"),
-            ("score", "Pisteet"),
             ("last_activity", "Viimeisin aktiviteetti"),
             ("source", "Lähde"),
         ],

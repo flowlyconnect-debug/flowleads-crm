@@ -403,7 +403,8 @@ def test_detail_shows_score_badge_and_summary(mock_openai, client, app):
 
     response = client.get(f"/leads/{lead_id}")
     html = response.data.decode()
-    assert "score-high" in html
+    # the AI score itself is not shown to the customer any more, the summary is
+    assert "score-high" not in html
     assert "Strong B2B prospect" in html
     assert "AI-rikastettu" in html
 
@@ -429,7 +430,7 @@ def test_detail_processing_state(client, app):
     assert "ai-pending" in html
 
 
-def test_score_badge_colors_in_list(client, app):
+def test_lead_page_shows_no_ai_score(client, app):
     ctx = _setup_org(app, "badges")
     _login(client, f"admin-badges@test.com")
 
@@ -454,12 +455,9 @@ def test_score_badge_colors_in_list(client, app):
         mid_id = mid.id
         high_id = high.id
 
-    low_html = client.get(f"/leads/{low_id}").data.decode()
-    assert "score-low" in low_html
-    mid_html = client.get(f"/leads/{mid_id}").data.decode()
-    assert "score-mid" in mid_html
-    high_html = client.get(f"/leads/{high_id}").data.decode()
-    assert "score-high" in high_html
+    for lead_id, css in ((low_id, "score-low"), (mid_id, "score-mid"), (high_id, "score-high")):
+        html = client.get(f"/leads/{lead_id}").data.decode()
+        assert css not in html
 
 
 def test_has_enrichment_fields():

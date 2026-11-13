@@ -26,9 +26,9 @@ PROPERTY_INFO_FIELDS: tuple[tuple[str, str, bool], ...] = (
     ("talotyyppi", "Talotyyppi", False),
     ("rakennusvuosi", "Rakennusvuosi", False),
     ("remontin_ajankohta", "Remontin ajankohta", False),
-    ("oikotie_url", "Oikotie-linkki", True),
-    ("lahde_url", "Lähde", True),
 )
+# The listing's own address (oikotie_url / lahde_url) stays in the lead data
+# for the CRM's own use but is never shown to the customer.
 
 
 def _has_value(value) -> bool:

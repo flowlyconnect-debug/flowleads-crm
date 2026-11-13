@@ -408,8 +408,8 @@ def company_timeline(organization_id: int, listings, matches, leads, *, limit: i
     for listing in listings:
         seen = listing.published_at or listing.first_seen_at
         where = ", ".join(p for p in (listing.osoite, listing.kaupunki) if p)
-        url = listing.url if (listing.url or "").startswith("http") else None
-        add(seen, "listing", f"Ilmoitus löytyi ({source_label(listing.source)})", where, url)
+        # where the listing came from is not shown to customers
+        add(seen, "listing", "Myynti-ilmoitus löytyi", where)
         for renovation in listing.renovations:
             detail = " · ".join(
                 p
@@ -422,14 +422,9 @@ def company_timeline(organization_id: int, listings, matches, leads, *, limit: i
             )
             add(listing.analyzed_at or seen, "renovation", f"Remonttimaininta: {renovation.remonttityyppi}", detail)
         if listing.has_contact and listing.contact_source:
-            add(
-                listing.analyzed_at or seen,
-                "contact",
-                "Isännöitsijän yhteystiedot löytyivät",
-                f"lähde: {source_label(listing.contact_source)}",
-            )
+            add(listing.analyzed_at or seen, "contact", "Isännöitsijän yhteystiedot löytyivät")
         if listing.removed_at:
-            add(listing.removed_at, "removed", "Ilmoitus poistui lähteestä", where)
+            add(listing.removed_at, "removed", "Ilmoitus poistui myynnistä", where)
 
     for match in matches:
         if match.released_at and match.status == "pending":
