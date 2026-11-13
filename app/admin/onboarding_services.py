@@ -177,6 +177,9 @@ def create_customer(
             cities=cities,
         )
         db.session.flush()
+        from app.sequences.defaults import ensure_default_sequences
+
+        ensure_default_sequences(organization.id, created_by=admin_user.id)
 
         log_audit(
             "customer_onboarded",

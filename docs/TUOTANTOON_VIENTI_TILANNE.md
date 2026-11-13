@@ -241,7 +241,8 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 `test_targets_map.py`, `test_crm_export.py`, `test_nl_search.py`, `test_monthly_report.py`, `test_billing.py`,
 `test_backup_logical.py`, `test_production_fixes.py`.
 
-- **Taloyhtiö yhtenä kohteena** ja **pisteet 0–100**, oletusjärjestys "Parhaat ensin", taloyhtiökortille
+- **Taloyhtiö yhtenä kohteena** ja **pisteet 0–100** (yhdistetty PR #25:n oppivaan Sopivuuteen: Sopivuus =
+  taloyhtiön pisteet × 0,9 + aiempien valintojen ±25, oletusjärjestys "Sopivimmat ensin"), taloyhtiökortille
   signaalien aikajana ja ikäarviot. Ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md` kohta 7.
 - **Yhteystiedot**: hallituksen puheenjohtaja, huoltoyhtiö, isännöintitoimistot (tuonti CSV:llä ja API:lla).
 - **Kohteet kartalla** (`/targets/map`). Osoitteiden geokoodaus on oletuksena pois (`GEOCODING_ENABLED`), jolloin
@@ -251,8 +252,8 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
   (Asetukset → Integraatiot). Avaimet salataan `WEBHOOK_ENCRYPTION_KEY`:llä. Ei testattu oikeita tilejä vasten.
 - **Haku tavallisella kielellä** Kohteet-sivulla (säännöt; tekoäly `NL_SEARCH_AI_ENABLED=true`).
 - **Kuukausiraportti** `/reports/monthly` ja sähköposti ylläpitäjille kuun 1. päivänä klo 8 (ajastin `monthly_report`).
-- **Hinnasto ja tilaus**: julkinen `/hinnasto` (hinnat `app/billing/plans.py`: Perus 149 €, Ammattilainen 290 €,
-  Yritys sopimuksen mukaan, alv 0 %, **ehdotus, vahvista ennen julkaisua**), kokeilupyyntölomake, 14 päivän
+- **Hinnasto ja tilaus**: julkinen `/hinnasto` (`app/billing/plans.py`: yksi paketti, kaikki ominaisuudet
+  149 €/kk + alv, käyttäjän päätös 13.11.), kokeilupyyntölomake, 14 päivän
   kokeilu (Luo asiakas / Kutsu asiakas), Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun, peru), päättynyt kokeilu
   estää uusien kohteiden haun ja siirron, muistutus 3 pv ennen kokeilun loppua. Laskutus edelleen käsin:
   tilaus ja irtisanominen lähettävät superadmineille sähköpostin. Vanhat organisaatiot pysyvät aktiivisina.
@@ -285,7 +286,7 @@ Käyttäjän tehtävät (vaativat tilejä ja avaimia):
 5. **Renderin health check** käyttöön: blueprint-synkka tai polku käsin palvelun asetuksiin.
 
 0. **Aja `flask system-check`** Renderin Shellissä (tai avaa `/admin/system`): se kertoo kohdat 1–5 kerralla.
-   Vahvista hinnat `app/billing/plans.py`:ssä ennen kuin `/hinnasto` linkitetään mihinkään.
+   Hinta on päätetty: kaikki 149 €/kk + alv (`app/billing/plans.py`).
 
 Claude voi tehdä:
 

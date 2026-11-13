@@ -334,3 +334,56 @@ def complete_task(task_id: int):
     next_url = request.referrer or url_for("tasks.list_tasks", **_org_query_suffix(organization_id))
     return redirect(next_url)
 
+
+
+@tasks_bp.route("/calls")
+def call_list_page():
+    """Soittolista: today's and overdue calls in order, one-click outcomes."""
+    from app.tasks.call_list import OUTCOMES, call_list, call_row
+
+    organization_id = resolve_organization_id()
+    show_all = can_assign_to_others() and request.args.get("all") == "1"
+    data = call_list(organization_id, user_id=None if show_all else current_user.id)
+    return render_template(
+        "tasks/calls.html",
+        rows=[call_row(task) for task in data["due"]],
+        upcoming=data["upcoming"],
+        outcomes=OUTCOMES,
+        show_all=show_all,
+        can_show_all=can_assign_to_others(),
+        org_query=_org_query_suffix(organization_id),
+    )
+
+
+@tasks_bp.route("/<int:task_id>/call-outcome", methods=["POST"])
+def call_outcome(task_id: int):
+    from app.tasks.call_list import OUTCOMES, record_call_outcome
+
+    organization_id = resolve_organization_id()
+    outcome = request.form.get("outcome", "")
+    try:
+        task = get_task_for_org(task_id, organization_id)
+        if current_user.role == "user" and task.assigned_to != current_user.id:
+            raise TaskServiceError("You can only record your own calls.", "forbidden")
+        record_call_outcome(
+            task_id,
+            organization_id,
+            user_id=current_user.id,
+            outcome=outcome,
+            note=request.form.get("note"),
+        )
+        db.session.commit()
+        label = OUTCOMES[outcome]
+        if outcome == "no_answer":
+            flash(f"{label}. Puhelu siirtyi huomisaamuun.", "info")
+        elif outcome == "offer":
+            flash(f"{label}. Tehtävä Tee tarjous lisättiin huomiselle.", "success")
+        else:
+            flash(f"{label}. Puhelu kirjattiin liidille.", "success")
+    except TaskServiceError as exc:
+        db.session.rollback()
+        flash(exc.message, "danger")
+    params = dict(_org_query_suffix(organization_id))
+    if request.form.get("all") == "1":
+        params["all"] = "1"
+    return redirect(url_for("tasks.call_list_page", **params))

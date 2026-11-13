@@ -314,6 +314,6 @@ def test_pages_show_score_and_signals(client, app):
     page = client.get("/targets").get_data(as_text=True)
     assert "target-score" in page and "/100" in page
     assert "2 ilmoitusta samasta taloyhtiöstä" in page
-    assert "Parhaat ensin" in page
+    assert "Sopivimmat ensin" in page and "Sopivuus" in page
     card = client.get(f"/housing-companies/{listing_id}").get_data(as_text=True)
     assert "Kohteen pisteet" in card and "Signaalit aikajanalla" in card and "Ilmoitus löytyi" in card

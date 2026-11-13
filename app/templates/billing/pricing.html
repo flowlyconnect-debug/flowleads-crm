@@ -31,10 +31,10 @@
       </ul>
     </section>
 
-    <section class="pricing-plans" aria-label="Paketit">
+    <section class="pricing-plans{% if plans|length == 1 %} pricing-plans--single{% endif %}" aria-label="Paketit">
       {% for plan in plans %}
       <article class="pricing-plan{% if plan.highlight %} pricing-plan--highlight{% endif %}" aria-labelledby="plan-{{ plan.key }}">
-        {% if plan.highlight %}<span class="pricing-plan__badge">Suosituin</span>{% endif %}
+        {% if plan.highlight and plans|length > 1 %}<span class="pricing-plan__badge">Suosituin</span>{% endif %}
         <h2 id="plan-{{ plan.key }}">{{ plan.name }}</h2>
         <p class="pricing-plan__tagline">{{ plan.tagline }}</p>
         <p class="pricing-plan__price">

@@ -148,23 +148,42 @@ def list_targets(
     query = _apply_target_filters(query, filters or {})
     newest = func.coalesce(Listing.published_at, Listing.first_seen_at)
     sort = (filters or {}).get("sort")
-    if sort == "newest":
-        query = query.order_by(newest.desc(), Listing.id.desc())
-    elif sort == "oldest":
+    if sort not in {key for key, _ in SORT_OPTIONS}:
+        sort = ""
+    if sort == "":
+        return _list_by_fit(organization_id, query, page=page, per_page=per_page)
+    if sort == "oldest":
         query = query.order_by(newest.asc(), Listing.id.asc())
     elif sort == "city":
         query = query.order_by(func.lower(func.coalesce(Listing.kaupunki, "")).asc(), newest.desc())
     elif sort == "confidence":
         query = query.order_by(ListingMatch.confidence.desc(), newest.desc())
-    else:  # best first: the target score, then the newest
-        query = query.order_by(func.coalesce(ListingMatch.score, 0).desc(), newest.desc(), Listing.id.desc())
+    else:  # "newest"
+        query = query.order_by(newest.desc(), Listing.id.desc())
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
+
+
+def _list_by_fit(organization_id: int, query, *, page: int, per_page: int):
+    """"Sopivimmat ensin": every visible target scored (app/listings/fit_services.py),
+    best first, newest first among equals."""
+    from app.listings.fit_services import ListPage, learn_preferences, score_matches
+
+    matches = query.all()
+    wanted = organization_wanted_types(organization_id)
+    prefs = learn_preferences(organization_id, wanted)
+    scores = score_matches(matches, prefs, wanted_types=wanted)
+
+    def key(match):
+        seen = match.listing.published_at or match.listing.first_seen_at
+        return (-scores[match.id][0], -(seen.timestamp() if seen else 0), -match.id)
+
+    return ListPage(sorted(matches, key=key), page, per_page)
 
 
 # Query-string keys of the Kohteet filter bar (kept across actions and pages).
 FILTER_KEYS = ("renovation", "region", "city", "year", "building", "contact", "sort")
 SORT_OPTIONS = (
-    ("", "Parhaat ensin"),
+    ("", "Sopivimmat ensin"),
     ("newest", "Uusimmat ensin"),
     ("oldest", "Vanhimmat ensin"),
     ("confidence", "Varmimmat ensin"),
@@ -284,13 +303,15 @@ def target_filter_options(organization_id: int, status: str = "pending", filters
 def target_row(
     match: ListingMatch,
     wanted_types: set[str] | None = None,
+    fit: tuple | None = None,
     company_listings: list[Listing] | None = None,
     *,
     now: datetime | None = None,
 ) -> dict:
     """What the page shows for one target: the housing company behind the
-    match, with the renovations and contacts of all its listings and one
-    score 0-100."""
+    match, with the renovations and contacts of all its listings, its score
+    breakdown (app/listings/housing.py) and the Sopivuus with its reasons
+    (`fit` = (score, reasons) from app/listings/fit_services.py)."""
     listing = match.listing
     company = list(company_listings or [])
     if all(other.id != listing.id for other in company):
@@ -337,25 +358,37 @@ def target_row(
         "renovation": renovation,
         "renovations": renovations,
         "seen_at": max(seen, key=lambda value: value.replace(tzinfo=None)) if seen else None,
-        "score": score["total"],
+        "base_score": score["total"],
+        "score": fit[0] if fit else score["total"],
         "score_parts": score["parts"],
-        "score_label": score_label(score["total"]),
-        "score_level": score_level(score["total"]),
+        "score_label": score_label(fit[0] if fit else score["total"]),
+        "score_level": score_level(fit[0] if fit else score["total"]),
+        "fit": fit[0] if fit else None,
+        "fit_reasons": fit[1] if fit else [],
     }
 
 
-def target_rows(organization_id: int, matches, wanted_types: set[str] | None = None) -> list[dict]:
-    """Rows for a page of targets. Stores the freshly computed score, so the
-    "best first" order follows what the page shows."""
+def target_rows(organization_id: int, matches, wanted_types: set[str] | None = None, *, with_fit: bool = True) -> list[dict]:
+    """Rows for a page of targets, with the Sopivuus (learned from the
+    organization's earlier decisions). Stores the base score of each housing
+    company (ListingMatch.score, used by the scheduler and reports)."""
+    from app.listings.fit_services import learn_preferences, score_matches
+
     now = _now()
+    matches = list(matches)
     groups = {company_group(match.listing) for match in matches}
     listings = org_company_listings(organization_id, groups)
+    fits = (
+        score_matches(matches, learn_preferences(organization_id, wanted_types), company_listings=listings, wanted_types=wanted_types)
+        if with_fit
+        else {}
+    )
     rows = []
     changed = False
     for match in matches:
-        row = target_row(match, wanted_types, listings.get(company_group(match.listing)), now=now)
-        if match.score != row["score"]:
-            match.score = row["score"]
+        row = target_row(match, wanted_types, fits.get(match.id), listings.get(company_group(match.listing)), now=now)
+        if match.score != row["base_score"]:
+            match.score = row["base_score"]
             changed = True
         rows.append(row)
     if changed:
@@ -462,6 +495,67 @@ def transfer_targets(
         db.session.commit()
     return result
 
+
+
+def sequences_for_transfer(organization_id: int) -> list:
+    """Active email sequences with at least one step: the ones a transfer can
+    start for the new leads. None when the organization does not have the
+    Sähköpostisekvenssit module."""
+    from app.core.features import organization_has_feature
+    from app.sequences.models import EmailSequence, EmailSequenceStep
+
+    if not organization_has_feature(organization_id, "sequences"):
+        return []
+
+    has_steps = (
+        db.session.query(EmailSequenceStep.id)
+        .filter(EmailSequenceStep.sequence_id == EmailSequence.id)
+        .exists()
+    )
+    return (
+        EmailSequence.query.filter(
+            EmailSequence.organization_id == organization_id,
+            EmailSequence.is_active.is_(True),
+            has_steps,
+        )
+        .order_by(EmailSequence.name.asc())
+        .all()
+    )
+
+
+def enroll_transferred_leads(
+    organization_id: int, lead_ids, sequence_id: int, *, enrolled_by: int | None = None
+) -> dict:
+    """Start one sequence for the leads a transfer created or joined. A lead
+    without an email address, an unsubscribed one and one already in the
+    sequence are skipped and counted. Returns the counts."""
+    from app.leads.models import Lead
+    from app.sequences.services import SequenceService, SequenceServiceError
+
+    result = {"enrolled": 0, "no_email": 0, "already": 0, "unsubscribed": 0}
+    sequence = next((s for s in sequences_for_transfer(organization_id) if s.id == sequence_id), None)
+    if sequence is None or not lead_ids:
+        return result
+    leads = Lead.query.filter(Lead.organization_id == organization_id, Lead.id.in_(list(lead_ids))).all()
+    for lead in leads:
+        if not (lead.email or "").strip():
+            result["no_email"] += 1
+            continue
+        try:
+            SequenceService.enroll_lead(
+                lead.id, sequence.id, enrolled_by=enrolled_by, organization_id=organization_id
+            )
+        except SequenceServiceError as exc:
+            if exc.code == "duplicate_enrollment":
+                result["already"] += 1
+            elif exc.code == "unsubscribed":
+                result["unsubscribed"] += 1
+            else:
+                raise
+            continue
+        result["enrolled"] += 1
+    db.session.commit()
+    return result
 
 def _set_status(organization_id: int, match_ids, *, from_status: str, to_status: str) -> int:
     """Hide or restore whole housing companies: every match of the company's

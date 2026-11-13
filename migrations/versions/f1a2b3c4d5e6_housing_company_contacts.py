@@ -1,14 +1,14 @@
 """Board chair and maintenance company on listings; property management offices.
 
 Revision ID: f1a2b3c4d5e6
-Revises: f0a1b2c3d4e5
+Revises: fa0b1c2d3e4f
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "f1a2b3c4d5e6"
-down_revision = "f0a1b2c3d4e5"
+down_revision = "fa0b1c2d3e4f"
 branch_labels = None
 depends_on = None
 

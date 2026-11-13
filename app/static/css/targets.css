@@ -47,10 +47,29 @@
 
 .targets-bulk__count { color: var(--color-text-primary); font-weight: var(--font-weight-medium); }
 
+.targets-bulk__warn { color: #B45309; font-size: 12px; }
+.targets-bulk__warn:empty { display: none; }
+
+.targets-transferred__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.targets-transferred .targets-transferred__actions a.btn-primary { color: #fff; }
+
 .targets-bulk__actions {
   display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+/* With an owner and a sequence picker the actions no longer fit on one line. */
+@media (max-width: 1100px) {
+  .targets-bulk__actions { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; }
 }
 
 .targets-list {
@@ -161,7 +180,22 @@
     grid-column: 2;
     justify-content: flex-start;
   }
-  .targets-bulk__actions { margin-left: 0; }
+  .targets-bulk__actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .targets-bulk__actions .targets-assignee { flex: 1 1 160px; max-width: none; }
+  .targets-bulk__actions .targets-calllist {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.targets-calllist input { margin: 0; width: 16px; height: 16px; }
+
+.targets-assignee__label { margin-left: 0; }
+  .targets-bulk__actions [data-transfer-button] { flex: 1 1 100%; white-space: normal; }
 }
 
 /* Filter bar */
@@ -511,3 +545,24 @@
 .targets-ask__unknown { color: #6B7280; }
 /* cards side by side: no stacked-card spacing (main.css .card + .card) */
 .insights-grid > .card + .card { margin-top: 0; }
+/* Sopivuus (app/listings/fit_services.py) */
+.target-fit {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.target-fit--high { background: #ECFDF3; color: #166534; }
+.target-fit--low { color: var(--color-text-muted, #6B7280); }
+
+.target-row__why {
+  margin: 2px 0 0;
+  color: var(--color-text-muted, #6B7280);
+  font-size: 12px;
+}
+
+.target-score__label { font-weight: 500; font-size: 11px; margin-right: 4px; opacity: .8; }

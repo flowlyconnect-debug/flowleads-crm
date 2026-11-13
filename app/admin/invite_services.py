@@ -268,6 +268,9 @@ def accept_invite(
 
             start_trial(organization, now=invite.accepted_at)
         db.session.flush()
+        from app.sequences.defaults import ensure_default_sequences
+
+        ensure_default_sequences(organization.id, created_by=admin_user.id)
 
         log_audit(
             "customer_invite_accepted",

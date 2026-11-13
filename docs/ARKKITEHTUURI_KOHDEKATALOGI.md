@@ -169,8 +169,9 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
   taloyhtiön uusi ilmoitus vapautuu heti (se on uusi signaali, ei uusi kohde). Taloyhtiö, jolla on jo liidi, ei näy
   kohteena; ajastin yhdistää sen uudet ilmoitukset liidiin (`merge_into_existing_leads`, organisaatiokohtainen).
 - **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
-  `listing_matches.score` on Kohteet-sivun oletusjärjestys "Parhaat ensin"; `refresh_scores` ajetaan
-  `listing_matching`-ajossa. Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
+  Kohteet-sivun Sopivuus (`app/listings/fit_services.py::company_fit`) = pisteet × 0,9 + asiakkaan aiempien
+  siirtojen ja piilotusten ±25; oletusjärjestys "Sopivimmat ensin". `listing_matches.score` tallentaa pohjapisteet
+  (`refresh_scores` `listing_matching`-ajossa). Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
   vaikuta pisteisiin.
 - **Taloyhtiökortti**: pisteet, signaalien aikajana (ilmoitukset, remonttimaininnat, yhteystiedot, kohteen tila,
   liidin myyntityö) sekä hallituksen puheenjohtaja, huoltoyhtiö ja isännöintitoimiston tiedot.

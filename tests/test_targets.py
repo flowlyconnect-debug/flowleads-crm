@@ -343,3 +343,134 @@ def test_superadmin_customers_list_shows_targets_per_customer(app, client):
     html = client.get("/admin/customers").get_data(as_text=True)
     assert "2 kohdetta saatavilla" in html
     assert client.get(f"/targets?organization_id={org_id}").status_code == 200
+
+
+# --- transfer + email sequence ---------------------------------------------------
+
+
+def _sequence(org, *, name="Taloyhtiöt", active=True, steps=1):
+    from app.sequences.models import EmailSequence, EmailSequenceStep
+
+    sequence = EmailSequence(organization_id=org.id, name=name, is_active=active, trigger_type="manual")
+    for index in range(steps):
+        sequence.steps.append(
+            EmailSequenceStep(order_index=index, delay_days=index * 3, subject_template=f"Viesti {index + 1}")
+        )
+    db.session.add(sequence)
+    db.session.commit()
+    return sequence
+
+
+def _enrollments(lead_ids, sequence_id):
+    from app.sequences.models import EmailSequenceEnrollment
+
+    return EmailSequenceEnrollment.query.filter(
+        EmailSequenceEnrollment.sequence_id == sequence_id,
+        EmailSequenceEnrollment.lead_id.in_(lead_ids),
+        EmailSequenceEnrollment.status == "active",
+    ).count()
+
+
+def test_only_active_sequences_with_steps_are_offered(app):
+    with app.app_context():
+        org, _ = _org("seq-offer")
+        other, _ = _org("seq-offer-other")
+        good = _sequence(org, name="Hyvä")
+        _sequence(org, name="Pois päältä", active=False)
+        _sequence(org, name="Tyhjä", steps=0)
+        _sequence(other, name="Toisen")
+        assert [s.id for s in targets.sequences_for_transfer(org.id)] == [good.id]
+
+
+def test_transferred_leads_with_email_join_the_sequence(app):
+    with app.app_context():
+        org, user = _org("seq-enroll")
+        _profile(org)
+        _listing(1, taloyhtio="As Oy Sähköposti", isannoitsija_email="isannoitsija@example.com")
+        _listing(2, taloyhtio="As Oy Ilman")
+        sequence = _sequence(org)
+        result = targets.transfer_targets(org.id, _match_ids(org))
+        assert result["created"] == 2
+
+        enrolled = targets.enroll_transferred_leads(org.id, result["lead_ids"], sequence.id, enrolled_by=user.id)
+        assert enrolled == {"enrolled": 1, "no_email": 1, "already": 0, "unsubscribed": 0}
+        assert _enrollments(result["lead_ids"], sequence.id) == 1
+
+        again = targets.enroll_transferred_leads(org.id, result["lead_ids"], sequence.id)
+        assert again["enrolled"] == 0 and again["already"] == 1
+        assert _enrollments(result["lead_ids"], sequence.id) == 1
+
+
+def test_another_organizations_sequence_is_never_started(app):
+    with app.app_context():
+        org, _ = _org("seq-iso")
+        other, _ = _org("seq-iso-other")
+        _profile(org)
+        _listing(1, isannoitsija_email="a@example.com")
+        foreign = _sequence(other)
+        result = targets.transfer_targets(org.id, _match_ids(org))
+        assert targets.enroll_transferred_leads(org.id, result["lead_ids"], foreign.id)["enrolled"] == 0
+        assert _enrollments(result["lead_ids"], foreign.id) == 0
+
+
+def test_targets_page_transfers_and_starts_sequence_in_one_action(app, client):
+    with app.app_context():
+        org, user = _org("seq-page")
+        _profile(org)
+        _listing(1, taloyhtio="As Oy Sekvenssi", isannoitsija_email="manager@example.com")
+        _listing(2, taloyhtio="As Oy Ilman Osoitetta")
+        sequence = _sequence(org, name="Putkiremontti syksy")
+        org_id, email, sequence_id = org.id, user.email, sequence.id
+        ids = _match_ids(org)
+
+    _login(client, email)
+    html = client.get("/targets").get_data(as_text=True)
+    assert 'name="sequence_id"' in html and "Putkiremontti syksy" in html
+
+    response = client.post("/targets/transfer", data={"match_ids": ids, "sequence_id": sequence_id}, follow_redirects=True)
+    page = response.get_data(as_text=True)
+    assert "2 kohdetta siirretty liideiksi" in page
+    assert "1 liidi lisätty sekvenssiin Putkiremontti syksy" in page
+    assert "1 liidiltä puuttuu sähköpostiosoite" in page
+    with app.app_context():
+        lead_ids = [lead.id for lead in Lead.query.filter_by(organization_id=org_id).all()]
+        assert len(lead_ids) == 2
+        assert _enrollments(lead_ids, sequence_id) == 1
+
+
+def test_unknown_sequence_stops_the_transfer(app, client):
+    with app.app_context():
+        org, user = _org("seq-bad")
+        other, _ = _org("seq-bad-other")
+        _profile(org)
+        _listing(1, isannoitsija_email="a@example.com")
+        foreign = _sequence(other)
+        org_id, email, foreign_id = org.id, user.email, foreign.id
+        ids = _match_ids(org)
+
+    _login(client, email)
+    response = client.post("/targets/transfer", data={"match_ids": ids, "sequence_id": foreign_id}, follow_redirects=True)
+    assert "Valittua sekvenssiä ei löytynyt" in response.get_data(as_text=True)
+    with app.app_context():
+        assert Lead.query.filter_by(organization_id=org_id).count() == 0
+        assert targets.count_targets(org_id) == 1
+
+
+def test_transfer_banner_opens_the_lead_and_rows_carry_contact_flags(app, client):
+    with app.app_context():
+        org, user = _org("banner")
+        _profile(org)
+        _listing(1, taloyhtio="As Oy Banneri", isannoitsija_email="a@example.com")
+        _listing(2, taloyhtio="As Oy Ilman")
+        org_id, email = org.id, user.email
+        ids = _match_ids(org)
+
+    _login(client, email)
+    html = client.get("/targets").get_data(as_text=True)
+    assert 'data-has-email="1"' in html and 'data-has-email="0"' in html and 'data-has-phone="0"' in html
+    assert 'id="targets-selected-warn"' in html
+
+    page = client.post("/targets/transfer", data={"match_ids": ids[:1]}, follow_redirects=True).get_data(as_text=True)
+    with app.app_context():
+        lead = Lead.query.filter_by(organization_id=org_id).one()
+    assert "Avaa liidi" in page and f'href="/leads/{lead.id}"' in page

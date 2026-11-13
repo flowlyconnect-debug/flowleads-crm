@@ -25,7 +25,8 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   taloyhtiö, the manager goes to `Lead.title`; leads are never merged by email (`match_by_email=False`); another apartment of the same taloyhtiö joins the existing
   lead (`ListingMatch.status == "merged"`).
 - Onboarding (`app/admin/onboarding_services.py`, `invite_services.py`) creates an **active** profile and
-  nothing else per customer: no API key, no SearchJob. It asks only the renovation types (urakat); regions
+  the ready-made email sequence (`app/sequences/defaults.py::ensure_default_sequences`) per customer: no API key,
+  no SearchJob. It asks only the renovation types (urakat); regions
   default to "Koko Suomi" and the customer narrows the list with the Kohteet filters. Turning a profile on must go through
   `activate_profile()` so it is rematched. Billing is manual for now.
 - **Oikotie blocks n8n Cloud since 11/2026** (DataDome 403 + captcha, the old Lead Worker too). The Crawler stops
@@ -37,9 +38,16 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   (`fetch_targets()`), which releases a batch of varying size once per hour per organization. The page shows
   a 10-15 s progress animation; the batch gets a `released_at` that far in the future. `count_targets()` and
   everything built on it count released targets only; `count_reserve()` is the rest.
-- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort) and a daily
+- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the default sort
+  "Sopivimmat ensin" and the score chip come from `app/listings/fit_services.py`, which learns from the
+  organization's transferred and hidden targets, tests `tests/test_target_fit.py`) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
-  `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner.
+  `OrganizationSettings.targets_digest_enabled`). Transfers can set the lead owner and start an email sequence
+  for the new leads in the same action (`sequences_for_transfer()`, `enroll_transferred_leads()`; leads without
+  an email are skipped and reported).
+  The same transfer can put the new leads on the **Soittolista** (`/tasks/calls`, `app/tasks/call_list.py`):
+  open tasks of type `call`, the lead's automatic "Ota yhteyttä" task becomes the call; one-click outcomes
+  (`record_call_outcome`) log a `call` activity and move the task on. Tests: `tests/test_call_list.py`.
 - Read models over what an organization already sees (`app/listings/insight_services.py`,
   `insight_routes.py`, never the reserve): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
   (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).
@@ -47,11 +55,12 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `listing_matching` job. Tests: `tests/test_insights.py`.
 - **One housing company = one target** (`app/listings/housing.py`): `Listing.company_key` (normalised name + city;
   Y-tunnus only for nameless rows) groups listings on Kohteet, on the taloyhtiökortti (signal timeline) and in
-  transfers/hiding/fetching. Each target has a score 0-100 (`ListingMatch.score`, default sort "Parhaat ensin").
+  transfers/hiding/fetching. Each target has a score 0-100 (`housing.score_target`, stored in `ListingMatch.score`); the Kohteet "Sopivuus"
+  (`fit_services.company_fit`) is that score × 0.9 plus the learned ±25, default sort "Sopivimmat ensin".
   Board chair / maintenance company / property-manager offices: `app/listings/contacts.py`. Map: `/targets/map`
   (`app/listings/geo.py`, vendored Leaflet). Plain-language search: `app/listings/nl_search.py`.
 - Other customer modules: CRM export to HubSpot/Pipedrive (`app/integrations/`), monthly report
-  (`app/analytics/monthly.py`), plans/trial/monthly contract and public `/hinnasto` (`app/billing/`, prices in
+  (`app/analytics/monthly.py`), plans/trial/monthly contract and public `/hinnasto` (`app/billing/`, one plan 149 €/kk in
   `plans.py`; an ended trial blocks fetching and transferring targets only). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).

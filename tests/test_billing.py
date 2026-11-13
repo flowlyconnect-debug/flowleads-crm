@@ -62,13 +62,13 @@ def test_subscribe_cancel_resume(app, mails):
         superadmin = create_user("super-billing@test.com", PASSWORD, role="superadmin")
         db.session.commit()
         org, admin, _ = _org("contract", status="trial")
-        billing.subscribe(org, "perus", actor=admin, now=NOW + timedelta(days=20))
-        assert (org.subscription_status, org.plan) == ("active", "perus")
-        assert mails[-1].recipients == [superadmin.email] and "Perus 149" in mails[-1].subject
+        billing.subscribe(org, "flowleads", actor=admin, now=NOW + timedelta(days=20))
+        assert (org.subscription_status, org.plan) == ("active", "flowleads")
+        assert mails[-1].recipients == [superadmin.email] and "FlowLeads 149" in mails[-1].subject
         with pytest.raises(billing.BillingError):
-            billing.subscribe(org, "perus", actor=admin)
+            billing.subscribe(org, "flowleads", actor=admin)
         with pytest.raises(billing.BillingError):
-            billing.subscribe(org, "yritys", actor=admin)  # no monthly price
+            billing.subscribe(org, "yritys", actor=admin)  # no such plan
 
         ends = billing.cancel(org, actor=admin, now=datetime(2026, 12, 10, 12, tzinfo=timezone.utc))
         assert ends == datetime(2026, 12, 31, 22, tzinfo=timezone.utc)  # 1.1. 00:00 Helsinki
@@ -148,22 +148,22 @@ def test_subscription_pages(client, app, mails):
     _login(client, seller_email)
     page = client.get("/billing").get_data(as_text=True)
     assert "Kokeilujakso" in page and "Tilausta hallinnoi organisaatiosi ylläpitäjä" in page
-    assert client.post("/billing/subscribe", data={"plan": "perus", "accept_terms": "1"}).status_code in (302, 403)
+    assert client.post("/billing/subscribe", data={"plan": "flowleads", "accept_terms": "1"}).status_code in (302, 403)
     assert "päivää jäljellä" in client.get("/dashboard").get_data(as_text=True)
     client.get("/auth/logout")
 
     _login(client, admin_email)
-    no_terms = client.post("/billing/subscribe", data={"plan": "perus"}, follow_redirects=True).get_data(as_text=True)
+    no_terms = client.post("/billing/subscribe", data={"plan": "flowleads"}, follow_redirects=True).get_data(as_text=True)
     assert "Hyväksy sopimusehdot" in no_terms
-    ordered = client.post("/billing/subscribe", data={"plan": "ammattilainen", "accept_terms": "1"}, follow_redirects=True)
-    assert "Kuukausisopimus (Ammattilainen) on voimassa" in ordered.get_data(as_text=True)
+    ordered = client.post("/billing/subscribe", data={"plan": "flowleads", "accept_terms": "1"}, follow_redirects=True)
+    assert "Kuukausisopimus (FlowLeads) on voimassa" in ordered.get_data(as_text=True)
     cancelled = client.post("/billing/cancel", follow_redirects=True).get_data(as_text=True)
     assert "Sopimus irtisanottu" in cancelled and "eikä seuraavaa kuukautta laskuteta" in cancelled
     resumed = client.post("/billing/resume", follow_redirects=True).get_data(as_text=True)
     assert "Irtisanominen peruttu" in resumed
     with app.app_context():
         org = db.session.get(Organization, org_id)
-        assert (org.subscription_status, org.plan) == ("active", "ammattilainen")
+        assert (org.subscription_status, org.plan) == ("active", "flowleads")
 
 
 def test_public_price_list_and_trial_request(client, app, mails):
@@ -175,7 +175,7 @@ def test_public_price_list_and_trial_request(client, app, mails):
     assert page.status_code == 200
     for plan in PLANS:
         assert plan["name"] in html
-    assert "149 €" in html and "290 €" in html and "Sopimuksen mukaan" in html
+    assert "149 €" in html and "290 €" not in html and "Rajaton määrä käyttäjiä" in html
     assert "irtisanottavissa milloin tahansa" in html and f"{TRIAL_DAYS} päivän maksuton kokeilu" in html
     assert "cdn" not in html.lower()
 
@@ -183,7 +183,7 @@ def test_public_price_list_and_trial_request(client, app, mails):
     assert "Anna kelvollinen sähköpostiosoite" in bad.get_data(as_text=True)
     ok = client.post(
         "/hinnasto/kokeilu",
-        data={"name": "Matti", "company": "Urakka Oy", "email": "matti@urakka.fi", "plan": "perus", "message": "putket"},
+        data={"name": "Matti", "company": "Urakka Oy", "email": "matti@urakka.fi", "plan": "flowleads", "message": "putket"},
         follow_redirects=True,
     )
     assert "Kiitos! Otamme yhteyttä" in ok.get_data(as_text=True)
@@ -221,7 +221,7 @@ def test_admin_controls(client, app, mails):
     with app.app_context():
         ends = db.session.get(Organization, org_id).trial_ends_at.replace(tzinfo=timezone.utc)
         assert ends > NOW + timedelta(days=TRIAL_DAYS)
-    client.post(f"/admin/customers/{org_id}/subscription", data={"action": "activate", "plan": "perus"})
+    client.post(f"/admin/customers/{org_id}/subscription", data={"action": "activate", "plan": "flowleads"})
     with app.app_context():
         assert db.session.get(Organization, org_id).subscription_status == "active"
     client.post(f"/admin/customers/{org_id}/subscription", data={"action": "end"})

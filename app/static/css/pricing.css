@@ -45,3 +45,4 @@ body.pricing { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe U
   .pricing-form { grid-template-columns: 1fr; }
   .pricing-terms, .pricing-contact { padding: 18px 16px; }
 }
+.pricing-plans--single { grid-template-columns: minmax(0, 440px); justify-content: center; }
