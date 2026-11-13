@@ -119,3 +119,82 @@ def test_superadmin_overview_is_one_reports_page(client, app):
     org_page = client.get(f"/settings/team?organization_id={org_id}").get_data(as_text=True)
     assert "Liidit ja koosteet" in org_page
     assert "Järjestelmäraportit" in org_page
+
+
+# --- what a customer admin must not reach -------------------------------------------
+
+
+def test_proposal_header_html_cannot_run_scripts(client, app):
+    from app.core.html_sanitize import sanitize_html
+
+    dirty = (
+        '<p onclick="x()">Hei <strong>Oy</strong></p><script>alert(1)</script>'
+        '<img src="javascript:alert(1)" onerror="x()"><a href="javascript:x()">a</a>'
+        '<a href="https://yritys.fi">b</a><style>body{}</style>'
+    )
+    clean = sanitize_html(dirty)
+    assert "<script" not in clean and "alert" not in clean
+    assert "onclick" not in clean and "onerror" not in clean and "javascript:" not in clean
+    assert "<strong>Oy</strong>" in clean
+    assert 'href="https://yritys.fi"' in clean
+
+
+def test_proposal_preview_has_no_script_policy(client, app):
+    org_id = _setup(app, "prop")
+    from app.leads.models import Lead
+    from app.proposals.models import Proposal
+    from app.proposals.services import ProposalService
+    from app.users.models import User
+
+    with app.app_context():
+        admin = User.query.filter_by(email="admin-prop@test.fi").one()
+        ProposalService.save_template(org_id, {"header_html": "<script>alert(1)</script><b>Otsikko</b>"}, admin.id)
+        from app.leads.services import get_default_stage
+
+        stage = get_default_stage(org_id)
+        lead = Lead(organization_id=org_id, company="As Oy Testi", email="t@t.fi", stage_id=stage.id)
+        db.session.add(lead)
+        db.session.flush()
+        proposal = Proposal(
+            organization_id=org_id, lead_id=lead.id, title="T", reference_number="FLW-1", created_by=admin.id
+        )
+        db.session.add(proposal)
+        db.session.commit()
+        proposal_id = proposal.id
+    _login(client, "admin-prop@test.fi")
+    response = client.get(f"/proposals/{proposal_id}/preview")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in body
+    assert "<b>Otsikko</b>" in body
+    assert "default-src 'none'" in response.headers["Content-Security-Policy"]
+
+
+def test_customer_does_not_see_catalogue_size_or_preview_addresses(client, app):
+    _setup(app, "cat")
+    _login(client, "admin-cat@test.fi")
+    page = client.get("/settings/search-profiles?id=new").get_data(as_text=True)
+    assert "Kohdekatalogissa" not in page
+    response = client.post(
+        "/settings/search-profiles/preview",
+        data={"name": "x", "remonttityypit": "Putkiremontti", "region_mode": "all_finland"},
+    )
+    data = response.get_json()
+    assert "count" in data
+    assert "sample" not in data
+
+
+def test_customer_cannot_preview_platform_notification_templates(client, app):
+    _setup(app, "intern")
+    _login(client, "admin-intern@test.fi")
+    client.get("/settings/email")  # seeds the templates
+    from app.email.models import EmailTemplate
+    from app.email.seed import INTERNAL_TEMPLATE_NAMES
+
+    with app.app_context():
+        internal = EmailTemplate.query.filter(
+            EmailTemplate.organization_id.is_(None), EmailTemplate.name.in_(list(INTERNAL_TEMPLATE_NAMES))
+        ).first()
+        assert internal is not None
+        internal_id = internal.id
+    assert client.get(f"/settings/email-templates/{internal_id}/preview").status_code == 404

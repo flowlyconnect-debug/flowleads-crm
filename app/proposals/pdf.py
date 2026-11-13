@@ -70,8 +70,11 @@ class ProposalPDFService:
         from app.proposals.services import ProposalService as PS
 
         PS.calculate_totals(proposal)
-        header = template_header or ""
-        footer = template_footer or ""
+        from app.core.html_sanitize import sanitize_html
+
+        # typed by the customer in Tarjousasetukset and shown on the app's origin
+        header = sanitize_html(template_header)
+        footer = sanitize_html(template_footer)
         currency = proposal.currency or "EUR"
         rows = []
         for li in sorted(proposal.line_items, key=lambda x: x.order_index):

@@ -276,6 +276,11 @@ def email_templates_preview(template_id):
         template = TemplateService.get_template(template_id, org_id)
     except EmailServiceError:
         abort(404)
+    if not current_user.is_superadmin() and template.organization_id is None:
+        from app.email.seed import INTERNAL_TEMPLATE_NAMES
+
+        if template.name in INTERNAL_TEMPLATE_NAMES:
+            abort(404)  # the platform's own notification mails are not listed for customers either
 
     sample_lead = Lead(
         first_name="Matti",

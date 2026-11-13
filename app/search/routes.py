@@ -97,7 +97,8 @@ def _render_search_profiles(
         selected_profile=selected_profile,
         latest_job=latest_job,
         match_stats=match_stats,
-        catalogue=catalogue_stats(),
+        # the shared catalogue's size is platform information
+        catalogue=catalogue_stats() if current_user.is_superadmin() else None,
         remonttityypit=REMONTTITYYPIT,
         finnish_regions=FINNISH_REGIONS,
         all_finland_region=ALL_FINLAND_REGION,
@@ -286,6 +287,10 @@ def register_search_profile_settings_routes(settings_bp):
             return jsonify({"success": False, "error": exc.message}), 400
         result = preview_profile(profile)
         db.session.rollback()  # the transient profile must never be flushed
+        if not current_user.is_superadmin():
+            # a customer sees only the count: addresses of targets not yet
+            # released with "Hae kohteita" stay hidden (the page never showed them)
+            result.pop("sample", None)
         return jsonify({"success": True, **result})
 
     @settings_bp.route("/search-profiles/<int:profile_id>", methods=["POST"])

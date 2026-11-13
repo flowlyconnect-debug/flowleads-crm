@@ -258,7 +258,13 @@ def preview_proposal(proposal_id: int):
         template_footer=template.footer_html if template else None,
         logo_url=template.logo_url if template else None,
     )
-    return Response(html, mimetype="text/html")
+    response = Response(html, mimetype="text/html")
+    # the page only shows the document: no scripts at all (defence in depth
+    # for the customer-typed header and footer)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; frame-ancestors 'self'"
+    )
+    return response
 
 
 @proposals_bp.route("/<int:proposal_id>/pdf", methods=["GET"])
