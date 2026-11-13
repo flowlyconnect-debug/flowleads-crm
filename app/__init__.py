@@ -35,6 +35,7 @@ def create_app(config_object=None):
     _register_blueprints(app)
     register_error_handlers(app)
     _register_security_headers(app)
+    _register_static_caching(app)
     _register_cli(app)
     _register_root_routes(app)
     _init_ai_enrichment(app)
@@ -274,7 +275,7 @@ SOURCE_LABELS_FI = {
     "n8n": "Automaatio",
     "import": "Tuonti",
     "webform": "Lomake",
-    "oikotie": "Oikotie",
+    "oikotie": "Kohteet",
 }
 
 
@@ -317,6 +318,40 @@ def stage_label_fi(name) -> str:
     if not name:
         return "—"
     return STAGE_LABELS_FI.get(str(name).strip().lower(), str(name))
+
+
+UI_CODE_LABELS_FI = {
+    # task types and priorities
+    "call": "Soitto",
+    "email": "Sähköposti",
+    "follow_up": "Seuranta",
+    "meeting": "Tapaaminen",
+    "other": "Muu",
+    "low": "Matala",
+    "normal": "Normaali",
+    "high": "Korkea",
+    "urgent": "Kiireellinen",
+    # statuses
+    "pending": "Odottaa",
+    "in_progress": "Kesken",
+    "completed": "Valmis",
+    "cancelled": "Peruttu",
+    "draft": "Luonnos",
+    "sent": "Lähetetty",
+    "viewed": "Avattu",
+    "accepted": "Hyväksytty",
+    "declined": "Hylätty",
+    "expired": "Vanhentunut",
+    "failed": "Epäonnistui",
+    "delivered": "Toimitettu",
+    "queued": "Jonossa",
+    "processed": "Käsitelty",
+    "spam": "Roskaposti",
+    "duplicate": "Kaksoiskappale",
+    "won": "Voitettu",
+    "lost": "Hävitty",
+    "active": "Avoin",
+}
 
 
 def source_label_fi(code) -> str:
@@ -440,6 +475,35 @@ def _nav_targets_count() -> int:
         return 0
 
 
+def _register_static_caching(app):
+    """Static files are cached by the browser for a year and every
+    url_for('static', ...) carries the file's modification time (?v=...), so a
+    deploy that changes a file changes its URL. Before this every CSS/JS file
+    was revalidated on every page (Cache-Control: no-cache), a round trip per
+    file per click."""
+    import os
+
+    if app.config.get("SEND_FILE_MAX_AGE_DEFAULT") is None:
+        app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 365
+    versions: dict[str, int] = {}
+
+    @app.url_defaults
+    def _static_version(endpoint, values):
+        if endpoint != "static" or "v" in values:
+            return
+        filename = values.get("filename")
+        if not filename:
+            return
+        version = versions.get(filename)
+        if version is None:
+            try:
+                version = int(os.stat(os.path.join(app.static_folder, filename)).st_mtime)
+            except OSError:
+                return
+            versions[filename] = version
+        values["v"] = version
+
+
 def _register_root_routes(app):
     @app.context_processor
     def inject_ui_helpers():
@@ -466,6 +530,18 @@ def _register_root_routes(app):
         """A stored UTC timestamp as Finnish local time, for display. Dates
         and empty values pass through untouched."""
         return to_helsinki(value)
+
+    @app.template_filter("fi_label")
+    def fi_label(value):
+        """Finnish text for a stored code shown as is (task type and priority,
+        proposal, email and form statuses). Unknown codes pass through."""
+        return UI_CODE_LABELS_FI.get(str(value or "").strip().lower(), value)
+
+    @app.template_filter("fi_signal")
+    def fi_signal(text):
+        from app.analytics.prediction import signal_fi
+
+        return signal_fi(text)
 
     @app.template_filter("fi_msg")
     def fi_msg(message):

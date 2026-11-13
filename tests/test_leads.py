@@ -263,8 +263,9 @@ def test_lead_detail_shows_property_info_from_ai_contact_info(app, client):
     assert "Esimerkki Isännöinti Oy" in html
     assert "+358401112233" in html
     assert "putkiremontti" in html
-    assert "Avaa Oikotiessä" in html
-    assert 'rel="noopener noreferrer"' in html
+    # the listing's own address is never shown to the customer
+    assert "Avaa Oikotiessä" not in html and "Avaa lähde" not in html
+    assert "asunnot.oikotie.fi" not in html
     assert "Isännöitsijän sähköposti" not in html
 
 

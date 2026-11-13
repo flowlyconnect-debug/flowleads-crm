@@ -22,6 +22,7 @@ _MESSAGES: dict[str, str] = {
     "2FA is not initialized.": "Kaksivaiheista tunnistautumista ei ole otettu käyttöön.",
     "Unable to initialize 2FA.": "Kaksivaiheisen tunnistautumisen käyttöönotto epäonnistui.",
     "Invalid email or password.": "Virheellinen sähköposti tai salasana.",
+    "If an account exists for that email, you will receive reset instructions.": "Jos osoitteella on käyttäjätili, saat ohjeet salasanan vaihtoon sähköpostiisi.",
     "This account is inactive.": "Tili ei ole käytössä.",
     "Invalid password.": "Virheellinen salasana.",
     "Access denied.": "Ei käyttöoikeutta.",

@@ -20,7 +20,7 @@
       <select name="status" class="form-select" onchange="this.form.submit()">
         <option value="">Kaikki</option>
         {% for s in statuses %}
-        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ {'draft': 'Luonnos', 'sent': 'Lähetetty', 'viewed': 'Avattu', 'accepted': 'Hyväksytty', 'declined': 'Hylätty', 'expired': 'Vanhentunut'}.get(s, s) }}</option>
         {% endfor %}
       </select>
     </label>

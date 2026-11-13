@@ -70,7 +70,7 @@
               {% for t in templates %}
               <button type="button" class="compose-template-card" role="listitem" data-template-id="{{ t.id }}">
                 <span class="compose-template-card__name">{{ t.name }}</span>
-                <span class="compose-template-card__hint">{{ t.subject_template[:48] }}{% if t.subject_template|length > 48 %}…{% endif %}</span>
+                <span class="compose-template-card__hint" data-raw-subject="{{ t.subject_template }}">{{ t.subject_template[:48] }}{% if t.subject_template|length > 48 %}…{% endif %}</span>
               </button>
               {% endfor %}
             </div>
@@ -101,23 +101,26 @@
     },
     {% endfor %}
   };
-  var leadContext = {
-    first_name: {{ (lead.first_name or 'there')|tojson }},
+  var leadContext = Object.assign({
+    first_name: {{ (lead.first_name or '')|tojson }},
     last_name: {{ (lead.last_name or '')|tojson }},
     company: {{ (lead.company or '')|tojson }},
     sender_name: {{ sender_name|tojson }},
     ai_summary: {{ (lead.ai_summary or '')|tojson }}
-  };
+  }, {{ catalogue_vars|tojson }});
   function renderVars(text) {
-    return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function(_, key) {
+    var out = (text || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function(_, key) {
       var val = leadContext[key];
-      if (val === undefined || val === null || val === '') {
-        if (key === 'first_name') return 'there';
-        return '';
-      }
-      return val;
+      return (val === undefined || val === null) ? '' : val;
     });
+    // a lead without a first name: "Hei ," -> "Hei,"
+    return out.replace(/\b(Hei|Moi|Terve|Hyvä) +,/g, '$1,');
   }
+  // template cards show the subject as it will read for this lead
+  document.querySelectorAll('[data-raw-subject]').forEach(function (hint) {
+    var text = renderVars(hint.getAttribute('data-raw-subject'));
+    hint.textContent = text.length > 48 ? text.slice(0, 48) + '…' : text;
+  });
   var quill = new Quill('#editor', { theme: 'snow' });
   {% if preview_html %}
   quill.root.innerHTML = {{ preview_html|tojson }};

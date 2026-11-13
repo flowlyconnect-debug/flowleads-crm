@@ -44,7 +44,17 @@ def build_template_context(lead, sender_name: str) -> dict[str, str]:
         "company": (lead.company or "").strip(),
         "sender_name": sender_name or "",
         "ai_summary": (lead.ai_summary or "").strip(),
+        **_catalogue_variables(lead),
     }
+
+
+def _catalogue_variables(lead) -> dict[str, str]:
+    from app.sequences.services import _catalogue_context
+
+    try:
+        return _catalogue_context(lead)
+    except Exception:
+        return {}
 
 
 def build_task_reminder_context(task) -> dict[str, str]:

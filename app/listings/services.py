@@ -815,7 +815,6 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
             renovation and renovation.evidence and f"Osuma ({rtype}): {renovation.evidence}",
-            listing.url and f"{'Oikotie' if source == SOURCE else 'Lähde'}: {listing.url}",
         )
         if part
     )
@@ -832,7 +831,7 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
         "email": _valid_email_or_none(listing.isannoitsija_email),
         "website": website,
         "notes": notes,
-        "tags": [t[:50] for t in (rtype, source, listing.maakunta) if t],
+        "tags": [t[:50] for t in (rtype, listing.maakunta) if t],
         "gdpr_legal_basis": "legitimate_interest",
         "metadata": _lead_metadata(listing, profile, renovation),
     }
