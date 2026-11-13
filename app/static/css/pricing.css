@@ -1,7 +1,7 @@
 /* Public price list (templates/billing/pricing.html). Standalone: no app chrome. */
 :root { --ink: #111827; --muted: #4B5563; --line: #E5E7EB; --brand: #6846DC; --brand-dark: #4C2FB8; --soft: #F5F3FF; }
 * { box-sizing: border-box; }
-body.pricing { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #FAFAFB; line-height: 1.55; }
+body.pricing { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #FAFAFB; line-height: 1.55; }
 .pricing a { color: var(--brand-dark); }
 .pricing-top { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto; padding: 18px 20px; }
 .pricing-top__logo img { display: block; height: 40px; width: auto; }
@@ -46,3 +46,6 @@ body.pricing { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe U
   .pricing-terms, .pricing-contact { padding: 18px 16px; }
 }
 .pricing-plans--single { grid-template-columns: minmax(0, 440px); justify-content: center; }
+
+/* v4: readable measure for the hero lead (impeccable: line-length) */
+.pricing-hero > p { max-width: 58ch; }

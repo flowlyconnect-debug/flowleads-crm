@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/pts.html" import pts_cells %}
 {% block title %}Kohteet — FlowLeads{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
@@ -293,110 +294,104 @@
         </span>
       </div>
 
+      {% set by_year = filters.get('sort') == 'year' %}
       <ul class="targets-list">
+        <li class="targets-head" aria-hidden="true">
+          <span></span><span>Taloyhtiö</span>
+          <span class="pts-years">{% for cell in rows[0].pts.years %}<span>{{ cell.year }}</span>{% endfor %}</span>
+          <span>Isännöitsijä</span><span class="targets-head__fit">Sopivuus</span><span></span>
+        </li>
+        {% set ns = namespace(last_year='-') %}
         {% for row in rows %}
         {% set listing = row.listing %}
         {% set contact = row.contact %}
         {% set renovation = row.renovation %}
+        {% if by_year and row.pts.start_year != ns.last_year %}
+        {% set ns.last_year = row.pts.start_year %}
+        <li class="targets-group"><span class="targets-group__year mono">{{ row.pts.start_year or 'Aikataulu auki' }}</span></li>
+        {% endif %}
         <li class="target-row">
           <input type="checkbox" class="target-row__check" name="match_ids" value="{{ row.match.id }}"
                  data-has-email="{{ '1' if (listing.isannoitsija_email or '').strip() else '0' }}"
                  data-has-phone="{{ '1' if (listing.isannoitsija_puh or '').strip() else '0' }}"
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
-            <div class="target-row__title">
-              <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a></span>
-              {% if row.match.id in new_ids %}<span class="badge badge-new">Uusi</span>{% endif %}
-              {% if row.location %}<span class="target-row__location">{{ row.location }}</span>{% endif %}
-              <details class="target-score target-score--{{ row.score_level }}">
-                <summary title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot, saman taloyhtiön muut ilmoitukset sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut. Avaa erittely.">
-                  <span class="target-score__label">Sopivuus</span>
-                  <span class="target-score__value">{{ row.score }}</span>
-                  <span class="sr-only">/100, {{ row.score_label }}</span>
-                </summary>
-                <div class="target-score__parts" role="list">
-                  <strong>Sopivuus {{ row.score }} / 100 · {{ row.score_label }}</strong>
-                  {% for part in row.score_parts %}
-                  <span class="target-score__part" role="listitem">
-                    <span>{{ part.label }}</span>
-                    <span class="target-score__bar" aria-hidden="true"><span style="width: {{ (100 * part.points / part.max)|round|int }}%"></span></span>
-                    <span>{{ part.points }}/{{ part.max }}</span>
-                    <span class="target-score__detail">{{ part.detail }}</span>
-                  </span>
-                  {% endfor %}
-                  {% if row.fit is not none %}
-                  {% set learned = row.score - (0.9 * row.base_score)|round|int %}
-                  <span class="target-score__detail">Kohteen pisteet {{ row.base_score }}/100 × 0,9{% if learned %} {{ '+' if learned > 0 else '−' }} {{ learned|abs }} aiempien valintojesi perusteella{% endif %}.</span>
-                  {% endif %}
-                </div>
-              </details>
-            </div>
-            {% if row.fit_reasons %}
-            <p class="target-row__why">{{ row.fit_reasons[:3]|join(' · ') }}</p>
-            {% endif %}
-            <div class="target-row__facts">
-              {% for item in row.renovations %}
-              <span class="target-row__reno">
-                <span class="badge badge-accent">{{ item.remonttityyppi }}</span>
-                {% if item.timing %}<span class="target-row__fact target-row__fact--strong">{{ item.timing }}</span>{% endif %}
-              </span>
-              {% endfor %}
-              {% if renovation %}
-              <span class="target-row__fact" title="Kuinka varmasti remontti on tulossa lähdetietojen perusteella">Varmuus {{ renovation.confidence }} %</span>
-              {% endif %}
-              {% if listing.building_type or listing.build_year %}
-              <span class="target-row__fact">{{ [listing.building_type, listing.build_year]|select|join(', ') }}</span>
-              {% endif %}
-              {% if row.seen_at %}<span class="target-row__fact">{{ 'Uusin signaali' if row.signal_count > 1 else 'Löydetty' }} {{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
-              {% if row.signal_count > 1 %}
-              <a class="target-row__fact target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} ilmoitusta samasta taloyhtiöstä</a>
-              {% endif %}
-            </div>
-            <div class="target-row__contact">
-              {% if contact.isannoitsija %}Isännöinti: <a href="{{ url_for('insights.manager_detail', name=contact.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ contact.isannoitsija }}</a>{% endif %}
-              {% if contact.isannoitsija_henkilo %}<span>· {{ contact.isannoitsija_henkilo }}</span>{% endif %}
-              {% if contact.has_contact %}
-              {% if contact.isannoitsija_puh %}<a class="target-row__contact-ok" href="tel:{{ contact.isannoitsija_puh|replace(' ', '') }}">{{ contact.isannoitsija_puh }}</a>{% endif %}
-              {% if contact.isannoitsija_email %}<a class="target-row__contact-ok" href="mailto:{{ contact.isannoitsija_email }}">{{ contact.isannoitsija_email }}</a>{% endif %}
-              {% elif contact.contact_status in ('pending', 'processing') %}
-              <span>{{ '· yhteystietoja haetaan' if contact.isannoitsija else 'Yhteystietoja haetaan' }}</span>
-              {% elif not contact.isannoitsija %}
-              <span>Isännöitsijän yhteystietoja ei löytynyt</span>
-              {% endif %}
-            </div>
-            {% set people = row.people %}
-            {% if people.chair or people.maintenance %}
-            <div class="target-row__contact target-row__contact--people">
-              {% if people.chair %}
-              <span>Hallituksen pj: {{ people.chair.name or '–' }}</span>
-              {% if people.chair.phone %}<a class="target-row__contact-ok" href="tel:{{ people.chair.phone|replace(' ', '') }}">{{ people.chair.phone }}</a>{% endif %}
-              {% if people.chair.email %}<a class="target-row__contact-ok" href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}
-              {% endif %}
-              {% if people.maintenance %}
-              <span>{{ '· ' if people.chair else '' }}Huolto: {{ people.maintenance.name or '–' }}</span>
-              {% if people.maintenance.phone %}<a class="target-row__contact-ok" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}
-              {% endif %}
-            </div>
-            {% endif %}
-            {% if (renovation and renovation.evidence) or listing.tulevat_remontit %}
-            <details class="target-row__more">
-              <summary>Lisätiedot</summary>
-              {% if listing.tulevat_remontit %}<p><strong>Tulevat remontit:</strong> {{ listing.tulevat_remontit }}</p>{% endif %}
-              {% if renovation and renovation.evidence %}<p><strong>Peruste:</strong> {{ renovation.evidence }}</p>{% endif %}
+            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}</span>
+            <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}{% if row.signal_count > 1 %} · <a class="target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} ilmoitusta samasta taloyhtiöstä</a>{% endif %}</span>
+          </div>
+          <div class="target-row__pts">{{ pts_cells(row.pts) }}</div>
+          <div class="target-row__who">
+            {% if contact.isannoitsija_henkilo %}<span class="target-row__person">{{ contact.isannoitsija_henkilo }}</span>{% endif %}
+            {% if contact.isannoitsija %}<a class="target-row__company" href="{{ url_for('insights.manager_detail', name=contact.isannoitsija, **org_query) }}" title="Avaa isännöitsijän kaikki kohteet">{{ contact.isannoitsija }}</a>
+            {% elif contact.contact_status in ('pending', 'processing') %}<span class="target-row__wait">isännöitsijä haussa</span>
+            {% else %}<span class="target-row__wait">isännöitsijää ei löytynyt</span>{% endif %}
+          </div>
+          <div class="target-row__fit">
+            <details class="target-score target-score--{{ row.score_level }}">
+              <summary title="Sopivuus asteikolla nollasta sataan. Siihen vaikuttavat remontin varmuus ja ajankohta, yhteystiedot, saman taloyhtiön muut ilmoitukset sekä se, millaisia kohteita olet aiemmin vienyt liideiksi tai piilottanut. Avaa erittely.">
+                <span class="target-score__label sr-only">Sopivuus </span>
+                <span class="target-score__value mono">{{ row.score }}</span>
+                <span class="sr-only">/100, {{ row.score_label }}</span>
+              </summary>
+              <div class="target-score__parts" role="list">
+                <strong>Sopivuus {{ row.score }} / 100 · {{ row.score_label }}</strong>
+                {% for part in row.score_parts %}
+                <span class="target-score__part" role="listitem">
+                  <span>{{ part.label }}</span>
+                  <span class="target-score__bar" aria-hidden="true"><span style="width: {{ (100 * part.points / part.max)|round|int }}%"></span></span>
+                  <span>{{ part.points }}/{{ part.max }}</span>
+                  <span class="target-score__detail">{{ part.detail }}</span>
+                </span>
+                {% endfor %}
+                {% if row.fit is not none %}
+                {% set learned = row.score - (0.9 * row.base_score)|round|int %}
+                <span class="target-score__detail">Kohteen pisteet {{ row.base_score }}/100 × 0,9{% if learned %} {{ '+' if learned > 0 else '−' }} {{ learned|abs }} aiempien valintojesi perusteella{% endif %}.</span>
+                {% endif %}
+              </div>
             </details>
-            {% endif %}
           </div>
           <div class="target-row__actions">
             {% if is_hidden_tab %}
-            <button type="submit" class="btn btn-secondary btn-sm" name="single_id" value="{{ row.match.id }}">Palauta</button>
-            <button type="submit" class="btn btn-primary btn-sm" name="single_id" value="{{ row.match.id }}"
+            <button type="submit" class="target-row__act" name="single_id" value="{{ row.match.id }}">Palauta</button>
+            <button type="submit" class="target-row__act target-row__act--go" name="single_id" value="{{ row.match.id }}"
                     formaction="{{ url_for('targets.transfer', **org_query) }}">Siirrä liidiksi</button>
             {% else %}
-            <button type="submit" class="btn btn-ghost btn-sm" name="single_id" value="{{ row.match.id }}"
+            <button type="submit" class="target-row__act" name="single_id" value="{{ row.match.id }}"
                     formaction="{{ url_for('targets.dismiss', **org_query) }}">Piilota</button>
-            <button type="submit" class="btn btn-primary btn-sm" name="single_id" value="{{ row.match.id }}">Siirrä liidiksi</button>
+            <button type="submit" class="target-row__act target-row__act--go" name="single_id" value="{{ row.match.id }}">Siirrä liidiksi</button>
             {% endif %}
           </div>
+          <details class="target-row__more">
+            <summary>Tiedot</summary>
+            <dl class="target-row__facts">
+              {% for item in row.renovations %}
+              <dt>{{ item.remonttityyppi }}</dt>
+              <dd>{{ item.timing or 'aikataulu auki' }}, varmuus <span class="mono">{{ item.confidence }} %</span></dd>
+              {% endfor %}
+              {% if contact.has_contact %}
+              <dt>Isännöitsijä</dt>
+              <dd>
+                {% if contact.isannoitsija_puh %}<a class="mono" href="tel:{{ contact.isannoitsija_puh|replace(' ', '') }}">{{ contact.isannoitsija_puh }}</a>{% endif %}
+                {% if contact.isannoitsija_email %}<a href="mailto:{{ contact.isannoitsija_email }}">{{ contact.isannoitsija_email }}</a>{% endif %}
+              </dd>
+              {% endif %}
+              {% set people = row.people %}
+              {% if people.chair or people.maintenance %}
+              <dt>Hallitus ja huolto</dt>
+              <dd>
+                {% if people.chair %}<span>Hallituksen pj: {{ people.chair.name or '–' }}</span>
+                {% if people.chair.phone %}<a class="mono" href="tel:{{ people.chair.phone|replace(' ', '') }}">{{ people.chair.phone }}</a>{% endif %}
+                {% if people.chair.email %}<a href="mailto:{{ people.chair.email }}">{{ people.chair.email }}</a>{% endif %}{% endif %}
+                {% if people.maintenance %}<span>Huolto: {{ people.maintenance.name or '–' }}</span>
+                {% if people.maintenance.phone %}<a class="mono" href="tel:{{ people.maintenance.phone|replace(' ', '') }}">{{ people.maintenance.phone }}</a>{% endif %}{% endif %}
+              </dd>
+              {% endif %}
+              {% if row.fit_reasons %}<dt>Miksi sopii</dt><dd>{{ row.fit_reasons[:3]|join(' · ') }}</dd>{% endif %}
+              {% if listing.tulevat_remontit %}<dt>Tulevat remontit</dt><dd>{{ listing.tulevat_remontit }}</dd>{% endif %}
+              {% if renovation and renovation.evidence %}<dt>Peruste</dt><dd>{{ renovation.evidence }}</dd>{% endif %}
+              {% if row.seen_at %}<dt>{{ 'Uusin signaali' if row.signal_count > 1 else 'Löydetty' }}</dt><dd class="mono">{{ (row.seen_at|helsinki).strftime('%d.%m.%Y') }}</dd>{% endif %}
+            </dl>
+          </details>
         </li>
         {% endfor %}
       </ul>

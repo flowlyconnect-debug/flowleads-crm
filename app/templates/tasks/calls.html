@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/pts.html" import pts_cells %}
 {% from "components/empty_state.html" import empty_state %}
 {% block title %}Soittolista | FlowLeads{% endblock %}
 {% block head %}
@@ -31,6 +32,7 @@
     {% set task = row.task %}
     {% set lead = row.lead %}
     <li class="call-card">
+      <span class="call-card__n mono" aria-hidden="true">{{ loop.index }}</span>
       <div class="call-card__main">
         <p class="call-card__title">
           {% if lead %}<a href="{{ url_for('leads.detail', lead_id=lead.id, **org_query) }}">{{ lead.company or lead.display_name }}</a>{% else %}{{ task.title }}{% endif %}
@@ -43,9 +45,9 @@
           {% if row.city %}<span>{{ row.city }}</span>{% endif %}
         </p>
         {% endif %}
+        {% if row.renovation %}<div class="call-card__pts">{{ pts_cells(row.pts) }}</div>{% endif %}
         {% if row.phone %}
         <a class="call-card__phone" href="tel:{{ row.phone|replace(' ', '') }}">
-          <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3h3l1.5 4-2 1.2a9 9 0 0 0 4.8 4.8L13 11l4 1.5v3a1.5 1.5 0 0 1-1.6 1.5A13.5 13.5 0 0 1 3 4.6 1.5 1.5 0 0 1 4.5 3Z"/></svg>
           {{ row.phone }}
         </a>
         {% else %}

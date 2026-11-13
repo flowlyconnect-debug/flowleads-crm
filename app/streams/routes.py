@@ -24,6 +24,8 @@ def _format_user_label(user: User) -> str:
 def _relative_time_fi(value, now: datetime) -> str:
     if not value:
         return "Ei vielä"
+    if value.tzinfo is None and now.tzinfo is not None:
+        value = value.replace(tzinfo=now.tzinfo)  # SQLite returns naive UTC
     diff = now - value
     seconds = int(diff.total_seconds())
     if seconds < 3600:

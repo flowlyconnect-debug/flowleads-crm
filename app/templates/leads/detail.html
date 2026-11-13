@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import score_badge, ai_status_badge, probability_badge %}
+{% from "components/pts.html" import pts_cells %}
 {% block title %}{{ lead.display_name }} — FlowLeads{% endblock %}
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
@@ -58,17 +59,16 @@
         {# A missing estimate is not the same thing as zero. #}
         {% if lead.deal_value is not none %}
         <span class="lead-focus__value">{{ currency_symbol }}{{ '{:,.0f}'.format(lead.deal_value|float).replace(',', ' ') }}</span>
-        {% else %}
-        <span class="lead-focus__value lead-focus__value--missing">Arvoa ei ole arvioitu</span>
         {% endif %}
         {% if lead.created_at %}<span>Saapui {{ (lead.created_at|helsinki).strftime('%d.%m.%Y') }}</span>{% endif %}
         {% if lead.assignee %}<span class="truncate">Vastuu: {{ lead.assignee.email.split('@')[0] }}</span>{% endif %}
       </div>
       <div class="lead-focus__badges lead-header-badges">
         {% if lead.close_probability is not none %}{{ probability_badge(lead.close_probability) }}{% endif %}
-        <span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>
+        {% if lead.ai_enrichment_status not in ('disabled', none, '') %}<span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>{% endif %}
       </div>
     </div>
+    {% if lead_pts %}<div class="lead-focus__pts">{{ pts_cells(lead_pts, big=true) }}</div>{% endif %}
     <div class="lead-focus__next">
       {% if next_task %}
       <span class="lead-focus__next-label">Kirjattu seuraava toimi</span>
@@ -88,6 +88,15 @@
 
   <div class="lead-profile-grid">
     <div class="lead-main-column">
+      {% if lead_evidence %}
+      <section class="lead-why">
+        <h2 class="lead-why__title">Miksi kohde löytyi</h2>
+        <p class="lead-why__quote">”{{ lead_evidence.text }}”</p>
+        <p class="lead-why__src">{{ lead_evidence.renovation.remonttityyppi }}{% if lead_evidence.renovation.timing %} {{ lead_evidence.renovation.timing }}{% endif %}, varmuus {{ lead_evidence.renovation.confidence }} %{% if lead_evidence.listing.published_at %}. Ilmoitus {{ (lead_evidence.listing.published_at|helsinki).strftime('%d.%m.%Y') }}{% endif %}.</p>
+      </section>
+      {% endif %}
+      {% set show_playbook = lead.ai_enrichment_status not in ('disabled', none, '') or playbook.ai_summary or playbook.ai_recommendation %}
+      {% if show_playbook %}
       <article class="card playbook-card" id="ai-playbook-card">
         <header class="playbook-card__header">
           <div class="playbook-card__title-row">
@@ -129,6 +138,7 @@
 
         </div>
       </article>
+      {% endif %}
 
       <section class="card">
         <header class="card-header">
@@ -184,7 +194,7 @@
           {% if lead.notes %}
           <div class="mt-4">
             <h3 class="text-sm font-semibold text-secondary">Muistiinpanot</h3>
-            <p class="text-sm text-secondary" style="margin-top:4px;">{{ lead.notes }}</p>
+            <p class="text-sm text-secondary lead-notes" style="margin-top:4px;">{{ lead.notes }}</p>
           </div>
           {% endif %}
 
@@ -711,6 +721,7 @@
         </div>
       </section>
 
+      {% if latest_prediction or lead.close_probability is not none or config.get("AI_ENRICHMENT_ENABLED") %}
       <section class="card ai-insights-card mt-4">
         <header class="card-header">
           <h2 class="card-title">AI-havainnot</h2>
@@ -795,6 +806,7 @@
           </div>
         </div>
       </section>
+      {% endif %}
     </aside>
   </div>
 </section>

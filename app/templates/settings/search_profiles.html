@@ -30,10 +30,8 @@
                 <a href="{{ url_for('settings.search_profiles_list', id=profile.id, **org_query) }}"
                    class="search-profiles-list__item{% if selected_profile and selected_profile.id == profile.id %} is-active{% endif %}">
                   <span class="search-profiles-list__name">{{ profile.name }}</span>
-                  {% if profile.is_active %}
-                  <span class="badge badge-active">Aktiivinen</span>
-                  {% else %}
-                  <span class="badge badge-inactive">Pois</span>
+                  {% if not profile.is_active %}
+                  <span class="search-profiles-list__off">pois päältä</span>
                   {% endif %}
                 </a>
               </li>

@@ -1,0 +1,11 @@
+{# The renovation timeline (app/listings/pts.py): one cell per coming year,
+   a short mark where a renovation starts. `big` is the lead page's version. #}
+{% macro pts_cells(pts, big=false) -%}
+<span class="pts{% if big %} pts--big{% endif %}" aria-label="Remontit vuosittain">
+  {%- for cell in pts.years -%}
+  <span class="pts__y">{% for mark in cell.marks %}<b class="pts__m pts__m--{{ mark.tone }}" title="{{ mark.name }} {{ mark.year }}">{{ mark.short if big else mark.abbr }}</b>{% endfor %}</span>
+  {%- endfor -%}
+</span>
+{%- if big %}<span class="pts-years pts-years--big">{% for cell in pts.years %}<span>{{ cell.year }}</span>{% endfor %}</span>{% endif %}
+{%- if pts.open %}<span class="pts-open">{% for mark in pts.open %}{{ mark.short }}{% if mark.year %} {{ mark.year }}{% else %}, aikataulu auki{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}
+{%- endmacro %}

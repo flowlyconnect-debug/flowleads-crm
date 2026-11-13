@@ -1,3 +1,4 @@
+{% from "components/pts.html" import pts_cells %}
 {% if org_picker %}
 <div class="dashboard-page dashboard-org-picker">
   <div class="page-header">
@@ -51,7 +52,8 @@
         <time id="dashboard-current-date" datetime=""></time>
         {% if org %}<span class="dash-header__sep" aria-hidden="true">·</span><span class="dash-header__org">{{ org.name }}</span>{% endif %}
       </p>
-      <h1 class="dash-header__title">Päivän työjono</h1>
+      <h1 class="dash-header__title">Tänään</h1>
+      <p class="dash-header__summary">{{ dash_calls_total }} {{ 'soitto' if dash_calls_total == 1 else 'soittoa' }} soittolistalla, {{ targets_available|default(0) }} {{ 'kohde' if targets_available|default(0) == 1 else 'kohdetta' }} saatavilla{% if tasks_overdue_count %}, {{ tasks_overdue_count }} myöhässä{% endif %}.</p>
     </div>
     <div class="dash-header__actions" role="toolbar" aria-label="Kojelaudan toiminnot">
       <form method="get" action="{{ url_for('leads.list_leads') }}" class="dash-search" role="search" aria-label="Hae liidejä">
@@ -78,20 +80,6 @@
   </div>
   {% endif %}
 
-  {% set targets_available = targets_available|default(0) %}
-  <a class="dash-targets{% if not targets_available %} dash-targets--empty{% endif %}" href="{{ url_for('targets.index', **org_q) }}">
-    <span class="dash-targets__count">{{ targets_available }}</span>
-    <span class="dash-targets__text">
-      <span class="dash-targets__title">{{ 'kohde saatavilla' if targets_available == 1 else 'kohdetta saatavilla' }}</span>
-      <span class="dash-targets__sub">
-        {% if targets_available %}Taloyhtiöitä, joissa on tulossa urakkasi remontti. Siirrä kiinnostavat liideiksi.
-        {% elif targets_reserve|default(0) %}Uusia kohteita on haettavissa: avaa Kohteet ja paina Hae kohteita.
-        {% else %}Uudet taloyhtiöt, joissa on tulossa urakkasi remontti, ilmestyvät Kohteet-sivulle.{% endif %}
-      </span>
-    </span>
-    <span class="dash-targets__cta">{{ 'Avaa kohteet' if targets_available else ('Hae kohteita' if targets_reserve|default(0) else 'Kohteet') }}<span aria-hidden="true"> →</span></span>
-  </a>
-
   {# The one dark surface in the app: the item the user should handle first. #}
   <section class="dash-focus" id="dashboardHero" aria-label="Käsittele ensin" aria-live="polite">
     <div class="dash-focus__main">
@@ -100,6 +88,51 @@
       <div class="dash-skeleton dash-skeleton--ink"></div>
     </div>
   </section>
+
+  {% set targets_available = targets_available|default(0) %}
+  <div class="dash-today">
+    <section class="dash-ledger" aria-labelledby="dash-calls-title">
+      <header class="dash-ledger__head">
+        <h2 id="dash-calls-title">Soitot tänään</h2>
+        <a class="dash-ledger__link" href="{{ url_for('tasks.call_list_page', **org_q) }}">Soittolista{% if dash_calls_total > dash_calls|length %} ({{ dash_calls_total }}){% endif %}</a>
+      </header>
+      {% for row in dash_calls %}
+      <a class="dash-call{% if row.late %} is-late{% endif %}" href="{{ url_for('leads.detail', lead_id=row.lead.id, **org_q) if row.lead else url_for('tasks.call_list_page', **org_q) }}">
+        <span class="dash-call__n mono">{{ loop.index }}</span>
+        <span class="dash-call__main">
+          <span class="dash-call__name">{{ row.lead.company or row.lead.display_name if row.lead else row.task.title }}</span>
+          <span class="dash-call__meta">{{ row.contact or '—' }}{% if row.late %} · myöhässä{% endif %}</span>
+        </span>
+        <span class="dash-call__tel mono">{{ row.phone }}</span>
+        {{ pts_cells(row.pts) }}
+      </a>
+      {% else %}
+      <p class="dash-ledger__empty">Ei soittoja tälle päivälle. Lisää liidejä soittolistalle Kohteet-sivulta.</p>
+      {% endfor %}
+    </section>
+    <section class="dash-ledger" aria-labelledby="dash-targets-title">
+      <header class="dash-ledger__head">
+        <h2 id="dash-targets-title">Uudet kohteet</h2>
+        <a class="dash-ledger__link dash-targets" href="{{ url_for('targets.index', **org_q) }}"><span class="dash-targets__count">{{ targets_available }}</span> {{ 'kohde saatavilla' if targets_available == 1 else 'kohdetta saatavilla' }}</a>
+      </header>
+      {% for row in dash_targets|default([]) %}
+      <a class="dash-target" href="{{ url_for('insights.company_card', listing_id=row.listing.id, **org_q) }}">
+        <span class="dash-call__main">
+          <span class="dash-call__name">{{ row.title }}</span>
+          <span class="dash-call__meta">{{ row.listing.kaupunki or row.listing.maakunta or '' }}</span>
+        </span>
+        {{ pts_cells(row.pts) }}
+        <span class="dash-target__fit mono">{{ row.fit if row.fit is not none else '' }}</span>
+      </a>
+      {% else %}
+      <p class="dash-ledger__empty">
+        {% if targets_reserve|default(0) %}Uusia kohteita on haettavissa: avaa Kohteet ja paina Hae kohteita.
+        {% else %}Uudet taloyhtiöt, joissa on tulossa urakkasi remontti, ilmestyvät Kohteet-sivulle.{% endif %}
+      </p>
+      {% endfor %}
+    </section>
+  </div>
+
 
   <div class="dash-columns" id="dashColumns">
     <section class="dash-panel" id="dashNewPanel" aria-labelledby="dash-new-title">
