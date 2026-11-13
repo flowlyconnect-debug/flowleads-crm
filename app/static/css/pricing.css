@@ -49,3 +49,5 @@ body.pricing { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system
 
 /* v4: readable measure for the hero lead (impeccable: line-length) */
 .pricing-hero > p { max-width: 58ch; }
+.pricing h1, .pricing h2, .pricing h3 { text-wrap: balance; }
+.pricing p, .pricing li { text-wrap: pretty; }

@@ -178,7 +178,7 @@
 
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary">
-                  {{ "Tallenna" if selected_profile else "Luo profiili" }}
+                  {{ "Tallenna profiili" if selected_profile else "Luo profiili" }}
                 </button>
                 <button type="button" class="btn btn-secondary" id="profile-preview-btn"
                         data-url="{{ url_for('settings.search_profiles_preview', **org_query) }}">Esikatsele osumat</button>

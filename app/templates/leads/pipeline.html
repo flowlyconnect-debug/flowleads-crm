@@ -117,7 +117,7 @@
   <div class="pipeline-summary" id="pipeline-summary" aria-label="Putken yhteenveto">
     <div class="pipeline-summary__stats">
       <span class="pipeline-summary__item">
-        Putken arvo <strong id="pipeline-total-value">{{ (currency_symbol ~ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ')) if ns.total_value else '—' }}</strong>
+        Putken arvo <strong id="pipeline-total-value">{{ (currency_symbol ~ '{:,.0f}'.format(ns.total_value|float).replace(',', ' ')) if ns.total_value else 'ei arvioitu' }}</strong>
       </span>
       <span class="pipeline-summary__item">
         <strong id="pipeline-total-leads">{{ ns.total_leads if ns.total_leads is not none else 0 }}</strong> <span id="pipeline-total-leads-label">{{ 'liidi' if ns.total_leads == 1 else 'liidiä' }}</span>
@@ -202,7 +202,7 @@
             <span class="pipeline-col__count" aria-label="{{ stage_count }} liidiä">{{ stage_count }}</span>
           </div>
           <div class="pipeline-col__meta">
-            <span class="pipeline-col__value" data-col-value>{{ (currency_symbol ~ '{:,.0f}'.format(stage_total|float).replace(',', ' ')) if stage_total else '—' }}</span>
+            <span class="pipeline-col__value" data-col-value>{{ (currency_symbol ~ '{:,.0f}'.format(stage_total|float).replace(',', ' ')) if stage_total else '' }}</span>
             <span class="pipeline-col__note pipeline-col__note--{{ col_note_mod }}" data-col-note{% if not col_note %} hidden{% endif %}>{{ col_note or '' }}</span>
           </div>
         </header>
@@ -363,7 +363,7 @@
               {% endif %}
             </div>
             {# 3) seuraava toimi #}
-            <a class="lead-card__next lead-next{% if is_slipping %} lead-next--urgent{% elif next_action == 'Avaa' %} lead-next--plain{% endif %}" href="{{ detail_url }}">{{ next_action }}<span class="lead-next__arrow" aria-hidden="true">→</span></a>
+            <a class="lead-card__next lead-next{% if is_slipping %} lead-next--urgent{% elif next_action == 'Avaa' %} lead-next--plain{% endif %}" href="{{ detail_url }}">{{ next_action }}</a>
           </article>
           {% endif %}
           {% endfor %}
@@ -739,7 +739,7 @@
     const valueEl = col.querySelector('[data-col-value]');
 
     if (countEl) countEl.textContent = String(count);
-    if (valueEl) valueEl.textContent = total > 0 ? formatEuro(total) : '—';
+    if (valueEl) valueEl.textContent = total > 0 ? formatEuro(total) : '';
     col.classList.toggle('pipeline-col--empty', count === 0);
     syncPlaceholder(listEl);
     updateColumnNote(col, listEl);
@@ -763,7 +763,7 @@
     const leadsEl = root.querySelector('#pipeline-total-leads');
     const valueEl = root.querySelector('#pipeline-total-value');
     if (leadsEl) leadsEl.textContent = String(totalLeads);
-    if (valueEl) valueEl.textContent = totalValue > 0 ? formatEuro(totalValue) : '—';
+    if (valueEl) valueEl.textContent = totalValue > 0 ? formatEuro(totalValue) : 'ei arvioitu';
     const leadsLabelEl = root.querySelector('#pipeline-total-leads-label');
     if (leadsLabelEl) leadsLabelEl.textContent = totalLeads === 1 ? 'liidi' : 'liidiä';
 
@@ -1037,7 +1037,7 @@
         toast(`Virhe: ${errMsg}`, 'error');
       }
     } catch (e) {
-      toast('Verkkovirhe — yritä uudelleen', 'error');
+      toast('Verkkovirhe. Yritä uudelleen.', 'error');
     } finally {
       confirmBtn.disabled = false;
     }

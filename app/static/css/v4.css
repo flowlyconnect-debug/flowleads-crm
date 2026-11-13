@@ -723,3 +723,134 @@ p.settings-panel__subtitle, .settings-panel__subtitle { max-width: 460px !import
 /* "Kerro mitä etsit": same inset as the other rows of the sheet */
 .targets-ask { padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--v4-rule); gap: 10px; align-items: center; }
 .targets-ask__label { font-size: 13px; font-weight: 500; white-space: nowrap; }
+
+/* ==========================================================================
+   Second detector pass (antislopdev UI-01/05/16/25/37, impeccable advisories)
+   ========================================================================== */
+
+/* headings and running text wrap without a lone last word */
+h1, h2, h3, .lp-hero__title, .lp-section__title { text-wrap: balance; }
+p, li, dd { text-wrap: pretty; }
+
+/* close and remove controls: a drawn x, never an emoji */
+.icon-close { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.icon-close:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); }
+.leads-opp-chip__x, .targets-saved__icon { display: inline-grid; place-items: center; }
+.i-x { display: block; }
+.btn-link-plain { border: 0; background: none; padding: 0; font: inherit; color: var(--color-accent); cursor: pointer; }
+.btn-link-plain:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* activity timeline and system checks: a small dot carries the kind */
+.activity-icon { width: 9px !important; height: 9px !important; min-width: 9px; border-radius: 50%; background: var(--color-card) !important; border: 1.5px solid var(--color-text-secondary); font-size: 0 !important; padding: 0 !important; margin-top: 6px; }
+.activity-icon.email { border-color: var(--color-info); }
+.activity-icon.stage { border-color: var(--color-accent); }
+.activity-icon.task { border-color: var(--color-success); }
+.system-check__mark { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-secondary); margin-right: 8px; vertical-align: middle; }
+.system-check--ok .system-check__mark { background: var(--color-success); }
+.system-check--warn .system-check__mark { background: var(--color-warning); }
+.system-check--fail .system-check__mark { background: var(--color-danger); }
+
+/* stat labels in the search-profile panel: sentence case, no tracking (UI-01) */
+.search-profiles-stats dt { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px; color: var(--color-text-secondary); }
+
+/* phone width: nothing wider than the screen (UI-37) */
+@media (max-width: 600px) {
+  .page-header, .leads-header { flex-wrap: wrap; gap: 10px; }
+  .page-header__actions, .leads-header__actions { flex-wrap: wrap; }
+  .search-profiles-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .search-profiles-list { border-right: 0; border-bottom: 1px solid var(--v4-rule); padding: 0 0 12px; }
+  .search-profiles-regions, .search-profiles-regions__grid { min-width: 0; max-width: 100%; }
+  .search-profiles-regions__grid { grid-template-columns: minmax(0, 1fr); }
+  fieldset { min-width: 0; }
+}
+.tasks-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.tasks-header .page-header__actions { flex-wrap: wrap; }
+@media (max-width: 600px) { .tasks-header .page-header__actions select { max-width: 100%; } }
+
+/* ==========================================================================
+   Third pass: nongeneric / Gesso / avoid-ai-design rules on a phone
+   ========================================================================== */
+
+/* the shell fills the dynamic viewport on phones (legacy-viewport-height) */
+.app-layout { min-height: 100dvh; }
+
+/* search fields that drop the input outline show the ring on their wrapper */
+.dash-search:focus-within, .leads-opp-search:focus-within { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
+
+/* touch: inputs at 16px so iOS does not zoom on focus (ios-input-zoom),
+   controls at least 44px tall (tiny-tap-target, WCAG 2.5.5) */
+@media (max-width: 900px), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]), select, textarea, .form-input, .form-select { font-size: 16px !important; }
+  .btn, .btn-sm, .btn-lg, .target-row__act, .leads-opp-tab, .tab, .icon-close, .btn-link-plain,
+  .seg button, .app-main__topbar button, .sidebar-toggle, .lead-next, .lead-card__next,
+  .call-card__outcomes .btn, .dash-ledger__link, .head-link { min-height: 44px; }
+  .sidebar-item { min-height: 44px; align-items: center; }
+  .app-main__topbar-logo { min-height: 44px; display: inline-flex; align-items: center; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; }
+  .target-row__check { width: 22px; height: 22px; }
+  .targets-filter__select.form-input, .leads-quick-filter__select.form-input { min-height: 40px; }
+  .lead-next, .lead-card__next { display: inline-flex; align-items: center; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .btn, .btn-sm { min-height: 44px !important; }
+  .lead-list-head__col, .task-row__edit, .calls-scope__item, .dash-panel__link, .task-row__meta a,
+  .breadcrumbs a, .work-row__name, .dash-call, .dash-target { min-height: 44px; display: inline-flex; align-items: center; }
+  .task-row__check, .task-row button[aria-label] { min-width: 44px; min-height: 44px; }
+}
+/* the complete-task control: a drawn ring, named for screen readers */
+.task-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--color-text-secondary); background: var(--color-card); cursor: pointer; padding: 0; font-size: 0; position: relative; }
+.task-check:hover { border-color: var(--color-success); }
+.task-check::after { content: ""; position: absolute; inset: -11px; }
+input[type=checkbox] { width: 24px; height: 24px; }
+@media (max-width: 900px), (pointer: coarse) {
+  .pipeline-page-actions .btn { height: auto !important; min-height: 44px !important; }
+  .task-row__edit { min-width: 44px; justify-content: center; }
+  .task-toggle-btn { min-height: 44px; }
+  .contact-info-value { min-height: 44px; display: inline-flex; align-items: center; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .pipeline-add-lead, .lead-row__name { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* ==========================================================================
+   Kirjautumissivu, rakenne 2: tuote heti näkyvissä, yksi faktaosio
+   ========================================================================== */
+
+.lp-ledger { margin: 22px 0 22px; max-width: 560px; background: var(--color-card); border: 1px solid var(--v4-rule); border-radius: 8px; padding: 0 16px; }
+.lp-ledger__head, .lp-ledger__row { display: grid; grid-template-columns: minmax(0, 1fr) auto 56px; column-gap: 16px; align-items: center; }
+.lp-ledger__head { min-height: 32px; font-size: 12px; color: var(--color-text-secondary); border-bottom: 1px solid var(--v4-rule); }
+.lp-ledger__head span:last-child, .lp-ledger__fit { text-align: right; }
+.lp-ledger__row { min-height: 52px; border-bottom: 1px solid var(--v4-rule-soft); }
+.lp-ledger__row:last-of-type { border-bottom: 0; }
+.lp-ledger__name { display: grid; min-width: 0; }
+.lp-ledger__name b { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-ledger__name span { font-size: 12.5px; color: var(--color-text-secondary); }
+.lp-ledger__fit { font-family: var(--font-mono); font-weight: 500; font-size: 14px; }
+.lp-ledger figcaption { font-size: 12.5px; color: var(--color-text-secondary); padding: 10px 0 12px; border-top: 1px solid var(--v4-rule); }
+.lp-textlink { display: inline-flex; align-items: center; min-height: 44px; font-weight: 500; color: var(--color-accent); margin-left: 6px; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.lp-textlink:hover { color: var(--color-accent-hover); }
+
+.lp-fit__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+.lp-facts { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0 16px; margin: 22px 0 0; border-top: 1px solid var(--color-text-primary); }
+.lp-facts dt, .lp-facts dd { padding: 11px 0; border-bottom: 1px solid var(--v4-rule); margin: 0; }
+.lp-facts dt { font-weight: 600; font-size: 14px; }
+.lp-facts dd { color: var(--color-text-secondary); font-size: 14.5px; }
+.lp-fit__label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin: 6px 0 8px; }
+.lp-trades { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-text-primary); }
+.lp-trades li { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--v4-rule); }
+.lp-trades b { font-weight: 600; font-size: 14px; }
+.lp-trades span { color: var(--color-text-secondary); font-size: 14px; }
+
+.lp-cta--plain { background: none !important; border: 0 !important; border-top: 1px solid var(--color-text-primary) !important; border-radius: 0 !important; padding: 22px 0 0 !important; box-shadow: none !important; }
+
+@media (max-width: 900px) {
+  .lp-fit__grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .lp-trades li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .lp-ledger__head .pts-years { display: none; }
+}
+@media (max-width: 480px) {
+  .lp-ledger__head, .lp-ledger__row { grid-template-columns: minmax(0, 1fr) 40px; }
+  .lp-ledger .pts { display: none; }
+  .lp-facts { grid-template-columns: minmax(0, 1fr); }
+  .lp-facts dt { border-bottom: 0; padding-bottom: 0; }
+}

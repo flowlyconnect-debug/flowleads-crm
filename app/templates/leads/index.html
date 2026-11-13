@@ -243,44 +243,44 @@
       <span class="leads-opp-chips__label">Rajaukset:</span>
       {% if filters.search %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, search=none)) }}">
-        Haku: {{ filters.search|truncate(24, True, '…') }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        Haku: {{ filters.search|truncate(24, True, '…') }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% if filters.stage_id %}
       {% set stage_chip = filter_form.stage_id.choices|selectattr('0', 'equalto', filters.stage_id)|map(attribute='1')|first|default('Vaihe') %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, stage_id=none)) }}">
-        {{ stage_label(stage_chip) }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        {{ stage_label(stage_chip) }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% if filters.source %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, source=none)) }}">
-        {{ source_labels.get(filters.source, filters.source) }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        {{ source_labels.get(filters.source, filters.source) }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% if filters.assigned_to %}
       {% set assignee_label = filter_form.assigned_to.choices|selectattr('0', 'equalto', filters.assigned_to)|map(attribute='1')|first|default('Vastuuhenkilö') %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, assigned_to=none)) }}">
-        {{ assignee_label|truncate(20, True, '…') }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        {{ assignee_label|truncate(20, True, '…') }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% for key in ('renovation', 'city', 'region') if filters.get(key) %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, **{key: none})) }}">
-        {{ filters.get(key) }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        {{ filters.get(key) }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endfor %}
       {% if filters.score_min %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, score_min=none)) }}">
-        Pisteet ≥ {{ filters.score_min }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        Pisteet ≥ {{ filters.score_min }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% if filters.score_max %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, score_max=none)) }}">
-        Pisteet ≤ {{ filters.score_max }} <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        Pisteet ≤ {{ filters.score_max }} <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       {% if filters.no_contact_7 and quick_tab != 'slipping' %}
       <a class="leads-opp-chip" href="{{ leads_url(dict(base_filters, no_contact_7=none)) }}">
-        Ei kontaktia 7+ pv <span class="leads-opp-chip__x" aria-hidden="true">✕</span>
+        Ei kontaktia 7+ pv <span class="leads-opp-chip__x"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
       </a>
       {% endif %}
       <a class="leads-opp-chips__clear" href="{{ leads_url({}) }}">Tyhjennä</a>
@@ -457,7 +457,7 @@
           </div>
 
           <div class="lead-row__next" role="cell">
-            <a class="lead-next{% if urgency.mod == 'slipping' %} lead-next--urgent{% elif next_action == 'Avaa' %} lead-next--plain{% endif %}" href="{{ detail_url }}">{{ next_action }}<span class="lead-next__arrow" aria-hidden="true">→</span></a>
+            <a class="lead-next{% if urgency.mod == 'slipping' %} lead-next--urgent{% elif next_action == 'Avaa' %} lead-next--plain{% endif %}" href="{{ detail_url }}">{{ next_action }}</a>
           </div>
         </article>
         {% endfor %}

@@ -132,12 +132,12 @@
           {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
           <button type="submit" class="targets-saved__icon{% if saved.notify %} is-on{% endif %}"
                   title="{{ 'Ilmoitukset päällä: paina kytkeäksesi pois' if saved.notify else 'Ilmoitukset pois: paina kytkeäksesi päälle' }}"
-                  aria-label="Ilmoitukset haulle {{ saved.name }}: {{ 'päällä' if saved.notify else 'pois' }}">{{ '🔔' if saved.notify else '🔕' }}</button>
+                  aria-label="Ilmoitukset haulle {{ saved.name }}: {{ 'päällä' if saved.notify else 'pois' }}">{{ 'ilmoitukset päällä' if saved.notify else 'ilmoitukset pois' }}</button>
         </form>
         <form method="post" action="{{ url_for('targets.delete_search_route', search_id=saved.id, **org_query) }}"
               data-confirm="Poistetaanko tallennettu haku {{ saved.name }}?" onsubmit="return confirm(this.dataset.confirm);">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="targets-saved__icon" title="Poista tallennettu haku" aria-label="Poista haku {{ saved.name }}">✕</button>
+          <button type="submit" class="targets-saved__icon" title="Poista tallennettu haku" aria-label="Poista haku {{ saved.name }}"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </form>
       </span>
       {% endfor %}
