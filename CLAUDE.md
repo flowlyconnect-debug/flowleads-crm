@@ -80,8 +80,13 @@ Keep that file up to date as items are finished.
   Catalogue tests: `tests/test_listings_catalogue.py`, `tests/test_catalogue_filters_and_onboarding.py`, `tests/test_targets.py` (Kohteet). n8n workflow e2e (needs Node.js):
   `tests/test_n8n_catalogue_e2e.py`, which runs the generated workflows with the mini n8n emulator in
   `tests/n8n_sim/` against a live local CRM. Re-run it after regenerating workflows.
-- Front-end libraries (Chart.js, Sortable, Quill, Inter) are vendored in `app/static/vendor/`; do not add
-  CDN links. CI (`.github/workflows/tests.yml`) runs migrations and the suite on every PR and on main.
+- Front-end libraries (Chart.js, Sortable, Quill, IBM Plex Sans/Mono) are vendored in `app/static/vendor/`; do not add
+  CDN links.
+- UI system "v4" (`app/static/css/v4.css`, loaded last): flat surfaces with hairlines, IBM Plex Sans,
+  figures in Plex Mono, text-only sidebar, the PTS strip (`app/listings/pts.py`,
+  `components/pts.html`) for renovation years. **Never add or change colour values**: use the tokens of
+  `design-system.css` only. Check new UI with `impeccable detect <url>` (no side-tab borders, nested
+  cards, icon tiles above headings, text under 12px, lines over ~80 characters). CI (`.github/workflows/tests.yml`) runs migrations and the suite on every PR and on main.
 - UI messages are Finnish: services raise English messages (shared with the JSON API) and
   `app/core/messages_fi.py` translates them when flashed. Timestamps are shown with the `helsinki` filter.
 - Migrations: Alembic in `migrations/versions/`. Check with

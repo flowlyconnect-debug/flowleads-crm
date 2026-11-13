@@ -555,3 +555,159 @@ h2 { letter-spacing: -0.2px; }
   grid-template-columns: repeat(var(--pipeline-cols, 6), minmax(160px, 1fr));
   min-width: calc(var(--pipeline-cols, 6) * 160px + (var(--pipeline-cols, 6) - 1) * 20px);
 }
+.target-row__new.badge-new { background: none; padding: 0; border-radius: 0; }
+
+/* ==========================================================================
+   System-wide fixes from `impeccable detect` on the remaining pages
+   ========================================================================== */
+
+/* no text below 12px: the xs step was 11px (tiny-text, undersized-ui-text) */
+:root { --font-size-xs: 12px; }
+.settings-nav__label, .settings-nav__group-label { font-size: 12px !important; color: var(--color-text-secondary); }
+small, .form-hint, .help-text, .text-xs { font-size: 12px; }
+
+/* empty states: a sentence and an action, no icon tile above the heading */
+.empty-state { padding: 28px 4px; max-width: 52ch; color: var(--color-text-secondary); }
+.empty-state__title { font-size: 15px; font-weight: 600; color: var(--color-text-primary); margin: 0 0 4px; letter-spacing: -0.1px; }
+.empty-state p { margin: 0 0 14px; font-size: 14px; }
+
+/* a card never sits inside another card (nested-cards): inner ones go flat */
+.card .card,
+.settings-panel .card,
+.card .report-card,
+.report-card .card,
+.card .report-metric,
+.settings-panel .settings-panel,
+.card .task-card,
+.task-section .task-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* running text in settings stays readable (line-length) */
+.settings-panel p, .card-body > p, .settings-section p { max-width: 70ch; }
+
+/* Raportit: metrics are figures on a rule, not boxes inside the card */
+.report-metric { background: none; border: 0; border-top: 1px solid var(--v4-rule); border-radius: 0; padding: 10px 0 0; }
+.report-metric__value, .report-metric strong { font-family: var(--font-mono); font-weight: 500; }
+
+/* Urakat ja kohdehaku: the profile list is a plain column; regions wrap freely */
+.search-profiles-list { background: none; border: 0; border-right: 1px solid var(--v4-rule); border-radius: 0; padding: 0 16px 0 0; }
+.search-profiles-regions__grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.search-profiles-regions__grid .form-check { min-width: 0; overflow-wrap: anywhere; }
+.search-profiles-sidepanel { position: static; }
+@media (max-width: 1280px) { .search-profiles-layout { grid-template-columns: 200px minmax(0, 1fr); } .search-profiles-sidepanel { grid-column: 1 / -1; } }
+
+/* Webhookit: event groups separated by a rule, not boxed */
+.event-fieldset { border: 0; border-top: 1px solid var(--v4-rule); border-radius: 0; padding: 12px 0 0; }
+
+/* Tehtävät: rows on rules inside their section */
+.task-row { border: 0; border-bottom: 1px solid var(--v4-rule); border-radius: 0; padding: 10px 2px; }
+.task-row:hover { background: var(--color-card-hover); }
+
+.form-helper { max-width: 68ch; }
+.search-profiles-list__off { display: block; font-size: 12px; color: var(--color-text-secondary); }
+.search-profiles-sidepanel { background: none; border: 0; border-left: 1px solid var(--v4-rule); border-radius: 0; padding: 0 0 0 16px; }
+.form-helper { max-width: 56ch; }
+
+/* ==========================================================================
+   Liidit (leads/index.html, list.html) and Isännöitsijät (insights)
+   ========================================================================== */
+
+.leads-page .leads-work { border-radius: 8px; box-shadow: none; }
+.leads-toolbar { min-height: 48px; }
+.leads-opp-tab { font-weight: 500; }
+.leads-quick-filters { gap: 6px 22px; align-items: baseline; }
+.leads-quick-filter { flex-direction: row; align-items: baseline; gap: 6px; }
+.leads-quick-filter__label { font-size: 13px; font-weight: 400; color: var(--color-text-secondary); margin: 0; }
+.leads-quick-filter__select.form-input {
+  min-height: 0; height: auto; width: auto; max-width: 190px; padding: 2px 16px 2px 0; border: 0; border-bottom: 1px dotted var(--color-text-secondary);
+  border-radius: 0; background-color: transparent; font-weight: 500; font-size: 13.5px; color: var(--color-text-primary); box-shadow: none;
+}
+.lead-row { border-radius: 0; }
+.lead-row .badge-new, .lead-row .badge { background: none; padding: 0; color: var(--color-accent); font-size: 12px; }
+.lead-row__value, .leads-footer__count { font-family: var(--font-mono); }
+
+.insights-table th { font-family: var(--font-family) !important; }
+.insights-count { background: none !important; padding: 0 !important; font-family: var(--font-mono); font-weight: 500; color: var(--color-text-primary); }
+.insights-table td.num, .insights-table .num { font-family: var(--font-mono); }
+
+/* ==========================================================================
+   Soittolista (tasks/calls.html): a call sheet
+   ========================================================================== */
+
+.calls-list { background: var(--color-card); border: 1px solid var(--v4-rule); border-radius: 8px; padding: 0 18px; gap: 0 !important; counter-reset: none; }
+.call-card {
+  display: grid !important;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(320px, 0.9fr);
+  column-gap: 18px;
+  align-items: start;
+  background: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--v4-rule) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 16px 0 !important;
+  margin: 0 !important;
+}
+.call-card:last-child { border-bottom: 0 !important; }
+.call-card__n { color: var(--color-text-secondary); padding-top: 2px; }
+.call-card:first-child .call-card__n { color: var(--color-accent); font-weight: 500; }
+.call-card__title { font-size: 15px; font-weight: 600; }
+.call-card__late { background: none; color: var(--color-warning-emphasis); padding: 0; font-size: 12.5px; font-weight: 500; }
+.call-card__tag { display: none; }
+.call-card__pts { margin: 8px 0 6px; }
+.call-card__phone { font-family: var(--font-mono); font-size: 17px; font-weight: 500; color: var(--color-text-primary); letter-spacing: -0.2px; }
+.call-card__phone:hover { color: var(--color-accent); }
+.call-card__form { gap: 8px; }
+@media (max-width: 900px) {
+  .call-card { grid-template-columns: 24px minmax(0, 1fr); row-gap: 10px; }
+  .call-card__form { grid-column: 2; }
+}
+
+/* Tehtävät: sections are headed groups on the page */
+.task-section { background: none; border: 0; box-shadow: none; padding: 0; margin-bottom: 28px; }
+.task-section__header, .task-section > header { padding: 0 0 8px; border-bottom: 1px solid var(--color-text-primary); }
+.call-card__outcomes { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.call-card__outcomes .btn { width: 100%; }
+.call-card__outcomes .btn-primary { order: -1; }
+/* mono is for figures only: values that can be words stay in the text face */
+.lead-row__value, .dash-stat__value, .leads-footer__count { font-family: var(--font-family) !important; font-variant-numeric: tabular-nums; }
+.insights-count { font-family: var(--font-family) !important; }
+
+/* ==========================================================================
+   Kirjautuminen ja esittely (auth/login.html, login.css)
+   ========================================================================== */
+
+.lp-hero__title { font-weight: 600; letter-spacing: -1.4px; }
+.lp-hero__lead { max-width: 58ch; }
+.lp-section__lead, .lp-card__lead { max-width: 62ch; }
+.lp-hero__points { list-style: none; padding: 0; margin-top: 20px; border-top: 1px solid var(--v4-rule); max-width: 58ch; }
+.lp-hero__points li { padding: 8px 0 8px 0 !important; border-bottom: 1px solid var(--v4-rule); }
+.lp-hero__points li::before, .lp-hero__points svg { display: none !important; }
+.lp-card { box-shadow: none !important; border: 1px solid var(--v4-rule) !important; border-radius: 10px !important; }
+.lp-btn { border-radius: 6px !important; box-shadow: none !important; }
+.lp-btn:hover { transform: translateY(-1px); }
+.lp-btn:active { transform: scale(0.98); }
+
+/* demo: one sheet with ruled rows, reasons as text, the score as a figure */
+.lp-target { border: 0 !important; border-bottom: 1px solid var(--v4-rule) !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; }
+.lp-target:last-child { border-bottom: 0 !important; }
+.lp-reason { background: none !important; border: 0 !important; padding: 0 !important; color: var(--color-text-secondary); font-size: 12.5px; }
+.lp-reason + .lp-reason::before { content: "· "; }
+.lp-score { background: none !important; border: 0 !important; }
+.lp-score__value { font-family: var(--font-mono); font-weight: 500; }
+.lp-learn { background: none !important; border: 0 !important; border-left: 2px solid var(--v4-rule) !important; border-radius: 0 !important; padding-left: 12px !important; }
+
+/* trade and benefit columns sit on a rule, not in boxes */
+.lp-segment, .lp-benefit { background: none !important; border: 0 !important; border-top: 1px solid var(--color-text-primary) !important; border-radius: 0 !important; box-shadow: none !important; padding: 14px 4px 0 0 !important; }
+.lp-cta { box-shadow: none !important; border-radius: 10px !important; }
+/* the score's label is said once, on the first row */
+.lp-target:not(:first-child) .lp-score__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* explanatory paragraphs stay a readable measure everywhere (line-length) */
+.app-main p.text-muted, .app-main p.text-sm, .app-main .card-body > p { max-width: 62ch; }
+p.form-helper { max-width: 460px !important; }
+/* counts in tables are figures; the available count is the accent figure */
+.insights-table td.num .badge { background: none; padding: 0; color: var(--color-accent); font-weight: 600; font-family: var(--font-mono); font-size: 13px; }

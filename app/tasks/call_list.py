@@ -17,6 +17,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.leads.models import Lead
 from app.leads.services import LeadService
+from app.listings.pts import pts_from_text
 from app.tasks.models import Task
 from app.tasks.services import TaskService, TaskServiceError, get_task_for_org
 
@@ -160,6 +161,7 @@ def call_row(task: Task, now: datetime | None = None) -> dict:
         "timing": str(meta.get("remontin_ajankohta") or "").strip(),
         "city": (meta.get("kaupunki") or "").strip(),
         "late": _aware(task.due_date) < start_of_today,
+        "pts": pts_from_text((meta.get("remonttityyppi") or "").strip(), str(meta.get("remontin_ajankohta") or "")),
     }
 
 

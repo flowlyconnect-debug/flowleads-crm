@@ -816,14 +816,8 @@ def dashboard():
     from app.listings.target_services import count_reserve, count_targets, top_target_rows
     from app.tasks.call_list import call_list, call_row
 
-    from app.listings.pts import pts_from_text
-
     due_calls = call_list(organization_id, user_id=current_user.id)["due"]
-    dash_calls = []
-    for task in due_calls[:6]:
-        row = call_row(task)
-        row["pts"] = pts_from_text(row["renovation"], row["timing"])
-        dash_calls.append(row)
+    dash_calls = [call_row(task) for task in due_calls[:6]]
 
     return render_template(
         "analytics/dashboard.html",

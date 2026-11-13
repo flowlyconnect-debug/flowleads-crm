@@ -289,7 +289,7 @@
                  data-has-phone="{{ '1' if (listing.isannoitsija_puh or '').strip() else '0' }}"
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
-            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new">uusi</span>{% endif %}</span>
+            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}</span>
             <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}</span>
           </div>
           <div class="target-row__pts">{{ pts_cells(row.pts) }}</div>

@@ -1,9 +1,6 @@
 {% macro empty_state(icon, title, body, cta_text=None, cta_url=None, secondary_text=None, secondary_url=None) %}
 <div class="empty-state">
-  <span class="empty-state-mark" aria-hidden="true">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13.5 6.5 6h11L20 13.5"/><path d="M4 13.5V18h16v-4.5h-5a3 3 0 0 1-6 0z"/></svg>
-  </span>
-  <h3>{{ title }}</h3>
+  <h2 class="empty-state__title">{{ title }}</h2>
   {% if body %}
   <p>{{ body }}</p>
   {% endif %}
