@@ -837,7 +837,7 @@ def test_superadmin_create_key_after_2fa(client, app):
         sess[TWO_FA_SESSION_KEY] = True
 
     response = client.post(
-        "/admin/api-keys",
+        "/settings/api-keys",
         data={
             "name": "cross org",
             "organization_id": org_id,
@@ -845,7 +845,16 @@ def test_superadmin_create_key_after_2fa(client, app):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Copy this API key now" in response.data or b"Show and copy API key" in response.data
+    assert "Kopioi avain nyt" in response.get_data(as_text=True)
+    with app.app_context():
+        from app.api.models import APIKey
+
+        assert APIKey.query.filter_by(organization_id=org_id, name="cross org").count() == 1
+
+    # the old all-organization page is gone: Järjestelmäraportit lists every key
+    old_page = client.get("/admin/api-keys")
+    assert old_page.status_code == 302
+    assert old_page.location.endswith("/admin/reports")
 
 
 def test_full_key_shown_only_once(client, app):

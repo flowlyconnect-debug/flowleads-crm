@@ -29,23 +29,6 @@ def get_organization_users(organization_id: int) -> list[User]:
     return User.query.filter_by(organization_id=organization_id).order_by(User.email).all()
 
 
-def get_dashboard_stats() -> dict:
-    orgs = get_accessible_organizations()
-    user_count = 0
-    if current_user.role == "superadmin":
-        user_count = User.query.count()
-    elif current_user.organization_id:
-        user_count = User.query.filter_by(organization_id=current_user.organization_id).count()
-
-    stats = {
-        "organization_count": len(orgs),
-        "user_count": user_count,
-    }
-    if current_user.role == "superadmin":
-        stats["ai_usage"] = get_ai_usage_stats()
-    return stats
-
-
 def get_ai_usage_stats() -> dict:
     completed = Activity.query.filter_by(type="ai_enriched").all()
     total_enrichments = 0

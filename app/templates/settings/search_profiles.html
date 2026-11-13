@@ -12,7 +12,7 @@
           <h1 class="settings-panel__title">Urakat ja kohdehaku</h1>
           <p class="settings-panel__subtitle">Valitse urakat (remonttityypit), joita teette. Kun taloyhtiössä on tulossa jokin niistä, kohde ilmestyy Kohteet-sivulle, josta siirrät kiinnostavat liideiksi.</p>
           {% if page_error %}
-          <p class="form-helper mt-2" style="color:#991B1B;" role="alert">{{ page_error }}</p>
+          <p class="form-helper mt-2" style="color:var(--color-danger-emphasis);" role="alert">{{ page_error }}</p>
           {% endif %}
         </header>
 
@@ -196,7 +196,7 @@
                   data-confirm="Poistetaanko hakuprofiili {{ selected_profile.name }}?"
                   onsubmit="return confirm(this.dataset.confirm);">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn-secondary btn-sm" style="color:#B91C1C;border-color:#FECACA;">Poista profiili</button>
+              <button type="submit" class="btn btn-secondary btn-sm" style="color:var(--color-danger-emphasis);border-color:var(--color-danger-soft);">Poista profiili</button>
             </form>
             {% endif %}
             {% else %}
@@ -240,7 +240,7 @@
                   {% if not selected_profile.is_active %}
                   <span class="badge badge-inactive">Profiili pois käytöstä</span>
                   {% elif selected_profile.needs_rematch %}
-                  <span class="badge" style="background:#FEF3C7;color:#92400E;">Haetaan osumia…</span>
+                  <span class="badge" style="background:var(--color-warning-soft);color:var(--color-warning-emphasis);">Haetaan osumia…</span>
                   {% else %}
                   <span class="badge badge-active">Seuraa uusia kohteita</span>
                   {% endif %}

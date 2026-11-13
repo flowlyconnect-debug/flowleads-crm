@@ -33,7 +33,7 @@
         <td>{{ (b.created_at|helsinki).strftime('%Y-%m-%d %H:%M') }}</td>
         <td>
           <a class="btn secondary" href="{{ url_for('backups.backups_download', filename=b.filename) }}">Lataa</a>
-          <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--danger); color: #fff;">Palauta</a>
+          <a class="btn" href="{{ url_for('backups.backups_restore', filename=b.filename) }}" style="background: var(--color-danger); color: var(--color-text-inverse);">Palauta</a>
         </td>
       </tr>
       {% endfor %}

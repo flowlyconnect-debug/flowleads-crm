@@ -134,7 +134,7 @@ def test_lead_settings_page_get_and_post(client, app):
     response = client.get("/settings/leads")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Liidiasetukset" in html
+    assert "Liidit ja koosteet" in html
     assert 'action="/settings/leads"' in html or "action=\"/settings/leads\"" in html
 
     save_resp = client.post(

@@ -57,7 +57,7 @@
                 <td><code>{{ key.key_prefix }}…</code></td>
                 <td>{{ 'kyllä' if key.is_active and not key.revoked_at else 'ei' }}</td>
                 <td>{{ (key.last_used_at|helsinki).strftime('%d.%m.%Y %H.%M') if key.last_used_at else '—' }}</td>
-                <td>{{ key.expires_at or '—' }}</td>
+                <td>{{ (key.expires_at|helsinki).strftime('%d.%m.%Y') if key.expires_at else '—' }}</td>
                 <td>{{ key.request_count }}</td>
                 <td>{{ (key.created_at|helsinki).strftime('%d.%m.%Y %H.%M') if key.created_at else '—' }}</td>
                 <td>

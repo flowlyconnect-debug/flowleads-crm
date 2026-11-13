@@ -5,9 +5,8 @@ from flask_login import current_user, login_required
 from app.admin.constants import FEATURE_CATALOG
 from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
-from app.admin.services import get_accessible_organizations, get_dashboard_stats, list_customers_summary
+from app.admin.services import list_customers_summary
 from app.billing.plans import TRIAL_DAYS
-from app.api.services import APIKeyServiceError, create_api_key, list_api_keys, revoke_api_key
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
 from app.search.constants import REMONTTITYYPIT
@@ -19,27 +18,6 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 # Secrets shown once (new API key, temporary password, invite link) wait on
 # the server, not in the readable session cookie: app/core/one_time_secrets.py
-
-
-def _store_pending_admin_api_key(organization_id: int, full_key: str) -> None:
-    from app.core import one_time_secrets
-
-    one_time_secrets.remember(
-        "admin_api_key", {"organization_id": int(organization_id), "full_key": full_key}, current_user.id
-    )
-
-
-def _pending_admin_api_key_exists() -> bool:
-    from app.core import one_time_secrets
-
-    return bool(one_time_secrets.pending("admin_api_key", current_user.id))
-
-
-def _consume_pending_admin_api_key() -> str | None:
-    from app.core import one_time_secrets
-
-    payload = one_time_secrets.consume("admin_api_key", current_user.id)
-    return (str(payload.get("full_key") or "").strip() or None) if payload else None
 
 
 def _store_onboarding_result(result: dict) -> None:
@@ -59,13 +37,11 @@ def _consume_onboarding_result() -> dict | None:
 @require_role("superadmin", "admin")
 @require_2fa
 def dashboard():
-    stats = get_dashboard_stats()
-    organizations = get_accessible_organizations()
-    return render_template(
-        "admin/dashboard.html",
-        stats=stats,
-        organizations=organizations,
-    )
+    """The old "Hallintapaneeli" (two counts and the AI usage) is part of
+    Järjestelmäraportit now; a customer admin lands on their own settings."""
+    if current_user.is_superadmin():
+        return redirect(url_for("analytics.admin_reports"))
+    return redirect(url_for("settings.team_members"))
 
 
 @admin_bp.route("/customers")
@@ -759,59 +735,9 @@ def catalogue_import_template():
 @require_role("superadmin")
 @require_2fa
 def api_keys():
-    keys = list_api_keys()
-    organizations = get_accessible_organizations()
-    return render_template(
-        "admin/api_keys.html",
-        keys=keys,
-        organizations=organizations,
-        has_pending_key=_pending_admin_api_key_exists(),
-    )
-
-
-@admin_bp.route("/api-keys", methods=["POST"])
-@login_required
-@require_role("superadmin")
-@require_2fa
-def create_api_key_route():
-    try:
-        organization_id = int(request.form.get("organization_id") or 0)
-    except (TypeError, ValueError):
-        organization_id = 0
-
-    name = request.form.get("name", "").strip()
-    if not organization_id:
-        flash("Organization is required.", "danger")
-        return redirect(url_for("admin.api_keys"))
-
-    from flask import current_app
-
-    try:
-        api_key, full_key = create_api_key(
-            organization_id,
-            name,
-            created_by=current_user.id,
-            test_mode=bool(current_app.config.get("TESTING")),
-        )
-        db.session.commit()
-    except APIKeyServiceError as exc:
-        db.session.rollback()
-        flash(exc.message, "danger")
-        return redirect(url_for("admin.api_keys"))
-
-    _store_pending_admin_api_key(organization_id, full_key)
-    return redirect(url_for("admin.api_keys"))
-
-
-@admin_bp.route("/api-keys/reveal-latest", methods=["POST"])
-@login_required
-@require_role("superadmin")
-@require_2fa
-def reveal_latest_api_key():
-    full_key = _consume_pending_admin_api_key()
-    if not full_key:
-        return jsonify({"success": False, "error": "No pending API key available."}), 404
-    return jsonify({"success": True, "data": {"api_key": full_key}})
+    """Old bookmark: keys are created per organization in Asetukset ->
+    API-avaimet; every organization's keys are listed in Järjestelmäraportit."""
+    return redirect(url_for("analytics.admin_reports"))
 
 
 @admin_bp.route("/predictions/run-batch", methods=["POST"])
@@ -869,18 +795,3 @@ def reset_running_test_jobs_route():
 
     result = reset_running_test_jobs()
     return jsonify(result)
-
-
-@admin_bp.route("/api-keys/<int:key_id>", methods=["POST", "DELETE"])
-@login_required
-@require_role("superadmin")
-@require_2fa
-def revoke_api_key_route(key_id: int):
-    try:
-        revoke_api_key(key_id, revoked_by=current_user.id)
-        db.session.commit()
-        flash("API key revoked.", "success")
-    except APIKeyServiceError as exc:
-        db.session.rollback()
-        flash(exc.message, "danger")
-    return redirect(url_for("admin.api_keys"))

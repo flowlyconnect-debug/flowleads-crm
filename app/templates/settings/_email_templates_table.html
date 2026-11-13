@@ -1,0 +1,40 @@
+{# The template table: on the Sähköposti page (admins) and the read-only
+   Sähköpostimallit page (myyjät). Needs templates, can_edit, organization_id. #}
+{% from "_macros.html" import empty_state %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nimi</th>
+        <th>Tyyppi</th>
+        <th>Aihe</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in templates %}
+      <tr>
+        <td>{{ t.name }}</td>
+        <td>{{ 'Järjestelmä' if t.is_system else 'Organisaatio' }}</td>
+        <td class="truncate">{{ t.subject_template }}</td>
+        <td>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.email_templates_preview', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_preview', template_id=t.id) }}">Esikatselu</a>
+          {% if can_edit and (not t.is_system or current_user.is_superadmin()) %}
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('settings.email_templates_edit', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_edit', template_id=t.id) }}">Muokkaa</a>
+          {% endif %}
+          {% if can_edit and not t.is_system %}
+          <form method="post" action="{{ url_for('settings.email_templates_delete', template_id=t.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_delete', template_id=t.id) }}" class="form-row-inline" onsubmit="return confirm('Poistetaanko malli?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary btn-sm">Poista</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">
+        {% call empty_state('Ei malleja', 'Luo ensimmäinen sähköpostimalli.') %}{% endcall %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

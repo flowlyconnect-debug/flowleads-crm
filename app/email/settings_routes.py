@@ -60,13 +60,30 @@ def email_settings():
         return redirect(url_for("settings.email_settings", organization_id=org_id))
 
     dns_records = request.args.get("_show_dns") and _consume_dns_records(org_id)
+    # one "Sähköposti" page for admins: the sender and the templates together
     return render_template(
         "settings/email.html",
         form=form,
         organization=org,
         organization_id=org_id,
         dns_records=dns_records,
+        templates=_visible_templates(org_id),
+        can_edit=True,
     )
+
+
+def _visible_templates(org_id: int):
+    seed_system_email_templates(commit=True)
+    templates = TemplateService.list_for_organization(org_id)
+    if not current_user.is_superadmin():
+        # customers see the templates they can use; the app's own notification
+        # templates are maintained by the platform
+        from app.email.seed import INTERNAL_TEMPLATE_NAMES
+
+        templates = [
+            t for t in templates if not (t.organization_id is None and t.name in INTERNAL_TEMPLATE_NAMES)
+        ]
+    return templates
 
 
 _DNS_RECORDS_SESSION = "pending_mailgun_dns_records"
@@ -137,22 +154,16 @@ def email_domain_verify():
 @require_role("admin", "superadmin", "user")
 def email_templates_list():
     org_id = _settings_org_id()
-    seed_system_email_templates(commit=True)
-    templates = TemplateService.list_for_organization(org_id)
-    if not current_user.is_superadmin():
-        # customers see the templates they can use; the app's own notification
-        # templates are maintained by the platform
-        from app.email.seed import INTERNAL_TEMPLATE_NAMES
-
-        templates = [
-            t for t in templates if not (t.organization_id is None and t.name in INTERNAL_TEMPLATE_NAMES)
-        ]
-    can_edit = current_user.role in ("admin", "superadmin")
+    templates = _visible_templates(org_id)
+    if current_user.role in ("admin", "superadmin"):
+        # admins manage the templates on the Sähköposti page, next to the sender
+        kwargs = {"organization_id": org_id} if current_user.is_superadmin() else {}
+        return redirect(url_for("settings.email_settings", _anchor="mallit", **kwargs))
     return render_template(
         "settings/email_templates.html",
         templates=templates,
         organization_id=org_id,
-        can_edit=can_edit,
+        can_edit=False,
     )
 
 

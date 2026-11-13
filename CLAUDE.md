@@ -64,6 +64,10 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `plans.py`; an ended trial blocks fetching and transferring targets only). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
+- Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
+  myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
+  koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`
+  (`/admin/dashboard` and `/admin/api-keys` redirect). Tests: `tests/test_settings_pages.py`.
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run

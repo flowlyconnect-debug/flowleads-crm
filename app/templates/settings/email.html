@@ -8,8 +8,8 @@
     <div class="settings-content">
       <div class="settings-panel">
         <header class="settings-panel__header">
-          <h1 class="settings-panel__title">Sähköpostiasetukset</h1>
-          <p class="settings-panel__subtitle">Millä nimellä ja osoitteella liideille lähetetyt sähköpostit lähtevät.</p>
+          <h1 class="settings-panel__title">Sähköposti</h1>
+          <p class="settings-panel__subtitle">Millä nimellä ja osoitteella liideille lähetetyt sähköpostit lähtevät, ja organisaation viestipohjat.</p>
         </header>
 
         <form method="post" action="{{ url_for('settings.email_settings', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_settings') }}">
@@ -87,6 +87,19 @@
           {% endif %}
         </div>
         {% endif %}
+        <hr class="form-divider">
+        <section id="mallit" class="email-templates-section" aria-labelledby="email-templates-title">
+          <header class="page-header">
+            <div class="page-header__main">
+              <h2 class="form-section-title" id="email-templates-title">Sähköpostimallit</h2>
+              <p class="form-helper">Valmiit viestipohjat liidin sähköpostiin, automaatioihin ja tarjouksiin.</p>
+            </div>
+            <div class="page-header__actions">
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.email_templates_new_form', organization_id=organization_id) if current_user.is_superadmin() else url_for('settings.email_templates_new_form') }}">Uusi malli</a>
+            </div>
+          </header>
+          {% include "settings/_email_templates_table.html" %}
+        </section>
       </div>
     </div>
   </div>
