@@ -68,6 +68,7 @@
     .cmd-item-meta { font-size:11px; color:#8A94A6; }
   </style>
   {% block head %}{% endblock %}
+  {% if ui_redesign %}<link rel="stylesheet" href="{{ url_for('static', filename='css/redesign.css') }}">{% endif %}
 </head>
 <body class="{% if current_user.is_authenticated %}app-authenticated{% else %}app-guest{% endif %}{% block body_class %}{% endblock %}">
   {% if current_user.is_authenticated %}

@@ -517,6 +517,7 @@ def _register_root_routes(app):
             "active_org_id": _nav_org_id(),
             "active_org_name": _nav_org_name(),
             "has_endpoint": has_endpoint,
+            "ui_redesign": app.config.get("UI_REDESIGN", False),
             "stage_label": stage_label_fi,
             "source_label": source_label_fi,
             "STAGE_LABELS_FI": STAGE_LABELS_FI,

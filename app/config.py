@@ -99,6 +99,9 @@ class Config:
     # "Hae kohteita" on the Kohteet page: new matches wait in a reserve and the
     # customer releases a batch of varying size with the button, at most once
     # per cooldown. Off = every match is visible as soon as it is found.
+    # UI v2 (app/static/css/redesign.css): type, radius, flat surfaces and
+    # hover motion on top of the unchanged colour tokens. Off until approved.
+    UI_REDESIGN = os.environ.get("UI_REDESIGN", "false").lower() in ("1", "true", "yes")
     TARGET_FETCH_ENABLED = os.environ.get("TARGET_FETCH_ENABLED", "true").lower() in ("1", "true", "yes")
     TARGET_FETCH_MIN = int(os.environ.get("TARGET_FETCH_MIN", "3"))
     TARGET_FETCH_MAX = int(os.environ.get("TARGET_FETCH_MAX", "8"))
