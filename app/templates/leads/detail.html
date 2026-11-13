@@ -320,7 +320,7 @@
                 <li class="activity-item">
                   {% set kind = act.type|lower %}
                   <div class="activity-icon {{ 'note' if 'note' in kind else '' }}{{ ' email' if 'email' in kind else '' }}{{ ' stage' if 'stage' in kind else '' }}{{ ' task' if 'task' in kind else '' }}{{ ' ai' if 'ai' in kind else '' }}">
-                    {% if 'email' in kind %}✉{% elif 'stage' in kind %}⬆{% elif 'task' in kind %}☑{% elif 'ai' in kind %}✦{% else %}●{% endif %}
+                    
                   </div>
                   <div class="activity-content">
                     <div class="activity-title">{{ ACTIVITY_LABELS_FI.get(act.type, act.type) }}</div>
@@ -354,7 +354,7 @@
               <ul class="activity-feed mt-2">
                 {% for task in lead_tasks if task.status not in ['completed', 'cancelled'] %}
                 <li class="activity-item{% if task.is_overdue %} task-overdue-item{% endif %}">
-                  <div class="activity-icon task">☑</div>
+                  <div class="activity-icon task"></div>
                   <div class="activity-content">
                     <div class="activity-title">
                       {{ task.title }}
@@ -374,7 +374,7 @@
                 </li>
                 {% else %}
                 <li class="activity-item">
-                  <div class="activity-icon task">☑</div>
+                  <div class="activity-icon task"></div>
                   <div class="activity-content">
                     <div class="activity-title">Ei avoimia tehtäviä</div>
                     <div class="activity-body text-secondary">Lisää tehtävä pitääksesi seuraavat askeleet näkyvissä.</div>

@@ -723,3 +723,46 @@ p.settings-panel__subtitle, .settings-panel__subtitle { max-width: 460px !import
 /* "Kerro mitä etsit": same inset as the other rows of the sheet */
 .targets-ask { padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--v4-rule); gap: 10px; align-items: center; }
 .targets-ask__label { font-size: 13px; font-weight: 500; white-space: nowrap; }
+
+/* ==========================================================================
+   Second detector pass (antislopdev UI-01/05/16/25/37, impeccable advisories)
+   ========================================================================== */
+
+/* headings and running text wrap without a lone last word */
+h1, h2, h3, .lp-hero__title, .lp-section__title { text-wrap: balance; }
+p, li, dd { text-wrap: pretty; }
+
+/* close and remove controls: a drawn x, never an emoji */
+.icon-close { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.icon-close:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); }
+.leads-opp-chip__x, .targets-saved__icon { display: inline-grid; place-items: center; }
+.i-x { display: block; }
+.btn-link-plain { border: 0; background: none; padding: 0; font: inherit; color: var(--color-accent); cursor: pointer; }
+.btn-link-plain:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* activity timeline and system checks: a small dot carries the kind */
+.activity-icon { width: 9px !important; height: 9px !important; min-width: 9px; border-radius: 50%; background: var(--color-card) !important; border: 1.5px solid var(--color-text-secondary); font-size: 0 !important; padding: 0 !important; margin-top: 6px; }
+.activity-icon.email { border-color: var(--color-info); }
+.activity-icon.stage { border-color: var(--color-accent); }
+.activity-icon.task { border-color: var(--color-success); }
+.system-check__mark { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-secondary); margin-right: 8px; vertical-align: middle; }
+.system-check--ok .system-check__mark { background: var(--color-success); }
+.system-check--warn .system-check__mark { background: var(--color-warning); }
+.system-check--fail .system-check__mark { background: var(--color-danger); }
+
+/* stat labels in the search-profile panel: sentence case, no tracking (UI-01) */
+.search-profiles-stats dt { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px; color: var(--color-text-secondary); }
+
+/* phone width: nothing wider than the screen (UI-37) */
+@media (max-width: 600px) {
+  .page-header, .leads-header { flex-wrap: wrap; gap: 10px; }
+  .page-header__actions, .leads-header__actions { flex-wrap: wrap; }
+  .search-profiles-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .search-profiles-list { border-right: 0; border-bottom: 1px solid var(--v4-rule); padding: 0 0 12px; }
+  .search-profiles-regions, .search-profiles-regions__grid { min-width: 0; max-width: 100%; }
+  .search-profiles-regions__grid { grid-template-columns: minmax(0, 1fr); }
+  fieldset { min-width: 0; }
+}
+.tasks-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.tasks-header .page-header__actions { flex-wrap: wrap; }
+@media (max-width: 600px) { .tasks-header .page-header__actions select { max-width: 100%; } }

@@ -38,7 +38,7 @@
     <div class="cond cond-lead_stage_changed" style="display:none;">
       <label>Kohdevaihe
         <select name="to_stage_id">
-          <option value="">— mikä tahansa —</option>
+          <option value="">mikä tahansa</option>
           {% for s in stages %}
           <option value="{{ s.id }}" {% if tc.get('to_stage_id') == s.id %}selected{% endif %}>{{ s.name }}</option>
           {% endfor %}
@@ -77,7 +77,7 @@
     <div class="cond cond-sequence_completed" style="display:none;">
       <label>Sekvenssi
         <select name="sequence_id">
-          <option value="">— mikä tahansa —</option>
+          <option value="">mikä tahansa</option>
           {% for seq in sequences %}
           <option value="{{ seq.id }}" {% if tc.get('sequence_id') == seq.id %}selected{% endif %}>{{ seq.name }}</option>
           {% endfor %}

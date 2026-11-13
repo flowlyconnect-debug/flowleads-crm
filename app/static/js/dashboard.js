@@ -309,7 +309,7 @@
         : '') +
       '<span class="lead-next' + (why.tone === 'urgent' ? ' lead-next--urgent' : '') + '">' +
       escapeHtml(row.next) +
-      '<span class="lead-next__arrow" aria-hidden="true">→</span></span>' +
+      '</span>' +
       '</a>'
     );
   }
@@ -351,7 +351,7 @@
       '<span class="dash-focus__next-text">' + escapeHtml(row.next) + '</span>' +
       '</div>' +
       '<div class="dash-focus__cta">' +
-      '<a class="btn btn-primary btn-lg dash-focus__open" href="' + escapeHtml(row.url) + '">Avaa liidi <span aria-hidden="true">→</span></a>' +
+      '<a class="btn btn-primary btn-lg dash-focus__open" href="' + escapeHtml(row.url) + '">Avaa liidi</a>' +
       '<button type="button" class="dash-focus__skip">Ohita toistaiseksi</button>' +
       '</div>' +
       '</div>' +
@@ -406,7 +406,7 @@
         newCount + (newCount === 1 ? ' uusi liidi' : ' uutta liidiä') +
         ' viimeisen 7 päivän aikana.</strong> Ei kiireellisiä toimia.</div>' +
         '<a class="btn btn-primary btn-sm" href="' + escapeHtml(newUrl) + '">' +
-        (newCount === 1 ? 'Katso uusi liidi' : 'Katso uudet liidit') + ' <span aria-hidden="true">→</span></a>' +
+        (newCount === 1 ? 'Katso uusi liidi' : 'Katso uudet liidit') + '</a>' +
         '</div>';
       return;
     }

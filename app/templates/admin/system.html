@@ -19,7 +19,7 @@
         <ul class="system-checks">
           {% for check in checks %}
           <li class="system-check system-check--{{ check.status }}">
-            <span class="system-check__mark" aria-hidden="true">{{ {'ok': '✓', 'warn': '!', 'fail': '✕', 'info': 'i'}[check.status] }}</span>
+            <span class="system-check__mark" aria-hidden="true"></span>
             <span class="sr-only">{{ {'ok': 'Kunnossa', 'warn': 'Varoitus', 'fail': 'Virhe', 'info': 'Tieto'}[check.status] }}:</span>
             <strong>{{ check.name }}</strong>
             <span class="system-check__detail">{{ check.detail }}</span>

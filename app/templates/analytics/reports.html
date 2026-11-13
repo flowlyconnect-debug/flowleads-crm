@@ -6,7 +6,7 @@
   <header class="page-header">
     <div class="page-header__main">
       <h1>Raportit</h1>
-      <p class="page-subtitle">Analytiikkatyötila — pipeline, lähteet, tiimi ja AI</p>
+      <p class="page-subtitle">Myyntiputki, lähteet, tiimi ja AI-rikastus.</p>
     </div>
     <div class="page-header__actions">
       <a class="btn btn-primary btn-sm" href="{{ url_for('analytics.monthly_report_page', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.monthly_report_page') }}">Kuukausiraportti</a>
@@ -170,9 +170,9 @@
             <tr>
               <td>{{ s.stage_name }}</td>
               <td>{{ s.lead_count }}</td>
-              <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
-              <td>{{ s.conversion_from_previous | fi_percent if s.conversion_from_previous is not none else '—' }}</td>
-              <td>{{ s.avg_time_in_stage if s.avg_time_in_stage is not none else '—' }}</td>
+              <td>{{ s.avg_score if s.avg_score is not none else '' }}</td>
+              <td>{{ s.conversion_from_previous | fi_percent if s.conversion_from_previous is not none else '' }}</td>
+              <td>{{ s.avg_time_in_stage if s.avg_time_in_stage is not none else '' }}</td>
             </tr>
             {% else %}
             <tr><td colspan="5">Ei liidejä valitulla kaudella.</td></tr>
@@ -199,7 +199,7 @@
               <td>{{ s.won }}</td>
               <td>{{ s.lost }}</td>
               <td>{{ s.conversion_rate | fi_percent }}</td>
-              <td>{{ s.avg_score if s.avg_score is not none else '—' }}</td>
+              <td>{{ s.avg_score if s.avg_score is not none else '' }}</td>
               <td>{{ s.no_score }}</td>
             </tr>
             {% else %}
@@ -235,7 +235,7 @@
             <tr><td>Yritykset</td><td>{{ report_data.attempts }}</td></tr>
             <tr><td>Valmiit</td><td>{{ report_data.completed }}</td></tr>
             <tr><td>Epäonnistuneet</td><td>{{ report_data.failed }}</td></tr>
-            <tr><td>Keskipiste (rikastetut)</td><td>{{ report_data.avg_score_enriched if report_data.avg_score_enriched is not none else '—' }}</td></tr>
+            <tr><td>Keskipiste (rikastetut)</td><td>{{ report_data.avg_score_enriched if report_data.avg_score_enriched is not none else '' }}</td></tr>
             <tr><td>Tokenit</td><td>{{ report_data.total_tokens }}</td></tr>
           </tbody>
         </table>
