@@ -716,3 +716,10 @@ p.form-helper { max-width: 460px !important; }
 .target-row__fit .target-score > summary { background: none !important; padding: 2px 0; border-radius: 0; font-weight: 500; font-size: 13.5px; }
 .target-row__fit .target-score__parts { box-shadow: var(--shadow-md); border-color: var(--v4-rule); border-radius: 8px; text-align: left; }
 .target-row__signals { color: var(--color-text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+/* Integraatiot: providers are sections on a rule, not cards in the panel */
+.integration-card { background: none !important; border: 0 !important; border-top: 1px solid var(--v4-rule) !important; border-radius: 0 !important; box-shadow: none !important; padding: 16px 0 !important; }
+.settings-panel__subtitle { max-width: 62ch; }
+p.settings-panel__subtitle, .settings-panel__subtitle { max-width: 460px !important; }
+/* "Kerro mitä etsit": same inset as the other rows of the sheet */
+.targets-ask { padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--v4-rule); gap: 10px; align-items: center; }
+.targets-ask__label { font-size: 13px; font-weight: 500; white-space: nowrap; }
