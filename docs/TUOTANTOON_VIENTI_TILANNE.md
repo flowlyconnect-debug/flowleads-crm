@@ -270,6 +270,14 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 - **Järjestelmän tila** `/admin/system` ja `flask system-check`: sähköposti (myös sandbox-domainin tunnistus),
   varmuuskopiot, avaimet ja migraatiot. Aja tämä ensimmäiseksi tuotannossa.
 
+## Ensimmäisen asiakkaan läpikäynti 16.11.2026
+
+Selainläpikäynti (admin + myyjä) ja tietosuoja-auditointi: kokeilu poistettu, lomakkeiden liidien
+ylikirjoitus, lomakkeiden viittaukset toiseen organisaatioon, GDPR-anonymisoinnin jäämät, health/db-tiedot,
+X-Forwarded-Host ja muutama 500-virhe korjattu (testit `test_forms.py`, `test_gdpr.py`, `test_page_smoke.py`).
+Avoinna: isännöitsijän henkilötietojen poisto jaetusta kohdekatalogista (`Listing`) GDPR-pyynnöllä puuttuu;
+myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):
