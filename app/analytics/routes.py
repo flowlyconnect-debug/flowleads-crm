@@ -819,20 +819,22 @@ def dashboard():
             continue
         new_leads.append(lead)
 
-    from app.listings.target_services import count_reserve, count_targets, top_target_rows
+    from app.billing.services import targets_locked
+    from app.listings.target_services import count_targets, top_target_rows
     from app.tasks.call_list import call_list, call_row
 
     due_calls = call_list(organization_id, user_id=current_user.id)["due"]
     dash_calls = [call_row(task) for task in due_calls[:6]]
 
+    dash_targets_locked = not current_user.is_superadmin() and targets_locked(organization_id)
     return render_template(
         "analytics/dashboard.html",
         org_picker=False,
         targets_available=count_targets(organization_id),
-        dash_targets=top_target_rows(organization_id, limit=5),
+        dash_targets=[] if dash_targets_locked else top_target_rows(organization_id, limit=5),
+        targets_locked=dash_targets_locked,
         dash_calls=dash_calls,
         dash_calls_total=len(due_calls),
-        targets_reserve=count_reserve(organization_id),
         now=now,
         new_leads=new_leads,
         organizations=organizations,

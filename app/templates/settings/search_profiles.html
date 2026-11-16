@@ -310,10 +310,9 @@
           out.textContent = data.error || "Esikatselu epäonnistui.";
           return;
         }
-        // addresses are not shown: unreleased targets stay hidden until "Hae kohteita"
         out.textContent = "Näillä ehdoilla sopivia kohteita on nyt " + data.count +
           " (viimeisen " + data.history_days + " päivän kohteista, ilman jo siirrettyjä ja piilotettuja). " +
-          "Ne tulevat näkyviin Kohteet-sivulla Hae kohteita -painikkeella.";
+          "Ne näkyvät Kohteet-sivulla.";
       } catch (err) {
         out.textContent = "Esikatselu epäonnistui.";
       }

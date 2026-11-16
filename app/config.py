@@ -110,14 +110,6 @@ class Config:
         "true",
         "yes",
     )
-    # "Hae kohteita" on the Kohteet page: new matches wait in a reserve and the
-    # customer releases a batch of varying size with the button, at most once
-    # per cooldown. Off = every match is visible as soon as it is found.
-    TARGET_FETCH_ENABLED = os.environ.get("TARGET_FETCH_ENABLED", "true").lower() in ("1", "true", "yes")
-    TARGET_FETCH_MIN = int(os.environ.get("TARGET_FETCH_MIN", "3"))
-    TARGET_FETCH_MAX = int(os.environ.get("TARGET_FETCH_MAX", "8"))
-    TARGET_FETCH_COOLDOWN_MINUTES = int(os.environ.get("TARGET_FETCH_COOLDOWN_MINUTES", "60"))
-    TARGET_FETCH_WAIT_SECONDS = (10, 15)
     LISTING_CRAWL_REGIONS = os.environ.get("LISTING_CRAWL_REGIONS", "all")
     LISTING_INCREMENTAL_MAX_PAGES = int(os.environ.get("LISTING_INCREMENTAL_MAX_PAGES", "10"))
     LISTING_FULL_PAGES_PER_RUN = int(os.environ.get("LISTING_FULL_PAGES_PER_RUN", "30"))
@@ -238,7 +230,6 @@ class TestingConfig(Config):
     SESSION_PROTECTION = None
     # the older Kohteet tests expect matches to be visible at once; the fetch
     # button's own tests switch this on
-    TARGET_FETCH_ENABLED = False
     GEOCODING_ENABLED = False
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")

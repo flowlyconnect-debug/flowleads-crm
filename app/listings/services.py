@@ -695,7 +695,7 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
             status="pending",
             confidence=renovation.confidence,
             created_at=now,
-            released_at=_release_time(now, profile.organization_id, listing),
+            released_at=now,
             score=_initial_score(profile.organization_id, listing, now),
         )
         db.session.add(match)
@@ -774,7 +774,7 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 status="pending",
                 confidence=conf,
                 created_at=now,
-                released_at=_release_time(now, profile.organization_id, listing),
+                released_at=now,
                 score=_initial_score(profile.organization_id, listing, now),
             )
         )
@@ -972,32 +972,6 @@ def _valid_email_or_none(value) -> str | None:
     return email if email and validate_email(email) else None
 
 
-def _release_time(now: datetime, organization_id: int | None = None, listing: Listing | None = None) -> datetime | None:
-    """released_at for a new match: at once, or None (reserve) when customers
-    release targets themselves with "Hae kohteita". A new listing of a housing
-    company the customer already sees is released at once: it is a new signal
-    on a visible target, not a new target."""
-    from flask import current_app
-
-    if not current_app.config.get("TARGET_FETCH_ENABLED"):
-        return now
-    if organization_id is not None and listing is not None and listing.company_key:
-        visible = (
-            db.session.query(ListingMatch.id)
-            .join(Listing, Listing.id == ListingMatch.listing_id)
-            .filter(
-                ListingMatch.organization_id == organization_id,
-                Listing.company_key == listing.company_key,
-                Listing.id != listing.id,
-                ListingMatch.released_at.isnot(None),
-            )
-            .first()
-        )
-        if visible is not None:
-            return now
-    return None
-
-
 def _initial_score(organization_id: int, listing: Listing, now: datetime) -> int:
     """Score of a new match from its own listing; the scheduler refreshes it
     with the rest of the housing company (housing.refresh_scores)."""
@@ -1054,8 +1028,16 @@ def merge_into_existing_leads(
     )
     if profile_ids:
         query = query.filter(ListingMatch.profile_id.in_(profile_ids))
+    from app.billing.services import targets_locked
+
     merged = 0
+    locked: dict[int, bool] = {}
     for match in query.all():
+        # an organization without target access gets nothing new from the catalogue
+        if match.organization_id not in locked:
+            locked[match.organization_id] = targets_locked(match.organization_id)
+        if locked[match.organization_id]:
+            continue
         same = _same_housing_company_lead(match, match.listing)
         if same is not None:
             _merge_into_lead(match, match.listing, same, now)
@@ -1261,22 +1243,9 @@ def save_contacts(listing_id: int, payload: dict, *, now: datetime | None = None
 # ---------------------------------------------------------------------------
 
 
-def profile_match_stats(profile: SearchProfile, *, include_reserve: bool = True) -> dict:
-    """Match counts of a profile. include_reserve=False (what the customer
-    sees): pending matches still in the "Hae kohteita" reserve are left out,
-    so the settings page never shows more than the Kohteet page."""
+def profile_match_stats(profile: SearchProfile) -> dict:
+    """Match counts of a profile."""
     criteria = [ListingMatch.profile_id == profile.id]
-    try:
-        reserve_on = bool(current_app.config.get("TARGET_FETCH_ENABLED"))
-    except RuntimeError:
-        reserve_on = False
-    if reserve_on and not include_reserve:
-        criteria.append(
-            or_(
-                ListingMatch.status != "pending",
-                and_(ListingMatch.released_at.isnot(None), ListingMatch.released_at <= _now()),
-            )
-        )
     rows = (
         db.session.query(ListingMatch.status, func.count(ListingMatch.id))
         .filter(*criteria)
@@ -1294,9 +1263,7 @@ def profile_match_stats(profile: SearchProfile, *, include_reserve: bool = True)
 
     # the same rule as the Kohteet page (one target per listing, not already a
     # lead or hidden through another profile, active listing)
-    available = _visible_match_ids(
-        profile.organization_id, "pending", profile_id=profile.id, include_reserve=include_reserve
-    ).count()
+    available = _visible_match_ids(profile.organization_id, "pending", profile_id=profile.id).count()
     return {
         "total": sum(counts.values()),
         "lead_created": counts.get("lead_created", 0),
@@ -1438,10 +1405,6 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
     matches = dict(
         db.session.query(ListingMatch.status, func.count(ListingMatch.id)).group_by(ListingMatch.status).all()
     )
-    # pending matches still waiting for the customer's "Hae kohteita"
-    reserve = (
-        ListingMatch.query.filter(ListingMatch.status == "pending", ListingMatch.released_at.is_(None)).count()
-    )
     recent_failures = (
         Listing.query.filter(Listing.analysis_status == "failed", Listing.is_active.is_(True))
         .order_by(Listing.id.desc())
@@ -1476,8 +1439,6 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
         "contacts": contacts,
         "matches": {
             "pending": matches.get("pending", 0),
-            "reserve": reserve,
-            "released": max(0, matches.get("pending", 0) - reserve),
             "lead_created": matches.get("lead_created", 0),
             "merged": matches.get("merged", 0),
         },

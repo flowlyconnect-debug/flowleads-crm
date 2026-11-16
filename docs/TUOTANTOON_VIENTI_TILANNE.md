@@ -128,7 +128,7 @@ passiiviseksi, sen käyttäjät eivät pääse kirjautumaan ennen kuin se otetaa
   varastosta vapautuu vaihteleva määrä kohteita (`TARGET_FETCH_MIN`–`TARGET_FETCH_MAX`, oletus 3–8, uusimmat
   ensin). Yksi haku tunnissa per organisaatio (`TARGET_FETCH_COOLDOWN_MINUTES`), myös kun mitään ei löytynyt;
   superadminia raja ei koske. Superadmin näkee Kohteet-sivulla varaston koon. Päiväkooste kertoo tässä tilassa
-  vain, että uusia kohteita on haettavissa. Testit: `tests/test_target_fetch.py`.
+  vain, että uusia kohteita on haettavissa. **Poistettu 16.11.2026**, ks. alla.
 - Tämän repon pilviympäristö `flowleads-crm` sallii tuotanto-osoitteen, joten tuotantoa voi testata
   Claude-istunnosta.
 
@@ -284,6 +284,18 @@ puuttuvan salausavaimen englanninkielinen virhe korjattu.
 ennen korjausta, sekvenssit/automaatiot voivat olla pois) ja `/admin/system` (avaimet, Mailgun).
 Avoinna: isännöitsijän henkilötietojen poisto jaetusta kohdekatalogista (`Listing`) GDPR-pyynnöllä puuttuu;
 myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
+
+## Tehty 16.11.2026 (2): haku pois, kohteiden käyttö asiakaskohtaiseksi
+
+- **"Hae kohteita" on poistettu** (painike, varasto, tunnin raja, `TARGET_FETCH_*`-asetukset). Asiakas näkee
+  Kohteet-sivulla heti kaikki profiiliinsa osuvat kohteet. Migraatio `d1e2f3a4b5c6` vapauttaa varastossa
+  olleet osumat. Renderin ympäristömuuttujan `TARGET_FETCH_ENABLED` voi poistaa, sitä ei enää lueta.
+- **Kohteiden käyttö päälle/pois asiakkaittain**: `/admin/customers` → Liidejä-sarake → "Ota pois" / "Ota
+  käyttöön" (`organizations.targets_enabled`). Pois päältä asiakas näkee kohteiden määrän (Kohteet-sivu,
+  sivupalkki, kojelauta), mutta ei pääse kohteisiin: lista, kartta, siirto, piilotus, tallennetut haut ja
+  kohdeilmoitukset on suljettu, Isännöitsijät ja taloyhtiökortti näyttävät vain liideiksi siirretyt. Liidit
+  säilyvät. Päättynyt sopimus lukitsee kohteet samalla tavalla (aiemmin esti vain siirron). Superadmin näkee
+  aina kaikki kohteet. Testit: `tests/test_target_access.py`.
 
 ## Seuraavaksi
 

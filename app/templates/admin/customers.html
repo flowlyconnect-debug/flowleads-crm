@@ -75,8 +75,16 @@
               <td>
                 {{ row.lead_count }}
                 <div class="text-muted text-sm">
-                  <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>{% if row.reserve_matches %}, {{ row.reserve_matches }} varastossa{% endif %}
+                  <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>
                 </div>
+                <form method="post" action="{{ url_for('admin.set_customer_targets_route', organization_id=row.org.id) }}" class="customer-sub-form"
+                      data-name="{{ row.org.name }}"
+                      {% if row.org.targets_enabled %}onsubmit="return confirm('Otetaanko kohteiden käyttö pois asiakkaalta ' + this.dataset.name + '? Asiakas näkee kohteiden määrän, mutta ei pääse kohteisiin. Liidit säilyvät.');"{% endif %}>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="enabled" value="{{ '0' if row.org.targets_enabled else '1' }}">
+                  <span class="badge {{ 'badge-active' if row.org.targets_enabled else 'badge-inactive' }}">{{ 'Kohteet käytössä' if row.org.targets_enabled else 'Kohteet pois' }}</span>
+                  <button type="submit" class="btn btn-secondary btn-sm">{{ 'Ota pois' if row.org.targets_enabled else 'Ota käyttöön' }}</button>
+                </form>
               </td>
               <td>{{ row.last_search_label }}</td>
               <td>

@@ -20,11 +20,18 @@ def _ui_users_only():
         abort(403)
 
 
+def _leads_only(organization_id: int) -> bool:
+    """Target access off: these pages show only what is already a lead."""
+    from app.billing.services import targets_locked
+
+    return not current_user.is_superadmin() and targets_locked(organization_id)
+
+
 @insights_bp.route("/managers", methods=["GET"])
 def managers():
     organization_id = resolve_organization_id()
     search = (request.args.get("search") or "").strip()
-    rows = list_managers(organization_id, search)
+    rows = list_managers(organization_id, search, leads_only=_leads_only(organization_id))
     return render_template(
         "insights/managers.html",
         managers=rows,
@@ -37,7 +44,9 @@ def managers():
 @insights_bp.route("/managers/view", methods=["GET"])
 def manager_detail():
     organization_id = resolve_organization_id()
-    manager = get_manager(organization_id, request.args.get("name") or "")
+    manager = get_manager(
+        organization_id, request.args.get("name") or "", leads_only=_leads_only(organization_id)
+    )
     if manager is None:
         abort(404)
     return render_template(
@@ -52,7 +61,7 @@ def manager_detail():
 @insights_bp.route("/housing-companies/<int:listing_id>", methods=["GET"])
 def company_card(listing_id: int):
     organization_id = resolve_organization_id()
-    card = get_company_card(organization_id, listing_id)
+    card = get_company_card(organization_id, listing_id, leads_only=_leads_only(organization_id))
     if card is None:
         abort(404)
     from app.tasks.models import Task

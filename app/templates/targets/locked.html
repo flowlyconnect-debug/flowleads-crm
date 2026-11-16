@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{# Kohteet without target access (app/billing/services.py::targets_locked):
+   the count is shown, the targets themselves are not. #}
+{% block title %}Kohteet — FlowLeads{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
+{% endblock %}
+{% block content %}
+<section class="leads-page targets-page">
+  <header class="leads-header">
+    <div class="leads-header__main">
+      <h1 class="leads-header__title">Kohteet</h1>
+      <p class="leads-header__sub">
+        <span class="mono" data-testid="targets-locked-count">{{ available_count }}</span>
+        {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla hakuprofiilillasi.
+      </p>
+    </div>
+    <div class="leads-header__actions">
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
+    </div>
+  </header>
+  <div class="leads-work">
+    <div class="targets-empty">
+      {% if contract_ended %}
+        {{ empty_state(none, "Kohteet eivät ole käytössäsi", "Sopimuksesi on päättynyt, joten kohteita ei voi avata eikä siirtää liideiksi. Liidit, jotka olet jo siirtänyt, ovat tallessa Liidit-sivulla.", "Valitse kuukausisopimus", url_for('billing.subscription_page', **org_query)) }}
+      {% else %}
+        {{ empty_state(none, "Kohteet eivät ole käytössäsi", "Kohteita ei voi juuri nyt avata eikä siirtää liideiksi. Liidit, jotka olet jo siirtänyt, ovat tallessa Liidit-sivulla. Ota yhteyttä FlowLeadsiin, niin avaamme kohteet uudelleen.", "Avaa liidit", url_for('leads.list_leads', **org_query)) }}
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

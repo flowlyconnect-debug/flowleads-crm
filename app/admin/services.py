@@ -67,7 +67,7 @@ def list_customers_summary() -> list[dict]:
 
     from app.admin.models import CustomerInvite
     from app.extensions import db
-    from app.listings.target_services import count_reserve, count_targets
+    from app.listings.target_services import count_targets
 
     customers = []
     for org in get_accessible_organizations():
@@ -95,7 +95,6 @@ def list_customers_summary() -> list[dict]:
                 "profile_is_active": first.is_active if first else None,
                 "lead_count": Lead.query.filter_by(organization_id=org.id).count(),
                 "pending_matches": pending,
-                "reserve_matches": count_reserve(org.id) if profiles else 0,
                 "open_invite": open_invite,
                 "last_search_label": _format_last_search(last_run),
                 "is_active": org.is_active,
