@@ -331,7 +331,7 @@ def register_search_profile_settings_routes(settings_bp):
         methods=["POST"],
     )
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # legacy SearchJob pipeline: never for customers
     def search_profiles_create_test_job(profile_id: int):
         organization_id = resolve_organization_id()
         try:

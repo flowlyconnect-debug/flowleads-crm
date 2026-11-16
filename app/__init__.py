@@ -60,7 +60,9 @@ def _apply_proxy_fix(app):
     from werkzeug.middleware.proxy_fix import ProxyFix
 
     hops = app.config.get("PROXY_FIX_X_FOR", 1)
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+    # x_host stays 0: a client-supplied X-Forwarded-Host must not end up in
+    # password-reset and invite links built with url_for(_external=True)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=0)
 
 
 def _register_security_headers(app):

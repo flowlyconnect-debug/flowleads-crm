@@ -43,6 +43,17 @@ def _setup_org(app, slug="search-ui"):
         }
 
 
+def _login_superadmin(app, client, slug):
+    """The legacy test-job button is superadmin-only (audit 16.11.2026)."""
+    with app.app_context():
+        user = create_user(f"super-{slug}@test.com", "securepassword1", role="superadmin")
+        user.totp_enabled = True
+        db.session.commit()
+        email = user.email
+    client.get("/auth/logout")
+    _login(client, email)
+
+
 def _login(client, email):
     response = client.post(
         "/auth/login",
@@ -224,6 +235,10 @@ def test_create_test_search_job_requires_admin(app, client):
     _login(client, ctx["user_email"])
     response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
     assert response.status_code == 403
+    client.get("/auth/logout")
+    _login(client, ctx["admin_email"])
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    assert response.status_code == 403
 
 
 def test_create_test_search_job_success(app, client):
@@ -240,8 +255,8 @@ def test_create_test_search_job_success(app, client):
         db.session.commit()
         profile_id = profile.id
 
-    _login(client, ctx["admin_email"])
-    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    _login_superadmin(app, client, "testjob-ok")
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job?organization_id={ctx['org_id']}")
     assert response.status_code == 200
     data = response.get_json()
     assert data == {
@@ -280,8 +295,8 @@ def test_create_test_search_job_rejects_duplicate(app, client):
         db.session.commit()
         profile_id = profile.id
 
-    _login(client, ctx["admin_email"])
-    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    _login_superadmin(app, client, "testjob-dup")
+    response = client.post(f"/settings/search-profiles/{profile_id}/create-test-job?organization_id={ctx['org_id']}")
     assert response.status_code == 409
     assert response.get_json()["success"] is False
 
@@ -301,8 +316,8 @@ def test_create_test_search_job_visible_in_n8n_pending_list(app, client):
         db.session.commit()
         profile_id = profile.id
 
-    _login(client, ctx["admin_email"])
-    create_resp = client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    _login_superadmin(app, client, "testjob-n8n")
+    create_resp = client.post(f"/settings/search-profiles/{profile_id}/create-test-job?organization_id={ctx['org_id']}")
     job_id = create_resp.get_json()["job_id"]
 
     pending = client.get(
@@ -516,7 +531,8 @@ def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client
         profile = db.session.get(SearchProfile, profile_id)
         assert profile.crm_api_key == secret_key
 
-    client.post(f"/settings/search-profiles/{profile_id}/create-test-job")
+    _login_superadmin(app, client, "keep-key")
+    client.post(f"/settings/search-profiles/{profile_id}/create-test-job?organization_id={ctx['org_id']}")
 
     response = client.get(
         "/api/v1/n8n/jobs?status=pending&limit=10",

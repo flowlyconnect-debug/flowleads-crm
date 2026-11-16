@@ -308,8 +308,55 @@ def test_lead_upsert_by_email(client, app):
         )
     with app.app_context():
         updated = Lead.query.filter_by(email="upsert@example.com").first()
-        assert updated.first_name == "New"
+        # an anonymous submission never overwrites, it only fills gaps
+        assert updated.first_name == "Old"
         assert updated.company == "Updated Oy"
+        assert Lead.query.filter_by(organization_id=org_id).count() == 1
+
+
+def test_submissions_never_take_over_other_leads(client, app):
+    """Audit 16.11.2026: a second submitter overwrote the first one's lead
+    (source_ref = form name) and a known phone number took over any lead."""
+    org_id, admin_id, _, _ = _setup_org(app, "takeover")
+    with app.app_context():
+        from app.leads.services import get_default_stage
+
+        victim = Lead(
+            organization_id=org_id, first_name="Victim", email="victim@example.com",
+            phone="0401234567", source="manual", status="active", stage_id=get_default_stage(org_id).id,
+        )
+        db.session.add(victim)
+        form = _create_form(org_id, admin_id)
+        db.session.commit()
+        token, victim_id = form.form_token, victim.id
+    with patch("app.forms.services._notify_users"):
+        for first, email in (("Alice", "alice@example.com"), ("Mallory", "mallory@example.com")):
+            assert client.post(f"/api/public/forms/{token}/submit", json={"first_name": first, "email": email}).status_code in (200, 201)
+        client.post(
+            f"/api/public/forms/{token}/submit",
+            json={"first_name": "Evil", "email": "evil@example.com", "phone": "0401234567"},
+        )
+    with app.app_context():
+        emails = sorted(l.email for l in Lead.query.filter_by(organization_id=org_id).all())
+        assert emails == ["alice@example.com", "evil@example.com", "mallory@example.com", "victim@example.com"]
+        victim = db.session.get(Lead, victim_id)
+        assert (victim.first_name, victim.email) == ("Victim", "victim@example.com")
+
+
+def test_form_rejects_other_organizations_references(app):
+    from app.forms.services import WebFormService, WebFormServiceError
+    from app.leads.services import get_default_stage
+
+    org_a, admin_a, _, _ = _setup_org(app, "ref-a")
+    org_b, admin_b, _, _ = _setup_org(app, "ref-b")
+    with app.app_context():
+        foreign_stage = get_default_stage(org_b).id
+        base = {"name": "F", "title": "F", "fields": _default_fields()}
+        for bad in ({"default_stage_id": foreign_stage}, {"default_assigned_to": admin_b}):
+            with pytest.raises(WebFormServiceError):
+                WebFormService.create_form({**base, **bad}, org_a, admin_a)
+        form = WebFormService.create_form({**base, "notify_users": [admin_a, admin_b], "is_active": "false"}, org_a, admin_a)
+        assert form.notify_users == [admin_a] and form.is_active is False
 
 
 def test_cors_headers_present(client, app):

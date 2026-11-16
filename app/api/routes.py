@@ -61,8 +61,19 @@ def health():
 def health_db():
     from app.core.db_health import full_health_report
 
+    import secrets as _secrets
+
+    from flask import current_app
+    from flask_login import current_user
+
     report = full_health_report()
-    response, _status = json_success(report)
+    expected = current_app.config.get("N8N_MASTER_SECRET") or ""
+    provided = request.headers.get("X-N8N-Secret", "").strip()
+    privileged = (current_user.is_authenticated and current_user.is_superadmin()) or (
+        expected and provided and _secrets.compare_digest(provided, expected)
+    )
+    # schema details (revisions, missing tables) only for operators
+    response, _status = json_success(report if privileged else {"ok": report["ok"]})
     if not report["ok"]:
         response.status_code = 503
     return response

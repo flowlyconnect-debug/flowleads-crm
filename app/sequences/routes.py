@@ -10,7 +10,7 @@ from app.extensions import db
 
 from app.leads.permissions import resolve_organization_id
 
-from app.leads.services import get_lead_for_org
+from app.leads.services import LeadServiceError, get_lead_for_org
 
 from app.sequences.models import EmailSequence, TRIGGER_TYPES
 
@@ -869,6 +869,10 @@ def list_lead_sequences(lead_id):
     try:
 
         enrollments = SequenceService.list_lead_enrollments(lead_id, organization_id)
+
+    except LeadServiceError:
+
+        abort(404)
 
     except SequenceServiceError as exc:
 
