@@ -18,6 +18,8 @@ from app.listings.housing import company_group, org_company_listings, score_labe
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
 from app.listings.services import _best_renovation, _merge_into_lead, _now, materialize_match
+from app.search.constants import FINNISH_REGIONS
+from app.search.municipalities import region_municipalities
 
 PER_PAGE = 25
 MAX_BULK = 200
@@ -288,13 +290,35 @@ def target_filter_options(organization_id: int, status: str = "pending", filters
             # a plan that started in the past ("2024-2028") is "by this year"
             years.add(max(int(timing_year), _now().year))
     region = (filters.get("region") or "").strip()
+    if region in FINNISH_REGIONS:
+        # every municipality of the region, plus the place names (villages,
+        # old municipality names) its targets actually carry
+        cities = _merge_place_names(
+            region_municipalities(region), distinct(Listing.kaupunki, Listing.maakunta == region)
+        )
+    else:
+        cities = distinct(Listing.kaupunki, *([Listing.maakunta == region] if region else []))
     return {
         "renovations": sorted(renovations),
-        "cities": distinct(Listing.kaupunki, *([Listing.maakunta == region] if region else [])),
-        "regions": distinct(Listing.maakunta),
+        "cities": cities,
+        # every maakunta is always offered, and a region stored outside the list too
+        "regions": list(FINNISH_REGIONS)
+        + [r for r in distinct(Listing.maakunta) if r not in FINNISH_REGIONS],
         "buildings": distinct(Listing.building_type),
         "years": [str(y) for y in sorted(years)],
     }
+
+
+def _merge_place_names(*groups) -> list[str]:
+    """One sorted list of place names, duplicates differing only in case or
+    surrounding space dropped (the first spelling wins)."""
+    seen: dict[str, str] = {}
+    for group in groups:
+        for name in group:
+            cleaned = " ".join(str(name).split())
+            if cleaned and cleaned.lower() not in seen:
+                seen[cleaned.lower()] = cleaned
+    return sorted(seen.values(), key=lambda n: (n.lower(), n))
 
 
 def target_row(

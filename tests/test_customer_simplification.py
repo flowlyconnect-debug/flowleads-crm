@@ -180,7 +180,10 @@ def test_filters_offer_own_urakat_years_and_cities_of_the_region(app):
         assert options["renovations"] == [PIPE, HEAT] or options["renovations"] == sorted([PIPE, HEAT])
         assert ROOF not in options["renovations"]
         assert options["years"] == ["2026", "2029"]
-        assert targets.target_filter_options(org_id, filters={"region": "Uusimaa"})["cities"] == ["Espoo", "Helsinki"]
+        uusimaa = targets.target_filter_options(org_id, filters={"region": "Uusimaa"})["cities"]
+        # every municipality of the chosen maakunta is offered, not only those with targets
+        assert {"Espoo", "Helsinki", "Vantaa", "Pornainen"} <= set(uusimaa)
+        assert "Tampere" not in uusimaa
 
         def names(**filters):
             return sorted(m.listing.external_id for m in targets.list_targets(org_id, filters=filters).items)

@@ -126,7 +126,7 @@
     </div>
     {% endif %}
 
-    {# Filter bar: every choice applies at once; only values that occur among the targets are offered. #}
+    {# Filter bar: every choice applies at once. Maakunta lists all 18; a chosen maakunta lists all of its kunnat (plus villages its targets name); other filters offer only values that occur among the targets. #}
     {% macro filter_select(name, label, options, all_label) -%}
     {% if options|length > 1 or filters.get(name) %}
     <label class="targets-filter">
@@ -158,7 +158,7 @@
           };
         })();
       </script>
-      {{ filter_select('city', 'Kaupunki', filter_options.cities, 'Kaikki kaupungit') }}
+      {{ filter_select('city', 'Kunta' if filters.get('region') else 'Kaupunki', filter_options.cities, 'Koko maakunta' if filters.get('region') else 'Kaikki kaupungit') }}
       {% macro year_select() -%}
       {% if filter_options.years|length > 1 or filters.get('year') %}
       <label class="targets-filter">
