@@ -2,6 +2,7 @@
 from flask import Blueprint, abort, current_app, jsonify, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.core.urls import external_url
 from app.admin.constants import FEATURE_CATALOG
 from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
@@ -372,7 +373,7 @@ def create_customer_route():
             "search_profile_name": result.search_profile_name,
             "temporary_password": result.temporary_password,
             "is_active": result.organization.is_active,
-            "login_url": url_for("auth.login", _external=True),
+            "login_url": external_url("auth.login"),
         }
     )
     return redirect(url_for("admin.create_customer_result"))
@@ -419,7 +420,7 @@ def _send_invite_and_store_result(*, organization, invite, token) -> None:
     from app.admin.models import INVITE_DEFAULT_TTL_DAYS
     from app.email.services import EmailService
 
-    invite_url = url_for("invite.accept_invite", token=token, _external=True)
+    invite_url = external_url("invite.accept_invite", token=token)
     sent = EmailService.send_customer_invite_email(
         to_email=invite.email,
         invite_url=invite_url,

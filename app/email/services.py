@@ -188,7 +188,14 @@ def _mailgun_send(
     from_email: str,
     domain: str | None = None,
     reply_to: str | None = None,
+    track_clicks: bool = True,
 ) -> tuple[bool, str | None, str | None]:
+    """Send one message through Mailgun.
+
+    track_clicks=False turns Mailgun's click tracking off for this message.
+    Account mails (invites, password links) need it off: tracking rewrites the
+    link to Mailgun's tracking host, which breaks it when that host has no DNS
+    record or no HTTPS, and a one-time token should not pass through it."""
     api_key = current_app.config.get("MAILGUN_API_KEY")
     domain = (domain or "").strip() or current_app.config.get("MAILGUN_DOMAIN")
 
@@ -205,6 +212,7 @@ def _mailgun_send(
             "html": body_html,
             "text": body_text,
             **({"h:Reply-To": reply_to} if reply_to else {}),
+            **({} if track_clicks else {"o:tracking-clicks": "no"}),
         }
     ).encode("utf-8")
 
@@ -475,6 +483,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            track_clicks=False,
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
@@ -514,6 +523,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            track_clicks=False,
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
@@ -549,6 +559,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            track_clicks=False,
         )
         return {"success": ok, "message_id": message_id, "error": error}
 
@@ -589,6 +600,7 @@ class EmailService:
             body_text=body_text,
             from_name=from_name,
             from_email=from_email,
+            track_clicks=False,
         )
         return {"success": ok, "message_id": message_id, "error": error}
 

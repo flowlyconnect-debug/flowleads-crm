@@ -6,6 +6,7 @@ ever handling or choosing that person's password.
 """
 import secrets
 
+from app.core.urls import external_url
 from app.extensions import db
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_user, ensure_same_organization
@@ -51,13 +52,11 @@ def _send_invite(user: User) -> dict:
     """Send the set-password link. Returns {"sent": bool, "url": str} so the
     caller can show the link when the email could not be sent (it used to
     report success either way)."""
-    from flask import url_for
-
     from app.auth.services import issue_password_reset_token
     from app.email.services import EmailService
 
     token = issue_password_reset_token(user, max_age_seconds=TEAM_INVITE_MAX_AGE_SECONDS)
-    set_password_url = url_for("auth.reset_password", token=token, _external=True)
+    set_password_url = external_url("auth.reset_password", token=token)
     organization = db.session.get(Organization, user.organization_id)
     try:
         result = EmailService.send_teammate_invite_email(

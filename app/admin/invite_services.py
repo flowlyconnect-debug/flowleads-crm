@@ -289,14 +289,13 @@ def accept_invite(
     except SearchProfileServiceError as exc:
         raise InviteServiceError(exc.message, exc.code) from exc
 
-    from flask import url_for
-
+    from app.core.urls import external_url
     from app.email.services import EmailService
 
     EmailService.send_onboarding_complete_email(
         to_email=admin_user.email,
         organization_name=organization.name,
-        login_url=url_for("auth.login", _external=True),
+        login_url=external_url("auth.login"),
     )
 
     return InviteAcceptanceResult(

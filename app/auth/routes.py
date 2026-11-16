@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.urls import external_url
 from app.auth.forms import (
     LoginForm,
     RegisterForm,
@@ -252,7 +253,7 @@ def reset_password_request():
         if user and user.can_login_ui():
             token = issue_password_reset_token(user)
             db.session.commit()
-            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            reset_url = external_url("auth.reset_password", token=token)
             EmailService.send_password_reset_email(to_email=user.email, reset_url=reset_url)
             flash(
                 "If an account exists for that email, you will receive reset instructions.",
