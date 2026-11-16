@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<title>FlowLeads – Flowly Solutions</title>
+<style>
+@font-face{font-family:"InterW";font-weight:400;src:url(../../app/static/vendor/fonts/inter-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:400;src:url(../../app/static/vendor/fonts/inter-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:"InterW";font-weight:500;src:url(../../app/static/vendor/fonts/inter-latin-500-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:500;src:url(../../app/static/vendor/fonts/inter-latin-ext-500-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:"InterW";font-weight:600;src:url(../../app/static/vendor/fonts/inter-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:600;src:url(../../app/static/vendor/fonts/inter-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:"InterW";font-weight:700;src:url(../../app/static/vendor/fonts/inter-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:700;src:url(../../app/static/vendor/fonts/inter-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@page { size: 1280px 720px; margin: 0; }
+:root{
+  --bg:#080d1a; --panel:#141829; --card:#23263b; --hl:#c5b3ff; --deep:#6948dc;
+  --tx:#f3f5ff; --mut:#cfd1e3; --mut2:#9a9db5;
+  --lbg:#f4f2ee; --lcard:#eee8fd; --ink:#1a1d2b; --lmut:#515368; --line:#dcd8e4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#555}
+body{font-family:InterW,"Segoe UI",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.s{width:1280px;height:720px;position:relative;overflow:hidden;page-break-after:always;padding:0 64px}
+.s:last-child{page-break-after:auto}
+.dark{background:var(--bg);color:var(--tx)}
+.light{background:var(--lbg);color:var(--ink)}
+.logo{position:absolute;left:58px;top:34px;height:44px}
+.foot{position:absolute;left:64px;right:64px;bottom:0;height:62px;border-top:1px solid;display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:500}
+.dark .foot{border-color:#262a3d;color:var(--mut)}
+.light .foot{border-color:var(--line);color:var(--lmut)}
+.foot a{color:inherit;text-decoration:none}
+.foot .mid{font-weight:400;font-size:12px}
+.eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.dark .eyebrow{color:var(--hl)}
+.light .eyebrow{color:var(--deep)}
+h1{font-size:66px;line-height:1.08;font-weight:700;letter-spacing:-.015em}
+h2{font-size:48px;line-height:1.1;font-weight:700;letter-spacing:-.012em}
+h3{font-size:22px;font-weight:600;line-height:1.25}
+p{line-height:1.5}
+.lead{font-size:20px;line-height:1.5}
+.dark .lead{color:var(--mut)}
+.light .lead{color:var(--lmut)}
+.top{position:absolute;left:64px;right:64px;top:112px}
+.top h2{margin-top:2px}
+.top .lead{margin-top:10px;font-size:18px}
+.kpi{margin-top:auto;padding-top:16px;border-top:1px solid var(--line);font-size:14px;font-weight:600;color:var(--deep)}
+.card.p .kpi{border-color:#d9cff8}
+.body{position:absolute;left:64px;right:64px;top:252px;bottom:92px}
+.grid{display:grid;gap:18px}
+.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:repeat(3,1fr)}.c4{grid-template-columns:repeat(4,1fr)}
+.card{border-radius:14px;padding:26px 28px;display:flex;flex-direction:column}
+.light .card{background:#fff;border:1px solid var(--line)}
+.light .card.p{background:var(--lcard);border-color:var(--lcard)}
+.dark .card{background:var(--panel);border:1px solid #23273a}
+.card .bar{width:26px;height:2px;background:var(--deep);margin-bottom:14px}
+.dark .card .bar{background:var(--hl)}
+.card h3{font-size:22px;margin-bottom:9px}
+.card p{font-size:16.5px}
+.light .card p{color:var(--lmut)}
+.dark .card p{color:var(--mut)}
+.chip{display:inline-block;border-radius:999px;padding:8px 14px;font-size:15px;font-weight:500;margin:0 6px 8px 0}
+.light .chip{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.light .chip.p{background:var(--lcard);border-color:var(--lcard)}
+.dark .chip{background:var(--card);color:var(--tx)}
+.num{width:28px;height:28px;border-radius:50%;background:var(--hl);color:var(--ink);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.mono{font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:var(--mut2)}
+.light .note{color:#8a8ca0}
+ul.ck{list-style:none}
+ul.ck li{position:relative;padding-left:24px;font-size:17px;line-height:1.45;margin-bottom:11px}
+ul.ck li:before{content:"";position:absolute;left:2px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--deep)}
+.dark ul.ck li:before{background:var(--hl)}
+.btn{display:inline-flex;align-items:center;gap:30px;background:var(--hl);color:var(--ink);font-weight:600;font-size:15.5px;border-radius:9px;padding:13px 18px;text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- 1 COVER -->
+<section class="s dark">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-dark.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:168px;width:640px">
+    <div class="eyebrow">FlowLeads · Flowly Solutions</div>
+    <h1 style="margin-top:18px;font-size:60px">Taloyhtiöiden tulevat remontit suoraan myyntiisi</h1>
+    <p class="lead" style="margin-top:26px;width:590px">FlowLeads löytää taloyhtiöt, joissa sinun urakkasi on tulossa, pisteyttää ne ja kokoaa päättäjien yhteystiedot. Kaikki samassa työkalussa tarjoukseen asti.</p>
+  </div>
+  <div style="position:absolute;right:64px;top:144px;width:420px;background:var(--panel);border:1px solid #23273a;border-radius:20px;padding:28px 34px">
+    <div class="eyebrow" style="font-size:11.5px">Näin kohde päätyy myyjälle</div>
+    <div style="margin-top:22px;display:flex;flex-direction:column;gap:22px;position:relative">
+      <div style="position:absolute;left:23px;top:30px;bottom:30px;width:1px;background:#4b4f6e"></div>
+      <div style="background:var(--card);border-radius:10px;padding:14px 18px 14px 40px;position:relative"><span style="position:absolute;left:18px;top:21px;width:7px;height:7px;border-radius:50%;background:var(--hl)"></span><div style="font-weight:600;font-size:17px">Remontti tunnistetaan</div><div style="font-size:13px;color:var(--mut);margin-top:3px">Ilmoitukset ja yhtiön tiedot, tekoälyanalyysi</div></div>
+      <div style="background:var(--card);border-radius:10px;padding:14px 18px 14px 40px;position:relative"><span style="position:absolute;left:18px;top:21px;width:7px;height:7px;border-radius:50%;background:var(--hl)"></span><div style="font-weight:600;font-size:17px">Päättäjät kootaan</div><div style="font-size:13px;color:var(--mut);margin-top:3px">Isännöitsijä, hallituksen pj, huoltoyhtiö</div></div>
+      <div style="background:var(--card);border-radius:10px;padding:14px 18px 14px 40px;position:relative"><span style="position:absolute;left:18px;top:21px;width:7px;height:7px;border-radius:50%;background:var(--hl)"></span><div style="font-weight:600;font-size:17px">Kohde pisteytetään</div><div style="font-size:13px;color:var(--mut);margin-top:3px">Sopivimmat ensin, 0–100</div></div>
+      <div style="background:var(--hl);color:var(--ink);border-radius:10px;padding:14px 18px 14px 40px;position:relative"><span style="position:absolute;left:18px;top:21px;width:7px;height:7px;border-radius:50%;background:var(--deep)"></span><div style="font-weight:600;font-size:17px">Myyjä ottaa yhteyttä</div><div style="font-size:13px;color:#2a2550;margin-top:3px">Soittolista, sähköpostisarja, tarjous</div></div>
+    </div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">1 / 12</span></div>
+</section>
+
+<!-- 2 FLOWLY -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Kuka FlowLeadsin takana on</div>
+    <h2>Flowly rakentaa asiakashankinnan työkaluja</h2>
+    <p class="lead">Yhdistämme tarvittavat työkalut ja hyödynnämme tekoälyä sovituissa työvaiheissa. FlowLeads on Flowlyn oma tuote.</p>
+  </div>
+  <div class="body grid c2" style="grid-template-rows:1fr 1fr">
+    <div class="card p"><div class="bar"></div><h3>Asiakashankinta</h3><p>Etsimme sovitut kriteerit täyttävät yritykset ja päättäjät. Kootut tiedot voidaan viedä myyntijärjestelmään. <b style="color:var(--ink);font-weight:600">FlowLeads on tämän valmis tuote remonttiurakoitsijoille.</b></p></div>
+    <div class="card"><div class="bar"></div><h3>Asiakasviestit ja tarjouspyynnöt</h3><p>Järjestelmä tunnistaa puuttuvat tiedot ja valmistelee vastausluonnoksen tiimin tarkistettavaksi.</p></div>
+    <div class="card"><div class="bar"></div><h3>Prosessien automatisointi</h3><p>Yhdistämme tilaukset, hyväksynnät ja tehtävät. Tieto siirtyy työkalusta toiseen ilman käsin kopiointia.</p></div>
+    <div class="card p"><div class="bar"></div><h3>Räätälöidyt järjestelmät</h3><p>Rakennamme ohjelmiston yrityksesi työtavan mukaan. Esimerkiksi BSTR:lle täydennämme yritys- ja yhteyshenkilötiedot suoraan myyntiputkeen.</p></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">2 / 12</span></div>
+</section>
+
+<!-- 3 PROBLEM -->
+<section class="s dark">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-dark.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:150px;width:560px">
+    <div class="eyebrow">Urakoitsijan myynnin ongelma</div>
+    <h2 style="margin-top:14px;font-size:50px">Kun remontista kuulee, se on jo kilpailutuksessa</h2>
+    <p class="lead" style="margin-top:24px">Taloyhtiöt kertovat tulevista remonteista jo vuosia etukäteen. Tieto on vain hajallaan, eikä kukaan ehdi lukea sitä läpi.</p>
+  </div>
+  <div style="position:absolute;right:64px;top:140px;width:500px;display:flex;flex-direction:column;gap:16px">
+    <div class="card"><h3 style="font-size:18px">Tieto on hajallaan</h3><p style="margin-top:6px">Myynti-ilmoitukset, isännöitsijäntodistukset ja kunnossapitosuunnitelmat. Jokaisen kohteen tarkistaminen käsin vie tunteja.</p></div>
+    <div class="card"><h3 style="font-size:18px">Päättäjää ei löydy</h3><p style="margin-top:6px">Kun sopiva taloyhtiö löytyy, isännöitsijän tai hallituksen puheenjohtajan yhteystiedot pitää vielä etsiä erikseen.</p></div>
+    <div class="card"><h3 style="font-size:18px">Seuranta jää kesken</h3><p style="margin-top:6px">Kohteet ovat Excelissä, sähköpostissa ja muistilapuilla. Yhteydenotto unohtuu, ja kilpailija ehtii ensin.</p></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">3 / 12</span></div>
+</section>
+
+<!-- 4 HOW IT WORKS -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Miten FlowLeads toimii</div>
+    <h2>Neljä vaihetta, jotka tapahtuvat puolestasi</h2>
+    <p class="lead">Jokainen kohde analysoidaan kerran ja tarkistetaan jatkuvasti uusia vasten. Sinä näet vain ne, jotka sopivat urakkaasi.</p>
+  </div>
+  <div class="body grid c4" style="top:262px">
+    <div class="card p"><div class="num">1</div><h3 style="margin-top:16px">Kerätään</h3><p>Taloyhtiöiden myynti-ilmoitukset ja yhtiötiedot kootaan yhteen kohdekatalogiin koko Suomesta.</p><div class="kpi">Kaikki taloyhtiöt, yksi katalogi</div></div>
+    <div class="card"><div class="num">2</div><h3 style="margin-top:16px">Analysoidaan</h3><p>Tekoäly lukee tekstit ja tunnistaa remonttityypin, ajoituksen ja sen, kuinka varma tieto on.</p><div class="kpi">Varmuus 0–100 % per remontti</div></div>
+    <div class="card"><div class="num">3</div><h3 style="margin-top:16px">Rikastetaan</h3><p>Sopiviin kohteisiin haetaan isännöitsijä, hallituksen puheenjohtaja ja huoltoyhtiö yhteystietoineen.</p><div class="kpi">Kolme päättäjää per kohde</div></div>
+    <div class="card p"><div class="num">4</div><h3 style="margin-top:16px">Tarjotaan sinulle</h3><p>Kohde ilmestyy Kohteet-sivulle pisteytettynä. Sinä päätät, siirrätkö sen liidiksi vai piilotatko sen.</p><div class="kpi">Sinä päätät, mikä on liidi</div></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">4 / 12</span></div>
+</section>
+
+<!-- 5 FILTERS -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Sinun urakkasi, sinun alueesi</div>
+    <h2>Valitse urakat, rajaa loput suodattimilla</h2>
+    <p class="lead">Käyttöönotossa kysytään vain, mitä urakoita teet. Alue on aluksi koko Suomi, ja rajaat sen haluamaksesi.</p>
+  </div>
+  <div class="body grid" style="grid-template-columns:1.15fr 1fr;top:262px">
+    <div class="card">
+      <h3 style="font-size:18px;margin-bottom:14px">Tunnistettavat remonttityypit</h3>
+      <div><span class="chip p">Putkiremontti</span><span class="chip p">Julkisivuremontti</span><span class="chip p">Katto- ja vesikattoremontti</span><span class="chip p">Lämmitysjärjestelmän remontti</span><span class="chip p">Sähkö- ja tietoliikennejärjestelmät</span><span class="chip p">Lukkoremontti / kulunvalvonta</span><span class="chip p">Huoneistoremontit</span><span class="chip p">Muu remontti</span></div>
+      <p style="margin-top:auto;padding-top:16px;border-top:1px solid var(--line);font-size:15.5px">Valitse niin monta urakkaa kuin teet. Sama taloyhtiö voi osua useaan urakkaan, ja eri asuntojen ilmoitukset yhdistyvät samaksi kohteeksi.</p>
+    </div>
+    <div class="card p">
+      <h3 style="font-size:18px;margin-bottom:14px">Rajaa haluamallasi tavalla</h3>
+      <ul class="ck">
+        <li>18 maakuntaa ja yksittäiset kaupungit</li>
+        <li>Remontin ajoitus ja tiedon varmuus</li>
+        <li>Rakennusvuosi ja talotyyppi</li>
+        <li>Vain kohteet, joissa on yhteystiedot</li>
+      </ul>
+      <p style="font-size:15.5px;margin-top:auto;padding-top:16px;border-top:1px solid #d9cff8">Puuttuva tieto ei koskaan sulje kohdetta pois, joten hyviä kohteita ei jää näkemättä.</p>
+    </div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">5 / 12</span></div>
+</section>
+
+<!-- 6 TARGET VIEW MOCK -->
+<section class="s dark">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-dark.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:150px;width:520px">
+    <div class="eyebrow">Kohteet-näkymä</div>
+    <h2 style="margin-top:14px">Sopivimmat taloyhtiöt ensin</h2>
+    <p class="lead" style="margin-top:20px;font-size:18px">Yksi taloyhtiö on yksi kohde, vaikka siitä olisi useita ilmoituksia. Jokainen kohde saa pisteet 0–100.</p>
+    <p class="lead" style="margin-top:14px;font-size:18px">FlowLeads oppii valinnoistasi: kohteet, joita siirrät liideiksi, nostavat samankaltaisia ylös, ja piilottamasi laskevat niitä.</p>
+  </div>
+  <div style="position:absolute;right:64px;top:128px;width:520px;background:var(--panel);border:1px solid #23273a;border-radius:20px;padding:26px 30px">
+    <div class="eyebrow" style="font-size:11.5px">Kohde</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:12px">
+      <div><div style="font-size:23px;font-weight:600">As Oy Esimerkkikatu 12</div><div style="font-size:14px;color:var(--mut);margin-top:4px">Tampere · Kerrostalo · 1974</div></div>
+      <div style="text-align:right"><div class="mono" style="font-size:34px;font-weight:700;color:var(--hl);line-height:1">86</div><div style="font-size:11.5px;color:var(--mut);margin-top:4px">Sopivuus</div></div>
+    </div>
+    <div style="margin-top:14px"><span class="chip" style="font-size:13px">Putkiremontti 2027</span><span class="chip" style="font-size:13px">Varmuus 90 %</span></div>
+    <div style="margin-top:8px;display:grid;grid-template-columns:120px 1fr 50px;row-gap:10px;align-items:center;font-size:13.5px;color:var(--mut)">
+      <span>Varmuus</span><span style="height:6px;background:var(--card);border-radius:3px"><i style="display:block;height:6px;width:90%;background:var(--hl);border-radius:3px"></i></span><span class="mono" style="text-align:right">36/40</span>
+      <span>Ajoitus</span><span style="height:6px;background:var(--card);border-radius:3px"><i style="display:block;height:6px;width:80%;background:var(--hl);border-radius:3px"></i></span><span class="mono" style="text-align:right">20/25</span>
+      <span>Yhteystiedot</span><span style="height:6px;background:var(--card);border-radius:3px"><i style="display:block;height:6px;width:100%;background:var(--hl);border-radius:3px"></i></span><span class="mono" style="text-align:right">15/15</span>
+      <span>Signaalit</span><span style="height:6px;background:var(--card);border-radius:3px"><i style="display:block;height:6px;width:70%;background:var(--hl);border-radius:3px"></i></span><span class="mono" style="text-align:right">7/10</span>
+      <span>Tuoreus</span><span style="height:6px;background:var(--card);border-radius:3px"><i style="display:block;height:6px;width:100%;background:var(--hl);border-radius:3px"></i></span><span class="mono" style="text-align:right">10/10</span>
+    </div>
+    <div style="border-top:1px solid #2c3048;margin-top:18px;padding-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+      <div><div style="color:var(--mut)">Isännöitsijä</div><div style="font-weight:600;margin-top:2px">Esimerkki Isännöinti Oy</div></div>
+      <div><div style="color:var(--mut)">Hallituksen pj</div><div style="font-weight:600;margin-top:2px">Puhelin ja sähköposti</div></div>
+    </div>
+    <div class="note" style="margin-top:14px">Havainnekuva · Kuvitteelliset tiedot</div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">6 / 12</span></div>
+</section>
+
+<!-- 7 TOOLS AROUND TARGETS -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Kohteiden ympärillä</div>
+    <h2>Kaikki tieto taloyhtiöstä yhdessä paikassa</h2>
+  </div>
+  <div class="body grid c3" style="top:212px;grid-template-rows:1fr 1fr">
+    <div class="card p"><div class="bar"></div><h3>Taloyhtiökortti</h3><p>Yhtiön remonttihistoria ja tulevat remontit aikajanalla, kaikki signaalit ja yhteyshenkilöt samalla sivulla.</p></div>
+    <div class="card"><div class="bar"></div><h3>Isännöitsijät</h3><p>Näe, mitkä isännöitsijät hoitavat useita sopivia kohteita. Yksi hyvä suhde avaa monta taloyhtiötä.</p></div>
+    <div class="card"><div class="bar"></div><h3>Kartta</h3><p>Kohteet kartalla, jolloin saman alueen yhtiöt on helppo hoitaa samalla kierroksella.</p></div>
+    <div class="card"><div class="bar"></div><h3>Haku tavallisella kielellä</h3><p>Kirjoita esimerkiksi ”putkiremontit Tampereella ensi vuonna”, niin suodattimet asettuvat itse.</p></div>
+    <div class="card"><div class="bar"></div><h3>Tallennetut haut</h3><p>Tallenna oma rajaus, ja saat ilmoituksen, kun siihen sopiva uusi kohde löytyy.</p></div>
+    <div class="card p"><div class="bar"></div><h3>Päivittäinen kooste</h3><p>Uudet kohteet sähköpostiin aamulla, ettei mitään tarvitse muistaa käydä katsomassa.</p></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">7 / 12</span></div>
+</section>
+
+<!-- 8 FROM TARGET TO DEAL -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Kohteesta kaupaksi</div>
+    <h2>Myyntityökalut samassa ohjelmassa</h2>
+    <p class="lead">Kun siirrät kohteet liideiksi, voit samalla valita myyjän, aloittaa sähköpostisarjan ja lisätä ne soittolistalle.</p>
+  </div>
+  <div class="body grid c3" style="top:262px;grid-template-rows:1fr 1fr">
+    <div class="card"><h3>Myyntiputki</h3><p>Liidit vaiheittain ensimmäisestä yhteydenotosta kauppaan.</p></div>
+    <div class="card p"><h3>Soittolista</h3><p>Päivän puhelut yhdessä listassa, lopputulos yhdellä klikkauksella.</p></div>
+    <div class="card"><h3>Sähköpostisarjat</h3><p>Valmis viestisarja taloyhtiöille, mukautettavissa omaksi.</p></div>
+    <div class="card"><h3>Tarjoukset ja tehtävät</h3><p>Tarjoukset ja muistutukset liidin yhteydessä, ei erillisiä tiedostoja.</p></div>
+    <div class="card"><h3>HubSpot ja Pipedrive</h3><p>Liidit voi viedä myös käytössä olevaan CRM-järjestelmään.</p></div>
+    <div class="card p"><h3>Kuukausiraportti</h3><p>Mitä löytyi, mitä siirrettiin ja mistä tuli kauppaa.</p></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">8 / 12</span></div>
+</section>
+
+<!-- 9 WHY -->
+<section class="s dark">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-dark.png" alt="Flowly Solutions"></a>
+  <div class="top">
+    <div class="eyebrow">Mitä tämä tarkoittaa myynnille</div>
+    <h2>Vähemmän etsimistä, enemmän oikeita keskusteluja</h2>
+  </div>
+  <div class="body grid c2" style="top:236px;grid-template-rows:1fr 1fr">
+    <div class="card"><div class="bar"></div><h3>Ajoissa liikkeelle</h3><p>Tulevat remontit näkyvät jo ennen kilpailutusta, kun taloyhtiö vasta suunnittelee.</p></div>
+    <div class="card"><div class="bar"></div><h3>Oikea ihminen kerralla</h3><p>Isännöitsijä, hallituksen puheenjohtaja ja huoltoyhtiö ovat valmiina kohteen kanssa.</p></div>
+    <div class="card"><div class="bar"></div><h3>Aika myyntiin</h3><p>Ilmoitusten läpikäynti ja tietojen kopiointi jäävät pois. Myyjä aloittaa päivän valmiista listasta.</p></div>
+    <div class="card"><div class="bar"></div><h3>Ei unohtuneita kohteita</h3><p>Jokaisella liidillä on seuraava askel, ja sarjat ja muistutukset pitävät huolen jatkosta.</p></div>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">9 / 12</span></div>
+</section>
+
+<!-- 10 PRICING -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:150px;width:520px">
+    <div class="eyebrow">Hinnoittelu</div>
+    <h2 style="margin-top:14px">Yksi hinta, kaikki ominaisuudet</h2>
+    <p class="lead" style="margin-top:18px;font-size:18px">Ei aloitusmaksua eikä määräaikaa. Kokeile ensin maksutta.</p>
+    <ul class="ck" style="margin-top:24px">
+      <li><b>14 päivän maksuton kokeilu</b>, ei maksukorttia, ei muutu maksulliseksi itsestään</li>
+      <li><b>Kuukausisopimus</b>, irtisanottavissa milloin tahansa</li>
+      <li><b>Omat tietosi</b> voit viedä ulos milloin tahansa</li>
+    </ul>
+  </div>
+  <div style="position:absolute;right:64px;top:118px;width:520px;background:var(--bg);color:var(--tx);border-radius:20px;padding:34px 38px">
+    <div class="eyebrow" style="color:var(--hl);font-size:11.5px">FlowLeads</div>
+    <div style="margin-top:10px;display:flex;align-items:baseline;gap:10px"><span class="mono" style="font-size:56px;font-weight:700;line-height:1">149 €</span><span style="color:var(--mut);font-size:16px">/ kk · alv 0 %</span></div>
+    <div style="border-top:1px solid #262a3d;margin:20px 0 18px"></div>
+    <ul class="ck" style="font-size:14.5px">
+      <li style="font-size:16px">Kaikki urakkatyypit koko Suomesta</li>
+      <li style="font-size:16px">Pisteytetyt kohteet, kartta ja taloyhtiökortit</li>
+      <li style="font-size:16px">Isännöitsijät, hallituksen pj:t ja huoltoyhtiöt</li>
+      <li style="font-size:16px">Myyntiputki, tehtävät, sähköposti, tarjoukset ja sarjat</li>
+      <li style="font-size:16px">Vienti HubSpotiin ja Pipedriveen</li>
+      <li style="font-size:16px">Haku tavallisella kielellä ja kuukausiraportti</li>
+      <li style="font-size:16px;margin-bottom:0"><b style="color:var(--hl)">Rajaton määrä käyttäjiä</b></li>
+    </ul>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">10 / 12</span></div>
+</section>
+
+<!-- 11 MATIAS -->
+<section class="s dark">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-dark.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:160px;width:640px">
+    <div class="eyebrow">Kuka toteutuksesta vastaa?</div>
+    <h1 style="margin-top:14px;font-size:62px">Matias Saarinen</h1>
+    <div style="color:var(--hl);font-size:19px;font-weight:600;margin-top:16px">Toimitusjohtaja ja yrittäjä · Flowly Solutions</div>
+    <div style="border-top:1px solid #262a3d;margin:26px 0 24px;width:590px"></div>
+    <p style="font-size:20px;line-height:1.5;width:590px">Suunnittelen ja rakennan yrityksille asiakashankinnan työkaluja ja automaatioita. FlowLeads on niistä pisimmälle viety.</p>
+    <p style="font-size:18px;line-height:1.55;color:var(--mut);margin-top:18px;width:590px">Otan teidät käyttöön itse: käymme yhdessä läpi urakkanne ja alueenne, ja olen yhteyshenkilönne myös käyttöönoton jälkeen.</p>
+  </div>
+  <img src="matias.jpg" alt="Matias Saarinen" style="position:absolute;right:64px;top:110px;width:440px;height:496px;object-fit:cover;object-position:50% 38%;border-radius:16px">
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mono">11 / 12</span></div>
+</section>
+
+<!-- 12 NEXT STEPS -->
+<section class="s light">
+  <a href="https://flowlysolutions.net/"><img class="logo" src="logo-light.png" alt="Flowly Solutions"></a>
+  <div style="position:absolute;left:64px;top:112px">
+    <h2>Näin pääset alkuun</h2>
+  </div>
+  <div style="position:absolute;left:64px;top:210px;width:580px;display:flex;flex-direction:column;gap:30px">
+    <div style="display:flex;gap:18px"><div class="num">1</div><div><h3>Esittely</h3><p style="color:var(--lmut);font-size:17px;margin-top:6px">Katsotaan yhdessä 30 minuutissa, millaisia kohteita alueeltanne ja urakoistanne löytyy juuri nyt.</p></div></div>
+    <div style="display:flex;gap:18px"><div class="num">2</div><div><h3>14 päivän kokeilu</h3><p style="color:var(--lmut);font-size:17px;margin-top:6px">Saatte tunnukset, valmiin hakuprofiilin ja sähköpostisarjan. Siirtäkää ensimmäiset kohteet liideiksi.</p></div></div>
+    <div style="display:flex;gap:18px"><div class="num">3</div><div><h3>Käyttöönotto</h3><p style="color:var(--lmut);font-size:17px;margin-top:6px">Jatkatte kuukausisopimuksella. Lisätkää koko myyntitiimi ilman lisähintaa.</p></div></div>
+  </div>
+  <div style="position:absolute;right:64px;top:166px;width:496px;background:var(--bg);color:var(--tx);border-radius:16px;padding:30px 34px">
+    <div class="eyebrow" style="color:var(--hl);font-size:11.5px">30 min · Maksuton</div>
+    <div style="font-size:36px;font-weight:700;margin-top:8px">Varaa esittely</div>
+    <p style="color:var(--mut);font-size:16px;margin-top:10px">Katsotaan yhdessä, mitä kohteita FlowLeads löytää teidän urakoillenne.</p>
+    <a class="btn" style="margin-top:22px" href="https://calendar.app.google/wzcCUsbmAcVD55g96">Avaa ajanvaraus <span>↗</span></a>
+    <div style="border-top:1px solid #262a3d;margin:26px 0 18px"></div>
+    <div style="font-size:18px;font-weight:600">Matias Saarinen</div>
+    <div style="font-size:13px;color:var(--mut);margin-top:4px">Toimitusjohtaja · Flowly Solutions</div>
+    <a href="mailto:matias.saarinen@flowlysolutions.net" style="display:block;color:var(--hl);font-size:14.5px;margin-top:12px;text-decoration:none">matias.saarinen@flowlysolutions.net</a>
+  </div>
+  <div class="foot"><a href="https://flowlysolutions.net/">flowlysolutions.net</a><span class="mid">ReveaLuxury Oy · Y-tunnus 3488675-1 · Ilmajoki</span><span class="mono">12 / 12</span></div>
+</section>
+
+</body>
+</html>
