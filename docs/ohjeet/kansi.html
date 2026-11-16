@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8"><title>FlowLeads-käyttöohje</title>
+<link rel="stylesheet" href="style.css">
+<style>
+@page{size:A4;margin:0}
+body{background:var(--bg);color:var(--tx)}
+.cover{width:210mm;height:297mm;position:relative;overflow:hidden;padding:0 20mm}
+.logo{position:absolute;left:18mm;top:16mm;height:15mm}
+.main{position:absolute;left:20mm;right:20mm;top:78mm}
+.main .eyebrow{color:var(--hl)}
+.main h1{font-size:44pt;margin-top:8pt}
+.main p{font-size:14pt;color:var(--mut);max-width:135mm;margin-top:14pt;line-height:1.5}
+.flow{position:absolute;left:20mm;right:20mm;top:178mm;display:grid;grid-template-columns:repeat(4,1fr);gap:4mm}
+.flow div{background:var(--panel);border:1px solid #23273a;border-radius:8pt;padding:10pt 11pt}
+.flow div.on{background:var(--hl);color:var(--ink);border-color:var(--hl)}
+.flow b{display:block;font-size:10.5pt}
+.flow span{font-size:8.5pt;color:var(--mut)}
+.flow div.on span{color:#2a2550}
+.foot{position:absolute;left:20mm;right:20mm;bottom:14mm;border-top:1px solid #262a3d;padding-top:8pt;display:flex;justify-content:space-between;font-size:8.5pt;color:var(--mut)}
+</style></head>
+<body><div class="cover">
+  <img class="logo" src="logo-dark.png" alt="Flowly Solutions">
+  <div class="main">
+    <div class="eyebrow">FlowLeads · Käyttöohje asiakkaille</div>
+    <h1>FlowLeads-käyttöohje</h1>
+    <p>Näin löydät taloyhtiöiden tulevat remontit, siirrät parhaat kohteet liideiksi ja viet ne kaupaksi. Ohje kattaa myyjän päivittäisen työn ja ylläpitäjän asetukset.</p>
+  </div>
+  <div class="flow">
+    <div><b>Hae kohteita</b><span>Kohteet-sivu</span></div>
+    <div><b>Valitse parhaat</b><span>Sopivuus ja suodattimet</span></div>
+    <div><b>Siirrä liideiksi</b><span>Soittolista ja sekvenssi</span></div>
+    <div class="on"><b>Vie kaupaksi</b><span>Myyntiputki ja tarjous</span></div>
+  </div>
+  <div class="foot"><span>flowlysolutions.net</span><span>Versio marraskuu 2026</span></div>
+</div></body></html>

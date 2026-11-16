@@ -1,0 +1,52 @@
+/* FlowLeads-käyttöohje: sama ilme kuin Flowly-esityksessä (tumma kansi, violetti korostus, Inter). */
+@font-face{font-family:"InterW";font-weight:400;src:url(../../app/static/vendor/fonts/inter-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:500;src:url(../../app/static/vendor/fonts/inter-latin-500-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:600;src:url(../../app/static/vendor/fonts/inter-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:700;src:url(../../app/static/vendor/fonts/inter-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2190-2199,U+2212}
+@font-face{font-family:"InterW";font-weight:400;src:url(../../app/static/vendor/fonts/inter-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:"InterW";font-weight:600;src:url(../../app/static/vendor/fonts/inter-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:"InterW";font-weight:700;src:url(../../app/static/vendor/fonts/inter-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+:root{
+  --bg:#080d1a; --panel:#141829; --card:#23263b; --hl:#c5b3ff; --deep:#6948dc;
+  --tx:#f3f5ff; --mut:#cfd1e3;
+  --lbg:#f4f2ee; --lcard:#eee8fd; --ink:#1a1d2b; --lmut:#515368; --line:#dcd8e4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:InterW,"Segoe UI",sans-serif;color:var(--ink);font-size:10.5pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.eyebrow{font-size:8pt;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--deep)}
+h1{font-size:28pt;line-height:1.1;font-weight:700;letter-spacing:-.01em;margin:4pt 0 10pt}
+h2{font-size:15pt;line-height:1.25;font-weight:700;margin:20pt 0 6pt;break-after:avoid}
+h3{font-size:11.5pt;font-weight:600;margin:14pt 0 4pt;break-after:avoid}
+p{margin:0 0 7pt}
+.lead{font-size:12pt;color:var(--lmut);margin-bottom:12pt}
+.ui{font-weight:600;color:var(--ink);white-space:nowrap}
+.chapter{break-before:page}
+.chapter:first-of-type{break-before:auto}
+.chapter.flow{break-before:auto;margin-top:26pt;padding-top:18pt;border-top:1.5pt solid var(--ink)}
+ul,ol{margin:0 0 8pt 0;padding-left:0;list-style:none}
+ul li{position:relative;padding-left:15pt;margin-bottom:3.5pt}
+ul li:before{content:"";position:absolute;left:3pt;top:6.2pt;width:4.5pt;height:4.5pt;border-radius:50%;background:var(--deep)}
+ol{counter-reset:s}
+ol li{position:relative;padding-left:24pt;margin-bottom:6pt;counter-increment:s;min-height:16pt}
+ol li:before{content:counter(s);position:absolute;left:0;top:0;width:16pt;height:16pt;border-radius:50%;background:var(--hl);color:var(--ink);font-size:8pt;font-weight:700;display:flex;align-items:center;justify-content:center}
+figure{margin:10pt 0 14pt;break-inside:avoid}
+figure img{width:100%;display:block;border:1px solid var(--line);border-radius:6pt}
+figcaption{font-size:8.5pt;color:var(--lmut);margin-top:5pt}
+.note{background:var(--lcard);border-radius:8pt;padding:10pt 13pt;margin:10pt 0 12pt;break-inside:avoid}
+.note b.t{display:block;font-size:8pt;letter-spacing:.07em;text-transform:uppercase;color:var(--deep);margin-bottom:3pt}
+.note p:last-child,.note ul:last-child{margin-bottom:0}
+.warn{background:#fff;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;margin:6pt 0 12pt;font-size:9.5pt;break-inside:avoid}
+th{text-align:left;font-weight:600;font-size:8pt;letter-spacing:.05em;text-transform:uppercase;color:var(--lmut);border-bottom:1.2pt solid var(--ink);padding:5pt 8pt 5pt 0}
+td{border-bottom:1px solid var(--line);padding:6pt 8pt 6pt 0;vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12pt;margin:8pt 0 12pt}
+.box{border:1px solid var(--line);border-radius:8pt;padding:10pt 12pt;break-inside:avoid}
+.box h3{margin-top:0}
+.box p:last-child,.box ul:last-child{margin-bottom:0}
+.toc{margin-top:8pt}
+.toc a{display:flex;justify-content:space-between;align-items:baseline;gap:8pt;text-decoration:none;color:var(--ink);padding:7pt 0;border-bottom:1px solid var(--line);font-size:11pt}
+.toc a span:first-child{font-weight:600}
+.toc a span.d{color:var(--lmut);font-size:9.5pt;font-weight:400}
+.toc .n{color:var(--deep);font-weight:700;width:22pt;display:inline-block}
+kbd{font-family:inherit;font-size:8.5pt;border:1px solid var(--line);border-bottom-width:2px;border-radius:3pt;padding:0 4pt;background:#fff}

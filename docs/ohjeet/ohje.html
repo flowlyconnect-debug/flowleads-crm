@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8"><title>FlowLeads-käyttöohje</title>
+<link rel="stylesheet" href="style.css">
+<style>@page{size:A4;margin:18mm 18mm 20mm 18mm}</style>
+</head>
+<body>
+
+<!-- SISÄLLYS -->
+<section class="chapter">
+  <img src="logo-light.png" alt="Flowly Solutions" style="height:12mm;margin:0 0 8mm -1mm">
+  <div class="eyebrow">Sisällys</div>
+  <h1>Mitä ohjeessa on</h1>
+  <p class="lead">Luvut 1–9 ovat kaikille käyttäjille. Luvut 10 ja 11 koskevat organisaation ylläpitäjää.</p>
+  <div class="toc">
+    <a href="#aloitus"><span><span class="n">1</span>Aloitus ja kirjautuminen</span><span class="d">Tunnukset, kaksivaiheinen tunnistautuminen, roolit</span></a>
+    <a href="#kojelauta"><span><span class="n">2</span>Kojelauta ja liikkuminen</span><span class="d">Valikko, päivän näkymä, pikahaku</span></a>
+    <a href="#kohteet"><span><span class="n">3</span>Kohteet</span><span class="d">Hae kohteita, suodattimet, sopivuus, siirto liideiksi</span></a>
+    <a href="#taloyhtio"><span><span class="n">4</span>Taloyhtiökortti, kartta ja isännöitsijät</span><span class="d">Kaikki tieto yhdestä yhtiöstä</span></a>
+    <a href="#liidit"><span><span class="n">5</span>Liidit ja myyntiputki</span><span class="d">Liidisivu, vaiheet, tuonti ja vienti</span></a>
+    <a href="#soittolista"><span><span class="n">6</span>Soittolista ja tehtävät</span><span class="d">Päivän puhelut ja muistutukset</span></a>
+    <a href="#sahkoposti"><span><span class="n">7</span>Sähköposti ja sekvenssit</span><span class="d">Yksittäiset viestit ja viestisarjat</span></a>
+    <a href="#tarjoukset"><span><span class="n">8</span>Tarjoukset</span><span class="d">Luonti, lähetys ja hyväksyntä</span></a>
+    <a href="#raportit"><span><span class="n">9</span>Raportit</span><span class="d">Kuukausiraportti ja ennuste</span></a>
+    <a href="#asetukset"><span><span class="n">10</span>Asetukset ylläpitäjälle</span><span class="d">Käyttäjät, urakat, koosteet, sähköposti, integraatiot</span></a>
+    <a href="#tilaus"><span><span class="n">11</span>Tilaus ja laskutus</span><span class="d">Kokeilu, kuukausisopimus, irtisanominen</span></a>
+    <a href="#ukk"><span><span class="n">12</span>Usein kysyttyä ja tuki</span><span class="d">Ratkaisut yleisimpiin tilanteisiin</span></a>
+  </div>
+  <div class="note" style="margin-top:18pt">
+    <b class="t">Kuvista</b>
+    <p>Ohjeen kuvakaappaukset on otettu esimerkkiorganisaatiosta. Kaikki niissä näkyvät taloyhtiöt, henkilöt ja yhteystiedot ovat kuvitteellisia.</p>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="chapter" id="aloitus">
+  <div class="eyebrow">Luku 1</div>
+  <h1>Aloitus ja kirjautuminen</h1>
+  <p class="lead">FlowLeads etsii taloyhtiöt, joissa sinun urakkasi on tulossa, pisteyttää ne ja kokoaa päättäjien yhteystiedot. Samassa työkalussa hoidat yhteydenotot tarjoukseen asti.</p>
+
+  <h2>Käyttöönotto kutsulinkillä</h2>
+  <p>Organisaation ensimmäinen käyttäjä saa Flowlylta sähköpostiin kutsulinkin. Linkki on voimassa 7 päivää.</p>
+  <ol>
+    <li>Avaa linkki. Sivulla lukee <span class="ui">Tervetuloa</span> ja organisaatiosi nimi.</li>
+    <li>Kirjoita salasana (vähintään 12 merkkiä) kahteen kertaan.</li>
+    <li>Paina <span class="ui">Viimeistele käyttöönotto</span>.</li>
+  </ol>
+  <p>Samalla organisaatiollesi luodaan valmis hakuprofiili koko Suomesta, valmis sähköpostisekvenssi ja 14 päivän maksuton kokeilu. Ensimmäiset kohteet voi hakea noin 10 minuutin kuluttua <span class="ui">Hae kohteita</span> -painikkeella.</p>
+  <p>Jos linkki on vanhentunut tai jo käytetty, sivulla lukee <span class="ui">Kutsu ei kelpaa</span>. Pyydä silloin uusi kutsu Flowlylta.</p>
+
+  <h2>Kirjautuminen</h2>
+  <p>Kirjaudu sähköpostiosoitteella ja salasanalla ja paina <span class="ui">Kirjaudu sisään</span>.</p>
+  <p>Jos salasana on unohtunut, valitse <span class="ui">Unohditko salasanan?</span>, kirjoita sähköpostiosoitteesi ja paina <span class="ui">Lähetä linkki</span>. Sähköpostiin tulevasta linkistä pääset asettamaan uuden salasanan.</p>
+
+  <h2>Kaksivaiheinen tunnistautuminen</h2>
+  <p>Ylläpitäjän tunnukset suojataan aina kaksivaiheisella tunnistautumisella. Myyjälle se on vapaaehtoinen.</p>
+  <ol>
+    <li>Asenna puhelimeen todennussovellus, esimerkiksi Google Authenticator, Microsoft Authenticator tai 1Password.</li>
+    <li>Skannaa sovelluksella näytöllä näkyvä QR-koodi.</li>
+    <li>Kirjoita sovelluksen näyttämä kuusinumeroinen koodi kenttään <span class="ui">Vahvistuskoodi</span> ja paina <span class="ui">Vahvista ja ota käyttöön</span>.</li>
+    <li>Tallenna varakoodit turvalliseen paikkaan. Ne näytetään vain kerran.</li>
+  </ol>
+  <p>Jatkossa kirjautuminen kysyy salasanan jälkeen sovelluksen koodin. Jos puhelin on hukassa, voit kirjautua varakoodilla. Ylläpitäjä voi myös nollata käyttäjän tunnistautumisen kohdassa <span class="ui">Asetukset → Käyttäjät</span>.</p>
+
+  <h2>Roolit</h2>
+  <table>
+    <tr><th>Rooli</th><th>Mitä rooli voi tehdä</th></tr>
+    <tr><td>Myyjä</td><td>Käyttää kohteita, liidejä, tehtäviä, soittolistaa ja tarjouksia. Myyjän siirtämät kohteet tulevat hänen omiksi liideikseen.</td></tr>
+    <tr><td>Ylläpitäjä</td><td>Kaikki myyjän toiminnot, ja lisäksi käyttäjät, urakat ja kohdehaku, koosteet, sähköpostiasetukset, integraatiot ja tilaus. Ylläpitäjä voi valita siirron yhteydessä liidille vastuuhenkilön ja arkistoida liidejä.</td></tr>
+  </table>
+</section>
+
+<!-- 2 -->
+<section class="chapter flow" id="kojelauta">
+  <div class="eyebrow">Luku 2</div>
+  <h1>Kojelauta ja liikkuminen</h1>
+  <p class="lead">Kojelauta näyttää yhdellä silmäyksellä, mitä tänään kannattaa tehdä.</p>
+  <figure><img src="kuvat/dashboard.jpg" alt=""><figcaption>Kojelauta. Ylhäällä on päivän tärkein liidi, alla tämän päivän soitot ja uudet kohteet.</figcaption></figure>
+
+  <h2>Valikko</h2>
+  <div class="two">
+    <div class="box"><h3>Myynti</h3><ul>
+      <li><span class="ui">Kojelauta</span>: päivän näkymä</li>
+      <li><span class="ui">Kohteet</span>: uudet taloyhtiöt. Luku kertoo saatavilla olevat kohteet.</li>
+      <li><span class="ui">Liidit</span> ja <span class="ui">Myyntiputki</span></li>
+      <li><span class="ui">Isännöitsijät</span></li>
+    </ul></div>
+    <div class="box"><h3>Toiminta ja hallinta</h3><ul>
+      <li><span class="ui">Tehtävät</span>, <span class="ui">Soittolista</span> ja <span class="ui">Kalenteri</span></li>
+      <li><span class="ui">Tarjoukset</span></li>
+      <li><span class="ui">Sekvenssit</span> ja <span class="ui">Automaatiot</span>, jos ne ovat käytössä</li>
+      <li><span class="ui">Raportit</span> ja <span class="ui">Asetukset</span></li>
+    </ul></div>
+  </div>
+
+  <h2>Kojelaudan osat</h2>
+  <ul>
+    <li><b>Tänään</b>: montako puhelua on soittolistalla ja montako kohdetta on saatavilla.</li>
+    <li><b>Tumma nostokortti</b>: liidi, joka kannattaa hoitaa ensin. <span class="ui">Avaa liidi</span> vie suoraan liidin sivulle.</li>
+    <li><b>Odottaa käsittelyä</b>: myöhässä olevat tehtävät ja avoimet tarjoukset.</li>
+    <li><b>Soitot tänään</b>, <b>Uudet kohteet</b>, <b>Uudet liidit</b> ja <b>Seurattavat kohteet</b>.</li>
+    <li>Tunnusluvut: uudet liidit 7 päivän ajalta, avoimen putken arvo, päivän tehtävät ja todennäköiset kaupat.</li>
+  </ul>
+
+  <div class="note"><b class="t">Pikahaku</b><p>Paina <kbd>Ctrl</kbd> + <kbd>K</kbd> (Macilla <kbd>Cmd</kbd> + <kbd>K</kbd>) missä tahansa. Haulla löydät liidit, tehtävät ja komennot.</p></div>
+  <p>Ilmoitukset löytyvät valikon alaosasta kohdasta <span class="ui">Ilmoitukset</span>. Sinne tulevat esimerkiksi uudet kohteet, tallennettujen hakujen osumat ja hyväksytyt tarjoukset.</p>
+</section>
+
+<!-- 3 -->
+<section class="chapter" id="kohteet">
+  <div class="eyebrow">Luku 3</div>
+  <h1>Kohteet</h1>
+  <p class="lead">Kohde on yksi taloyhtiö, jossa on tulossa sinun urakkaasi sopiva remontti. Kohteet eivät muutu liideiksi itsestään. Sinä päätät, mitkä siirrät myyntiin ja mitkä piilotat.</p>
+  <figure><img src="kuvat/targets.jpg" alt=""><figcaption>Kohteet-sivu. Ylhäällä haku ja suodattimet, alla kohteet sopivimmasta alkaen.</figcaption></figure>
+
+  <h2>Hae kohteita</h2>
+  <p>Uudet kohteet tulevat näkyviin <span class="ui">Hae kohteita</span> -painikkeella.</p>
+  <ul>
+    <li>Painiketta voi käyttää kerran tunnissa organisaatiota kohden. Odotusaikana painikkeessa näkyy, milloin seuraava haku onnistuu.</li>
+    <li>Haku kestää 10–15 sekuntia. Älä sulje sivua sen aikana.</li>
+    <li>Kerralla löytyy muutama uusi kohde. Uudet kohteet on merkitty listalla tunnuksella <span class="ui">uusi</span>.</li>
+  </ul>
+
+  <h2>Suodattimet ja järjestys</h2>
+  <p>Rajaukset tulevat voimaan heti. Valikoissa näkyvät vain ne arvot, joita kohteissa oikeasti on.</p>
+  <table>
+    <tr><th>Suodatin</th><th>Käyttö</th></tr>
+    <tr><td>Remontti</td><td>Remonttityyppi, esimerkiksi putki-, julkisivu- tai kattoremontti</td></tr>
+    <tr><td>Maakunta, Kaupunki</td><td>Alueen rajaus</td></tr>
+    <tr><td>Remontti alkaa</td><td>Näytä vain remontit, jotka alkavat viimeistään valittuna vuonna</td></tr>
+    <tr><td>Talotyyppi</td><td>Kerrostalo, rivitalo ja niin edelleen</td></tr>
+    <tr><td>Vain yhteystiedolliset</td><td>Piilottaa kohteet, joihin ei vielä ole yhteystietoja</td></tr>
+    <tr><td>Järjestys</td><td>Sopivimmat ensin (oletus), Uusimmat ensin, Vanhimmat ensin, Varmimmat ensin, Kaupungin mukaan, Remontti alkaa ensin</td></tr>
+  </table>
+  <p>Jos kohteesta puuttuu tieto, esimerkiksi rakennusvuosi tai talotyyppi, se ei koskaan putoa rajauksen ulkopuolelle. <span class="ui">Tyhjennä rajaukset</span> palauttaa koko listan.</p>
+
+  <h3>Haku tavallisella kielellä</h3>
+  <p>Kirjoita kenttään <span class="ui">Kerro mitä etsit</span> esimerkiksi ”putkiremontit Tampereella 2027 mennessä, joilla on yhteystiedot” ja paina <span class="ui">Hae</span>. FlowLeads asettaa suodattimet puolestasi ja näyttää, miten se tulkitsi haun.</p>
+
+  <h3>Tallennetut haut</h3>
+  <p>Kun rajaus on kohdallaan, anna sille nimi ja paina <span class="ui">Tallenna haku</span>. Saat ilmoituksen, kun haulle löytyy uusia kohteita. Ilmoitukset voi kytkeä haun kohdalta päälle tai pois. Jokaisella käyttäjällä voi olla enintään 15 tallennettua hakua.</p>
+
+  <h2>Sopivuus</h2>
+  <p>Jokainen kohde saa pisteet 0–100. Klikkaamalla pisteitä näet, mistä ne muodostuvat.</p>
+  <table>
+    <tr><th>Osa</th><th>Enintään</th><th>Mitä se mittaa</th></tr>
+    <tr><td>Varmuus</td><td>40</td><td>Kuinka varmasti remontti on tulossa</td></tr>
+    <tr><td>Ajoitus</td><td>25</td><td>Kuinka pian remontti alkaa</td></tr>
+    <tr><td>Yhteystiedot</td><td>15</td><td>Löytyykö päättäjän puhelin ja sähköposti</td></tr>
+    <tr><td>Signaalit</td><td>10</td><td>Kuinka moni erillinen lähde viittaa remonttiin</td></tr>
+    <tr><td>Tuoreus</td><td>10</td><td>Kuinka tuore uusin tieto on</td></tr>
+  </table>
+  <p>Pisteet oppivat valinnoistasi. Kohteet, joita organisaatiosi siirtää liideiksi, nostavat samankaltaisia kohteita ylemmäs. Piilotetut kohteet laskevat samankaltaisia alemmas. Pisteiden selitteet ovat Erinomainen (75 tai enemmän), Hyvä (55–74), Kohtalainen (35–54) ja Heikko (alle 35).</p>
+  <p>Avaa kohteen rivi nuolesta, niin näet remonttien ajoituksen ja varmuuden, isännöitsijän yhteystiedot, hallituksen puheenjohtajan ja huoltoyhtiön sekä perustelun sille, miksi kohde sopii sinulle.</p>
+
+  <h2>Siirrä liideiksi</h2>
+  <ol>
+    <li>Valitse kohteet rivien valintaruuduista tai kohdasta <span class="ui">Valitse kaikki tällä sivulla</span>.</li>
+    <li>Valitse halutessasi <span class="ui">Vastuuhenkilö</span> (vain ylläpitäjä) ja <span class="ui">Sekvenssi</span>, joka lähettää uusille liideille sähköpostisarjan.</li>
+    <li>Rastita <span class="ui">Lisää soittolistalle</span>, jos haluat soittaa liideille.</li>
+    <li>Paina <span class="ui">Siirrä valitut liideiksi</span>. Painikkeen teksti kertoo, mitä kaikkea siirto tekee.</li>
+  </ol>
+  <figure><img src="kuvat/transfer_done.jpg" alt=""><figcaption>Siirron jälkeen näet luodut liidit ja pääset avaamaan ensimmäisen liidin tai soittolistan.</figcaption></figure>
+  <div class="note warn"><b class="t">Huomaa</b><ul>
+    <li>Liidi, jolla ei ole sähköpostiosoitetta, ei mene sekvenssiin. Liidi, jolla ei ole puhelinnumeroa, ei mene soittolistalle. Sivu kertoo tämän jo ennen siirtoa.</li>
+    <li>Saman taloyhtiön uusi ilmoitus liitetään olemassa olevaan liidiin. Samasta taloyhtiöstä ei synny kahta liidiä.</li>
+  </ul></div>
+
+  <h2>Piilota kohde</h2>
+  <p><span class="ui">Piilota</span> siirtää kohteen välilehdelle <span class="ui">Piilotetut</span>. Sieltä sen saa takaisin painikkeella <span class="ui">Palauta</span>, tai sen voi siirtää suoraan liidiksi.</p>
+  <p>Ylläpitäjä voi kytkeä Kohteet-sivulta päälle päiväkoosteen. Kooste tulee joka aamu klo 7.30 ilmoituksena ja sähköpostina, kun uusia kohteita on tullut.</p>
+</section>
+
+<!-- 4 -->
+<section class="chapter" id="taloyhtio">
+  <div class="eyebrow">Luku 4</div>
+  <h1>Taloyhtiökortti, kartta ja isännöitsijät</h1>
+  <p class="lead">Kun haluat tietää yhdestä taloyhtiöstä kaiken, avaa sen taloyhtiökortti.</p>
+
+  <h2>Taloyhtiökortti</h2>
+  <p>Kortti aukeaa, kun klikkaat taloyhtiön nimeä Kohteet-sivulla, kojelaudalla, isännöitsijän sivulla tai liidillä.</p>
+  <figure><img src="kuvat/housing.jpg" alt=""><figcaption>Taloyhtiökortti: perustiedot, isännöinti, hallitus ja huolto sekä kohteen pisteet eriteltyinä.</figcaption></figure>
+  <ul>
+    <li><b>Perustiedot</b>, <b>Isännöinti</b> sekä <b>Hallitus ja huolto</b></li>
+    <li><b>Kohteen pisteet</b> osa kerrallaan</li>
+    <li><b>Tulevat remontit</b> ja <b>Signaalit aikajanalla</b>: kaikki tieto, joka remonttiin viittaa, aikajärjestyksessä</li>
+    <li><b>Myynnin tilanne</b> sekä painike <span class="ui">Siirrä liidiksi</span> tai <span class="ui">Avaa liidi</span></li>
+  </ul>
+  <div class="note"><b class="t">Tietosuoja</b><p>Hallituksen puheenjohtajan yhteystietoja saa käyttää vain tätä remonttia koskevaan yhteydenottoon.</p></div>
+
+  <h2>Kartta</h2>
+  <p>Kohteet-sivun <span class="ui">Kartta</span> näyttää kohteet kartalla samoilla rajauksilla kuin lista. Pisteen väri kertoo sopivuuden. Kartta auttaa hoitamaan saman alueen yhtiöt samalla kertaa. Sijainti on likimääräinen.</p>
+
+  <h2>Isännöitsijät</h2>
+  <p>Isännöitsijät-sivu kokoaa isännöitsijät, jotka hoitavat organisaatiollesi sopivia taloyhtiöitä. Näet heti, kenellä on eniten sopivia kohteita, avoimia liidejä ja voitettuja kauppoja ja milloin hänen kanssaan on viimeksi oltu yhteydessä.</p>
+  <figure><img src="kuvat/managers.jpg" alt=""><figcaption>Isännöitsijät. Yksi hyvä suhde isännöitsijään voi avata useita taloyhtiöitä.</figcaption></figure>
+</section>
+
+<!-- 5 -->
+<section class="chapter" id="liidit">
+  <div class="eyebrow">Luku 5</div>
+  <h1>Liidit ja myyntiputki</h1>
+  <p class="lead">Liidi on yksi taloyhtiön remontti, jota myyt. Taloyhtiön nimi on liidin yrityksenä ja isännöitsijä yhteyshenkilönä.</p>
+
+  <h2>Liidilista</h2>
+  <figure><img src="kuvat/leads.jpg" alt=""><figcaption>Liidit-sivu. Välilehdet Kaikki, Kuumat, Liukumassa pois ja Uudet.</figcaption></figure>
+  <ul>
+    <li><span class="ui">Kuumat</span> ovat liidejä, joiden pisteet ovat vähintään 70. <span class="ui">Liukumassa pois</span> ovat liidejä, joihin ei ole oltu yhteydessä yli 7 päivään.</li>
+    <li>Rajaa listaa haulla sekä valikoilla <span class="ui">Vaihe</span> ja <span class="ui">Vastuuhenkilö</span>. Lisää rajauksia löytyy painikkeesta <span class="ui">Suodattimet</span>.</li>
+    <li>Kun valitset useita liidejä, voit vaihtaa niiden vaiheen, määrittää vastuuhenkilön tai viedä ne kerralla (<span class="ui">Toiminto → Toteuta</span>).</li>
+    <li>Rivin klikkaus avaa liidin sivupaneeliin. <span class="ui">Avaa liidi</span> avaa koko sivun.</li>
+  </ul>
+
+  <h2>Liidin sivu</h2>
+  <figure><img src="kuvat/lead.jpg" alt=""><figcaption>Liidin sivu: miksi kohde löytyi, yhteystiedot, vaihe ja työtila.</figcaption></figure>
+  <ul>
+    <li><b>Jatka tästä</b> ehdottaa seuraavaa tekoa.</li>
+    <li><b>Miksi kohde löytyi</b> näyttää lauseen, josta remontti tunnistettiin.</li>
+    <li><span class="ui">Lähetä sähköposti</span>, <span class="ui">Soita</span>, sekä nopeat kirjaukset <span class="ui">Kirjaa soitto</span> ja <span class="ui">Kirjaa sähköposti</span> lyhyen muistiinpanon kanssa.</li>
+    <li>Työtilan välilehdet: Aktiviteetti, Tehtävät, Sähköposti, Sekvenssit, Tapaamiset, Tarjoukset ja Tietosuoja.</li>
+    <li><b>Myyntiputki &amp; tila</b>: vaihda vaihetta valikosta. Kun merkitset liidin hävityksi, valitse syy. Syyt näkyvät raporteissa.</li>
+  </ul>
+
+  <h2>Myyntiputki</h2>
+  <p>Myyntiputki näyttää liidit vaiheittain. Siirrä korttia vetämällä se toiseen vaiheeseen. Vaiheet ovat <span class="ui">Uusi liidi</span>, <span class="ui">Kontaktoitu</span>, <span class="ui">Kvalifioitu</span>, <span class="ui">Tarjous lähetetty</span>, <span class="ui">Voitettu</span> ja <span class="ui">Hävitty</span>.</p>
+  <figure><img src="kuvat/pipeline.jpg" alt=""><figcaption>Myyntiputki. Sarakkeen yläosassa näkyy liidien määrä ja yhteenlaskettu arvo.</figcaption></figure>
+
+  <h2>Tuonti ja vienti</h2>
+  <ul>
+    <li><span class="ui">Tuo CSV</span>: tuo omat liidisi tiedostosta. Lataa ensin mallitiedosto. Yhdellä kertaa voi tuoda enintään 2000 riviä. Rivi ohitetaan, jos samalla sähköpostilla ja yrityksellä on jo liidi.</li>
+    <li><span class="ui">Vie</span>: CSV (Excel), HubSpot-tuontitiedosto tai Pipedrive-tuontitiedosto. Suoraa yhteyttä HubSpotiin ja Pipedriveen käsitellään luvussa 10.</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section class="chapter" id="soittolista">
+  <div class="eyebrow">Luku 6</div>
+  <h1>Soittolista ja tehtävät</h1>
+  <p class="lead">Soittolistalla ovat päivän puhelut järjestyksessä. Jokaisen puhelun lopputuloksen kirjaat yhdellä painalluksella.</p>
+  <figure><img src="kuvat/calls.jpg" alt=""><figcaption>Soittolista. Jokaisella kortilla on puhelinnumero, remontti ja lopputulospainikkeet.</figcaption></figure>
+
+  <h2>Näin soittolista toimii</h2>
+  <ol>
+    <li>Liidit tulevat listalle, kun rastitat siirrossa <span class="ui">Lisää soittolistalle</span>. Uuden liidin automaattisesta tehtävästä ”Ota yhteyttä” tulee silloin puhelu.</li>
+    <li>Soita kortilla näkyvään numeroon. Kirjoita halutessasi muistiinpano.</li>
+    <li>Valitse lopputulos. Se kirjataan liidille soittona, ja lista siirtyy seuraavaan.</li>
+  </ol>
+  <table>
+    <tr><th>Lopputulos</th><th>Mitä tapahtuu</th></tr>
+    <tr><td>Ei vastannut</td><td>Puhelu siirtyy seuraavaan aamuun klo 9.00.</td></tr>
+    <tr><td>Pyysi tarjouksen</td><td>Puhelu on tehty, ja seuraavalle aamulle syntyy tehtävä ”Tee tarjous”.</td></tr>
+    <tr><td>Tapaaminen sovittu</td><td>Puhelu on tehty.</td></tr>
+    <tr><td>Ei kiinnostunut</td><td>Puhelu on tehty.</td></tr>
+  </table>
+  <p>Ylläpitäjä voi vaihtaa näkymää omien ja koko tiimin puheluiden välillä.</p>
+
+  <h2>Tehtävät</h2>
+  <p>Tehtävät-sivulla tehtävät on ryhmitelty: Myöhässä, Tänään, Tämä viikko ja Myöhemmin. Uuden tehtävän luot painikkeella <span class="ui">+ Uusi tehtävä</span> tai liidin sivun Tehtävät-välilehdeltä. Tehtävällä on tyyppi (Soitto, Sähköposti, Seuranta, Tapaaminen, Muu), prioriteetti, eräpäivä ja tarvittaessa muistutus. Ajat ovat Suomen aikaa.</p>
+  <figure><img src="kuvat/tasks.jpg" alt=""><figcaption>Tehtävät. Valikosta voi vaihtaa omien ja koko tiimin tehtävien välillä.</figcaption></figure>
+  <p>Kalenterissa näet sovitut tapaamiset päivä- tai viikkonäkymänä. Tapaamisen voi sopia liidin sivun Tapaamiset-välilehdeltä.</p>
+</section>
+
+<!-- 7 -->
+<section class="chapter" id="sahkoposti">
+  <div class="eyebrow">Luku 7</div>
+  <h1>Sähköposti ja sekvenssit</h1>
+  <p class="lead">Lähetä yksittäinen viesti liidin sivulta, tai anna sekvenssin lähettää sovittu viestisarja puolestasi.</p>
+
+  <h2>Yksittäinen sähköposti</h2>
+  <ol>
+    <li>Avaa liidi ja paina <span class="ui">Lähetä sähköposti</span>. Painike ei ole käytössä, jos liidillä ei ole sähköpostiosoitetta.</li>
+    <li>Valitse halutessasi valmis <span class="ui">Malli</span>, kirjoita aihe ja viesti ja tarkista <span class="ui">Esikatselu</span>.</li>
+    <li>Paina <span class="ui">Lähetä sähköposti</span>. Lähetetyt viestit näkyvät kohdassa <span class="ui">Sähköpostihistoria</span>.</li>
+  </ol>
+
+  <h2>Sekvenssit</h2>
+  <p>Sekvenssi on viestisarja, joka lähtee liidille sovituin väliajoin. Organisaatiollasi on valmiina sekvenssi <b>”Taloyhtiöt: isännöitsijän lähestyminen”</b>:</p>
+  <table>
+    <tr><th>Viesti</th><th>Milloin</th><th>Aihe</th></tr>
+    <tr><td>1</td><td>Heti</td><td>{{company}}: tuleva remontti</td></tr>
+    <tr><td>2</td><td>4 päivää myöhemmin</td><td>{{company}}: referenssit hallitukselle</td></tr>
+    <tr><td>3</td><td>6 päivää myöhemmin</td><td>{{company}}: palataanko asiaan myöhemmin?</td></tr>
+  </table>
+  <p>Viestit 2 ja 3 jätetään lähettämättä, jos liidi on jo vastannut.</p>
+  <div class="note"><b class="t">Ennen ensimmäistä käyttöä</b><p>Muokkaa viestit omiksesi: kerro yrityksestäsi, referensseistäsi ja yhteystiedoistasi. Avaa <span class="ui">Sekvenssit</span>, valitse sekvenssi ja muokkaa vaiheita.</p></div>
+  <figure><img src="kuvat/sequence_builder.jpg" alt=""><figcaption>Sekvenssin muokkaus. Vasemmalla vaiheet, oikealla esikatselu testiliidillä.</figcaption></figure>
+
+  <h3>Muuttujat</h3>
+  <p>Viesteihin voi lisätä muuttujia, jotka täyttyvät liidin tiedoilla. Esimerkiksi {{company}} on taloyhtiön nimi, {{remonttityyppi}} remontti, {{ajankohta}} remontin ajankohta, {{kaupunki}} kaupunki ja {{isannoitsija}} isännöitsijä. Lisäksi käytössä ovat {{first_name}}, {{email}}, {{phone}} ja {{taloyhtio}}.</p>
+
+  <h3>Aloita ja lopeta</h3>
+  <ul>
+    <li>Aloita sekvenssi suoraan siirron yhteydessä Kohteet-sivulla, tai liidin sivulla kohdasta <span class="ui">Sekvenssit → Lisää sekvenssiin</span>.</li>
+    <li>Lopeta sekvenssi liidin sivulla painikkeella <span class="ui">Poista sekvenssistä</span>.</li>
+    <li>Jokaisessa sekvenssiviestissä on peruutuslinkki. Jos vastaanottaja on perunut viestit, häntä ei lisätä sekvenssiin.</li>
+  </ul>
+  <p>Uuden sekvenssin luot painikkeella <span class="ui">Uusi sekvenssi</span>. Sekvenssi lähettää viestejä vain, kun se on merkitty aktiiviseksi.</p>
+</section>
+
+<!-- 8 -->
+<section class="chapter" id="tarjoukset">
+  <div class="eyebrow">Luku 8</div>
+  <h1>Tarjoukset</h1>
+  <p class="lead">Tee tarjous suoraan liidille, lähetä se sähköpostilla ja näe, milloin asiakas avaa sen.</p>
+  <ol>
+    <li>Avaa liidi, valitse välilehti <span class="ui">Tarjoukset</span> ja paina <span class="ui">Luo tarjous</span>.</li>
+    <li>Täytä otsikko, voimassaoloaika ja huomautukset. Lisää rivejä painikkeella <span class="ui">+ Rivi</span>. Jokaisella rivillä on kuvaus, määrä, hinta, alennus ja ALV.</li>
+    <li>Tarkista <span class="ui">Esikatselu</span> tai lataa <span class="ui">PDF</span>. Paina <span class="ui">Tallenna</span>.</li>
+    <li>Paina <span class="ui">Lähetä</span>. Liidillä täytyy olla sähköpostiosoite.</li>
+  </ol>
+  <p>Asiakas saa linkin tarjoukseen. Hän voi hyväksyä tarjouksen kirjoittamalla nimensä, hylätä sen tai ladata sen PDF:nä. Kun asiakas hyväksyy tai hylkää tarjouksen, liidin vastuuhenkilö saa ilmoituksen ja sähköpostin.</p>
+  <table>
+    <tr><th>Tila</th><th>Merkitys</th></tr>
+    <tr><td>Luonnos</td><td>Tarjousta ei ole vielä lähetetty.</td></tr>
+    <tr><td>Lähetetty</td><td>Tarjous on lähetetty asiakkaalle.</td></tr>
+    <tr><td>Avattu</td><td>Asiakas on avannut tarjouksen. Listalla näkyy avauskertojen määrä. Kolme avausta tai enemmän näkyy merkintänä ”Korkea kiinnostus”.</td></tr>
+    <tr><td>Hyväksytty / Hylätty</td><td>Asiakkaan päätös</td></tr>
+    <tr><td>Vanhentunut</td><td>Voimassaoloaika on päättynyt.</td></tr>
+  </table>
+  <div class="note"><b class="t">Vinkki</b><p>Lähetettyä tarjousta ei voi muokata. Paina <span class="ui">Luo kopio</span>, muokkaa kopiota ja lähetä se. Ylläpitäjä voi määrittää, että hyväksytty tarjous siirtää liidin automaattisesti Voitettu-vaiheeseen (luku 10).</p></div>
+</section>
+
+<!-- 9 -->
+<section class="chapter" id="raportit">
+  <div class="eyebrow">Luku 9</div>
+  <h1>Raportit</h1>
+  <p class="lead">Raportit näyttävät, mitä FlowLeads löysi, mitä siitä tehtiin ja mistä tuli kauppaa.</p>
+  <p>Raportit-sivulla on välilehdet Myyntiputki, Lähteet, Tiimi, AI-rikastus ja Ennuste. Aikaväliksi voi valita esimerkiksi kuluvan viikon, kuluvan kuukauden, viimeiset 30 päivää tai oman välin. Häviösyyt-osio kertoo, miksi kauppoja on hävitty.</p>
+  <h2>Kuukausiraportti</h2>
+  <figure><img src="kuvat/monthly.jpg" alt=""><figcaption>Kuukausiraportti vertaa kuluvaa kuukautta edelliseen.</figcaption></figure>
+  <p>Raportissa ovat saadut kohteet, liideiksi siirretyt ja piilotetut kohteet, uudet liidit, kirjatut soitot, lähetetyt sähköpostit, tarjoukset ja voitetut ja hävityt kaupat. Lisäksi se näyttää myyjäkohtaiset luvut. Ylläpitäjä voi tilata raportin sähköpostiin. Se tulee kuun ensimmäisenä päivänä klo 8.00.</p>
+  <h2>Myyntiennuste</h2>
+  <p>Ennuste laskee odotetun myynnin vaiheittain konservatiivisena ja optimistisena arviona. Ennusteen tarkkuus riippuu siitä, onko liideille kirjattu kaupan arvo.</p>
+</section>
+
+<!-- 10 -->
+<section class="chapter" id="asetukset">
+  <div class="eyebrow">Luku 10 · Ylläpitäjälle</div>
+  <h1>Asetukset</h1>
+  <p class="lead">Asetuksia hallitsee ylläpitäjä. Myyjä näkee asetuksista vain kalenteriyhteyden, sähköpostimallit (vain luku) ja tilauksen tiedot.</p>
+
+  <h2>Käyttäjät</h2>
+  <ol>
+    <li>Kirjoita kohdassa <span class="ui">Kutsu käyttäjä</span> kollegan sähköpostiosoite.</li>
+    <li>Valitse <span class="ui">Rooli</span>: Myyjä tai Ylläpitäjä.</li>
+    <li>Paina <span class="ui">Lähetä kutsu</span>. Kollega saa linkin, josta hän asettaa salasanan. Linkki on voimassa 7 päivää.</li>
+  </ol>
+  <p>Käyttäjälistalta voit vaihtaa käyttäjän roolin, lähettää kirjautumislinkin uudelleen, nollata kaksivaiheisen tunnistautumisen sekä poistaa käyttäjän käytöstä tai aktivoida hänet. Käyttäjiä voi olla rajattomasti ilman lisähintaa.</p>
+  <figure><img src="kuvat/team.jpg" alt=""><figcaption>Käyttäjät. Roolin selite kertoo, mitä kumpikin rooli voi tehdä.</figcaption></figure>
+
+  <h2>Urakat ja kohdehaku</h2>
+  <p>Hakuprofiili kertoo, millaisia kohteita organisaatiollesi etsitään. Käyttöönotossa luodaan profiili, joka kattaa koko Suomen. Profiileja voi olla useita, esimerkiksi yksi kutakin urakkaa varten.</p>
+  <figure><img src="kuvat/profiles.jpg" alt=""><figcaption>Urakat ja kohdehaku. Oikealla näkyvät profiilin viimeisimmät osumat.</figcaption></figure>
+  <ul>
+    <li><b>Remonttityypit</b>: Lukkoremontti / kulunvalvonta, Putkiremontti, Sähkö- ja tietoliikennejärjestelmät, Lämmitysjärjestelmän remontti, Julkisivuremontti, Katto- ja vesikattoremontti, Huoneistoremontit ja Muu remontti.</li>
+    <li><b>Tarkemmat rajaukset</b> (valinnaisia): alueet (koko Suomi tai valitut maakunnat), kaupungit, kuinka monen vuoden päässä remontti saa enintään olla, talotyyppi, rakennusvuosi ja varmuus (oletus 50).</li>
+    <li><span class="ui">Esikatsele osumat</span> näyttää ennen tallennusta, mitä profiili löytää.</li>
+  </ul>
+  <div class="note"><b class="t">Vinkki</b><p>Pidä profiili mieluummin laajana ja rajaa Kohteet-sivun suodattimilla. Profiili ei koskaan jätä kohdetta pois puuttuvan tiedon takia.</p></div>
+
+  <h2>Liidit ja koosteet</h2>
+  <ul>
+    <li><b>Minne uusi liidi menee?</b> Uuden liidin aloitusvaihe myyntiputkessa.</li>
+    <li><b>Kenelle liidi osoitetaan?</b> Uuden liidin oletusvastuuhenkilö. Siirrossa valittu vastuuhenkilö menee tämän edelle.</li>
+    <li><b>Oletustagit</b> lisätään jokaiseen uuteen liidiin.</li>
+    <li><b>Päiväkoosteet</b>: uudet kohteet kaikille käyttäjille aamuisin, ja uudet liidit sähköpostikoosteena ylläpitäjille. Kooste lähtee vain, kun uutta on tullut.</li>
+  </ul>
+
+  <h2>Sähköposti</h2>
+  <p>Aseta <span class="ui">Lähettäjän nimi</span> ja <span class="ui">Lähettäjän sähköposti</span>. Kunnes yrityksesi lähetysverkkotunnus on vahvistettu, viestit lähtevät FlowLeadsin osoitteesta sinun nimelläsi, ja vastaukset tulevat sinun osoitteeseesi. Verkkotunnuksen vahvistuksen (SPF/DKIM) tekee Flowly. Ota yhteyttä tukeen, kun haluat viestien lähtevän omasta verkkotunnuksestasi. Samalla sivulla hallitset sähköpostimalleja.</p>
+
+  <h2>Tarjoukset</h2>
+  <p>Määritä tarjousten oletusvoimassaolo, oletus-ALV, oletushuomautukset, tarjousnumeron etuliite, logo sekä PDF:n ylä- ja alatunniste. Täällä valitset myös, siirtyykö liidi Voitettu-vaiheeseen, kun asiakas hyväksyy tarjouksen.</p>
+
+  <h2>Kalenteri</h2>
+  <p>Kun kalenteriyhteys on käytössä, Google Calendarin tai Microsoft Outlookin voi yhdistää FlowLeadsiin. Silloin tapaamiset näkyvät molemmissa.</p>
+
+  <h2>Integraatiot: HubSpot ja Pipedrive</h2>
+  <figure><img src="kuvat/integrations.jpg" alt=""><figcaption>Integraatiot. Viennissä taloyhtiöstä tulee yritys, isännöitsijästä yhteyshenkilö ja remontista kauppa.</figcaption></figure>
+  <ul>
+    <li><b>Ilman yhteyttä</b>: lataa Liidit-sivun <span class="ui">Vie</span>-valikosta tuontitiedosto ja tuo se omaan järjestelmääsi.</li>
+    <li><b>HubSpot</b>: luo HubSpotissa Private app -avain (alkaa ”pat-”). Anna avaimelle luku- ja kirjoitusoikeudet yrityksiin, yhteyshenkilöihin ja kauppoihin (crm.objects.companies, contacts ja deals). Liitä avain ja paina <span class="ui">Yhdistä</span>.</li>
+    <li><b>Pipedrive</b>: kopioi henkilökohtainen API-avain Pipedrivesta (profiilikuva → Personal preferences → API). Liitä avain ja paina <span class="ui">Yhdistä</span>.</li>
+  </ul>
+  <p>Yhteyden jälkeen liidit viedään Liidit-sivun toiminnolla <span class="ui">Vie HubSpotiin</span> tai <span class="ui">Vie Pipedriveen</span>. Uusi vienti päivittää aiemmin viedyt tiedot eikä luo kaksoiskappaleita.</p>
+
+  <h2>Lisäasetukset</h2>
+  <ul>
+    <li><b>Tietosuoja ja tietojen vienti</b>: <span class="ui">Tee vienti nyt</span> kokoaa kaikki organisaatiosi tiedot ZIP-tiedostoon. Latauslinkki on voimassa 48 tuntia.</li>
+    <li><b>API-avaimet</b> ja <b>Webhookit</b> (Slack, Teams tai oma osoite) muiden järjestelmien liittämiseen.</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section class="chapter flow" id="tilaus">
+  <div class="eyebrow">Luku 11 · Ylläpitäjälle</div>
+  <h1>Tilaus ja laskutus</h1>
+  <p class="lead">FlowLeadsissa on yksi paketti, joka sisältää kaikki ominaisuudet ja rajattomasti käyttäjiä: 149 € kuukaudessa (alv 0 %).</p>
+  <figure><img src="kuvat/billing.jpg" alt=""><figcaption>Tilaus-sivu. Näet kokeilun tilan, valitset kuukausisopimuksen ja luet sopimusehdot.</figcaption></figure>
+  <h2>Kokeilujakso</h2>
+  <ul>
+    <li>Kokeilu kestää 14 päivää. Se on maksuton, eikä se vaadi maksukorttia.</li>
+    <li>Kokeilu ei muutu maksulliseksi itsestään. Ylläpitäjä saa ilmoituksen, kun kokeilu on päättymässä.</li>
+    <li>Kun kokeilu tai sopimus päättyy, uusia kohteita ei enää haeta eikä siirretä liideiksi. Kaikki muu toimii edelleen, ja voit viedä tietosi ulos.</li>
+  </ul>
+  <h2>Kuukausisopimuksen tilaaminen</h2>
+  <ol>
+    <li>Avaa <span class="ui">Asetukset → Tilaus</span> tai paina yläpalkin <span class="ui">Valitse kuukausisopimus</span>.</li>
+    <li>Hyväksy sopimusehdot ja paina <span class="ui">Tilaa kuukausisopimus</span>.</li>
+    <li>Lasku tulee sähköpostiin kuukausittain etukäteen. ALV 25,5 % lisätään laskulle.</li>
+  </ol>
+  <h2>Irtisanominen</h2>
+  <p>Sopimuksessa ei ole määräaikaa eikä aloitusmaksua. Irtisano sopimus kohdasta <span class="ui">Irtisanominen → Irtisano sopimus</span>. Palvelu on käytössä kuluvan kuukauden loppuun, eikä seuraavaa kuukautta laskuteta. Irtisanomisen voi perua painikkeella <span class="ui">Peru irtisanominen</span>. Omat tietosi voit viedä ulos milloin tahansa, myös sopimuksen päätyttyä.</p>
+</section>
+
+<!-- 12 -->
+<section class="chapter" id="ukk">
+  <div class="eyebrow">Luku 12</div>
+  <h1>Usein kysyttyä</h1>
+  <h3>Hae kohteita -painike ei ole käytössä.</h3>
+  <p>Kohteita voi hakea kerran tunnissa organisaatiota kohden. Painikkeessa näkyy, milloin seuraava haku onnistuu. Jos kokeilu tai sopimus on päättynyt, haku ei ole käytössä. Katso luku 11.</p>
+  <h3>Haku ei löytänyt uusia kohteita.</h3>
+  <p>Uusia sopivia kohteita ei ollut juuri silloin. Kokeile myöhemmin uudelleen. Ylläpitäjä voi myös laajentaa hakuprofiilia kohdassa <span class="ui">Asetukset → Urakat ja kohdehaku</span>, esimerkiksi lisäämällä remonttityyppejä tai alueita.</p>
+  <h3>Liidi ei mennyt sekvenssiin.</h3>
+  <p>Liidillä ei ole sähköpostiosoitetta, tai vastaanottaja on perunut viestit. Lisää osoite liidin sivulla ja aloita sekvenssi Sekvenssit-välilehdeltä.</p>
+  <h3>Liidi ei näy soittolistalla.</h3>
+  <p>Liidillä ei ole puhelinnumeroa, tai sitä ei lisätty listalle siirron yhteydessä. Lisää numero liidille ja luo liidille Soitto-tyyppinen tehtävä.</p>
+  <h3>Samasta taloyhtiöstä tuli uusi ilmoitus.</h3>
+  <p>Uusi ilmoitus liitetään olemassa olevaan liidiin, ja tieto näkyy taloyhtiökortin aikajanalla. Uutta liidiä ei synny.</p>
+  <h3>En saa kirjautumiskoodia, koska puhelin on hukassa.</h3>
+  <p>Kirjaudu varakoodilla. Jos varakoodeja ei ole, pyydä organisaatiosi ylläpitäjää nollaamaan kaksivaiheinen tunnistautumisesi kohdassa <span class="ui">Asetukset → Käyttäjät</span>.</p>
+  <h3>Miten saan tietoni ulos?</h3>
+  <p>Liidit saat Liidit-sivun <span class="ui">Vie</span>-valikosta. Kaikki organisaation tiedot ylläpitäjä saa kohdasta <span class="ui">Asetukset → Lisäasetukset → Tietosuoja ja tietojen vienti</span>.</p>
+
+  <div style="margin-top:22pt;background:var(--bg);color:var(--tx);border-radius:10pt;padding:16pt 18pt;break-inside:avoid">
+    <div class="eyebrow" style="color:var(--hl)">Tuki</div>
+    <div style="font-size:17pt;font-weight:700;margin-top:4pt">Tarvitsetko apua?</div>
+    <p style="color:var(--mut);margin-top:6pt">Ota yhteyttä suoraan sähköpostilla, niin autamme.</p>
+    <p style="margin:10pt 0 0"><b>Matias Saarinen</b>, toimitusjohtaja, Flowly Solutions<br>
+    <a href="mailto:matias.saarinen@flowlysolutions.net" style="color:var(--hl);text-decoration:none">matias.saarinen@flowlysolutions.net</a> · <a href="https://flowlysolutions.net/" style="color:var(--hl);text-decoration:none">flowlysolutions.net</a></p>
+    <p style="color:var(--mut);font-size:8.5pt;margin:10pt 0 0">ReveaLuxury Oy · Y-tunnus 3488675-1 · Ilmajoki</p>
+  </div>
+</section>
+
+</body></html>
