@@ -52,7 +52,10 @@ def register_calendar_lead_routes(leads_bp):
             data = request.get_json(silent=True) or {}
             title = (data.get("title") or "").strip()
             start_raw = data.get("start_at")
-            duration = int(data.get("duration_minutes") or 30)
+            try:
+                duration = int(data.get("duration_minutes") or 30)
+            except (TypeError, ValueError):
+                duration = 30
             description = data.get("description")
             attendees_raw = data.get("attendees") or []
             if isinstance(attendees_raw, str):
@@ -87,10 +90,18 @@ def register_calendar_lead_routes(leads_bp):
         if not title:
             title = f"Tapaaminen — {lead.company or lead.display_name}"
 
-        if isinstance(start_raw, str):
-            start_at = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
-        else:
-            start_at = start_raw
+        try:
+            if isinstance(start_raw, str):
+                start_at = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+            else:
+                start_at = start_raw
+            if not isinstance(start_at, datetime):
+                raise ValueError
+        except ValueError:
+            if request.is_json:
+                return jsonify({"success": False, "error": "validation_error", "message": "start_at is required."}), 400
+            flash("Tarkista tapaamisen aika.", "danger")
+            return redirect(url_for("leads.detail", lead_id=lead_id))
         # The form sends the wall-clock time the user typed, i.e. Finnish time.
         from app import helsinki_to_utc
 

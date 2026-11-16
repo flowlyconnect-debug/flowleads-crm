@@ -130,7 +130,7 @@
 <span class="badge ai-pending">Rikastetaan…</span>
 {% elif lead.ai_enrichment_status == 'failed' %}
 <span class="badge ai-failed">AI-rikastus epäonnistui</span>
-{% if lead.ai_enrichment_error %}<p class="ai-error">{{ lead.ai_enrichment_error }}</p>{% endif %}
+{% if lead.ai_enrichment_error and current_user.is_authenticated and current_user.is_superadmin() %}<p class="ai-error">{{ lead.ai_enrichment_error }}</p>{% endif %}
 {% elif lead.ai_enrichment_status == 'disabled' %}
 <span class="badge ai-disabled">AI ei käytössä</span>
 {% else %}

@@ -14,11 +14,7 @@
 
         <section class="billing-status billing-status--{{ 'ok' if state.can_use else 'ended' }}" aria-label="Nykyinen tilanne">
           <p class="billing-status__label">{{ state.label }}{% if state.status in ('active', 'cancelled') %} · {{ state.plan_name }}{% endif %}</p>
-          {% if state.status == 'trial' %}
-          <p>Maksuton kokeilu päättyy {{ state.last_day }} ({{ state.days_left }} {{ 'päivä' if state.days_left == 1 else 'päivää' }} jäljellä). Kokeilu ei muutu maksulliseksi itsestään.</p>
-          {% elif state.status == 'trial_expired' %}
-          <p>Kokeilujakso päättyi {{ state.last_day }}. Tietosi ovat tallessa. Valitse kuukausisopimus, niin kohteiden haku ja siirto liideiksi jatkuvat.</p>
-          {% elif state.status == 'cancelled' %}
+          {% if state.status == 'cancelled' %}
           <p>Sopimus on irtisanottu. Palvelu on käytössä {{ state.last_day }} asti, eikä seuraavaa kuukautta laskuteta.</p>
           {% if can_manage %}
           <form method="post" action="{{ url_for('billing.resume_route', **org_query) }}">
@@ -34,6 +30,8 @@
         </section>
 
         {% if can_manage %}
+        {% set priced = plans|selectattr('price')|list %}
+        {% if state.status != 'active' or priced|length > 1 %}
         <h2 class="form-section-title">{{ 'Vaihda pakettia' if state.status == 'active' else 'Valitse kuukausisopimus' }}</h2>
         <form method="post" action="{{ url_for('billing.subscribe_route', **org_query) }}" class="billing-plans">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -45,7 +43,7 @@
             <span class="billing-plan__name">{{ plan.name }}</span>
             <span class="billing-plan__price">{{ plan_price_label(plan) }}{% if plan.price is not none %} + alv{% endif %}</span>
             <span class="billing-plan__features">{{ plan.features|join(' · ') }}</span>
-            {% if plan.price is none %}<span class="text-sm">Ota yhteyttä: <a href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='kokeilu') }}">pyydä tarjous</a></span>{% endif %}
+            {% if plan.price is none %}<span class="text-sm">Ota yhteyttä: <a href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='yhteys') }}">pyydä tarjous</a></span>{% endif %}
           </label>
           {% endfor %}
           <label class="form-check billing-accept">
@@ -54,6 +52,7 @@
           </label>
           <button type="submit" class="btn btn-primary btn-sm">{{ 'Vaihda paketti' if state.status == 'active' else 'Tilaa kuukausisopimus' }}</button>
         </form>
+        {% endif %}
 
         {% if state.status == 'active' %}
         <h2 class="form-section-title">Irtisanominen</h2>

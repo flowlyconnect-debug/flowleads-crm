@@ -9,7 +9,7 @@
       <p class="page-subtitle">Liidien automaattiset toiminnot</p>
     </div>
     <div class="page-header__actions">
-      <a class="btn btn-primary btn-sm" href="{{ url_for('automations.create_automation', **org_query) }}">Uusi automaatio</a>
+      {% if current_user.role in ('admin', 'superadmin') %}<a class="btn btn-primary btn-sm" href="{{ url_for('automations.create_automation', **org_query) }}">Uusi automaatio</a>{% endif %}
     </div>
   </header>
 
@@ -31,7 +31,7 @@
           {% for row in rows %}
           {% set a = row.automation %}
           <tr>
-            <td><a href="{{ url_for('automations.edit_automation', automation_id=a.id, **org_query) }}">{{ a.name }}</a></td>
+            <td>{% if current_user.role in ('admin', 'superadmin') %}<a href="{{ url_for('automations.edit_automation', automation_id=a.id, **org_query) }}">{{ a.name }}</a>{% else %}{{ a.name }}{% endif %}</td>
             <td>{{ row.trigger_label }}</td>
             <td>{{ row.action_count }}</td>
             <td>
@@ -45,10 +45,12 @@
             <td>{{ (a.last_run_at|helsinki).strftime('%d.%m.%Y %H:%M') if a.last_run_at else 'ei vielä' }}</td>
             <td>
               <a class="btn btn-ghost btn-sm" href="{{ url_for('automations.automation_logs', automation_id=a.id, **org_query) }}">Loki</a>
+              {% if current_user.role in ('admin', 'superadmin') %}
               <form method="post" action="{{ url_for('automations.toggle_automation', automation_id=a.id, **org_query) }}" class="form-row-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-secondary btn-sm">{% if a.is_active %}Poista käytöstä{% else %}Aktivoi{% endif %}</button>
               </form>
+              {% endif %}
             </td>
           </tr>
           {% else %}

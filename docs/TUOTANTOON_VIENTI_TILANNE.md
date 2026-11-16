@@ -253,9 +253,10 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 - **Haku tavallisella kielellä** Kohteet-sivulla (säännöt; tekoäly `NL_SEARCH_AI_ENABLED=true`).
 - **Kuukausiraportti** `/reports/monthly` ja sähköposti ylläpitäjille kuun 1. päivänä klo 8 (ajastin `monthly_report`).
 - **Hinnasto ja tilaus**: julkinen `/hinnasto` (`app/billing/plans.py`: yksi paketti, kaikki ominaisuudet
-  149 €/kk + alv, käyttäjän päätös 13.11.), kokeilupyyntölomake, 14 päivän
-  kokeilu (Luo asiakas / Kutsu asiakas), Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun, peru), päättynyt kokeilu
-  estää uusien kohteiden haun ja siirron, muistutus 3 pv ennen kokeilun loppua. Laskutus edelleen käsin:
+  149 €/kk + alv, käyttäjän päätös 13.11.), yhteydenottolomake, Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun,
+  peru), päättynyt sopimus estää uusien kohteiden haun ja siirron. **Maksuton kokeilu poistettu kokonaan 16.11.**
+  (käyttäjän päätös): uusi asiakas on heti kuukausisopimuksella, migraatio `a1b2c3d4e5f7` siirtää kokeilussa olleet
+  organisaatiot aktiivisiksi (käyttämättömät sarakkeet `trial_ends_at` ja `trial_reminder_sent_at` jäävät tauluun, jotta julkaisu ei katkaise vanhaa versiota; poista myöhemmin). Laskutus edelleen käsin:
   tilaus ja irtisanominen lähettävät superadmineille sähköpostin. Vanhat organisaatiot pysyvät aktiivisina.
 - **Varmuuskopiot**: Python-dumppi (`app/backups/logical.py`) käytetään automaattisesti, kun `pg_dump` puuttuu tai
   on tietokantaa vanhempi (todennäköinen syy tuotannon `backup_failed`-riviin: Renderin pg_dump vs. Postgres 18).
@@ -268,6 +269,21 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
   tarjousnumeron etuliite, Kutsuttu-tila käyttäjälistalla, pois kytketyt sekvenssit/automaatiot taustalla.
 - **Järjestelmän tila** `/admin/system` ja `flask system-check`: sähköposti (myös sandbox-domainin tunnistus),
   varmuuskopiot, avaimet ja migraatiot. Aja tämä ensimmäiseksi tuotannossa.
+
+## Ensimmäisen asiakkaan läpikäynti 16.11.2026
+
+Selainläpikäynti (admin + myyjä) ja tietosuoja-auditointi: kokeilu poistettu, lomakkeiden liidien
+ylikirjoitus, lomakkeiden viittaukset toiseen organisaatioon, GDPR-anonymisoinnin jäämät, health/db-tiedot,
+X-Forwarded-Host ja muutama 500-virhe korjattu (testit `test_forms.py`, `test_gdpr.py`, `test_page_smoke.py`).
+Toinen kierros (joka asetussivu ja toiminto selaimella, admin + myyjä + kutsuttu asiakas): kutsulla luotu asiakas
+jäi ilman sekvenssejä ja automaatioita (valinnat ovat nyt oletuksena päällä), tapaamista ei voinut sopia ilman
+Google/Outlook-yhteyttä (nyt paikallinen tapaaminen, `provider="local"`), myyjä pystyi poistamaan sekvenssin ja
+kytkemään automaatioita (nyt vain ylläpitäjä), julkisen tarjoussivun muotoilut, yrityssivun paikkamerkkitekstit ja
+puuttuvan salausavaimen englanninkielinen virhe korjattu.
+**Tarkista tuotannosta:** `/admin/customers` → ensimmäisen asiakkaan "Toiminnot käytössä" -ruudut (jos kutsu tehtiin
+ennen korjausta, sekvenssit/automaatiot voivat olla pois) ja `/admin/system` (avaimet, Mailgun).
+Avoinna: isännöitsijän henkilötietojen poisto jaetusta kohdekatalogista (`Listing`) GDPR-pyynnöllä puuttuu;
+myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
 
 ## Seuraavaksi
 

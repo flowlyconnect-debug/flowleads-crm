@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -108,7 +109,6 @@ def create_customer(
     min_confidence: int = 50,
     daily_lead_limit: int = 50,
     cities: list[str] | None = None,
-    trial: bool = False,
 ) -> CustomerOnboardingResult:
     """Create organization + admin + search profile in one go.
 
@@ -146,10 +146,12 @@ def create_customer(
     try:
         organization = create_organization(organization_name, org_slug)
         organization.is_active = is_active
-        if trial:
-            from app.billing.services import start_trial
+        # app/billing: no free trial, the monthly contract is in force at once
+        from app.billing.plans import DEFAULT_PLAN
 
-            start_trial(organization)  # app/billing: free trial, then the monthly contract
+        organization.subscription_status = "active"
+        organization.plan = DEFAULT_PLAN
+        organization.subscription_started_at = datetime.now(timezone.utc)
 
         admin_user = create_user(
             admin_email,

@@ -20,7 +20,7 @@
     </div>
     <div class="page-header__actions">
       {% if company.website %}
-        <a class="btn btn-secondary btn-sm" href="{{ company.website }}" target="_blank" rel="noopener">Website</a>
+        <a class="btn btn-secondary btn-sm" href="{{ company.website }}" target="_blank" rel="noopener">Verkkosivu</a>
       {% endif %}
     </div>
   </header>
@@ -40,7 +40,7 @@
           </div>
           <div>
             <dt>Tyyppi</dt>
-            <dd>{{ company.type or "prospect" }}</dd>
+            <dd>{{ {"customer": "Asiakas", "prospect": "Prospekti", "partner": "Kumppani", "supplier": "Toimittaja"}.get(company.type or "prospect", company.type) }}</dd>
           </div>
           <div>
             <dt>Alue</dt>
@@ -53,7 +53,16 @@
     <div class="card md:col-span-1">
       <div class="card-body">
         <h2 class="card-title">Kontaktit</h2>
-        <p class="text-sm text-secondary">Ei toteutettu tässä vaiheessa.</p>
+        {% set company_contacts = company.contacts.all() %}
+        {% if company_contacts %}
+        <ul class="text-sm">
+          {% for contact in company_contacts %}
+          <li>{{ ((contact.first_name or '') ~ ' ' ~ (contact.last_name or '')).strip() or contact.email or 'Nimetön' }}{% if contact.title %}, {{ contact.title }}{% endif %}{% if contact.email %} · {{ contact.email }}{% endif %}{% if contact.phone %} · {{ contact.phone }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-secondary">Ei kontakteja.</p>
+        {% endif %}
       </div>
     </div>
 
@@ -63,7 +72,7 @@
         <p class="open-leads-count">
           {{ open_leads_count }}
         </p>
-        <p class="text-sm text-secondary">Avoimet = active/won (ei Hävitty).</p>
+        <p class="text-sm text-secondary">Avoimet ja voitetut liidit, ei hävittyjä.</p>
       </div>
     </div>
   </div>

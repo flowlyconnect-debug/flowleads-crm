@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app, url_for
 from app.api.services import (
     ApiServiceError,
-    _apply_partial_update,
     find_lead_for_upsert,
     upsert_lead,
 )
@@ -58,32 +57,37 @@ def find_lead_for_form_upsert(
     organization_id: int,
     *,
     email: str | None,
-    phone: str | None,
-    source: str,
-    source_ref: str | None,
+    phone: str | None = None,
+    source: str | None = None,
+    source_ref: str | None = None,
 ) -> Lead | None:
-    lead = find_lead_for_upsert(
-        organization_id,
-        email=email,
-        source=source,
-        source_ref=source_ref,
-    )
-    if lead:
-        return lead
-    if phone:
-        normalized_phone = str(phone).strip()
-        if normalized_phone:
-            return Lead.query.filter_by(
-                organization_id=organization_id,
-                phone=normalized_phone,
-            ).first()
-    return None
+    """The lead an anonymous submission belongs to: same email in the same
+    organization only. Never by phone or by the form's name: anybody who
+    knows a phone number (or just submits the form twice) used to take over
+    an existing lead's contact details."""
+    normalized = normalize_email(email or "")
+    if not normalized:
+        return None
+    return Lead.query.filter_by(organization_id=organization_id, email=normalized).order_by(Lead.id).first()
+
+
+def _fill_empty_fields(lead: Lead, payload: dict) -> list[str]:
+    """An unauthenticated submission may add missing details to a lead but
+    never overwrite what the customer already has."""
+    filled = []
+    for field in ("first_name", "last_name", "phone", "company", "title", "website", "linkedin_url"):
+        value = payload.get(field)
+        if value and not getattr(lead, field, None):
+            setattr(lead, field, value)
+            filled.append(field)
+    return filled
 
 
 def _submission_to_lead_payload(form: WebForm, data: dict) -> dict:
     payload = {k: v for k, v in data.items() if k in LEAD_MAPPED_FIELD_KEYS}
     payload["source"] = "webform"
-    payload["source_ref"] = form.name
+    # unique per submission: (source, source_ref) identifies a lead
+    payload["source_ref"] = f"{(form.name or 'Lomake')[:200]} #{secrets.token_hex(4)}"
     if payload.get("email"):
         payload["email"] = normalize_email(payload["email"])
     return payload
@@ -208,6 +212,47 @@ def _notify_users(form: WebForm, lead: Lead) -> None:
             )
 
 
+def _own_id(model, organization_id: int, value, *, active_user: bool = False) -> int | None:
+    """An id from the request that must belong to this organization (a stage,
+    user or sequence of another customer is rejected, not stored)."""
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        ident = int(value)
+    except (TypeError, ValueError):
+        raise WebFormServiceError("Invalid reference.", "validation_error") from None
+    row = db.session.get(model, ident)
+    if row is None or getattr(row, "organization_id", None) != organization_id:
+        raise WebFormServiceError("Invalid reference.", "validation_error")
+    return ident
+
+
+def _clean_form_references(data: dict, organization_id: int) -> dict:
+    from app.leads.models import PipelineStage
+    from app.sequences.models import EmailSequence
+    from app.users.models import User
+
+    clean = {}
+    if "default_stage_id" in data:
+        clean["default_stage_id"] = _own_id(PipelineStage, organization_id, data.get("default_stage_id"))
+    if "default_assigned_to" in data:
+        clean["default_assigned_to"] = _own_id(User, organization_id, data.get("default_assigned_to"))
+    if "auto_enroll_sequence_id" in data:
+        clean["auto_enroll_sequence_id"] = _own_id(EmailSequence, organization_id, data.get("auto_enroll_sequence_id"))
+    if "notify_users" in data:
+        users = []
+        for uid in data.get("notify_users") or []:
+            try:
+                users.append(_own_id(User, organization_id, uid))
+            except WebFormServiceError:
+                continue
+        clean["notify_users"] = [u for u in users if u]
+    if "is_active" in data:
+        value = data.get("is_active")
+        clean["is_active"] = value if isinstance(value, bool) else str(value).strip().lower() in ("1", "true", "y", "yes", "on")
+    return clean
+
+
 class WebFormService:
     @staticmethod
     def create_form(data: dict, organization_id: int, user_id: int) -> WebForm:
@@ -223,6 +268,7 @@ class WebFormService:
         if not title:
             raise WebFormServiceError("Title is required.", "validation_error")
 
+        data = {**data, **_clean_form_references(data, organization_id)}
         form = WebForm(
             organization_id=organization_id,
             name=name,
@@ -248,6 +294,7 @@ class WebFormService:
     @staticmethod
     def update_form(form_id: int, data: dict, organization_id: int) -> WebForm:
         form = get_form_for_org(form_id, organization_id)
+        data = {**data, **_clean_form_references(data, organization_id)}
         if "fields" in data:
             ok, msg = validate_fields_config(data["fields"])
             if not ok:
@@ -275,14 +322,7 @@ class WebFormService:
             if key in data:
                 setattr(form, key, data[key])
         if "notify_users" in data:
-            raw_users = data["notify_users"] or []
-            notify: list[int] = []
-            for uid in raw_users:
-                try:
-                    notify.append(int(uid))
-                except (TypeError, ValueError):
-                    continue
-            form.notify_users = notify
+            form.notify_users = data["notify_users"]
         form.updated_at = _utc_now()
         db.session.flush()
         return form
@@ -376,27 +416,21 @@ class WebFormService:
         normalized_data = normalized
         try:
             lead_payload = _submission_to_lead_payload(form, normalized_data)
-            existing = find_lead_for_form_upsert(
-                form.organization_id,
-                email=lead_payload.get("email"),
-                phone=lead_payload.get("phone"),
-                source="webform",
-                source_ref=form.name,
-            )
+            existing = find_lead_for_form_upsert(form.organization_id, email=lead_payload.get("email"))
             if existing:
-                _apply_partial_update(existing, lead_payload)
+                _fill_empty_fields(existing, lead_payload)
                 existing.updated_at = _utc_now()
                 db.session.flush()
                 LeadService.log_activity(
                     existing.id,
                     None,
                     "updated",
-                    content=f"Updated via web form: {form.name}",
+                    content=f"Lähetti lomakkeen: {form.name}",
                 )
                 lead = existing
             else:
-                lead, _action = upsert_lead(form.organization_id, lead_payload)
-            _apply_form_defaults(form, lead)
+                lead, _action = upsert_lead(form.organization_id, lead_payload, match_by_email=False)
+                _apply_form_defaults(form, lead)
             lead.updated_at = _utc_now()
             db.session.flush()
 

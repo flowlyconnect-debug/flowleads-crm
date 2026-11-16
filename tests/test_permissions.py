@@ -124,3 +124,39 @@ def test_send_test_email_cli_failure(mock_send, runner, app):
     mock_send.return_value = (False, None, "provider error")
     result = runner.invoke(args=["send-test-email", "fail@example.com"])
     assert result.exit_code != 0
+
+
+def test_seller_cannot_manage_sequences_or_automations(client, app, org_users):
+    """16.11.2026: a seller could delete the organization's e-mail sequence and
+    switch automations off. Sellers view and enroll; admins manage."""
+    from app.automations.models import Automation
+    from app.sequences.defaults import ensure_default_sequences
+    from app.sequences.models import EmailSequence
+
+    with app.app_context():
+        ensure_default_sequences(org_users["org_a"])
+        db.session.commit()
+        sequence_id = EmailSequence.query.filter_by(organization_id=org_users["org_a"]).first().id
+        automation = Automation.query.filter_by(organization_id=org_users["org_a"]).first()
+        automation_id = automation.id if automation else None
+
+    _login(client, org_users["user_a"])
+    page = client.get("/sequences")
+    assert page.status_code == 200 and "btn-new-sequence\"" not in page.get_data(as_text=True)
+    assert client.delete(f"/sequences/{sequence_id}").status_code == 403
+    assert client.post("/sequences", json={"name": "x"}).status_code == 403
+    assert client.put(f"/sequences/{sequence_id}", json={"is_active": False}).status_code == 403
+    assert client.post(f"/sequences/{sequence_id}/steps", json={"subject_template": "x"}).status_code == 403
+    assert client.get(f"/sequences/{sequence_id}/builder").status_code == 403
+    assert client.get("/automations").status_code == 200
+    assert client.get("/automations/new").status_code == 403
+    if automation_id:
+        assert client.post(f"/automations/{automation_id}/toggle").status_code == 403
+    with app.app_context():
+        assert db.session.get(EmailSequence, sequence_id) is not None
+    client.get("/auth/logout")
+
+    _login(client, org_users["admin_a"])
+    _enable_2fa_session(client)
+    assert client.get(f"/sequences/{sequence_id}/builder").status_code == 200
+    assert client.get("/automations/new").status_code == 200

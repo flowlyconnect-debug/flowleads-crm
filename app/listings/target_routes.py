@@ -286,7 +286,7 @@ def index():
 
 
 def _subscription_ended(organization_id: int) -> bool:
-    """A trial or contract that has ended: the targets stay visible, but no
+    """A contract that has ended: the targets stay visible, but no
     new ones are fetched or moved to leads (app/billing)."""
     from app.billing.services import organization_can_use
 

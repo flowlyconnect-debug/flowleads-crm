@@ -337,3 +337,25 @@ def test_invite_route_requires_superadmin(client, app):
         sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/admin/customers/invite")
     assert response.status_code == 403
+
+
+@patch("app.email.services.EmailService.send_customer_invite_email")
+def test_invite_offers_every_feature_by_default(mock_send, client, app):
+    """One plan with everything: an invited customer who just sets a password
+    must get sequences and automations (16.11.2026: both tick boxes were empty)."""
+    import re
+
+    mock_send.return_value = {"success": True, "message_id": "<invite@test>", "error": None}
+    _login_superadmin(client, app)
+    form = client.get("/admin/customers/invite").get_data(as_text=True)
+    boxes = re.findall(r'<input type="checkbox" name="allowed_features" value="(\w+)"\s+(checked)?', form)
+    assert len(boxes) == 3 and all(checked for _, checked in boxes)
+    client.post(
+        "/admin/customers/invite",
+        data={"organization_name": "Kaikki Oy", "admin_email": "admin@kaikki.fi", "remonttityypit": ["Putkiremontti"],
+              "source": "oikotie", "allowed_features": [key for key, _ in boxes]},
+    )
+    token = mock_send.call_args.kwargs["invite_url"].rsplit("/", 1)[-1]
+    page = app.test_client().get(f"/invite/{token}").get_data(as_text=True)
+    assert page.count('name="enabled_features"') == 3
+    assert page.count('name="enabled_features"') == len(re.findall(r'name="enabled_features" value="\w+" checked', page))

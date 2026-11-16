@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 from app.core.errors import json_error, json_success, wants_json_response
 from app.extensions import db
 from app.leads.models import Lead
+from app.leads.services import LeadServiceError
 from app.leads.permissions import can_assign_to_others, resolve_organization_id
 from app.tasks.forms import QuickTaskForm
 from app.tasks.models import Task
@@ -219,6 +220,9 @@ def create_task():
         except TaskServiceError as exc:
             db.session.rollback()
             return json_error(exc.code, exc.message, 404 if exc.code == "not_found" else 400)
+        except LeadServiceError:
+            db.session.rollback()
+            return json_error("not_found", "Lead not found.", 404)
 
     quick_form = QuickTaskForm()
     if not quick_form.validate_on_submit():

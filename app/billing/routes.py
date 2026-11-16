@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.billing.plans import PLANS, PLANS_BY_KEY, TERMS, TRIAL_DAYS, VAT_PERCENT, price_label
+from app.billing.plans import PLANS, PLANS_BY_KEY, TERMS, VAT_PERCENT, price_label
 from app.billing.services import (
     BillingError,
     admin_set,
@@ -26,7 +26,7 @@ billing_bp = Blueprint("billing", __name__)
 
 @billing_bp.app_context_processor
 def _subscription_banner():
-    """The trial / ended-contract notice at the top of every app page."""
+    """The cancelled / ended-contract notice at the top of every app page."""
 
     def subscription_banner():
         try:
@@ -54,27 +54,26 @@ def pricing():
         "billing/pricing.html",
         plans=PLANS,
         terms=TERMS,
-        trial_days=TRIAL_DAYS,
         vat=VAT_PERCENT,
         sent=request.args.get("sent") == "1",
         chosen=request.args.get("paketti") if request.args.get("paketti") in PLANS_BY_KEY else "",
     )
 
 
-@billing_bp.route("/hinnasto/kokeilu", methods=["POST"])
+@billing_bp.route("/hinnasto/yhteydenotto", methods=["POST"])
 @limiter.limit("5 per hour", methods=["POST"])
 def pricing_contact():
-    """A trial request from the price list. The honeypot field `website` is
+    """A contact request from the price list. The honeypot field `website` is
     hidden from people; a bot that fills it gets the thank-you page and no email."""
     if (request.form.get("website") or "").strip():
-        return redirect(url_for("billing.pricing", sent=1, _anchor="kokeilu"))
+        return redirect(url_for("billing.pricing", sent=1, _anchor="yhteys"))
     try:
         contact_request(request.form, ip=request.remote_addr)
     except BillingError as exc:
         db.session.rollback()
         flash(fi_message(exc.message), "danger")
-        return redirect(url_for("billing.pricing", paketti=request.form.get("plan") or None, _anchor="kokeilu"))
-    return redirect(url_for("billing.pricing", sent=1, _anchor="kokeilu"))
+        return redirect(url_for("billing.pricing", paketti=request.form.get("plan") or None, _anchor="yhteys"))
+    return redirect(url_for("billing.pricing", sent=1, _anchor="yhteys"))
 
 
 # --- the customer's subscription --------------------------------------------------------

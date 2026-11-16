@@ -58,8 +58,9 @@
 
           <fieldset style="margin-top:1rem;">
             <legend class="form-label">Sallitut toiminnot</legend>
-            <p class="form-helper mb-2">Asiakas valitsee näistä haluamansa kutsua hyväksyessään. Voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
-            {% set selected_features = form_data.get('allowed_features', []) %}
+            <p class="form-helper mb-2">Kaikki kuuluvat pakettiin ja ovat oletuksena päällä. Asiakas voi jättää jonkin pois kutsua hyväksyessään, ja voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
+            {# one plan, every feature: all ticked unless the superadmin removes some #}
+            {% set selected_features = form_data.get('allowed_features', feature_catalog.keys()|list) %}
             {% for key, label in feature_catalog.items() %}
             <label class="form-check">
               <input type="checkbox" name="allowed_features" value="{{ key }}"
@@ -68,12 +69,6 @@
             </label>
             {% endfor %}
           </fieldset>
-
-          <label class="form-check" style="margin-top:1rem;">
-            <input type="checkbox" name="trial" value="y"
-              {% if form_data.get('trial', True) %}checked{% endif %}>
-            Maksuton kokeilujakso ({{ trial_days }} päivää), alkaa kun asiakas hyväksyy kutsun. Ilman: kuukausisopimus on voimassa heti.
-          </label>
 
           <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
             <button type="submit" class="btn btn-primary">Lähetä kutsu</button>

@@ -33,14 +33,12 @@ class Organization(db.Model):
     # app/core/features.py; a superadmin edits them on /admin/customers.
     enabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     # Subscription (app/billing): "active" for customers billed by agreement
-    # (every organization created before plans existed), "trial", "cancelled"
+    # (every organization created before plans existed), "cancelled"
     # (in use until cancel_at) or "expired". plan = app/billing/plans.py key.
     subscription_status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     plan: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     subscription_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    trial_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
