@@ -296,6 +296,7 @@ def create_organization_route():
     slug = request.form.get("slug", "").strip().lower()
     try:
         org = create_organization(name, slug)
+        org.enabled_features = []  # optional modules are switched on per customer
         db.session.commit()
         flash(f"Organisaatio luotu: {org.name}", "success")
     except UserServiceError as exc:

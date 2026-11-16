@@ -58,9 +58,9 @@
 
           <fieldset style="margin-top:1rem;">
             <legend class="form-label">Sallitut toiminnot</legend>
-            <p class="form-helper mb-2">Kaikki kuuluvat pakettiin ja ovat oletuksena päällä. Asiakas voi jättää jonkin pois kutsua hyväksyessään, ja voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
-            {# one plan, every feature: all ticked unless the superadmin removes some #}
-            {% set selected_features = form_data.get('allowed_features', feature_catalog.keys()|list) %}
+            <p class="form-helper mb-2">Nämä ovat oletuksena pois päältä: valitse vain ne, jotka ovat valmiit tämän asiakkaan käyttöön. Voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
+            {# off by default (16.11.2026): a module is switched on per customer once it is ready for them #}
+            {% set selected_features = form_data.get('allowed_features', []) %}
             {% for key, label in feature_catalog.items() %}
             <label class="form-check">
               <input type="checkbox" name="allowed_features" value="{{ key }}"

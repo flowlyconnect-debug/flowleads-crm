@@ -31,7 +31,10 @@ def test_onboarded_customer_gets_active_default_sequence(app):
         assert sequence.is_active is True
         assert [s.delay_days for s in sorted(sequence.steps, key=lambda s: s.order_index)] == [0, 4, 6]
         assert sequence.steps[0].body_html_template.startswith("<p>")
-        # offered on the Kohteet page right away
+        # ready, but offered on the Kohteet page only once the module is switched on
+        assert targets.sequences_for_transfer(result.organization.id) == []
+        result.organization.enabled_features = ["sequences"]
+        db.session.commit()
         assert [s.id for s in targets.sequences_for_transfer(result.organization.id)] == [sequence.id]
 
 

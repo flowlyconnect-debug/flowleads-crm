@@ -146,6 +146,9 @@ def create_customer(
     try:
         organization = create_organization(organization_name, org_slug)
         organization.is_active = is_active
+        # optional modules (sequences, automations, AI) start off: a superadmin
+        # switches each on from /admin/customers once it is ready for the customer
+        organization.enabled_features = []
         # app/billing: no free trial, the monthly contract is in force at once
         from app.billing.plans import DEFAULT_PLAN
 

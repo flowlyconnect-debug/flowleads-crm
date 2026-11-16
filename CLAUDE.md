@@ -41,6 +41,11 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   map and every target action redirect there, Isännöitsijät / taloyhtiökortti show only what is already a lead,
   and digests, saved-search alerts and same-taloyhtiö merges skip the organization. Leads stay. Matching goes
   on, so the count stays current. Superadmins are never locked. Tests: `tests/test_target_access.py`.
+- **Optional modules are off by default** (`Organization.enabled_features`, keys in `app/admin/constants.py`:
+  sequences, automations, ai_enrichment; `app/core/features.py`, template global `has_feature()`): a new customer
+  gets none, and a superadmin ticks them per customer on `/admin/customers` ("Toiminnot käytössä") once a module
+  is ready. Off = no nav item, no lead-page tab/AI cards, no AI report. `create_organization()` itself still
+  enables all (tests rely on it); onboarding and invites clear them. Tests: `tests/test_optional_modules_off.py`.
 - Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the default sort
   "Sopivimmat ensin" and the score chip come from `app/listings/fit_services.py`, which learns from the
   organization's transferred and hidden targets, tests `tests/test_target_fit.py`) and a daily
