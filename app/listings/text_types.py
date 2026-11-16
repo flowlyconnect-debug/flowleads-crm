@@ -23,15 +23,24 @@ VENTILATION = "Ilmanvaihdon puhdistus ja säätö"
 ATTIC_INSULATION = "Yläpohjan lisäeristys"
 TEXT_TYPE_CONFIDENCE = 75
 
-# type -> (every pattern must be found in the same clause of the folded text)
-_PATTERNS: dict[str, tuple[re.Pattern, ...]] = {
+# type -> alternatives; a type is found when every pattern of one alternative
+# is in the same clause of the folded text
+_PATTERNS: dict[str, tuple[tuple[re.Pattern, ...], ...]] = {
     VENTILATION: (
-        re.compile(r"ilmanvaih|\biv[- ]|ilmamaar|poistoilma"),
-        re.compile(r"puhdist|nuoho|mittau|saato|saado|tasapainot"),
+        # cleaning, measuring, adjusting
+        (
+            re.compile(r"ilmanvaih|\biv[- ]|ilmamaar|poistoilma"),
+            re.compile(r"puhdist|nuoho|mittau|saato|saado|tasapainot"),
+        ),
+        # renewing the ventilation units or system ("ilmanvaihtokoneiden
+        # peruskorjaus tai uusiminen"): the verb must follow the ventilation word
+        (re.compile(r"(ilmanvaih\w*|\biv-\w+)\s+(uusi|uusinta|peruskorja|saneera)"),),
     ),
     ATTIC_INSULATION: (
-        re.compile(r"ylapohj|ullako|ullakk|vinti"),
-        re.compile(r"erist"),
+        (
+            re.compile(r"ylapohj|ullako|ullakk|vinti"),
+            re.compile(r"erist"),
+        ),
     ),
 }
 # SQL prefilter for the backfill (ILIKE, so accents as written)
@@ -67,8 +76,8 @@ def find_text_types(text: str | None) -> dict[str, dict]:
             continue
         for clause in _CLAUSE_RE.split(sentence):
             folded = _fold(clause)
-            for rtype, patterns in _PATTERNS.items():
-                if rtype in found or not all(p.search(folded) for p in patterns):
+            for rtype, alternatives in _PATTERNS.items():
+                if rtype in found or not any(all(p.search(folded) for p in alt) for alt in alternatives):
                     continue
                 found[rtype] = {
                     "timing": _timing(clause) or _timing(sentence),

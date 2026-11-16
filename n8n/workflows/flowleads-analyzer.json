@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "5e64c020-b945-4713-9eec-4643ec886a8c",
+      "id": "178ebf27-aecb-42c8-ae1b-6728e1f9efbb",
       "name": "Every 10 minutes"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "5ddc77e0-09ac-467c-8aef-d158601a93f9",
+      "id": "e57377ee-9e9d-4570-b1d5-d6395f67b6cb",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "bf56f5cc-c01b-41ca-8dd3-8c52fc06e92b",
+              "id": "f0c9c3ea-da1b-42ff-83a4-e405222df1f3",
               "name": "crm_base_url",
               "value": "https://flowleads-crm-zv0a.onrender.com",
               "type": "string"
             },
             {
-              "id": "09a319ea-25f1-4215-80a6-982a726393e3",
+              "id": "d5e2afe4-f156-4bae-a52d-cb77668f59b7",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "98314ac4-e4d5-416f-8a3c-044c767d5a96",
+      "id": "4fccabb4-ab61-40f3-98af-e39d2f780e9f",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -72,7 +72,7 @@
         440,
         100
       ],
-      "id": "0d298967-ed41-4437-bd46-bb54f0e93361",
+      "id": "601d0c79-c5bf-497f-a387-8b209e7724b5",
       "name": "CODE – Start"
     },
     {
@@ -103,7 +103,7 @@
         660,
         100
       ],
-      "id": "021abc24-e7d5-4ba8-b667-984ee1c109c5",
+      "id": "7cc53423-19f7-4e80-b7c2-9a0c7c827d35",
       "name": "HTTP – Claim Listings",
       "retryOnFail": true,
       "maxTries": 3,
@@ -119,7 +119,7 @@
         880,
         100
       ],
-      "id": "33f2db51-eb26-419e-b7b4-0151cd00b3e8",
+      "id": "f65aede0-d61f-41d6-a2ee-5de3d99d0139",
       "name": "CODE – Split Listings"
     },
     {
@@ -134,7 +134,7 @@
         1100,
         100
       ],
-      "id": "a84a7849-0ce4-4213-808f-260d79c2f950",
+      "id": "94f15c12-c685-488e-8ac1-9e1c6912d5c6",
       "name": "LOOP – Listings"
     },
     {
@@ -148,9 +148,9 @@
         1320,
         260
       ],
-      "id": "2930a873-7569-48b2-882f-56ff049781e5",
+      "id": "8b7bb34e-edc9-4237-af07-3ef68686b74d",
       "name": "WAIT – Rate Limit",
-      "webhookId": "59d68c77-d8f1-4816-85f5-930e209e8e6c"
+      "webhookId": "b2180d2a-afdd-419d-bfac-74695cec0e02"
     },
     {
       "parameters": {
@@ -163,7 +163,7 @@
           },
           "conditions": [
             {
-              "id": "51b48f4c-b9a5-485b-9c46-d28680bb1aaf",
+              "id": "68dda1df-abf9-4712-baf7-b639c2ffb600",
               "leftValue": "={{ $json.fetch_detail !== false }}",
               "rightValue": "",
               "operator": {
@@ -184,7 +184,7 @@
         1430,
         260
       ],
-      "id": "ffc98690-a22d-4b81-9887-f7281b675967",
+      "id": "fb4f0404-d76e-4853-8d78-a73e165a5501",
       "name": "IF – Fetch Detail Page"
     },
     {
@@ -237,13 +237,13 @@
         1540,
         260
       ],
-      "id": "c70e8883-6b60-4094-a826-be6cdc527efd",
+      "id": "8ee68ebc-5ebb-4299-a718-175fa1cab048",
       "name": "HTTP – Fetch Listing Detail Page",
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const listing = $('LOOP – Listings').first().json;\nconst useOwnText = listing.fetch_detail === false;\nconst h = useOwnText ? {} : ($input.first()?.json || {});\nconst status = Number(h.statusCode || 0);\nconst html = String(h.pageHtml ?? h.body ?? h.data ?? '').slice(0, 200000);\n\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n  .replace(/<svg[\\s\\S]*?<\\/svg>/gi, ' ')\n  .replace(/<img[^>]*>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '\"').replace(/&#39;/gi, \"'\")\n  .replace(/\\s+/g, ' ')\n  .trim();\nfor (const marker of ['Taloyhtiö', 'Tulevat remontit', 'Asunnon lisätiedot', 'Perustiedot', 'Kohdenumero', 'Rakennuksen tiedot', 'Asunnon kuvaus']) {\n  const idx = text.indexOf(marker);\n  if (idx >= 0) { text = text.slice(idx); break; }\n}\ntext = text.slice(0, 12000);\nif (useOwnText) text = String(listing.description || '').replace(/\\s+/g, ' ').trim().slice(0, 12000);\n\nconst ok = useOwnText\n  ? text.length >= 30\n  : !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;\nconst PROMPT = \"Olet kiinteistöalan analyytikko. Saat suomalaisen myytävän asunnon ilmoituksen tekstin.\\nTehtäväsi on poimia taloyhtiön tiedot ja kohteen TULEVAT remontit.\\n\\nRemonttityypit (käytä TÄSMÄLLEEN näitä nimiä):\\n__TYPES__\\n\\nSäännöt tuleville remonteille:\\n- Ota mukaan vain tuleva, suunniteltu, päätetty, budjetoitu, ehdotettu, kuntoarviossa tai PTS:ssä mainittu tai muuten vielä tekemätön työ.\\n- ÄLÄ ota mukaan jo tehtyjä, valmistuneita tai aiemmin toteutettuja remontteja.\\n- Luokittele jokainen tuleva remontti yhteen tyyppiin. Jos sopivaa tyyppiä ei ole, käytä \\\"Muu remontti\\\".\\n- \\\"Lukkoremontti / kulunvalvonta\\\": lukitus, lukkojen tai avainten uusiminen, sarjoitus, sähkölukitus, iLOQ, kulunvalvonta tai kulkuoikeudet oviin ja sisäänkäynteihin. EI kameravalvontaa, murtohälytintä, paloilmoitinta eikä pelkkää ovipuhelinta.\\n- \\\"Putkiremontti\\\": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus.\\n- \\\"Sähkö- ja tietoliikennejärjestelmät\\\": sähköverkon, sähköpääkeskuksen, nousujohtojen, antenni-, valokuitu- tai tietoliikenneverkon uusiminen.\\n- \\\"Lämmitysjärjestelmän remontti\\\": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.\\n- \\\"Julkisivuremontti\\\": julkisivu, ikkunat, parvekkeet.\\n- \\\"Katto- ja vesikattoremontti\\\": katto, vesikatto, yläpohja (ei pelkkä yläpohjan lisäeristys).\\n- \\\"Ilmanvaihdon puhdistus ja säätö\\\": ilmanvaihtokanavien tai IV-hormien puhdistus tai nuohous, ilmamäärien mittaus, ilmanvaihdon säätö tai tasapainotus. EI ilmanvaihtokoneiden uusimista (se on \\\"Muu remontti\\\").\\n- \\\"Yläpohjan lisäeristys\\\": yläpohjan tai ullakon lisäeristys.\\n- \\\"Huoneistoremontit\\\": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.\\n- confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.\\n- evidence = lyhyt suora lainaus tekstistä. timing = esim. \\\"2027\\\", \\\"suunnitteilla\\\", \\\"PTS 2026–2028\\\" tai \\\"\\\".\\n- Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.\\n\\nYhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (isännöintiyritys tai, jos yritystä ei mainita, henkilö), isännöitsijän henkilön nimi (isannoitsija_henkilo, jos teksti nimeää sekä yrityksen että henkilön), isännöitsijän puhelin ja sähköposti sekä huoltoyhtiö (kiinteistöhuolto) ja sen puhelin. Muuten \\\"\\\".\\n\\nRakennus: rakennusvuosi = rakennuksen valmistumis- tai rakennusvuosi numerona (esim. 1972), tai null jos tekstissä ei ole. talotyyppi = yksi näistä: \\\"Kerrostalo\\\", \\\"Rivitalo\\\", \\\"Paritalo\\\", \\\"Omakotitalo\\\", \\\"Muu\\\", tai \\\"\\\" jos tekstistä ei selviä (luhtitalo = \\\"Kerrostalo\\\", erillistalo = \\\"Omakotitalo\\\").\\n\\nPalauta VAIN validi JSON ilman markdownia:\\n{\\\"taloyhtio\\\":\\\"\\\",\\\"isannoitsija\\\":\\\"\\\",\\\"isannoitsija_henkilo\\\":\\\"\\\",\\\"isannoitsija_puh\\\":\\\"\\\",\\\"isannoitsija_email\\\":\\\"\\\",\\\"huoltoyhtio\\\":\\\"\\\",\\\"huoltoyhtio_puh\\\":\\\"\\\",\\\"rakennusvuosi\\\":null,\\\"talotyyppi\\\":\\\"\\\",\\\"tulevat_remontit\\\":\\\"lyhyt tiivistelmä tulevista remonteista\\\",\\\"renovations\\\":[{\\\"remonttityyppi\\\":\\\"\\\",\\\"confidence\\\":0,\\\"timing\\\":\\\"\\\",\\\"evidence\\\":\\\"\\\"}]}\";\nconst types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');\nreturn [{ json: {\n  ...listing,\n  ok,\n  error: ok ? '' : (useOwnText ? 'Imported listing has no text to analyse' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`),\n  ai_system_prompt: PROMPT.replace('__TYPES__', types),\n  ai_user_prompt: useOwnText\n    ? `Taloyhtiö: ${listing.taloyhtio || ''}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\n\\nKohteen teksti:\\n${text}`\n    : `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,\n} }];\n"
+        "jsCode": "const listing = $('LOOP – Listings').first().json;\nconst useOwnText = listing.fetch_detail === false;\nconst h = useOwnText ? {} : ($input.first()?.json || {});\nconst status = Number(h.statusCode || 0);\nconst html = String(h.pageHtml ?? h.body ?? h.data ?? '').slice(0, 200000);\n\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n  .replace(/<svg[\\s\\S]*?<\\/svg>/gi, ' ')\n  .replace(/<img[^>]*>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '\"').replace(/&#39;/gi, \"'\")\n  .replace(/\\s+/g, ' ')\n  .trim();\nfor (const marker of ['Taloyhtiö', 'Tulevat remontit', 'Asunnon lisätiedot', 'Perustiedot', 'Kohdenumero', 'Rakennuksen tiedot', 'Asunnon kuvaus']) {\n  const idx = text.indexOf(marker);\n  if (idx >= 0) { text = text.slice(idx); break; }\n}\ntext = text.slice(0, 12000);\nif (useOwnText) text = String(listing.description || '').replace(/\\s+/g, ' ').trim().slice(0, 12000);\n\nconst ok = useOwnText\n  ? text.length >= 30\n  : !h.error && (status === 0 || (status >= 200 && status < 300)) && text.length > 200;\nconst PROMPT = \"Olet kiinteistöalan analyytikko. Saat suomalaisen myytävän asunnon ilmoituksen tekstin.\\nTehtäväsi on poimia taloyhtiön tiedot ja kohteen TULEVAT remontit.\\n\\nRemonttityypit (käytä TÄSMÄLLEEN näitä nimiä):\\n__TYPES__\\n\\nSäännöt tuleville remonteille:\\n- Ota mukaan vain tuleva, suunniteltu, päätetty, budjetoitu, ehdotettu, kuntoarviossa tai PTS:ssä mainittu tai muuten vielä tekemätön työ.\\n- ÄLÄ ota mukaan jo tehtyjä, valmistuneita tai aiemmin toteutettuja remontteja.\\n- Luokittele jokainen tuleva remontti yhteen tyyppiin. Jos sopivaa tyyppiä ei ole, käytä \\\"Muu remontti\\\".\\n- \\\"Lukkoremontti / kulunvalvonta\\\": lukitus, lukkojen tai avainten uusiminen, sarjoitus, sähkölukitus, iLOQ, kulunvalvonta tai kulkuoikeudet oviin ja sisäänkäynteihin. EI kameravalvontaa, murtohälytintä, paloilmoitinta eikä pelkkää ovipuhelinta.\\n- \\\"Putkiremontti\\\": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus.\\n- \\\"Sähkö- ja tietoliikennejärjestelmät\\\": sähköverkon, sähköpääkeskuksen, nousujohtojen, antenni-, valokuitu- tai tietoliikenneverkon uusiminen.\\n- \\\"Lämmitysjärjestelmän remontti\\\": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.\\n- \\\"Julkisivuremontti\\\": julkisivu, ikkunat, parvekkeet.\\n- \\\"Katto- ja vesikattoremontti\\\": katto, vesikatto, yläpohja (ei pelkkä yläpohjan lisäeristys).\\n- \\\"Ilmanvaihdon puhdistus ja säätö\\\": ilmanvaihtokanavien tai IV-hormien puhdistus tai nuohous, ilmamäärien mittaus, ilmanvaihdon säätö tai tasapainotus sekä ilmanvaihtokoneiden tai -järjestelmän uusiminen tai peruskorjaus.\\n- \\\"Yläpohjan lisäeristys\\\": yläpohjan tai ullakon lisäeristys.\\n- \\\"Huoneistoremontit\\\": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.\\n- confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.\\n- evidence = lyhyt suora lainaus tekstistä. timing = esim. \\\"2027\\\", \\\"suunnitteilla\\\", \\\"PTS 2026–2028\\\" tai \\\"\\\".\\n- Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.\\n\\nYhteystiedot: poimi vain tekstissä näkyvät tiedot: taloyhtiön nimi, isännöitsijä (isännöintiyritys tai, jos yritystä ei mainita, henkilö), isännöitsijän henkilön nimi (isannoitsija_henkilo, jos teksti nimeää sekä yrityksen että henkilön), isännöitsijän puhelin ja sähköposti sekä huoltoyhtiö (kiinteistöhuolto) ja sen puhelin. Muuten \\\"\\\".\\n\\nRakennus: rakennusvuosi = rakennuksen valmistumis- tai rakennusvuosi numerona (esim. 1972), tai null jos tekstissä ei ole. talotyyppi = yksi näistä: \\\"Kerrostalo\\\", \\\"Rivitalo\\\", \\\"Paritalo\\\", \\\"Omakotitalo\\\", \\\"Muu\\\", tai \\\"\\\" jos tekstistä ei selviä (luhtitalo = \\\"Kerrostalo\\\", erillistalo = \\\"Omakotitalo\\\").\\n\\nPalauta VAIN validi JSON ilman markdownia:\\n{\\\"taloyhtio\\\":\\\"\\\",\\\"isannoitsija\\\":\\\"\\\",\\\"isannoitsija_henkilo\\\":\\\"\\\",\\\"isannoitsija_puh\\\":\\\"\\\",\\\"isannoitsija_email\\\":\\\"\\\",\\\"huoltoyhtio\\\":\\\"\\\",\\\"huoltoyhtio_puh\\\":\\\"\\\",\\\"rakennusvuosi\\\":null,\\\"talotyyppi\\\":\\\"\\\",\\\"tulevat_remontit\\\":\\\"lyhyt tiivistelmä tulevista remonteista\\\",\\\"renovations\\\":[{\\\"remonttityyppi\\\":\\\"\\\",\\\"confidence\\\":0,\\\"timing\\\":\\\"\\\",\\\"evidence\\\":\\\"\\\"}]}\";\nconst types = (listing.remonttityypit || []).map(t => '- ' + t).join('\\n');\nreturn [{ json: {\n  ...listing,\n  ok,\n  error: ok ? '' : (useOwnText ? 'Imported listing has no text to analyse' : `Detail page failed (status ${status || 'n/a'}, ${text.length} chars)`),\n  ai_system_prompt: PROMPT.replace('__TYPES__', types),\n  ai_user_prompt: useOwnText\n    ? `Taloyhtiö: ${listing.taloyhtio || ''}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\n\\nKohteen teksti:\\n${text}`\n    : `URL: ${listing.url}\\nKaupunki: ${listing.kaupunki || ''}\\nOsoite: ${listing.osoite || ''}\\nIlmoituksen kuvaus: ${listing.description || ''}\\n\\nKohdesivun teksti:\\n${text}`,\n} }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -251,7 +251,7 @@
         1760,
         260
       ],
-      "id": "c6aba58d-7fe0-454b-9020-874f76cac952",
+      "id": "f693ecbf-04e0-4570-9f2c-92dae854ba92",
       "name": "CODE – Build Analysis Prompt"
     },
     {
@@ -265,7 +265,7 @@
           },
           "conditions": [
             {
-              "id": "7375dc9e-8655-4845-8f3b-6c2e50143d1c",
+              "id": "282fc9bf-65c4-434f-8ad1-d04856116b80",
               "leftValue": "={{ $json.ok }}",
               "rightValue": "",
               "operator": {
@@ -286,7 +286,7 @@
         1980,
         260
       ],
-      "id": "33ec3e59-5023-4f7f-81ce-7a69261e0443",
+      "id": "b901d327-4b29-42c0-8170-ae93654c9abb",
       "name": "IF – Page OK"
     },
     {
@@ -317,7 +317,7 @@
         2200,
         180
       ],
-      "id": "46de735a-8e44-433f-906c-44e3dfcc42c2",
+      "id": "755d9f1c-1cfa-4474-92b2-1e44d656c489",
       "name": "AI – Analyze Listing",
       "credentials": {
         "openAiApi": {
@@ -340,7 +340,7 @@
         2420,
         260
       ],
-      "id": "4c8bd275-1a1a-43fa-a3b9-4694d0a61611",
+      "id": "605a183a-cfc5-4e22-97e8-f802a4dfb8b7",
       "name": "CODE – Parse Analysis"
     },
     {
@@ -371,7 +371,7 @@
         2640,
         260
       ],
-      "id": "9f921922-ce83-4305-b862-be21d5e6d78b",
+      "id": "1e682a43-1f9e-4550-aaad-51e20151855a",
       "name": "HTTP – CRM Save Analysis",
       "retryOnFail": true,
       "maxTries": 3,
@@ -388,7 +388,7 @@
         1320,
         -80
       ],
-      "id": "f0e572b4-f269-4bb4-919a-4c0399c16ab7",
+      "id": "bb0dfbb8-2aa8-4b81-a31a-3df85262e304",
       "name": "CODE – More To Claim"
     },
     {
@@ -402,7 +402,7 @@
           },
           "conditions": [
             {
-              "id": "fbc474d3-9497-47df-8fd5-dfb44c878118",
+              "id": "8355d4c3-3594-4162-9c2a-d4fe4a8d9a06",
               "leftValue": "={{ $json.more }}",
               "rightValue": "",
               "operator": {
@@ -423,7 +423,7 @@
         1540,
         -80
       ],
-      "id": "232bc667-067e-476a-a997-d5a360850320",
+      "id": "520ed92b-2b5c-41ee-840b-20b9b733c035",
       "name": "IF – Claim Again"
     }
   ],

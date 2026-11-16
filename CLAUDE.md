@@ -84,7 +84,7 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `n8n/tools/build_workflows.py::build_worker()` (with its bug fixes).
 - Renovation types: `app/search/constants.py::REMONTTITYYPIT` is the single source of truth (the
   Analyzer receives them from `/analysis/claim`). A type name must not contain `,` `;` or `|` (the import splits
-  type cells on them). "Ilmanvaihdon puhdistus ja säätö" and "Yläpohjan lisäeristys" are also read from the
+  type cells on them). "Ilmanvaihdon puhdistus ja säätö" (cleaning, measuring, adjusting and renewing the units) and "Yläpohjan lisäeristys" are also read from the
   listing's own text (`app/listings/text_types.py`: on `save_analysis` and, for older listings,
   `backfill_text_types()` in the `listing_matching` job; tests `tests/test_text_types.py`). A new type needs a
   mark in `app/listings/pts.py` and words in `nl_search.py`. Regions: `FINNISH_REGIONS` (18 maakuntaa) and

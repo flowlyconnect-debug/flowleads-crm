@@ -32,6 +32,12 @@ NOW = datetime.now(timezone.utc)
         ("2027: lämmönjakokeskuksen uusinta sekä lämmityksen tasapainotus ja säätö (samana vuonna myös IV-kanavien puhdistus ja säätö).", "2027"),
         ("Tulevat remontit: 2027 valokatteiden uusiminen, 2028 ilmanvaihtojärjestelmän puhdistus ja säätö.", "2028"),
         ("Ilmanvaihdon mittaus ja tasapainotus suunnitteilla.", ""),
+        # renewing the units belongs to the same type (decided 16.11.2026)
+        ("Tulevat remontit: 2028 ilmanvaihtokoneiden uusiminen (järjestelmä alkuperäinen), 2028-2029 hissien kunnostus.", "2028"),
+        ("Tulevat remontit: ilmanvaihtokoneiden uusiminen 2027-2030.", "2027-2030"),
+        ("Tulevat remontit: 2028 ilmanvaihtokoneiden peruskorjaus tai uusiminen.", "2028"),
+        ("Ilmanvaihto: tulevat remontit 2027 ilmanvaihtojärjestelmän uusiminen (koneellinen poisto).", "2027"),
+        ("Kunnossapitotarveselvitys 2026-2030: ilmanvaihtokoneiden uusimisen suunnittelu 2026, toteutus 2027-2028", "2026-2030"),
     ],
 )
 def test_ventilation_cleaning_is_found_with_its_year(text, timing):
@@ -42,7 +48,9 @@ def test_ventilation_cleaning_is_found_with_its_year(text, timing):
 @pytest.mark.parametrize(
     "text",
     [
-        "Tulevat remontit: 2028 ilmanvaihtokoneiden uusiminen, 2028-2029 hissien kunnostus.",
+        "2027 hissien uusiminen sekä uima-allashuoneen ilmanvaihdon parantaminen käynnissä.",
+        "Sähkösaneeraus 2026-2027; lisäksi ilmanvaihtoon ja saunaosastoon liittyviä töitä.",
+        "2027 ilmanvaihdon tarkastaminen ja tarvittavat kunnossapitotoimenpiteet.",
         "2027: lämmönjakokeskuksen uusinta sekä lämmityksen tasapainotus ja säätö.",
         "Yläpohjan ja vesikaton tarkastus suunniteltu 2026.",
         "Linjasaneeraus 2027, saunaosaston ilmanvaihtotyö.",

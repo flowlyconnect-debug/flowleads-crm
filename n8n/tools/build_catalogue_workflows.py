@@ -367,7 +367,7 @@ Säännöt tuleville remonteille:
 - "Lämmitysjärjestelmän remontti": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.
 - "Julkisivuremontti": julkisivu, ikkunat, parvekkeet.
 - "Katto- ja vesikattoremontti": katto, vesikatto, yläpohja (ei pelkkä yläpohjan lisäeristys).
-- "Ilmanvaihdon puhdistus ja säätö": ilmanvaihtokanavien tai IV-hormien puhdistus tai nuohous, ilmamäärien mittaus, ilmanvaihdon säätö tai tasapainotus. EI ilmanvaihtokoneiden uusimista (se on "Muu remontti").
+- "Ilmanvaihdon puhdistus ja säätö": ilmanvaihtokanavien tai IV-hormien puhdistus tai nuohous, ilmamäärien mittaus, ilmanvaihdon säätö tai tasapainotus sekä ilmanvaihtokoneiden tai -järjestelmän uusiminen tai peruskorjaus.
 - "Yläpohjan lisäeristys": yläpohjan tai ullakon lisäeristys.
 - "Huoneistoremontit": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.
 - confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.
