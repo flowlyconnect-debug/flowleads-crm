@@ -65,7 +65,7 @@
       </div>
       <div class="lead-focus__badges lead-header-badges">
         {% if lead.close_probability is not none %}{{ probability_badge(lead.close_probability) }}{% endif %}
-        {% if lead.ai_enrichment_status not in ('disabled', none, '') %}<span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>{% endif %}
+        {% if has_feature('ai_enrichment') and lead.ai_enrichment_status not in ('disabled', none, '') %}<span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>{% endif %}
       </div>
     </div>
     {% if lead_pts %}<div class="lead-focus__pts">{{ pts_cells(lead_pts, big=true) }}</div>{% endif %}
@@ -95,7 +95,8 @@
         <p class="lead-why__src">{{ lead_evidence.renovation.remonttityyppi }}{% if lead_evidence.renovation.timing %} {{ lead_evidence.renovation.timing }}{% endif %}, varmuus {{ lead_evidence.renovation.confidence }} %{% if lead_evidence.listing.published_at %}. Ilmoitus {{ (lead_evidence.listing.published_at|helsinki).strftime('%d.%m.%Y') }}{% endif %}.</p>
       </section>
       {% endif %}
-      {% set show_playbook = lead.ai_enrichment_status not in ('disabled', none, '') or playbook.ai_summary or playbook.ai_recommendation %}
+      {# AI off for the organization (app/core/features.py): no AI blocks at all #}
+      {% set show_playbook = has_feature('ai_enrichment') and (lead.ai_enrichment_status not in ('disabled', none, '') or playbook.ai_summary or playbook.ai_recommendation) %}
       {% if show_playbook %}
       <article class="card playbook-card" id="ai-playbook-card">
         <header class="playbook-card__header">
@@ -292,11 +293,13 @@
             <button type="button" class="lead-tab" data-tab="email" role="tab" aria-selected="false">
               Sähköposti
             </button>
+            {% if has_feature('sequences') %}
             <button type="button" class="lead-tab" data-tab="sequences" role="tab" aria-selected="false">
               Sekvenssit <span class="badge">
                 {{ sequence_enrollments|selectattr('enrollment.status', 'equalto', 'active')|list|length }}
               </span>
             </button>
+            {% endif %}
             <button type="button" class="lead-tab" data-tab="meetings" role="tab" aria-selected="false">
               Tapaamiset <span class="badge">{{ lead_meetings_upcoming|length }}</span>
             </button>
@@ -664,7 +667,7 @@
       </section>
     </div>
 
-    <aside class="lead-sidebar-column" aria-label="AI-ennuste ja signaalit">
+    <aside class="lead-sidebar-column" aria-label="Myyntiputki ja tila">
       <section class="card lead-sidebar-card">
         <header class="card-header">
           <h2 class="card-title">Myyntiputki & tila</h2>
@@ -715,7 +718,7 @@
         </div>
       </section>
 
-      {% if latest_prediction or lead.close_probability is not none or config.get("AI_ENRICHMENT_ENABLED") %}
+      {% if has_feature('ai_enrichment') and (latest_prediction or lead.close_probability is not none or config.get("AI_ENRICHMENT_ENABLED")) %}
       <section class="card ai-insights-card mt-4">
         <header class="card-header">
           <h2 class="card-title">AI-havainnot</h2>

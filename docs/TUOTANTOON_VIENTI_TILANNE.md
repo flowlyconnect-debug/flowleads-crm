@@ -297,6 +297,15 @@ myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
   säilyvät. Päättynyt sopimus lukitsee kohteet samalla tavalla (aiemmin esti vain siirron). Superadmin näkee
   aina kaikki kohteet. Testit: `tests/test_target_access.py`.
 
+## Tehty 16.11.2026 (3): keskeneräiset toiminnot pois asiakkailta
+
+- **Sekvenssit, automaatiot ja AI-toiminnot ovat pois päältä kaikilta asiakkailta** (migraatio `e2f3a4b5c6d7`
+  tyhjentää `enabled_features`-kentän) ja oletuksena pois uusilta (suora luonti ja kutsu). Pois päältä ne eivät
+  näy missään: ei valikossa, ei liidin sivulla (Sekvenssit-välilehti, AI-myyntisuunnitelma, AI-havainnot,
+  Rikasta AI:lla), ei raporttien AI-välilehteä. Käynnissä olevat sekvenssit pysähtyvät.
+- Takaisin päälle asiakaskohtaisesti: `/admin/customers` → "Toiminnot käytössä" → rasti ja Tallenna.
+  Testit: `tests/test_optional_modules_off.py`.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

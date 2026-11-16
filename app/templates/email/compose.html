@@ -16,7 +16,7 @@
     </div>
   </header>
 
-  {% if ai_summary %}
+  {% if ai_summary and has_feature('ai_enrichment') %}
   <div class="ai-summary-box">
     <strong>AI-yhteenveto (konteksti)</strong>
     <p class="text-sm mt-2 mb-0">{{ ai_summary }}</p>

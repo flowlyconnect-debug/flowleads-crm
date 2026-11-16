@@ -411,7 +411,9 @@ def test_optional_modules_are_enforced_and_editable_by_superadmin(app, client):
         email = result.admin_user.email
         result.admin_user.must_change_password = False
         db.session.commit()
-        assert result.organization.enabled_features == ["sequences", "automations", "ai_enrichment"]
+        assert result.organization.enabled_features == []  # optional modules start off
+        result.organization.enabled_features = ["sequences", "automations", "ai_enrichment"]
+        db.session.commit()
 
     # superadmin narrows the organization to automations only
     _login(client, "sa-features@test.com", "securepassword1")
