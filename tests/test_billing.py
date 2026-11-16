@@ -104,7 +104,7 @@ def test_onboarding_and_invite_start_contract_at_once(app, mails):
         assert billing.subscription_state(org).status == "active" and org.subscription_started_at is not None
 
 
-def test_ended_contract_keeps_data_but_blocks_new_targets(client, app):
+def test_ended_contract_keeps_leads_and_the_count_but_locks_targets(client, app):
     from app.listings.models import Listing, ListingMatch
 
     with app.app_context():
@@ -118,18 +118,13 @@ def test_ended_contract_keeps_data_but_blocks_new_targets(client, app):
         match_id, email = match.id, seller.email
     _login(client, email)
     page = client.get("/targets").get_data(as_text=True)
-    assert "As Oy Loppu" in page  # still visible
+    assert "As Oy Loppu" not in page  # the targets themselves are closed
+    assert 'data-testid="targets-locked-count">1<' in page  # the count is still shown
     assert "Päättynyt" in page and "Valitse kuukausisopimus" in page
     response = client.post("/targets/transfer", data={"single_id": str(match_id)}, follow_redirects=True)
-    assert "Sopimus on päättynyt" in response.get_data(as_text=True)
+    assert "Kohteet eivät ole käytössäsi" in response.get_data(as_text=True)
     with app.app_context():
         assert db.session.get(ListingMatch, match_id).status == "pending"
-    app.config["TARGET_FETCH_ENABLED"] = True
-    try:
-        fetch = client.post("/targets/fetch", headers={"Accept": "application/json"})
-        assert fetch.status_code == 402 and fetch.get_json()["code"] == "subscription"
-    finally:
-        app.config["TARGET_FETCH_ENABLED"] = False
     # leads can still be exported
     assert client.get("/leads/export").status_code == 200
 

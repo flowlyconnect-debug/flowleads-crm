@@ -5,7 +5,7 @@
   {% if sub.status == 'cancelled' %}
   <span><strong>Sopimus irtisanottu.</strong> Palvelu on käytössäsi {{ sub.last_day }} asti.</span>
   {% else %}
-  <span><strong>{{ sub.label }}.</strong> Näet tietosi ja voit viedä ne ulos, mutta uusia kohteita ei haeta eikä siirretä liideiksi.</span>
+  <span><strong>{{ sub.label }}.</strong> Näet liidisi ja voit viedä tietosi ulos, mutta kohteet eivät ole käytössäsi.</span>
   {% endif %}
   <a class="btn btn-sm {{ 'btn-secondary' if sub.can_use else 'btn-primary' }}" href="{{ url_for('billing.subscription_page') }}">{{ 'Tilaus' if sub.status == 'cancelled' else 'Valitse kuukausisopimus' }}</a>
 </div>

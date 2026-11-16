@@ -85,9 +85,7 @@ def _render_search_profiles(
         selected_profile = get_profile(organization_id, selected_id)
         if selected_profile:
             latest_job = get_latest_job(selected_profile.id)
-            match_stats = profile_match_stats(
-                selected_profile, include_reserve=current_user.is_superadmin()
-            )
+            match_stats = profile_match_stats(selected_profile)
 
     now = datetime.now(timezone.utc)
     org_query = org_query_suffix(organization_id)
@@ -288,8 +286,7 @@ def register_search_profile_settings_routes(settings_bp):
         result = preview_profile(profile)
         db.session.rollback()  # the transient profile must never be flushed
         if not current_user.is_superadmin():
-            # a customer sees only the count: addresses of targets not yet
-            # released with "Hae kohteita" stay hidden (the page never showed them)
+            # a customer sees only the count; the targets themselves are on Kohteet
             result.pop("sample", None)
         return jsonify({"success": True, **result})
 

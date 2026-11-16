@@ -59,6 +59,39 @@ def customers_list():
     )
 
 
+@admin_bp.route("/customers/<int:organization_id>/targets-access", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_targets_route(organization_id: int):
+    """Switch a customer's access to its targets off or back on. Off: it
+    still sees how many targets it has, but cannot open or move them. Leads
+    it already has stay."""
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    organization.targets_enabled = request.form.get("enabled") == "1"
+    log_audit(
+        "customer_targets_access_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"enabled": organization.targets_enabled},
+    )
+    db.session.commit()
+    flash(
+        f"{organization.name}: kohteet ovat käytössä."
+        if organization.targets_enabled
+        else f"{organization.name}: kohteiden käyttö on pois päältä. Asiakas näkee kohteiden määrän ja liidinsä.",
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
 @login_required
 @require_role("superadmin")
@@ -156,7 +189,7 @@ AUDIT_ACTION_LABELS_FI = {
     "logout": "Uloskirjautuminen",
     "customer_invited": "Asiakas kutsuttu",
     "targets_transferred": "Kohteita siirretty liideiksi",
-    "targets_fetched": "Kohteita haettu (Hae kohteita)",
+    "targets_fetched": "Kohteita haettu (poistettu Hae kohteita -painike)",
     "leads_imported": "Liidejä tuotu tiedostosta",
     "leads_purged": "Liidit poistettu",
     "lead_archived": "Liidi arkistoitu",
@@ -532,8 +565,8 @@ def activate_source_route(profile_id: int):
         activate_source(profile, actor=current_user)
         db.session.commit()
         flash(
-            f"Hakuprofiili aktivoitu: {profile.name}. Osumat ovat asiakkaan haettavissa "
-            "Kohteet-sivun Hae kohteita -painikkeella noin 10 minuutin kuluttua.",
+            f"Hakuprofiili aktivoitu: {profile.name}. Osumat näkyvät asiakkaan "
+            "Kohteet-sivulla noin 10 minuutin kuluttua.",
             "success",
         )
     except InviteServiceError as exc:
@@ -633,12 +666,7 @@ def catalogue_import():
     db.session.commit()
     flash(
         f"Tuotu {result['created']} uutta ja päivitetty {result['updated']} kohdetta. "
-        + (
-            f"Asiakkaiden haettavaksi (Hae kohteita) tuli {result['matches']} osumaa, "
-            if current_app.config.get("TARGET_FETCH_ENABLED")
-            else f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
-        )
-        + 
+        f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
         f"AI-analyysiin jonossa {result['queued']}.",
         "success",
     )

@@ -61,7 +61,7 @@ class OrganizationSettings(db.Model):
     targets_digest_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # last press of "Hae kohteita" (one per cooldown for the organization)
+    # unused since the "Hae kohteita" button was removed (16.11.2026); drop in a later release
     targets_fetched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

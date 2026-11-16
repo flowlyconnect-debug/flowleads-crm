@@ -126,7 +126,7 @@
       </a>
       {% else %}
       <p class="dash-ledger__empty">
-        {% if targets_reserve|default(0) %}Uusia kohteita on haettavissa: avaa Kohteet ja paina Hae kohteita.
+        {% if targets_locked|default(false) %}Kohteet eivät ole käytössäsi. Liidisi ovat tallessa.
         {% else %}Uudet taloyhtiöt, joissa on tulossa urakkasi remontti, ilmestyvät Kohteet-sivulle.{% endif %}
       </p>
       {% endfor %}

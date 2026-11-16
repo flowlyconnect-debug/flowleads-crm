@@ -185,6 +185,7 @@ _MESSAGES: dict[str, str] = {
     "Two-factor sign-in required.": "Kaksivaiheinen tunnistautuminen vaaditaan.",
     "The proposal number prefix may have 1-12 letters or digits.": "Tarjousnumeron etuliitteessä voi olla 1–12 kirjainta tai numeroa.",
     # --- billing (app/billing) ---
+    "Target access is off.": "Kohteet eivät ole käytössäsi.",
     "Choose a plan with a monthly price.": "Valitse paketti, jolla on kuukausihinta. Yritys-paketista sovitaan erikseen.",
     "This plan is already in use.": "Tämä paketti on jo käytössä.",
     "Only an active monthly contract can be cancelled.": "Vain voimassa olevan kuukausisopimuksen voi irtisanoa.",

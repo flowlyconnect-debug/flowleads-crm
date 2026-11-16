@@ -33,11 +33,14 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
-- **Reserve + "Hae kohteita"** (`TARGET_FETCH_ENABLED`, on by default, off in tests): a new match has
-  `released_at = NULL` and is invisible to the customer until they press the button on Kohteet
-  (`fetch_targets()`), which releases a batch of varying size once per hour per organization. The page shows
-  a 10-15 s progress animation; the batch gets a `released_at` that far in the future. `count_targets()` and
-  everything built on it count released targets only; `count_reserve()` is the rest.
+- **No reserve** (the "Hae kohteita" button and `TARGET_FETCH_ENABLED` were removed 16.11.2026): every match is
+  a target on Kohteet as soon as it is found (`released_at` = creation time).
+- **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
+  `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
+  sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html`, the
+  map and every target action redirect there, Isännöitsijät / taloyhtiökortti show only what is already a lead,
+  and digests, saved-search alerts and same-taloyhtiö merges skip the organization. Leads stay. Matching goes
+  on, so the count stays current. Superadmins are never locked. Tests: `tests/test_target_access.py`.
 - Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the default sort
   "Sopivimmat ensin" and the score chip come from `app/listings/fit_services.py`, which learns from the
   organization's transferred and hidden targets, tests `tests/test_target_fit.py`) and a daily
@@ -49,19 +52,19 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   open tasks of type `call`, the lead's automatic "Ota yhteyttä" task becomes the call; one-click outcomes
   (`record_call_outcome`) log a `call` activity and move the task on. Tests: `tests/test_call_list.py`.
 - Read models over what an organization already sees (`app/listings/insight_services.py`,
-  `insight_routes.py`, never the reserve): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
+  `insight_routes.py`): **Isännöitsijät** (`/managers`) and the **taloyhtiökortti**
   (`/housing-companies/<listing_id>`, opened from a target name, a manager page or a lead; no nav item).
   **Saved searches** on Kohteet (`SavedTargetSearch`, per user) are notified by `notify_saved_searches()` in the
   `listing_matching` job. Tests: `tests/test_insights.py`.
 - **One housing company = one target** (`app/listings/housing.py`): `Listing.company_key` (normalised name + city;
   Y-tunnus only for nameless rows) groups listings on Kohteet, on the taloyhtiökortti (signal timeline) and in
-  transfers/hiding/fetching. Each target has a score 0-100 (`housing.score_target`, stored in `ListingMatch.score`); the Kohteet "Sopivuus"
+  transfers/hiding. Each target has a score 0-100 (`housing.score_target`, stored in `ListingMatch.score`); the Kohteet "Sopivuus"
   (`fit_services.company_fit`) is that score × 0.9 plus the learned ±25, default sort "Sopivimmat ensin".
   Board chair / maintenance company / property-manager offices: `app/listings/contacts.py`. Map: `/targets/map`
   (`app/listings/geo.py`, vendored Leaflet). Plain-language search: `app/listings/nl_search.py`.
 - Other customer modules: CRM export to HubSpot/Pipedrive (`app/integrations/`), monthly report
   (`app/analytics/monthly.py`), plans/monthly contract (no free trial, removed 16.11.2026) and public `/hinnasto` (`app/billing/`, one plan 149 €/kk in
-  `plans.py`; an ended contract blocks fetching and transferring targets only). Superadmin `/admin/system` and
+  `plans.py`; an ended contract locks the targets like the access switch). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,

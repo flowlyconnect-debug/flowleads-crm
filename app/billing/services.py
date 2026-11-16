@@ -4,7 +4,7 @@ States of Organization.subscription_status:
     active     monthly contract (or an older customer billed by agreement);
     cancelled  works until cancel_at (end of the month it was cancelled in);
     expired    a cancelled contract that has ended: the organization keeps its
-               data but cannot fetch or move new targets.
+               data but cannot use targets (targets_locked).
 
 There is no free trial. Billing is manual: ordering and cancelling email the
 platform's superadmins, who invoice. Nothing here charges a card.
@@ -93,6 +93,22 @@ def organization_can_use(organization_id: int | None) -> bool:
     return organization is None or subscription_state(organization).can_use
 
 
+def targets_locked(organization_id: int | None) -> bool:
+    """True when the organization may not use its targets: a superadmin
+    switched them off (Organization.targets_enabled) or the contract has
+    ended. It still sees the count; opening, moving and hiding targets,
+    target notifications and the pages built on targets are closed. Leads
+    it already has are untouched."""
+    from app.users.models import Organization
+
+    if not organization_id:
+        return False
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        return False
+    return not organization.targets_enabled or not subscription_state(organization).can_use
+
+
 def end_of_month(now: datetime) -> datetime:
     """Midnight after the last day of the month, Finnish time, as UTC."""
     local = now.astimezone(HELSINKI)
@@ -169,7 +185,7 @@ def admin_set(organization, action: str, *, plan_key: str | None = None, now: da
     if action == "end":
         organization.subscription_status = "expired"
         organization.cancel_at = now
-        return "Sopimus päätetty. Asiakas näkee tietonsa, mutta ei saa uusia kohteita."
+        return "Sopimus päätetty. Asiakas näkee liidinsä ja kohteiden määrän, mutta ei pääse kohteisiin."
     raise BillingError("Unknown action.")
 
 

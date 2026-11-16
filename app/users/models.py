@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from flask_login import UserMixin
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy import false as sa_false
+from sqlalchemy import true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -39,6 +40,10 @@ class Organization(db.Model):
     plan: Mapped[str | None] = mapped_column(String(30), nullable=True)
     subscription_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Superadmin switch on /admin/customers. Off: the organization still sees
+    # how many targets it has, but cannot open, move or hide them; its leads
+    # stay (app/billing/services.py::targets_locked).
+    targets_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

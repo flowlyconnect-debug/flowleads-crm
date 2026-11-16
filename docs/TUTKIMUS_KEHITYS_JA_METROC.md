@@ -72,7 +72,7 @@ otteisiin metroc.ai:n sivuista ja kolmansien osapuolten lähteisiin. Ne kannatta
 - **Hankinta:** jaettu kohdekatalogi (`app/listings/`). n8n Crawler → Analyzer (gpt-4.1-mini, 8 remonttityyppiä,
   varmuus 0–100, ajoitus, lainaus) → Enricher (Finder/Asiakastieto vain osuneille). Tuonti CSV:llä tai
   `POST /api/v1/n8n/listings/import`.
-- **Asiakkaalle:** Kohteet (suodattimet, tallennetut haut, päivittäinen kooste, "Hae kohteita" -varanto),
+- **Asiakkaalle:** Kohteet (suodattimet, tallennetut haut, päivittäinen kooste),
   Isännöitsijät, taloyhtiökortti, liidit ja kanban, tehtävät, kalenterisynkka, sähköposti (Mailgun),
   sekvenssit, automaatiot, PDF-tarjoukset hyväksymissivulla, raportit ja ennuste, webhookit, Slack/Teams,
   REST API, GDPR-työkalut, 2FA.
