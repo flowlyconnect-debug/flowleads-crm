@@ -1,13 +1,16 @@
 """Remove the free trial: trial organizations become monthly contracts.
 
-Organizations still on "trial" are moved to "active" (plan flowleads) and the
-trial columns are dropped. The downgrade restores the empty columns only.
+Organizations still on "trial" are moved to "active" (plan flowleads). The
+unused columns trial_ends_at and trial_reminder_sent_at stay in the table on
+purpose: the previous release is still serving requests while this migration
+runs (Render starts the new version next to the old one), and dropping columns
+its model selects would break every page until the switch. Nothing reads them
+any more; drop them in a later release.
 
 Revision ID: a1b2c3d4e5f7
 Revises: f8b9c0d1e2f3
 """
 
-import sqlalchemy as sa
 from alembic import op
 
 revision = "a1b2c3d4e5f7"
@@ -22,12 +25,7 @@ def upgrade():
         "subscription_started_at = COALESCE(subscription_started_at, CURRENT_TIMESTAMP), "
         "subscription_status = 'active' WHERE subscription_status = 'trial'"
     )
-    with op.batch_alter_table("organizations") as batch:
-        batch.drop_column("trial_reminder_sent_at")
-        batch.drop_column("trial_ends_at")
 
 
 def downgrade():
-    with op.batch_alter_table("organizations") as batch:
-        batch.add_column(sa.Column("trial_ends_at", sa.DateTime(timezone=True), nullable=True))
-        batch.add_column(sa.Column("trial_reminder_sent_at", sa.DateTime(timezone=True), nullable=True))
+    pass  # data-only: former trials stay monthly contracts
