@@ -286,7 +286,11 @@
     }).then(function(res) {
       return res.json().then(function(data) { return { ok: res.ok, data: data }; });
     }).then(function(result) {
-      if (!result.ok || !result.data.success) return;
+      if (!result.ok || !result.data.success) {
+        // a failed save used to do nothing at all
+        window.alert('Tehtävää ei voitu tallentaa. Tarkista otsikko ja eräpäivä ja yritä uudelleen.');
+        return;
+      }
       var task = result.data.data.task;
       var row = buildTaskRow(task);
       var target = document.getElementById(task.section + '-list');

@@ -52,10 +52,16 @@ def local_to_utc(dt: datetime | None) -> datetime | None:
 
 
 def _parse_user_time(value: str, field: str) -> datetime:
+    text = value.strip()
     try:
-        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         raise TaskServiceError(f"Invalid {field} format.", "validation_error") from None
+    if len(text) == 10:
+        # a bare date (the Tehtävät page's date picker) means that day, not its
+        # first minute: 00:00 Finnish time is the previous evening in UTC, and
+        # a task added for today showed as a day overdue at once
+        parsed = parsed.replace(hour=23, minute=59)
     return local_to_utc(parsed)
 
 

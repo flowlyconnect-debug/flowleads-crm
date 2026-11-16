@@ -267,8 +267,16 @@ def list_leads():
     filter_form.assigned_to.coerce = lambda v: int(v) if v not in (None, "", 0) else 0
 
     bulk_form = BulkActionForm()
-    bulk_form.stage_id.choices = [(s.id, s.name) for s in stages]
+    bulk_form.stage_id.choices = [(s.id, stage_label_fi(s.name)) for s in stages]
     bulk_form.assigned_to.choices = [(u.id, u.email) for u in users]
+    # a seller only gets the actions the server accepts from them (assigning
+    # and archiving answered with a raw 403 JSON page before)
+    hidden_actions = set()
+    if not can_assign_to_others():
+        hidden_actions.add("assign")
+    if not can_archive_leads():
+        hidden_actions.add("archive")
+    bulk_form.action.choices = [c for c in bulk_form.action.choices if c[0] not in hidden_actions]
     now = datetime.now(timezone.utc)
 
     return render_template(
@@ -871,6 +879,11 @@ def create_lead_task(lead_id):
     form = TaskForm()
     users = _org_users(organization_id)
     form.assigned_to.choices = [(u.id, u.email) for u in users]
+    if not can_assign_to_others():
+        # a seller's form has no assignee field: the task is their own
+        # (before this the form never validated and sellers could not add tasks)
+        form.assigned_to.data = current_user.id
+        form.assigned_to.raw_data = [str(current_user.id)]
     if not form.validate_on_submit():
         flash("Invalid task data.", "danger")
         return redirect(
@@ -1004,7 +1017,14 @@ def export_leads():
 def bulk_action():
     organization_id = resolve_organization_id()
     action = request.form.get("action") or (request.get_json(silent=True) or {}).get("action")
-    lead_ids_raw = request.form.get("lead_ids") or (request.get_json(silent=True) or {}).get("lead_ids")
+    # the first non-empty value: a form can carry an empty lead_ids next to the
+    # JSON list the page's script fills in
+    form_ids = [v for v in request.form.getlist("lead_ids") if v and v.strip()]
+    json_ids = [v for v in form_ids if v.strip().startswith("[")]
+    lead_ids_raw = (
+        (json_ids[0] if json_ids else (",".join(form_ids) if form_ids else None))
+        or (request.get_json(silent=True) or {}).get("lead_ids")
+    )
     if isinstance(lead_ids_raw, str):
         try:
             lead_ids = json.loads(lead_ids_raw) if lead_ids_raw.startswith("[") else [int(x) for x in lead_ids_raw.split(",") if x.strip()]
@@ -1018,10 +1038,11 @@ def bulk_action():
     else:
         lead_ids = request.form.getlist("lead_ids", type=int)
 
-    if action == "archive" and not can_archive_leads():
-        return json_error("forbidden", "Insufficient permissions.", 403)
-    if action == "assign" and not can_assign_to_others():
-        return json_error("forbidden", "Insufficient permissions.", 403)
+    if (action == "archive" and not can_archive_leads()) or (action == "assign" and not can_assign_to_others()):
+        if request.is_json:
+            return json_error("forbidden", "Insufficient permissions.", 403)
+        flash("Sinulla ei ole oikeutta tähän toimintoon.", "danger")
+        return redirect(url_for("leads.list_leads", **_org_kwargs(organization_id)))
 
     payload = {}
     if action == "assign":

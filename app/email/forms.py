@@ -4,7 +4,10 @@ from wtforms.validators import DataRequired, Email, Length, Optional
 
 
 class ComposeEmailForm(FlaskForm):
-    template_id = SelectField("Malli", coerce=int, validators=[Optional()], choices=[])
+    # only a starting point for the text already in the editor: an unknown id
+    # must not stop the email (system template ids used to change between
+    # the compose page and the send request)
+    template_id = SelectField("Malli", coerce=int, validators=[Optional()], choices=[], validate_choice=False)
     subject = StringField("Aihe", validators=[DataRequired(), Length(max=255)])
     body_html = HiddenField("Viesti", validators=[DataRequired()])
     submit = SubmitField("Lähetä sähköposti")

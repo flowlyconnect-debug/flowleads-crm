@@ -24,7 +24,8 @@
   {% endif %}
 
   <form method="post" action="{{ url_for('email.send', lead_id=lead.id, organization_id=organization_id) if current_user.is_superadmin() else url_for('email.send', lead_id=lead.id) }}" id="compose-form">
-    {{ form.hidden_tag() }}
+    {# csrf only: hidden_tag() also printed an empty body_html before the editor's, and the server read the empty one #}
+    {{ form.csrf_token }}
 
     <div class="compose-header">
       <div class="compose-header__row">
@@ -122,8 +123,13 @@
     hint.textContent = text.length > 48 ? text.slice(0, 48) + '…' : text;
   });
   var quill = new Quill('#editor', { theme: 'snow' });
+  // Quill drops a <br> inside a paragraph, which glued the signature to the
+  // greeting ("terveisin,Matti"); give each line its own paragraph instead
+  function toQuillHtml(html) {
+    return (html || '').replace(/<br\s*\/?>/gi, '</p><p>');
+  }
   {% if preview_html %}
-  quill.root.innerHTML = {{ preview_html|tojson }};
+  quill.root.innerHTML = toQuillHtml({{ preview_html|tojson }});
   {% endif %}
   function syncBody() {
     document.getElementById('body-html-field').value = quill.root.innerHTML;
@@ -138,7 +144,7 @@
     if (!id || !templateData[id]) { updatePreview(); return; }
     var t = templateData[id];
     document.getElementById('subject-field').value = renderVars(t.subject);
-    quill.root.innerHTML = renderVars(t.body);
+    quill.root.innerHTML = toQuillHtml(renderVars(t.body));
     document.querySelectorAll('.compose-template-card').forEach(function(card) {
       card.classList.toggle('is-selected', parseInt(card.dataset.templateId, 10) === id);
     });
