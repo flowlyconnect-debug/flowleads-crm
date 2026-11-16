@@ -177,7 +177,7 @@
                 {# a lead from the Kohteet page never shows where its listing came from #}
                 {% set from_targets = lead.ai_contact_info is mapping and lead.ai_contact_info.get('listing_id') %}
                 <span class="badge leads-source-badge">
-                  {% if from_targets %}Kohteet{% else %}{{ source_label(lead.source) }}{% if lead.source_ref %} · {{ lead.source_ref }}{% endif %}{% endif %}
+                  {% if from_targets %}Kohteet{% else %}{{ source_label(lead.source) }}{% if lead.source_ref and lead.source in ('manual', 'webform') %} · {{ lead.source_ref }}{% endif %}{% endif %}
                 </span>
               </div>
             </div>
@@ -491,15 +491,9 @@
             <section id="tab-meetings" class="lead-tabpanel" role="tabpanel" aria-label="Tapaamiset">
               <div class="lead-meetings-header">
                 <h3 class="text-sm font-semibold text-secondary">Tapaamiset</h3>
-                {% if calendar_connection %}
                 <button type="button" class="btn btn-primary btn-sm" data-open-modal="meeting-modal">
                   Aikatauluta tapaaminen
                 </button>
-                {% else %}
-                <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.calendar_settings') }}">
-                  Yhdistä kalenteri
-                </a>
-                {% endif %}
               </div>
               {% if calendar_connection %}
               <p class="text-sm text-muted mt-2">
@@ -620,7 +614,7 @@
                     <div class="contact-info-item">
                       <span class="contact-info-icon" aria-hidden="true">⚖</span>
                       <div class="contact-info-value">
-                        <strong>Oikeusperuste:</strong> {{ lead.gdpr_legal_basis or '—' }}
+                        <strong>Oikeusperuste:</strong> {{ {'legitimate_interest': 'Oikeutettu etu', 'consent': 'Suostumus', 'contract': 'Sopimus'}.get(lead.gdpr_legal_basis, lead.gdpr_legal_basis or '—') }}
                       </div>
                     </div>
                     <div class="contact-info-item">
@@ -822,12 +816,14 @@
       <label>{{ schedule_meeting_form.description.label }}{{ schedule_meeting_form.description(rows=3) }}</label>
       <label>{{ schedule_meeting_form.attendees.label }}{{ schedule_meeting_form.attendees(placeholder='email@example.com, toinen@example.com') }}</label>
       <label>{{ schedule_meeting_form.location.label }}{{ schedule_meeting_form.location() }}</label>
-      <label>{{ schedule_meeting_form.video_meeting() }} {{ schedule_meeting_form.video_meeting.label.text }}</label>
       {% if calendar_connection %}
+      <label>{{ schedule_meeting_form.video_meeting() }} {{ schedule_meeting_form.video_meeting.label.text }}</label>
       <p class="text-sm text-muted mt-2">
         Palvelu:
         {% if calendar_connection.provider == 'google' %}Google (Meet){% else %}Microsoft (Teams){% endif %}
       </p>
+      {% else %}
+      <p class="text-sm text-muted mt-2">Tapaaminen tallentuu FlowLeadsin kalenteriin ja liidin historiaan. Kutsua ei lähetetä osallistujille.</p>
       {% endif %}
       <div class="mt-3 flex gap-2">
         <button type="submit" class="btn btn-primary btn-sm">Aikatauluta</button>

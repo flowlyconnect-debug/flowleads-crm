@@ -135,7 +135,7 @@ class ProposalPDFService:
 <p class="meta">
   <strong>{html_module.escape(proposal.reference_number)}</strong><br>
   Asiakas: {html_module.escape(proposal.lead_name_snapshot or '')}
-  {f' — {html_module.escape(proposal.lead_company_snapshot)}' if proposal.lead_company_snapshot else ''}<br>
+  {f' — {html_module.escape(proposal.lead_company_snapshot)}' if proposal.lead_company_snapshot and proposal.lead_company_snapshot != proposal.lead_name_snapshot else ''}<br>
   Voimassa: {valid_until}
 </p>
 <table>

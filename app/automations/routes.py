@@ -95,6 +95,11 @@ def _parse_trigger_config(trigger_type: str, form) -> dict:
 @login_required
 def _guard():
     _require_ui_role()
+    # sellers may look; creating, changing and switching automations is for admins
+    if request.endpoint in (
+        "automations.create_automation", "automations.edit_automation", "automations.toggle_automation"
+    ) and current_user.role not in ("admin", "superadmin"):
+        abort(403)
 
 
 @automations_bp.route("")

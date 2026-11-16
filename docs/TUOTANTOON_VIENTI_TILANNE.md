@@ -275,6 +275,13 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 Selainläpikäynti (admin + myyjä) ja tietosuoja-auditointi: kokeilu poistettu, lomakkeiden liidien
 ylikirjoitus, lomakkeiden viittaukset toiseen organisaatioon, GDPR-anonymisoinnin jäämät, health/db-tiedot,
 X-Forwarded-Host ja muutama 500-virhe korjattu (testit `test_forms.py`, `test_gdpr.py`, `test_page_smoke.py`).
+Toinen kierros (joka asetussivu ja toiminto selaimella, admin + myyjä + kutsuttu asiakas): kutsulla luotu asiakas
+jäi ilman sekvenssejä ja automaatioita (valinnat ovat nyt oletuksena päällä), tapaamista ei voinut sopia ilman
+Google/Outlook-yhteyttä (nyt paikallinen tapaaminen, `provider="local"`), myyjä pystyi poistamaan sekvenssin ja
+kytkemään automaatioita (nyt vain ylläpitäjä), julkisen tarjoussivun muotoilut, yrityssivun paikkamerkkitekstit ja
+puuttuvan salausavaimen englanninkielinen virhe korjattu.
+**Tarkista tuotannosta:** `/admin/customers` → ensimmäisen asiakkaan "Toiminnot käytössä" -ruudut (jos kutsu tehtiin
+ennen korjausta, sekvenssit/automaatiot voivat olla pois) ja `/admin/system` (avaimet, Mailgun).
 Avoinna: isännöitsijän henkilötietojen poisto jaetusta kohdekatalogista (`Listing`) GDPR-pyynnöllä puuttuu;
 myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
 

@@ -373,3 +373,33 @@ def test_disconnect_route(app, client):
     assert response.status_code == 302
     with app.app_context():
         assert CalendarConnection.query.filter_by(user_id=ctx["user_id"]).count() == 0
+
+
+def test_meeting_without_calendar_connection_is_local(app, client):
+    """16.11.2026: the Tapaamiset tab was a dead end before Google/Outlook was
+    connected. A meeting is now stored in FlowLeads' own calendar."""
+    from app.leads.models import Activity
+
+    ctx = _setup_org(app, "cal-local")
+    with app.app_context():
+        lead = LeadService.create(
+            {"email": "local@cal.com", "company": "Local Co", "stage_id": ctx["stage_id"]}, ctx["org_id"], ctx["user_id"]
+        )
+        db.session.commit()
+        lead_id = lead.id
+    _login(client, ctx["user_email"])
+    page = client.get(f"/leads/{lead_id}").get_data(as_text=True)
+    assert 'data-open-modal="meeting-modal"' in page and "Yhdistä kalenteri" not in page
+    response = client.post(
+        f"/leads/{lead_id}/meetings/schedule",
+        json={"title": "Katselmus", "start_at": "2026-11-24T13:00", "duration_minutes": 60},
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)
+    with app.app_context():
+        event = CalendarEvent.query.filter_by(lead_id=lead_id).one()
+        assert (event.provider, event.is_synced, event.status) == ("local", False, "scheduled")
+        assert event.start_at.replace(tzinfo=timezone.utc) == datetime(2026, 11, 24, 11, 0, tzinfo=timezone.utc)  # 13.00 Finnish time
+        assert Activity.query.filter_by(lead_id=lead_id, type="meeting_scheduled").count() == 1
+        event_id = event.id
+    assert "Katselmus" in client.get("/calendar?week=2026-11-23").get_data(as_text=True)
+    assert client.post(f"/calendar/events/{event_id}", json={"action": "cancel"}).status_code in (200, 302)

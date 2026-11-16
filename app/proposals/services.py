@@ -874,6 +874,8 @@ class ProposalService:
     @staticmethod
     def public_proposal_dict(proposal: Proposal) -> dict:
         """Safe subset for public pages — no organization_id or internal ids in URLs."""
+        from app.proposals.pdf import fi_money
+
         lines = [
             {
                 "description": li.description,
@@ -881,10 +883,21 @@ class ProposalService:
                 "unit_price": str(li.unit_price),
                 "discount_percent": str(li.discount_percent),
                 "total": str(li.total),
+                # Finnish display values for the customer's page
+                "quantity_display": f"{li.quantity.normalize():f}".replace(".", ",") if li.quantity is not None else "",
+                "unit_price_display": fi_money(li.unit_price, proposal.currency),
+                "total_display": fi_money(li.total, proposal.currency),
             }
             for li in sorted(proposal.line_items, key=lambda x: x.order_index)
         ]
+        from app import to_helsinki
+
+        company = (proposal.lead_company_snapshot or "").strip()
+        name = (proposal.lead_name_snapshot or "").strip()
         return {
+            "customer_line": company if (not name or name == company) else (f"{company} — {name}" if company else name),
+            "valid_until_display": proposal.valid_until.strftime("%d.%m.%Y") if proposal.valid_until else "—",
+            "accepted_at_display": to_helsinki(proposal.accepted_at).strftime("%d.%m.%Y klo %H.%M") if proposal.accepted_at else "",
             "reference_number": proposal.reference_number,
             "title": proposal.title,
             "status": proposal.status,

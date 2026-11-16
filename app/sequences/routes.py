@@ -232,6 +232,21 @@ def _sequences_auth():
 
     _require_ui_role()
 
+    # Sellers use sequences (view, enroll their leads); building, changing and
+    # deleting the organization's sequences is for admins.
+    if request.endpoint in _MANAGE_ENDPOINTS and current_user.role not in ("admin", "superadmin"):
+
+        abort(403)
+
+
+_MANAGE_ENDPOINTS = frozenset(
+    "sequences." + name
+    for name in (
+        "create_sequence", "sequence_builder", "update_sequence", "delete_sequence",
+        "add_step", "update_step", "delete_step_route", "reorder_steps",
+    )
+)
+
 
 
 

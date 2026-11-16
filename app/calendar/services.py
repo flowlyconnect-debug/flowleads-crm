@@ -206,12 +206,10 @@ class CalendarService:
                 raise CalendarServiceError("User organization not found.", "not_found")
             organization_id = user.organization_id
 
+        # Without a Google/Outlook connection the meeting lives in FlowLeads'
+        # own calendar only (provider "local"): it used to be impossible to
+        # book a meeting at all before connecting a calendar.
         connection = CalendarService.get_active_connection(user_id, organization_id)
-        if not connection:
-            raise CalendarServiceError(
-                "No calendar connection. Connect Google or Microsoft in settings.",
-                "no_connection",
-            )
 
         if lead_id is not None:
             get_lead_for_org(lead_id, organization_id)
@@ -224,7 +222,7 @@ class CalendarService:
             user_id=user_id,
             lead_id=lead_id,
             organization_id=organization_id,
-            provider=connection.provider,
+            provider=connection.provider if connection else "local",
             title=title.strip(),
             description=description,
             start_at=start_at,
@@ -237,26 +235,27 @@ class CalendarService:
         db.session.add(event)
         db.session.flush()
 
-        CalendarService.refresh_token_if_needed(connection)
-        access = CalendarService.get_access_token(connection)
-        if not connection.calendar_id:
-            raise CalendarServiceError("Calendar ID not configured.", "no_calendar")
+        if connection:
+            CalendarService.refresh_token_if_needed(connection)
+            access = CalendarService.get_access_token(connection)
+            if not connection.calendar_id:
+                raise CalendarServiceError("Calendar ID not configured.", "no_calendar")
 
-        client = _provider_client(connection.provider)
-        result = client.create_event(
-            access,
-            connection.calendar_id,
-            title=event.title,
-            description=event.description,
-            start_at=event.start_at,
-            end_at=event.end_at,
-            attendees=attendee_list,
-            location=location,
-            video_meeting=video_meeting,
-        )
-        event.external_event_id = result["external_event_id"]
-        event.meeting_url = result.get("meeting_url")
-        event.is_synced = True
+            client = _provider_client(connection.provider)
+            result = client.create_event(
+                access,
+                connection.calendar_id,
+                title=event.title,
+                description=event.description,
+                start_at=event.start_at,
+                end_at=event.end_at,
+                attendees=attendee_list,
+                location=location,
+                video_meeting=video_meeting,
+            )
+            event.external_event_id = result["external_event_id"]
+            event.meeting_url = result.get("meeting_url")
+            event.is_synced = True
         event.updated_at = _utc_now()
 
         if lead_id is not None:

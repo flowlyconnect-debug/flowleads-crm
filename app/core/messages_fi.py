@@ -193,6 +193,9 @@ _MESSAGES: dict[str, str] = {
     "Unknown action.": "Tuntematon toiminto.",
     "Name and company are required.": "Kirjoita nimesi ja yrityksesi nimi.",
     "The subscription has ended.": "Sopimus on päättynyt. Valitse kuukausisopimus Tilaus-sivulta jatkaaksesi.",
+    # missing platform keys: the customer gets a plain message, not a variable name
+    "WEBHOOK_ENCRYPTION_KEY is required for webhook endpoint storage.": "Tämä toiminto ei ole vielä käytössä. Ota yhteyttä FlowLeadsin ylläpitoon.",
+    "CALENDAR_ENCRYPTION_KEY is required for calendar OAuth token storage.": "Kalenteriyhteys ei ole vielä käytössä. Ota yhteyttä FlowLeadsin ylläpitoon.",
     # --- CRM export (app/integrations) ---
     "Unknown CRM.": "Tuntematon CRM-järjestelmä.",
     "The API token looks incomplete.": "API-avain näyttää vajaalta. Kopioi koko avain.",
