@@ -217,7 +217,7 @@ def test_customer_admin_settings_menu_is_short(app, client):
     with client.session_transaction() as sess:
         sess[TWO_FA_SESSION_KEY] = True
     html = client.get("/settings/team").get_data(as_text=True)
-    assert "Käyttäjät" in html and "Urakat ja kohdehaku" in html
+    assert "Käyttäjät" in html and "Urakat ja kohdehaku" not in html  # FlowLeads sets the profile
     main, _, advanced = html.partition("Lisäasetukset")
     assert "API-avaimet" not in main and "API-avaimet" in advanced
     assert 'name="email"' in html  # the invite form is right there
