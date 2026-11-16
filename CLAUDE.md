@@ -46,7 +46,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   gets none, and a superadmin ticks them per customer on `/admin/customers` ("Toiminnot käytössä") once a module
   is ready. Off = no nav item, no lead-page tab/AI cards, no AI report. `create_organization()` itself still
   enables all (tests rely on it); onboarding and invites clear them. Tests: `tests/test_optional_modules_off.py`.
-- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the default sort
+- Kohteet has a filter bar (renovation, region, city, building type, contact info, sort; the region list always has all
+  18 maakuntaa and a chosen region lists all its kunnat from `app/search/municipalities.py` plus the place names its
+  targets carry, tests `tests/test_target_region_filter.py`; the default sort
   "Sopivimmat ensin" and the score chip come from `app/listings/fit_services.py`, which learns from the
   organization's transferred and hidden targets, tests `tests/test_target_fit.py`) and a daily
   digest of new targets (scheduler job `target_digest`, `send_target_digests()`, per-organization switch
