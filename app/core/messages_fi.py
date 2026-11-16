@@ -192,7 +192,7 @@ _MESSAGES: dict[str, str] = {
     "Unknown plan.": "Tuntematon paketti.",
     "Unknown action.": "Tuntematon toiminto.",
     "Name and company are required.": "Kirjoita nimesi ja yrityksesi nimi.",
-    "The subscription has ended.": "Kokeilujakso tai sopimus on päättynyt. Valitse kuukausisopimus Tilaus-sivulta jatkaaksesi.",
+    "The subscription has ended.": "Sopimus on päättynyt. Valitse kuukausisopimus Tilaus-sivulta jatkaaksesi.",
     # --- CRM export (app/integrations) ---
     "Unknown CRM.": "Tuntematon CRM-järjestelmä.",
     "The API token looks incomplete.": "API-avain näyttää vajaalta. Kopioi koko avain.",

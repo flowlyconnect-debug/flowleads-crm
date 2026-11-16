@@ -253,9 +253,10 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 - **Haku tavallisella kielellä** Kohteet-sivulla (säännöt; tekoäly `NL_SEARCH_AI_ENABLED=true`).
 - **Kuukausiraportti** `/reports/monthly` ja sähköposti ylläpitäjille kuun 1. päivänä klo 8 (ajastin `monthly_report`).
 - **Hinnasto ja tilaus**: julkinen `/hinnasto` (`app/billing/plans.py`: yksi paketti, kaikki ominaisuudet
-  149 €/kk + alv, käyttäjän päätös 13.11.), kokeilupyyntölomake, 14 päivän
-  kokeilu (Luo asiakas / Kutsu asiakas), Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun, peru), päättynyt kokeilu
-  estää uusien kohteiden haun ja siirron, muistutus 3 pv ennen kokeilun loppua. Laskutus edelleen käsin:
+  149 €/kk + alv, käyttäjän päätös 13.11.), yhteydenottolomake, Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun,
+  peru), päättynyt sopimus estää uusien kohteiden haun ja siirron. **Maksuton kokeilu poistettu kokonaan 16.11.**
+  (käyttäjän päätös): uusi asiakas on heti kuukausisopimuksella, migraatio `a1b2c3d4e5f7` siirtää kokeilussa olleet
+  organisaatiot aktiivisiksi ja poistaa kokeilusarakkeet. Laskutus edelleen käsin:
   tilaus ja irtisanominen lähettävät superadmineille sähköpostin. Vanhat organisaatiot pysyvät aktiivisina.
 - **Varmuuskopiot**: Python-dumppi (`app/backups/logical.py`) käytetään automaattisesti, kun `pg_dump` puuttuu tai
   on tietokantaa vanhempi (todennäköinen syy tuotannon `backup_failed`-riviin: Renderin pg_dump vs. Postgres 18).

@@ -27,11 +27,11 @@ class LeadForm(FlaskForm):
     source = SelectField(
         "Lähde",
         choices=[
-            ("manual", "Manuaalinen"),
-            ("n8n", "n8n"),
+            ("manual", "Lisätty käsin"),
+            ("n8n", "Automaatio"),
             ("import", "Tuonti"),
             ("webform", "Lomake"),
-            ("oikotie", "Oikotie"),
+            ("oikotie", "Kohteet"),
         ],
         default="manual",
     )
@@ -51,11 +51,11 @@ class LeadFilterForm(FlaskForm):
         "Lähde",
         choices=[
             ("", "Kaikki"),
-            ("manual", "Manuaalinen"),
-            ("n8n", "n8n"),
+            ("manual", "Lisätty käsin"),
+            ("n8n", "Automaatio"),
             ("import", "Tuonti"),
             ("webform", "Lomake"),
-            ("oikotie", "Oikotie"),
+            ("oikotie", "Kohteet"),
         ],
         validators=[Optional()],
     )

@@ -87,7 +87,7 @@
     <label>Min. pistemäärä (valinnainen)
       <input type="number" name="min_score" min="0" max="100" value="{{ tc.get('min_score', '') }}">
     </label>
-    <label>Lähde (pilkuilla, esim. n8n, manual)
+    <label>Lähde (pilkuilla, esim. manual, oikotie = Kohteet, webform = lomake)
       <input type="text" name="source" value="{{ tc.get('source', [])|join(',') if tc.get('source') else '' }}">
     </label>
   </div>

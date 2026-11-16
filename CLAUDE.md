@@ -60,8 +60,8 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   Board chair / maintenance company / property-manager offices: `app/listings/contacts.py`. Map: `/targets/map`
   (`app/listings/geo.py`, vendored Leaflet). Plain-language search: `app/listings/nl_search.py`.
 - Other customer modules: CRM export to HubSpot/Pipedrive (`app/integrations/`), monthly report
-  (`app/analytics/monthly.py`), plans/trial/monthly contract and public `/hinnasto` (`app/billing/`, one plan 149 €/kk in
-  `plans.py`; an ended trial blocks fetching and transferring targets only). Superadmin `/admin/system` and
+  (`app/analytics/monthly.py`), plans/monthly contract (no free trial, removed 16.11.2026) and public `/hinnasto` (`app/billing/`, one plan 149 €/kk in
+  `plans.py`; an ended contract blocks fetching and transferring targets only). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
