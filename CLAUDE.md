@@ -27,7 +27,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
 - Onboarding (`app/admin/onboarding_services.py`, `invite_services.py`) creates an **active** profile and
   the ready-made email sequence (`app/sequences/defaults.py::ensure_default_sequences`) per customer: no API key,
   no SearchJob. It asks only the renovation types (urakat); regions
-  default to "Koko Suomi" and the customer narrows the list with the Kohteet filters. Turning a profile on must go through
+  default to "Koko Suomi" and the customer narrows the list with the Kohteet filters. The search profile page
+  (`/settings/search-profiles`, "Urakat ja kohdehaku") is **superadmin-only**: the customer admin has no menu item and
+  gets 403; FlowLeads edits a customer's profile from `/admin/customers` ("Muokkaa"). Turning a profile on must go through
   `activate_profile()` so it is rematched. Billing is manual for now.
 - **Oikotie blocks n8n Cloud since 11/2026** (DataDome 403 + captcha, the old Lead Worker too). The Crawler stops
   at the first block; never add bot-protection workarounds. Listings can come from any other source through

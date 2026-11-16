@@ -195,12 +195,8 @@ def test_e2e_admin_login_sees_own_data_only(app, client):
     assert "oma@liidi.fi" in pipeline_page
     assert "muu@liidi.fi" not in pipeline_page
 
-    settings_resp = client.get("/settings/search-profiles")
-    assert settings_resp.status_code == 200
-    settings_page = settings_resp.get_data(as_text=True)
-    assert f"Haku tenant-a" in settings_page
-    assert "Haku tenant-b" not in settings_page
-    assert ctx["api_key"] not in settings_page
+    # the search profile is FlowLeads' setting: the customer admin cannot open it
+    assert client.get("/settings/search-profiles").status_code == 403
 
     api_keys_resp = client.get("/settings/api-keys")
     assert api_keys_resp.status_code == 200
@@ -245,13 +241,21 @@ def test_e2e_admin_cannot_access_superadmin_routes(app, client):
         assert lead.organization_id == other["org_id"]
 
 
-def test_e2e_customer_admin_can_edit_own_profile(app, client):
+def test_e2e_superadmin_edits_customer_profile_admin_cannot(app, client):
     ctx = _onboard_customer(app, slug_suffix="profile-edit")
 
     _login(client, ctx["admin_email"])
     _bypass_2fa_for(client, app, ctx["admin_email"])
-    update_resp = client.post(
+    denied = client.post(
         f"/settings/search-profiles/{ctx['profile_id']}",
+        data={"name": "Asiakkaan muutos", "remonttityypit": ["Putkiremontti"], "region_mode": "all_finland"},
+    )
+    assert denied.status_code == 403
+    client.get("/auth/logout")
+
+    _login_superadmin(client, app, email="sa-profile-edit-2@test.com")
+    update_resp = client.post(
+        f"/settings/search-profiles/{ctx['profile_id']}?organization_id={ctx['org_id']}",
         data={
             "name": "Päivitetty profiili",
             "remonttityypit": ["Putkiremontti", "Julkisivuremontti"],

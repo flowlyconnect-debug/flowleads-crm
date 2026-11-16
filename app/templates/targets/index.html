@@ -210,7 +210,7 @@
       {% elif is_hidden_tab %}
         {{ empty_state(none, "Ei piilotettuja kohteita", "Kohteet, jotka piilotat Saatavilla-listalta, löytyvät täältä.") }}
       {% elif not profiles %}
-        {{ empty_state(none, "Hakuprofiilia ei ole vielä", "Kohteet haetaan hakuprofiilin perusteella: alueet ja remonttityypit.", "Luo hakuprofiili" if can_edit_profiles else none, url_for('settings.search_profiles_list', id='new', **org_query) if can_edit_profiles else none) }}
+        {{ empty_state(none, "Hakuprofiilia ei ole vielä", "Kohteet haetaan hakuprofiilin perusteella: alueet ja remonttityypit." if can_edit_profiles else "FlowLeads määrittää urakat, joista kohteita haetaan. Ota yhteyttä, jos haluat muuttaa niitä.", "Luo hakuprofiili" if can_edit_profiles else none, url_for('settings.search_profiles_list', id='new', **org_query) if can_edit_profiles else none) }}
       {% else %}
         {{ empty_state(none, "Ei uusia kohteita juuri nyt", "Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät tänne sitä mukaa kun niitä löytyy.") }}
       {% endif %}
@@ -378,7 +378,7 @@
       {% endif %}
     </footer>
     {% endif %}
-    {% if can_edit_profiles and not is_hidden_tab %}
+    {% if can_edit_digest and not is_hidden_tab %}
     <form method="post" class="targets-digest" action="{{ url_for('targets.digest_setting', **org_query) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="enabled" value="{{ '0' if digest_enabled else '1' }}">

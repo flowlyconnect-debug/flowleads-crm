@@ -291,7 +291,7 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
         assert profile_b.is_active is True
         assert org_a.enabled_features == []  # allowed "sequences" but did not tick it
 
-    # Each admin logs in and sees ONLY their own organization's search profile.
+    # Each admin logs in; the search profile page stays FlowLeads-only.
     # Each gets its own fresh app context: Flask caches the resolved current_user
     # on `g`, which is tied to the app context, not the request — reusing the
     # ambient context across different "logged in as" test clients within one
@@ -301,18 +301,18 @@ def test_full_invite_flow_two_isolated_organizations(mock_send, client, app):
         login_a.post("/auth/login", data={"email": "admin@eka.fi", "password": "ekasalasana1"})
         with login_a.session_transaction() as sess:
             sess[TWO_FA_SESSION_KEY] = True
-        page_a = login_a.get("/settings/search-profiles", follow_redirects=True).get_data(as_text=True)
-        assert "Eka profiili" in page_a
-        assert "Toka profiili" not in page_a
+        # the profile chosen in the invite is FlowLeads' setting, not the customer's
+        assert login_a.get("/settings/search-profiles").status_code == 403
+        assert login_a.get("/targets").status_code == 200
 
     with app.app_context():
         login_b = app.test_client()
         login_b.post("/auth/login", data={"email": "admin@toka.fi", "password": "tokasalasana1"})
         with login_b.session_transaction() as sess:
             sess[TWO_FA_SESSION_KEY] = True
-        page_b = login_b.get("/settings/search-profiles", follow_redirects=True).get_data(as_text=True)
-        assert "Toka profiili" in page_b
-        assert "Eka profiili" not in page_b
+        # the profile chosen in the invite is FlowLeads' setting, not the customer's
+        assert login_b.get("/settings/search-profiles").status_code == 403
+        assert login_b.get("/targets").status_code == 200
 
     # No per-customer search job is ever created.
     with app.app_context():

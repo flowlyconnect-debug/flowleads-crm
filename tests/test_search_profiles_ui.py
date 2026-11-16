@@ -54,6 +54,14 @@ def _login_superadmin(app, client, slug):
     _login(client, email)
 
 
+def _login_for_org(app, client, org_id, slug=None):
+    """Search profiles are set by FlowLeads: only a superadmin edits them,
+    working on the chosen organization."""
+    _login_superadmin(app, client, slug or f"org-{org_id}")
+    with client.session_transaction() as sess:
+        sess["superadmin_org_id"] = org_id
+
+
 def _login(client, email):
     response = client.post(
         "/auth/login",
@@ -87,7 +95,7 @@ def test_search_profiles_requires_admin(app, client):
 
 def test_search_profiles_list_and_create(app, client):
     ctx = _setup_org(app, "create")
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
 
     response = client.get("/settings/search-profiles")
     assert response.status_code == 200
@@ -115,7 +123,7 @@ def test_search_profiles_list_and_create(app, client):
 
 def test_search_profiles_update(app, client):
     ctx = _setup_org(app, "update")
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     client.post("/settings/search-profiles", data=_profile_form())
 
     with app.app_context():
@@ -143,7 +151,7 @@ def test_search_profiles_update(app, client):
 
 def test_search_profiles_tenant_isolation(app, client):
     ctx = _setup_org(app, "iso")
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     client.post("/settings/search-profiles", data=_profile_form())
 
     with app.app_context():
@@ -151,7 +159,7 @@ def test_search_profiles_tenant_isolation(app, client):
         profile_id = profile.id
 
     client.get("/auth/logout")
-    _login(client, ctx["other_admin_email"])
+    _login_for_org(app, client, ctx["other_org_id"], slug="iso-other")
     response = client.post(
         f"/settings/search-profiles/{profile_id}",
         data=_profile_form(name="Hacked"),
@@ -168,7 +176,7 @@ def test_search_profiles_missing_tables_shows_message_not_500(app, client):
         db.session.execute(text("DROP TABLE IF EXISTS search_profiles"))
         db.session.commit()
 
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     response = client.get("/settings/search-profiles")
     text_body = response.get_data(as_text=True)
     assert response.status_code == 200
@@ -176,12 +184,25 @@ def test_search_profiles_missing_tables_shows_message_not_500(app, client):
     assert "flask db upgrade" in text_body
 
 
-def test_search_profiles_admin_ignores_invalid_org_query_param(app, client):
+def test_customer_admin_cannot_open_or_edit_search_profiles(app, client):
+    """The customer's profile is chosen in the invite; FlowLeads edits it."""
     ctx = _setup_org(app, "org-query")
+    with app.app_context():
+        profile = SearchProfile(organization_id=ctx["org_id"], name="Asiakkaan haku",
+                                remonttityyppi="Putkiremontti", regions=["Uusimaa"], is_active=True)
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
     _login(client, ctx["admin_email"])
-    response = client.get("/settings/search-profiles?organization_id=99999")
-    assert response.status_code == 200
-    assert "Hakuprofiili" in response.get_data(as_text=True)
+    assert client.get("/settings/search-profiles").status_code == 403
+    assert client.post("/settings/search-profiles", data=_profile_form()).status_code == 403
+    assert client.post(f"/settings/search-profiles/{profile_id}", data=_profile_form(name="X")).status_code == 403
+    assert client.post(f"/settings/search-profiles/{profile_id}/delete").status_code == 403
+    assert client.post("/settings/search-profiles/preview", data=_profile_form()).status_code == 403
+    with app.app_context():
+        assert db.session.get(SearchProfile, profile_id).name == "Asiakkaan haku"
+    settings = client.get("/settings/team").get_data(as_text=True)
+    assert "Urakat ja kohdehaku" not in settings
 
 
 def test_search_profiles_superadmin_invalid_org_redirects(app, client):
@@ -367,7 +388,7 @@ def test_search_profiles_sidepanel_shows_catalogue_matches(app, client):
         db.session.commit()
         profile_id = profile.id
 
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     response = client.get(f"/settings/search-profiles?id={profile_id}")
     text_body = response.get_data(as_text=True)
     assert response.status_code == 200
@@ -380,7 +401,7 @@ def test_search_profiles_sidepanel_shows_catalogue_matches(app, client):
 
 def test_search_profile_form_saves_matching_settings(app, client):
     ctx = _setup_org(app, "matchset")
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     client.post(
         "/settings/search-profiles",
         data=_profile_form(min_confidence="75", daily_lead_limit="0"),
@@ -487,7 +508,7 @@ def test_update_profile_updates_key_when_new_value(app):
 def test_search_profiles_edit_page_does_not_render_full_api_key(app, client):
     ctx = _setup_org(app, "mask-ui")
     secret_key = "fl_live_secret_full_key_value"
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     client.post(
         "/settings/search-profiles",
         data=_profile_form(crm_api_key=secret_key),
@@ -509,7 +530,7 @@ def test_n8n_jobs_still_return_full_crm_api_key_after_profile_update(app, client
     (now job-scoped, not the profile's permanent) token either way."""
     ctx = _setup_org(app, "n8n-full-key")
     secret_key = "fl_live_n8n_full_key_value"
-    _login(client, ctx["admin_email"])
+    _login_for_org(app, client, ctx["org_id"])
     client.post(
         "/settings/search-profiles",
         data=_profile_form(crm_api_key=secret_key),

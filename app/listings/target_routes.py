@@ -300,7 +300,9 @@ def index():
         hidden_count=count_targets(organization_id, "dismissed"),
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
-        can_edit_profiles=current_user.role in ("admin", "superadmin"),
+        # search profiles are set by FlowLeads (superadmin), not by the customer
+        can_edit_profiles=current_user.is_superadmin(),
+        can_edit_digest=current_user.role in ("admin", "superadmin"),
     )
 
 

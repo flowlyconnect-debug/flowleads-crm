@@ -84,8 +84,9 @@ def test_settings_menu_of_a_customer_admin(client, app):
     _login(client, "admin-nav@test.fi")
     page = client.get("/settings/team").get_data(as_text=True)
     nav = page[page.index('class="settings-nav"'):page.index("</nav>", page.index('class="settings-nav"'))]
-    for label in ("Käyttäjät", "Urakat ja kohdehaku", "Liidit ja koosteet", "Sähköposti", "Tarjoukset", "Tilaus"):
+    for label in ("Käyttäjät", "Liidit ja koosteet", "Sähköposti", "Tarjoukset", "Tilaus"):
         assert label in nav, label
+    assert "Urakat ja kohdehaku" not in nav  # FlowLeads sets the search profile
     assert "Sähköpostimallit" not in nav  # part of the Sähköposti page
     assert "Kalenteri" not in nav  # Google/Outlook are not configured here
     assert 'aria-current="page"' in nav
@@ -170,18 +171,16 @@ def test_proposal_preview_has_no_script_policy(client, app):
     assert "default-src 'none'" in response.headers["Content-Security-Policy"]
 
 
-def test_customer_does_not_see_catalogue_size_or_preview_addresses(client, app):
+def test_customer_cannot_open_search_profiles_or_preview(client, app):
+    """The search profile is set in the invite and edited by FlowLeads only."""
     _setup(app, "cat")
     _login(client, "admin-cat@test.fi")
-    page = client.get("/settings/search-profiles?id=new").get_data(as_text=True)
-    assert "Kohdekatalogissa" not in page
+    assert client.get("/settings/search-profiles?id=new").status_code == 403
     response = client.post(
         "/settings/search-profiles/preview",
         data={"name": "x", "remonttityypit": "Putkiremontti", "region_mode": "all_finland"},
     )
-    data = response.get_json()
-    assert "count" in data
-    assert "sample" not in data
+    assert response.status_code == 403
 
 
 def test_customer_cannot_preview_platform_notification_templates(client, app):

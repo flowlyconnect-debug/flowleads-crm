@@ -188,7 +188,7 @@ def _selected_profile_id(profiles: list) -> int | None:
 def register_search_profile_settings_routes(settings_bp):
     @settings_bp.route("/search-profiles", methods=["GET"])
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # the customer's profile is set by FlowLeads (invite / customer list)
     def search_profiles_list():
         organization_id = resolve_organization_id_with_fallback()
         if organization_id is None:
@@ -239,7 +239,7 @@ def register_search_profile_settings_routes(settings_bp):
 
     @settings_bp.route("/search-profiles", methods=["POST"])
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # the customer's profile is set by FlowLeads (invite / customer list)
     def search_profiles_create():
         organization_id = resolve_organization_id()
         org_query = org_query_suffix(organization_id)
@@ -271,7 +271,7 @@ def register_search_profile_settings_routes(settings_bp):
 
     @settings_bp.route("/search-profiles/preview", methods=["POST"])
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # the customer's profile is set by FlowLeads (invite / customer list)
     def search_profiles_preview():
         """How many catalogue listings the filter on the form matches right
         now (nothing is saved)."""
@@ -285,14 +285,11 @@ def register_search_profile_settings_routes(settings_bp):
             return jsonify({"success": False, "error": exc.message}), 400
         result = preview_profile(profile)
         db.session.rollback()  # the transient profile must never be flushed
-        if not current_user.is_superadmin():
-            # a customer sees only the count; the targets themselves are on Kohteet
-            result.pop("sample", None)
         return jsonify({"success": True, **result})
 
     @settings_bp.route("/search-profiles/<int:profile_id>", methods=["POST"])
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # the customer's profile is set by FlowLeads (invite / customer list)
     def search_profiles_update(profile_id: int):
         organization_id = resolve_organization_id()
         org_query = org_query_suffix(organization_id)
@@ -358,7 +355,7 @@ def register_search_profile_settings_routes(settings_bp):
 
     @settings_bp.route("/search-profiles/<int:profile_id>/delete", methods=["POST"])
     @login_required
-    @require_role("admin", "superadmin")
+    @require_role("superadmin")  # the customer's profile is set by FlowLeads (invite / customer list)
     def search_profiles_delete(profile_id: int):
         organization_id = resolve_organization_id()
         org_query = org_query_suffix(organization_id)

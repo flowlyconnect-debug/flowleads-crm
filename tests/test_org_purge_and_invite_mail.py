@@ -197,7 +197,7 @@ def test_two_factor_is_required_on_every_page_for_admins(app, client):
         assert response.status_code == 302 and "/auth/2fa" in response.headers["Location"], path
     with client.session_transaction() as sess:
         sess[TWO_FA_SESSION_KEY] = True
-    assert client.get("/settings/search-profiles").status_code == 200
+    assert client.get("/settings/proposals").status_code == 200
 
 
 def test_org_admin_manages_other_admins_but_keeps_one(app, client):
