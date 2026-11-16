@@ -578,6 +578,9 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
         )
     for renovation in best.values():
         listing.renovations.append(renovation)
+    from app.listings.text_types import add_text_types
+
+    add_text_types(listing)  # ventilation cleaning / attic insulation mentioned in the text
 
     listing.analysis_status = "done"
     listing.analyzed_at = now

@@ -286,6 +286,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 from app.listings.housing import backfill_company_keys, refresh_scores
 
                 backfill_company_keys()  # listings stored before housing-company keys
+                from app.listings.text_types import backfill_text_types
+
+                backfill_text_types()  # renovation types read from the listing text
                 matched = rematch_profiles()
                 merge_into_existing_leads()
                 refresh_scores()  # timing and freshness change with time

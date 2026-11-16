@@ -30,6 +30,8 @@ RENOVATION_WORDS: dict[str, tuple[str, ...]] = {
     "Sähkö- ja tietoliikennejärjestelmät": ("sahkoremont", "sahkojarjest", "sahkoverk", "sahkosaneera", "sahkot", "valokuitu", "tietoliikent", "antenni", "nousujohto"),
     "Lämmitysjärjestelmän remontti": ("lammity", "maalampo", "kaukolampo", "lammonjako", "patteri", "lampopumpp"),
     "Huoneistoremontit": ("huoneistoremont", "kylpyhuone", "keittio", "pintaremont"),
+    "Ilmanvaihdon puhdistus ja säätö": ("ilmanvaih", "iv-kanav", "iv-puhdist", "ilmastoin"),
+    "Yläpohjan lisäeristys": ("ylapohjan lisaerist", "lisaerist", "ylapohjan erist"),
     "Muu remontti": ("muu remontti", "muut remontit"),
 }
 BUILDING_WORDS = {
