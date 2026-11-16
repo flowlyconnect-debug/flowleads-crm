@@ -306,6 +306,17 @@ myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
 - Takaisin päälle asiakaskohtaisesti: `/admin/customers` → "Toiminnot käytössä" → rasti ja Tallenna.
   Testit: `tests/test_optional_modules_off.py`.
 
+## Tehty 16.11.2026 (4): kaksi uutta urakkatyyppiä
+
+- **"Ilmanvaihdon puhdistus ja säätö"** (kanavien puhdistus/nuohous, ilmamäärien mittaus, säätö, tasapainotus;
+  ei IV-koneiden uusimista) ja **"Yläpohjan lisäeristys"** ovat valittavissa urakoiksi kuten muutkin tyypit.
+- Tyypit poimitaan kohteen omasta tulevat remontit -tekstistä (`app/listings/text_types.py`), joten ne löytyvät
+  myös aiemmin tuoduista kohteista: ajastin lisää ne 10 minuutin sisällä julkaisusta. Tuotannon 294 kohteesta
+  osuu arviolta 8 ilmanvaihdon puhdistukseen ja 1 yläpohjan lisäeristykseen.
+- Asiakas saa kohteet näkyviin, kun tyypit lisätään hänen hakuprofiiliinsa (Asetukset → Urakat, tai
+  `/admin/customers` → Muokkaa). Analyzer-työnkulun kehote on päivitetty (`n8n/workflows/flowleads-analyzer.json`,
+  tuo n8n:ään kun Analyzer on käytössä). Tuontitiedostossa tyypin voi antaa myös suoraan remonttityyppi-sarakkeessa.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

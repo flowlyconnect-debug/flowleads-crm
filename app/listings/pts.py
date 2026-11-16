@@ -19,6 +19,8 @@ RENOVATION_MARKS: dict[str, tuple[str, str, str]] = {
     "Julkisivuremontti": ("Ju", "Julkisivu", "warning"),
     "Katto- ja vesikattoremontti": ("Ka", "Katto", "accent"),
     "Huoneistoremontit": ("Hu", "Huoneistot", "neutral"),
+    "Ilmanvaihdon puhdistus ja säätö": ("Iv", "Ilmanvaihto", "info"),
+    "Yläpohjan lisäeristys": ("Yp", "Yläpohja", "warning"),
     "Muu remontti": ("Mu", "Muu", "neutral"),
 }
 
