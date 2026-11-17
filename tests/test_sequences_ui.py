@@ -101,6 +101,22 @@ def test_sequence_stats_page(app, client):
     response = client.get(f"/sequences/{seq_id}/stats")
     assert response.status_code == 200
     assert b"Ilmoittautuneet" in response.data
+    assert f"/sequences/{seq_id}/builder".encode() in response.data
+
+
+def test_sequence_stats_page_hides_edit_link_from_seller(app, client):
+    """The builder is admin-only (403 for sellers), so the stats page must
+    not offer sellers a "Muokkaa sekvenssiä" link to it."""
+    ctx = _setup_org(app, "stats-seller")
+    seq_id = _create_sequence_with_step(app, ctx["org_id"], ctx["admin_id"])
+    with app.app_context():
+        create_user("seller-stats@test.com", "securepassword1", role="user", organization_id=ctx["org_id"])
+        db.session.commit()
+    _login(client, "seller-stats@test.com")
+    response = client.get(f"/sequences/{seq_id}/stats")
+    assert response.status_code == 200
+    assert b"Ilmoittautuneet" in response.data
+    assert f"/sequences/{seq_id}/builder".encode() not in response.data
 
 
 def test_sequence_stats_json(app, client):

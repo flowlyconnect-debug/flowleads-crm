@@ -3,7 +3,9 @@
 {% block content %}
 <div class="toolbar">
   <h1 style="margin:0;">Tilastot: {{ sequence.name }}</h1>
+  {% if current_user.role in ('admin', 'superadmin') %}
   <a class="btn secondary" href="{{ url_for('sequences.sequence_builder', sequence_id=sequence.id, **org_query) }}">Muokkaa sekvenssiä</a>
+  {% endif %}
   <a class="btn secondary" href="{{ url_for('sequences.list_sequences', **org_query) }}">Lista</a>
 </div>
 

@@ -219,6 +219,11 @@ _MESSAGES: dict[str, str] = {
     "HubSpot rate limit reached. Try again in a minute.": "HubSpotin pyyntöraja täyttyi. Yritä minuutin päästä uudelleen.",
     "Pipedrive rate limit reached. Try again in a minute.": "Pipedriven pyyntöraja täyttyi. Yritä minuutin päästä uudelleen.",
     "HubSpot did not return an id.": "HubSpot ei palauttanut tunnistetta.",
+    "Email provider could not be reached.": "Sähköpostipalveluun ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
+    "Email provider request timed out.": "Sähköpostipalvelu ei vastannut ajoissa. Yritä hetken päästä uudelleen.",
+    "Email provider authentication failed (check MAILGUN_API_KEY and region).": "Sähköpostipalvelun tunnistautuminen epäonnistui. Ota yhteyttä ylläpitoon.",
+    "Email provider refused the message (Mailgun 403).": "Sähköpostipalvelu hylkäsi viestin. Ota yhteyttä ylläpitoon.",
+    "Email send failed.": "Sähköpostin lähetys epäonnistui.",
     "Pipedrive did not return an id.": "Pipedrive ei palauttanut tunnistetta.",
 }
 

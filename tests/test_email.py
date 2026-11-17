@@ -695,3 +695,18 @@ def test_superadmin_test_email_goes_to_the_typed_address(mock_send, client, app)
     response = client.post("/admin/email/test", data={"to": "ei-osoite"}, follow_redirects=True)
     assert not mock_send.called
     assert "Anna kelvollinen sähköpostiosoite" in response.get_data(as_text=True)
+
+
+def test_unreachable_mail_provider_gives_a_readable_finnish_error():
+    """QA 17.11.2026: with no connection to Mailgun the user saw the raw
+    "<urlopen error Tunnel connection failed ...>" (e.g. when sending a proposal)."""
+    import urllib.error
+
+    from app.core.messages_fi import fi_message
+    from app.email.services import _safe_mailgun_error
+
+    message = _safe_mailgun_error(urllib.error.URLError("Tunnel connection failed: 403 Forbidden"))
+    assert message == "Email provider could not be reached."
+    assert fi_message(message).startswith("Sähköpostipalveluun ei saatu yhteyttä")
+    assert _safe_mailgun_error(urllib.error.URLError("timed out")) == "Email provider request timed out."
+    assert fi_message("Email provider request timed out.").startswith("Sähköpostipalvelu ei vastannut")

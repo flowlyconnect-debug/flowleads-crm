@@ -119,8 +119,11 @@ def _safe_mailgun_error(exc: Exception) -> str:
         return "Email provider authentication failed (check MAILGUN_API_KEY and region)."
     if msg in ("Mailgun HTTP 403", "Forbidden") or msg.startswith("HTTP Error 403"):
         return "Email provider refused the message (Mailgun 403)."
-    if "timeout" in msg.lower():
+    if "timeout" in msg.lower() or "timed out" in msg.lower():
         return "Email provider request timed out."
+    if isinstance(exc, (urllib.error.URLError, ConnectionError, OSError)) or msg.startswith("<urlopen error"):
+        # no network / DNS / proxy: the raw "<urlopen error ...>" means nothing to a user
+        return "Email provider could not be reached."
     if len(msg) > 500:
         return msg[:500]
     return msg or "Email send failed."
