@@ -177,8 +177,14 @@ def create_task():
                 actor_role=current_user.role,
             )
             db.session.commit()
+            # sections and shown times in Finnish time, like the list itself
+            # (UTC put a task for today 00-02/03 into "overdue" with the wrong hour)
+            from zoneinfo import ZoneInfo
+
+            helsinki = ZoneInfo("Europe/Helsinki")
             due = _to_utc(task.due_date)
-            today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            due = due.astimezone(helsinki) if due else None
+            today = datetime.now(helsinki).replace(hour=0, minute=0, second=0, microsecond=0)
             tomorrow = today + timedelta(days=1)
             week_end = today - timedelta(days=today.weekday()) + timedelta(days=7)
             section = "later"

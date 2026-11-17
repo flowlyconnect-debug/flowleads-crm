@@ -309,7 +309,8 @@
 
     {% else %}
     <form method="post" action="{{ url_for('leads.bulk_action', organization_id=organization_id) if current_user.is_superadmin() else url_for('leads.bulk_action') }}" class="leads-bulk-form">
-      {{ bulk_form.hidden_tag() }}
+      {# csrf only: hidden_tag() also printed an empty lead_ids that hid the selection #}
+      {{ bulk_form.csrf_token }}
 
       <div class="lead-list" role="table" aria-label="Liidit">
         <div class="lead-list-head" role="row">

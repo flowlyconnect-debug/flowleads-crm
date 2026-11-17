@@ -155,6 +155,18 @@ _MESSAGES: dict[str, str] = {
     "Proposal cannot be accepted.": "Tarjousta ei voi hyväksyä.",
     "Proposal cannot be declined.": "Tarjousta ei voi hylätä.",
     "Signature name is required.": "Kirjoita allekirjoittajan nimi.",
+    "Proposal is locked and cannot be edited. Duplicate to create a new draft.": "Tarjous on lukittu. Luo kopio muokataksesi.",
+    # --- found in the QA round 16.11.2026 ---
+    "Lead cannot receive email (unsubscribed or anonymized).": "Liidille ei voi lähettää sähköpostia (peruttu tilaus tai anonymisoitu).",
+    "You cannot assign leads to other users.": "Et voi osoittaa liidejä muille käyttäjille.",
+    "You cannot assign tasks to other users.": "Et voi osoittaa tehtäviä muille käyttäjille.",
+    "Email not found.": "Sähköpostia ei löytynyt.",
+    "Notification not found.": "Ilmoitusta ei löytynyt.",
+    "Invalid unsubscribe token.": "Peruutuslinkki on virheellinen tai vanhentunut.",
+    "Cannot link contact to lead across organizations.": "Kontaktia ei voi liittää toisen organisaation liidiin.",
+    "Name is required (max 100 characters).": "Anna nimi (enintään 100 merkkiä).",
+    "The organization has a superadmin; it cannot be deleted.": "Organisaatiossa on superadmin, joten sitä ei voi poistaa.",
+    "Invalid task status.": "Virheellinen tehtävän tila.",
     # --- calendar ---
     "Event not found.": "Tapaamista ei löytynyt.",
     "Unsupported calendar provider.": "Kalenteripalvelua ei tueta.",

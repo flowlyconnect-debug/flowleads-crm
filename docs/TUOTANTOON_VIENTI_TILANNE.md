@@ -317,6 +317,32 @@ myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
   `/admin/customers` → Muokkaa). Analyzer-työnkulun kehote on päivitetty (`n8n/workflows/flowleads-analyzer.json`,
   tuo n8n:ään kun Analyzer on käytössä). Tuontitiedostossa tyypin voi antaa myös suoraan remonttityyppi-sarakkeessa.
 
+## Tehty 16.11.2026 (5): koko järjestelmän testaus ennen ensimmäistä asiakasta
+
+Paikallinen tuotantokokoonpano (FLASK_ENV=production, gunicorn 2 workeria, Postgres 16, Mailgun-kutsut siepattu)
+ja Playwright kolmella roolilla: jokainen linkki, nappi ja lomake (myyjä 103 sivua / 44 lomaketta, ylläpitäjä
+167 / 82, superadmin 236 / 122), kaikki 23 ajastintyötä, `flask system-check`, mobiilinäkymät ja koko polku
+kutsusta tarjouksen hyväksyntään. Testit: `tests/test_qa_round_fixes.py`, koko sarja 927 läpi.
+
+Korjattu:
+- **Sähköposti liidille ei lähtenyt koskaan** käyttöliittymästä: `hidden_tag()` tulosti tyhjän `body_html`-kentän
+  editorin kentän eteen, ja järjestelmämallien tunnisteet vaihtuivat sivun ja lähetyksen välillä (kylvö ilman
+  committia), joten valittu malli oli "virheellinen valinta". Lisäksi allekirjoitus liimautui tervehdykseen
+  (Quill pudotti `<br>`:n).
+- **Liidilistan massatoiminnot eivät toimineet** (sama `hidden_tag()`-tuplakenttä: valinta katosi). Myyjälle ei enää
+  näytetä toimintoja, joihin hänellä ei ole oikeutta (aiemmin raaka 403-JSON).
+- **Myyjä ei voinut lisätä tehtävää liidisivulta** (vastuuhenkilökenttä piilossa mutta pakollinen).
+- **Tehtävät-sivulla tälle päivälle lisätty tehtävä oli heti "myöhässä"** (pelkkä päivämäärä tulkittiin klo 00 →
+  edellinen ilta UTC:nä); nyt päivän loppu Suomen aikaa, ja uuden rivin aika näytetään Suomen ajassa.
+  Epäonnistunut tallennus kertoo nyt virheestä.
+- Kohdetuonnin varmuus "0.9" / "0,75" tallentui nollaksi, jolloin rivi ei osunut yhteenkään profiiliin.
+- Superadminin kontaktin tallennus päättyi 500-virheeseen; ilmoituskello antoi 400 hallintasivuilla.
+- Puuttuvia suomennoksia (mm. lukittu tarjous, liidi ei voi vastaanottaa sähköpostia).
+
+Huomioita: tuotannon Render-lokeissa ei virheitä 14.–16.11. Sovellusloki kirjoitetaan puskuroituun stdoutiin,
+joten 500-virheen traceback voi näkyä viiveellä; `PYTHONUNBUFFERED=1` Renderin ympäristömuuttujiin korjaa sen.
+Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaikuta tuotantoon.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

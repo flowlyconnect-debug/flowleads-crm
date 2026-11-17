@@ -178,9 +178,16 @@ def _office_from_row(raw: dict, source: str) -> None:
 
 def _confidence(value) -> int:
     try:
-        return max(0, min(100, int(float(str(value).replace("%", "").replace(",", ".").strip()))))
+        text = str(value).strip()
+        number = float(text.replace("%", "").replace(",", ".").strip())
     except (TypeError, ValueError):
         return 100
+    # 0.9 / 0,75 = a fraction of one (as AI tools and spreadsheets often write
+    # it), not 0.9 %; without this every such row got confidence 0 and matched
+    # no profile
+    if 0 < number <= 1 and "%" not in text and number != int(number):
+        number *= 100
+    return max(0, min(100, int(round(number))))
 
 
 def parse_listing_csv(data: bytes) -> list[dict]:
