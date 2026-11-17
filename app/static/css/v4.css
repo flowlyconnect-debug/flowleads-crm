@@ -318,7 +318,7 @@ h2 { letter-spacing: -0.2px; }
 
 /* filter bar reads as a sentence of choices, not a row of boxes */
 .targets-filters { gap: 6px 22px; padding: 12px 18px; border-bottom: 1px solid var(--v4-rule); background: var(--color-card); align-items: center; }
-.targets-filter { flex-direction: row; align-items: baseline; gap: 6px; }
+.targets-filter { flex-direction: row; align-items: baseline; gap: 6px; margin: 0; }
 .targets-filter__label { font-size: 13px; font-weight: 400; color: var(--color-text-secondary); margin: 0; }
 .targets-filter__select.form-input {
   min-height: 0; height: auto; width: auto; padding: 2px 16px 2px 0; border: 0; border-bottom: 1px dotted var(--color-text-secondary);
