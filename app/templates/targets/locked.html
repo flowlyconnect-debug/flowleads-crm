@@ -15,6 +15,12 @@
         <span class="mono" data-testid="targets-locked-count">{{ available_count }}</span>
         {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla hakuprofiilillasi.
       </p>
+      {% if superadmin_preview %}
+      <p class="leads-header__sub" data-testid="targets-customer-preview">
+        Näin asiakas näkee Kohteet-sivun.
+        <a href="{{ url_for('targets.index', **org_query) }}">Takaisin kohteisiin</a>
+      </p>
+      {% endif %}
     </div>
     <div class="leads-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>

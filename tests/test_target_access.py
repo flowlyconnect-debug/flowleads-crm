@@ -234,3 +234,35 @@ def test_superadmin_still_sees_a_locked_customers_targets(client, app):
     _login(client, email)
     page = client.get(f"/targets?organization_id={org_id}").get_data(as_text=True)
     assert "As Oy Kohde 1" in page
+
+
+def test_locked_profile_page_names_only_leads(client, app):
+    """Hakuprofiilit "Viimeisimmät osumat" must not list targets that are not leads."""
+    with app.app_context():
+        org, user, profile = _org("lockedprofile")
+        listings = _match(4)
+        first = ListingMatch.query.filter_by(organization_id=org.id, listing_id=listings[0].id).one()
+        targets.transfer_targets(org.id, [first.id])
+        db.session.get(Organization, org.id).targets_enabled = False
+        db.session.commit()
+        email, profile_id = user.email, profile.id
+    _login(client, email)
+    page = client.get(f"/settings/search-profiles?profile_id={profile_id}").get_data(as_text=True)
+    assert "Testitie 1" in page
+    for ext in (2, 3, 4):
+        assert f"Testitie {ext}" not in page
+
+
+def test_superadmin_is_told_the_customer_is_locked(client, app):
+    with app.app_context():
+        org, _, _ = _org("lockednote")
+        _match(3)
+        db.session.get(Organization, org.id).targets_enabled = False
+        root = _superadmin()
+        org_id, email = org.id, root.email
+    _login(client, email)
+    page = client.get(f"/targets?organization_id={org_id}").get_data(as_text=True)
+    assert 'data-testid="targets-customer-locked"' in page and "As Oy Kohde 2" in page
+    preview = client.get(f"/targets?organization_id={org_id}&customer_view=1").get_data(as_text=True)
+    assert 'data-testid="targets-customer-preview"' in preview and "As Oy Kohde 2" not in preview
+    assert 'data-testid="targets-locked-count">3<' in preview
