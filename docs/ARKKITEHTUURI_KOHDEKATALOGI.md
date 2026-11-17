@@ -251,7 +251,7 @@ erillinen myöhempi vaihe (tarvitsee "ennuste"-merkinnän Kohteet-sivulle, jotta
 | `permits` | Ryhti `avoimet_lupa_rakennukset` | Muutostyöluvat ("Muu muutostyö", "Uudelleen rakentamiseen verrattava muutostyö") viimeisen 24 kk ajalta. Yhdistyy rakennukseen pysyvällä rakennustunnuksella (lupavaiheen `rakennusavain` on eri). |
 | `addresses` | Ryhti `open_address` | Osoitteet rakennuksille, joilla niitä ei vielä ole (100 rakennusta per kutsu, `REGISTRY_ADDRESS_BATCH_LIMIT` per ajo). |
 | `prh` | PRH YTJ v3 `companies?companyForm=AOY&location=<kunta>` | Rekisteröidyt asunto-osakeyhtiöt, enintään `REGISTRY_PRH_LOCATIONS_PER_RUN` kuntaa per ajo, kukin enintään viikoittain. |
-| `link` | – | Rakennus → taloyhtiö: 1) yhtiön nimessä oleva katuosoite ("As Oy Härmälänkatu 13") omassa kunnassa, tai koko maassa jos osoite on vain yhdessä kunnassa; 2) yhtiön rekisteröity katuosoite omassa kunnassa vain, jos kukaan muu yhtiö ei ole samassa osoitteessa (yhteinen osoite = isännöintitoimisto). |
+| `link` | – | Rakennus → taloyhtiö, ensimmäinen osuva sääntö voittaa: 1) `name`: yhtiön nimessä oleva katuosoite ("As Oy Härmälänkatu 13", myös "Koulukatu 5-7") nimen kunnassa ("Kangasalan …"), muuten yhtiön kunnassa tai koko maassa, jos osoite on vain yhdessä kunnassa; 2) `listing`: katalogin kohde samassa osoitteessa nimeää yhtiön (Y-tunnus tai nimi); 3) `prh_address`: yhtiön rekisteröity katuosoite, jos kukaan muu yhtiö ei ole samassa osoitteessa (yhteinen osoite = isännöintitoimisto) eikä nimi sijoita yhtiötä muualle; 4) `name_street`: nimi on katu ("As Oy Valkoseläntie") ja kadun talot ovat yhdellä kiinteistöllä; 5) `property`: yhdistetyn talon kiinteistön muut talot, jos kiinteistöllä on vain yksi yhtiö. Osoitteissa on sekä suomen- että ruotsinkielinen kadunnimi. |
 | `signals` | – | `permit` (avoin muutostyölupa, tyyppi "Muu remontti", varmuus 70), `heating` (öljylämmitys → lämmitysjärjestelmän remontti, 50), `age` (tyypillinen korjausikä `housing._AGE_HINTS`, 30/25; betonielementtijulkisivu 1960–85 45 ja 25 vuoden ikkuna). |
 
 Ajo: `flask registry-sync [--step ...]`, tai yöllä klo 1.40 ajastintyö `registry_sync`, kun `REGISTRY_SYNC_ENABLED=true`.
@@ -261,8 +261,9 @@ Rajaus `REGISTRY_MUNICIPALITIES` (kuntien nimet pilkuilla, tyhjä = koko Suomi).
 Rajoitukset (todettu oikealla datalla 17.11.2026, Nokia ja Pirkkala):
 - Ryhdin avoimessa datassa **ei ole korjauspäiviä**, joten ikäennuste ei tiedä, onko remontti jo tehty.
 - Muutostyölupa ei kerro, mitä muutetaan.
-- Vain noin 15 % rakennuksista yhdistyy taloyhtiöön: useimpien yhtiöiden nimessä ei ole katuosoitetta, ja PRH:n osoite on
-  yleensä isännöintitoimiston. Yhdistämättömällä rakennuksella on silti osoite, josta yhteystiedot voi rikastaa myöhemmin.
+- Noin 19 % rakennuksista yhdistyy taloyhtiöön (Tampere, Nokia ja Pirkkala: 1 722 / 9 021). Suurin este: 60 % yhtiöistä on
+  rekisteröity isännöintitoimiston yhteiseen osoitteeseen, eikä niiden nimessä ole katuosoitetta. Yhdistämättömällä
+  rakennuksella on silti osoite, josta yhtiön voi rikastaa myöhemmin (esim. Asiakastieto/Finder osoitteella).
 - PRH:n `location` osuu yhtiön postiosoitteeseen, joten yhtiö löytyy sen kunnan haulla, jossa isännöitsijä on. Koko Suomen
   ajo kattaa kaikki.
 

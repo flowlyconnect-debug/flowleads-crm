@@ -308,3 +308,97 @@ def test_scheduler_job_only_when_enabled(app):
         assert "registry_sync" in on.ids
     finally:
         app.config["REGISTRY_SYNC_ENABLED"] = False
+
+
+# --- linking rules -------------------------------------------------------------
+
+
+def _b(key, town="Tampere", keys=(), property_id=None):
+    building = RegistryBuilding(
+        building_key=key, building_type="Kerrostalo", municipality=town, address_keys=list(keys), property_id=property_id
+    )
+    db.session.add(building)
+    return building
+
+
+def _c(business_id, name, town="Tampere", street=None):
+    company = RegistryHousingCompany(business_id=business_id, name=name, municipality=town, street=street)
+    db.session.add(company)
+    return company
+
+
+def _links():
+    return {
+        b.building_key: (b.housing_company.name if b.housing_company else None, b.link_method)
+        for b in RegistryBuilding.query
+    }
+
+
+def test_name_with_a_number_range_and_swedish_street_names():
+    from app.registry.sync import _keys_for_address
+
+    assert name_address_keys("As Oy Koulukatu 5-7")[:3] == ["koulukatu5", "koulukatu6", "koulukatu7"]
+    keys = _keys_for_address(
+        {"address_name_fin": "Mannerheimintie", "address_name_swe": "Mannerheimvägen", "number_part_of_address_number": 5}
+    )
+    assert keys == ["mannerheimintie5", "mannerheimvagen5"]
+
+
+def test_street_name_company_links_buildings_on_one_property(app):
+    with app.app_context():
+        _b("v1", keys=["valkoselantie8"], property_id="P1")
+        _b("v2", keys=["valkoselantie10"], property_id="P1")
+        _b("m1", keys=["mantytie1"], property_id="P2")
+        _b("m2", keys=["mantytie3"], property_id="P3")  # two properties: ambiguous
+        _c("6000000-1", "As Oy Valkoseläntie")
+        _c("6000000-2", "As Oy Mäntytie")
+        db.session.commit()
+        link_companies()
+        links = _links()
+        assert links["v1"] == links["v2"] == ("As Oy Valkoseläntie", "name_street")
+        assert links["m1"] == links["m2"] == (None, None)
+
+
+def test_other_buildings_on_the_property_follow_a_linked_one(app):
+    with app.app_context():
+        _b("a", keys=["harmalankatu13"], property_id="P9")
+        _b("b", keys=["sivukatu2"], property_id="P9")
+        _c("7000000-1", "Asunto Oy Härmälänkatu 13")
+        db.session.commit()
+        link_companies()
+        assert _links()["b"] == ("Asunto Oy Härmälänkatu 13", "property")
+
+
+def test_a_catalogue_listing_names_the_company_of_its_address(app):
+    with app.app_context():
+        _b("l", keys=["listakatu3"])
+        _c("8000000-1", "As Oy Listahovi", town="Nokia")  # managed from another town
+        db.session.add(
+            Listing(
+                source="import", external_id="x1", maakunta="Pirkanmaa", kaupunki="Tampere",
+                osoite="Listakatu 3 A 1", taloyhtio="Asunto Oy Listahovi",
+            )
+        )
+        db.session.commit()
+        link_companies()
+        assert _links()["l"] == ("As Oy Listahovi", "listing")
+
+
+def test_a_town_in_the_name_beats_the_registered_office_address(app):
+    from app.registry.sync import name_town
+
+    assert name_town("As Oy Kangasalan Pikontie 2") == "kangasala"
+    assert name_town("As Oy Koivupiha") is None
+    with app.app_context():
+        _b("kang", town="Kangasala", keys=["pikontie2"])
+        _b("tre", town="Tampere", keys=["pikontie2"])
+        _b("office", town="Tampere", keys=["vallerinkatu21"])
+        _c("9000000-1", "As Oy Kangasalan Pikontie 2", town="Tampere")
+        # the only company at a Tampere address, but its name says Hämeenkyrö
+        _c("9000000-2", "Asunto Oy Hämeenkyrön Kirkkokatu 11", town="Tampere", street="Vallerinkatu 21 A")
+        db.session.commit()
+        link_companies()
+        links = _links()
+        assert links["kang"] == ("As Oy Kangasalan Pikontie 2", "name")
+        assert links["tre"] == (None, None)
+        assert links["office"] == (None, None)
