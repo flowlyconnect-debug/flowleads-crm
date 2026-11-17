@@ -172,7 +172,7 @@ def test_locked_customer_sees_the_count_but_not_the_targets(client, app):
     _login(client, email)
     page = client.get("/targets").get_data(as_text=True)
     assert 'data-testid="targets-locked-count">4<' in page
-    assert "Kohteet eivät ole käytössäsi" in page
+    assert 'data-testid="targets-locked-count"' in page
     assert target_name not in page and "As Oy Kohde" not in page
 
     # the map, the hidden tab and every action lead back to the locked page
@@ -180,7 +180,7 @@ def test_locked_customer_sees_the_count_but_not_the_targets(client, app):
     assert "As Oy Kohde" not in client.get("/targets?tab=hidden").get_data(as_text=True)
     for path in ("/targets/transfer", "/targets/dismiss"):
         response = client.post(path, data={"single_id": str(match_id)}, follow_redirects=True)
-        assert "Kohteet eivät ole käytössäsi" in response.get_data(as_text=True)
+        assert 'data-testid="targets-locked-count"' in response.get_data(as_text=True)
     with app.app_context():
         assert db.session.get(ListingMatch, match_id).status == "pending"
         assert Lead.query.filter_by(organization_id=org_id).count() == 1
@@ -266,3 +266,44 @@ def test_superadmin_is_told_the_customer_is_locked(client, app):
     preview = client.get(f"/targets?organization_id={org_id}&customer_view=1").get_data(as_text=True)
     assert 'data-testid="targets-customer-preview"' in preview and "As Oy Kohde 2" not in preview
     assert 'data-testid="targets-locked-count">3<' in preview
+
+
+def test_locked_page_sells_without_showing_targets(client, app, monkeypatch):
+    """The locked page shows counts by renovation type and region and the plan,
+    never a housing company, address or manager, and "Ota kohteet käyttöön"
+    tells FlowLeads (once)."""
+    sent = []
+    monkeypatch.setattr("app.billing.services._notify_superadmins", lambda org, subject, body: sent.append(subject))
+    with app.app_context():
+        org, user, _ = _org("sell")
+        _match(6)
+        db.session.get(Organization, org.id).targets_enabled = False
+        db.session.commit()
+        email, org_id = user.email, org.id
+        summary = targets.locked_target_summary(org_id)
+        assert summary["total"] == 6 and summary["new_week"] == 6
+        assert summary["by_type"][0] == {"name": PIPE, "count": 6, "share": 100}
+        assert summary["by_region"][0]["name"] == "Uusimaa"
+    _login(client, email)
+    page = client.get("/targets").get_data(as_text=True)
+    assert "149 € / kk" in page and PIPE in page and "Uusimaa" in page
+    assert 'data-testid="targets-request-access"' in page
+    for text in ("As Oy Kohde", "Testitie", "Isännöinti", "Espoo"):
+        assert text not in page
+    response = client.post("/targets/request-access", follow_redirects=True)
+    assert 'data-testid="targets-access-requested"' in response.get_data(as_text=True)
+    client.post("/targets/request-access")
+    assert sent == ["Kohteet käyttöön: Org sell"]
+    with app.app_context():
+        assert targets_locked(org_id)  # a request does not open the targets
+
+
+def test_request_access_is_a_no_op_when_targets_are_open(client, app, monkeypatch):
+    sent = []
+    monkeypatch.setattr("app.billing.services._notify_superadmins", lambda *a: sent.append(a))
+    with app.app_context():
+        _, user, _ = _org("open")
+        email = user.email
+    _login(client, email)
+    assert client.post("/targets/request-access").status_code == 302
+    assert sent == []

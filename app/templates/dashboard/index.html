@@ -126,7 +126,7 @@
       </a>
       {% else %}
       <p class="dash-ledger__empty">
-        {% if targets_locked|default(false) %}Kohteet eivät ole käytössäsi. Liidisi ovat tallessa.
+        {% if targets_locked|default(false) %}Kohteet odottavat sinua. <a href="{{ url_for('targets.index', **org_q) }}">Katso mitä on saatavilla ja ota kohteet käyttöön</a>.
         {% else %}Uudet taloyhtiöt, joissa on tulossa urakkasi remontti, ilmestyvät Kohteet-sivulle.{% endif %}
       </p>
       {% endfor %}

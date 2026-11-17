@@ -205,6 +205,28 @@ def _notify_superadmins(organization, subject: str, body: str) -> None:
         current_app.logger.exception("Billing notification failed for org %s", organization.id)
 
 
+def request_targets_access(organization, *, actor) -> None:
+    """A customer without target access asked for them (targets/locked.html):
+    tell the superadmins, who turn them on from /admin/customers once the
+    monthly contract is agreed. Billing is manual."""
+    from app.listings.target_services import count_targets
+    from app.users.models import User
+
+    admins = [
+        u.email
+        for u in User.query.filter_by(organization_id=organization.id, role="admin", is_active=True).all()
+        if u.email
+    ]
+    _notify_superadmins(
+        organization,
+        f"Kohteet käyttöön: {organization.name}",
+        f"{organization.name} haluaa kohteet käyttöön ({count_targets(organization.id)} kohdetta saatavilla).\n"
+        f"Pyytäjä: {actor.email}\n"
+        + (f"Asiakkaan pääkäyttäjät: {', '.join(admins)}\n" if admins else "")
+        + "\nSovi kuukausisopimus ja avaa kohteet sivulta /admin/customers (Ota käyttöön).",
+    )
+
+
 # --- contact requests from the public price list ------------------------------------
 
 
