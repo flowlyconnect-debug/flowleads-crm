@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app.core.permissions import require_2fa, require_role
 from app.email.forms import ComposeEmailForm
+from app.email.seed import seed_system_email_templates
 from app.email.utils import sender_display_name
 from app.email.services import (
     EmailService,
@@ -67,6 +68,9 @@ def compose(lead_id):
         flash(exc.message, "danger")
         return redirect(url_for("leads.detail", lead_id=lead_id, organization_id=organization_id))
 
+    # the page renders template ids, so missing system templates must be
+    # committed, not only flushed (see seed_system_email_templates)
+    seed_system_email_templates(commit=True)
     templates = TemplateService.list_sales_templates(organization_id)
     form = ComposeEmailForm()
     form.template_id.choices = [(0, "— Ei mallia —")] + [(t.id, t.name) for t in templates]

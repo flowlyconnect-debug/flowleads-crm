@@ -2,8 +2,8 @@
 
 Both are read models built from what the organization already has: the
 targets it can see on Kohteet, the targets it has handled and its leads.
-Nothing here reads the reserve (matches not yet released with "Hae kohteita"),
-so these pages never reveal targets the customer has not received.
+An organization whose target access is off (app/billing/services.py::
+targets_locked) sees only what it has moved to leads.
 """
 
 from __future__ import annotations
@@ -36,9 +36,16 @@ STATE_LABELS_FI = {
 }
 
 
-def _visible_matches(organization_id: int) -> list[ListingMatch]:
-    """The organization's matches except the reserve: handled ones
-    (lead / merged / hidden) and the released pending ones."""
+def _visible_matches(organization_id: int, *, leads_only: bool = False) -> list[ListingMatch]:
+    """The organization's matches: handled ones (lead / merged / hidden) and
+    the available ones. leads_only (target access off): only what it has
+    moved to leads."""
+    if leads_only:
+        matches = ListingMatch.query.filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status.in_(("lead_created", "merged")),
+        ).options(selectinload(ListingMatch.listing).selectinload(Listing.renovations))
+        return [m for m in matches.all() if m.listing is not None]
     handled = ListingMatch.query.filter(
         ListingMatch.organization_id == organization_id,
         ListingMatch.status.in_(("lead_created", "merged", "dismissed")),
@@ -75,11 +82,11 @@ def _lead_meta(lead: Lead) -> dict:
     return lead.ai_contact_info if isinstance(lead.ai_contact_info, dict) else {}
 
 
-def _companies(organization_id: int) -> "OrderedDict[str, dict]":
+def _companies(organization_id: int, *, leads_only: bool = False) -> "OrderedDict[str, dict]":
     """Housing companies the organization knows about, keyed by company group."""
     companies: OrderedDict[str, dict] = OrderedDict()
     lead_ids: set[int] = set()
-    for match in _visible_matches(organization_id):
+    for match in _visible_matches(organization_id, leads_only=leads_only):
         listing = match.listing
         key = _company_key(listing)
         company = companies.setdefault(
@@ -147,7 +154,7 @@ def _renovations(listings) -> list[dict]:
 # --- property managers -----------------------------------------------------------
 
 
-def list_managers(organization_id: int, search: str | None = None) -> list[dict]:
+def list_managers(organization_id: int, search: str | None = None, *, leads_only: bool = False) -> list[dict]:
     """Property managers with their housing companies, targets and leads,
     busiest first. Sources: the organization's visible targets and leads."""
     managers: dict[str, dict] = {}
@@ -168,7 +175,7 @@ def list_managers(organization_id: int, search: str | None = None) -> list[dict]
             },
         )
 
-    companies = _companies(organization_id)
+    companies = _companies(organization_id, leads_only=leads_only)
     for company in companies.values():
         for listing in company["listings"].values():
             if not (listing.isannoitsija or "").strip():
@@ -225,9 +232,9 @@ def list_managers(organization_id: int, search: str | None = None) -> list[dict]
     return result
 
 
-def get_manager(organization_id: int, name: str) -> dict | None:
+def get_manager(organization_id: int, name: str, *, leads_only: bool = False) -> dict | None:
     key = _norm(name)
-    for manager in list_managers(organization_id):
+    for manager in list_managers(organization_id, leads_only=leads_only):
         if manager["key"] == key:
             return manager
     return None
@@ -236,10 +243,10 @@ def get_manager(organization_id: int, name: str) -> dict | None:
 # --- housing company card ----------------------------------------------------------------
 
 
-def get_company_card(organization_id: int, listing_id: int) -> dict | None:
+def get_company_card(organization_id: int, listing_id: int, *, leads_only: bool = False) -> dict | None:
     """Everything the organization knows about the housing company of one
     listing. None when the listing is not visible to the organization."""
-    for company in _companies(organization_id).values():
+    for company in _companies(organization_id, leads_only=leads_only).values():
         if listing_id in company["listings"]:
             company["organization_id"] = organization_id
             return _card(company)

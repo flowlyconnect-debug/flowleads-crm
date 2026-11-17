@@ -26,16 +26,16 @@
   <p class="lp-solo__hint">
     Näet Kohteet-sivulla taloyhtiöt, joissa on tulossa <strong>{{ invite.types|join(', ') }}</strong>, ja siirrät kiinnostavat liideiksi.
     Kohteet tulevat koko Suomesta; rajaat ne omalle alueellesi Kohteet-sivun suodattimilla.
-    Ensimmäiset kohteet ovat haettavissa noin 10 minuutin kuluttua Kohteet-sivun Hae kohteita -painikkeella.
+    Ensimmäiset kohteet näkyvät Kohteet-sivulla noin 10 minuutin kuluttua.
   </p>
 
   {% if allowed_features %}
   <div>
     <h2 class="lp-solo__section-title">Lisätoiminnot</h2>
-    <p class="lp-solo__hint" style="margin-bottom:8px;">Valitse, mitkä haluat ottaa käyttöön. Jos haluat muuttaa valintoja myöhemmin, ota yhteyttä FlowLeadsiin.</p>
+    <p class="lp-solo__hint" style="margin-bottom:8px;">Nämä kuuluvat pakettiisi ja ovat valmiiksi päällä. Jos haluat muuttaa valintoja myöhemmin, ota yhteyttä FlowLeadsiin.</p>
     {% for key, label in allowed_features %}
     <label class="lp-solo__check">
-      <input type="checkbox" name="enabled_features" value="{{ key }}">
+      <input type="checkbox" name="enabled_features" value="{{ key }}" checked>
       {{ label }}
     </label>
     {% endfor %}

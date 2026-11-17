@@ -87,7 +87,6 @@ def create_invite(
     allowed_features: list[str] | None = None,
     slug: str | None = None,
     ttl_days: int = INVITE_DEFAULT_TTL_DAYS,
-    trial: bool = False,
 ) -> CustomerInviteResult:
     organization_name = (organization_name or "").strip()
     if not organization_name:
@@ -120,10 +119,11 @@ def create_invite(
         organization = create_organization(organization_name, org_slug)
     except UserServiceError as exc:
         raise InviteServiceError(exc.message, exc.code) from exc
-    if trial:
-        # the trial clock starts when the customer accepts (accept_invite)
-        organization.subscription_status = "trial"
-        organization.trial_ends_at = None
+    # no free trial: the monthly contract is in force once the invite is accepted
+    from app.billing.plans import DEFAULT_PLAN
+
+    organization.subscription_status = "active"
+    organization.plan = DEFAULT_PLAN
 
     invite, token = _issue_invite_row(
         organization=organization,
@@ -263,10 +263,8 @@ def accept_invite(
 
         organization.enabled_features = chosen_features
         invite.accepted_at = datetime.now(timezone.utc)
-        if organization.subscription_status == "trial" and organization.trial_ends_at is None:
-            from app.billing.services import start_trial
-
-            start_trial(organization, now=invite.accepted_at)
+        if organization.subscription_started_at is None:
+            organization.subscription_started_at = invite.accepted_at
         db.session.flush()
         from app.sequences.defaults import ensure_default_sequences
 

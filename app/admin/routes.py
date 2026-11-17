@@ -6,7 +6,6 @@ from app.admin.constants import FEATURE_CATALOG
 from app.admin.invite_services import InviteServiceError, activate_source, create_invite, renew_invite
 from app.admin.onboarding_services import CustomerOnboardingError, create_customer
 from app.admin.services import list_customers_summary
-from app.billing.plans import TRIAL_DAYS
 from app.core.permissions import require_2fa, require_role
 from app.extensions import db
 from app.search.constants import REMONTTITYYPIT
@@ -58,6 +57,39 @@ def customers_list():
     return render_template(
         "admin/customers.html", customers=customers, feature_catalog=FEATURE_CATALOG, plans=PLANS
     )
+
+
+@admin_bp.route("/customers/<int:organization_id>/targets-access", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_targets_route(organization_id: int):
+    """Switch a customer's access to its targets off or back on. Off: it
+    still sees how many targets it has, but cannot open or move them. Leads
+    it already has stay."""
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    organization.targets_enabled = request.form.get("enabled") == "1"
+    log_audit(
+        "customer_targets_access_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"enabled": organization.targets_enabled},
+    )
+    db.session.commit()
+    flash(
+        f"{organization.name}: kohteet ovat käytössä."
+        if organization.targets_enabled
+        else f"{organization.name}: kohteiden käyttö on pois päältä. Asiakas näkee kohteiden määrän ja liidinsä.",
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
 
 
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
@@ -157,7 +189,7 @@ AUDIT_ACTION_LABELS_FI = {
     "logout": "Uloskirjautuminen",
     "customer_invited": "Asiakas kutsuttu",
     "targets_transferred": "Kohteita siirretty liideiksi",
-    "targets_fetched": "Kohteita haettu (Hae kohteita)",
+    "targets_fetched": "Kohteita haettu (poistettu Hae kohteita -painike)",
     "leads_imported": "Liidejä tuotu tiedostosta",
     "leads_purged": "Liidit poistettu",
     "lead_archived": "Liidi arkistoitu",
@@ -264,6 +296,7 @@ def create_organization_route():
     slug = request.form.get("slug", "").strip().lower()
     try:
         org = create_organization(name, slug)
+        org.enabled_features = []  # optional modules are switched on per customer
         db.session.commit()
         flash(f"Organisaatio luotu: {org.name}", "success")
     except UserServiceError as exc:
@@ -323,7 +356,6 @@ def create_customer_route():
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
             form_data={},
-            trial_days=TRIAL_DAYS,
         )
 
     types = request.form.getlist("remonttityypit") or [request.form.get("remonttityyppi", "")]
@@ -336,7 +368,6 @@ def create_customer_route():
         "remonttityypit": [t.strip() for t in types if t.strip()],
         "source": (request.form.get("source") or "oikotie").strip(),
         "is_active": request.form.get("is_active") == "y",
-        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -350,7 +381,6 @@ def create_customer_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             is_active=form_data["is_active"],
-            trial=form_data["trial"],
         )
         db.session.commit()
     except CustomerOnboardingError as exc:
@@ -359,7 +389,6 @@ def create_customer_route():
         return render_template(
             "admin/customer_onboarding.html",
             remonttityypit=REMONTTITYYPIT,
-            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 
@@ -449,7 +478,6 @@ def create_invite_route():
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
             form_data={},
-            trial_days=TRIAL_DAYS,
         )
 
     allowed_features = request.form.getlist("allowed_features")
@@ -464,7 +492,6 @@ def create_invite_route():
         ],
         "source": (request.form.get("source") or "oikotie").strip(),
         "allowed_features": allowed_features,
-        "trial": request.form.get("trial") == "y",
     }
 
     try:
@@ -476,7 +503,6 @@ def create_invite_route():
             remonttityypit=form_data["remonttityypit"],
             source=form_data["source"],
             allowed_features=allowed_features,
-            trial=form_data["trial"],
         )
         db.session.commit()
     except InviteServiceError as exc:
@@ -486,7 +512,6 @@ def create_invite_route():
             "admin/customer_invite.html",
             remonttityypit=REMONTTITYYPIT,
             feature_catalog=FEATURE_CATALOG,
-            trial_days=TRIAL_DAYS,
             form_data=form_data,
         )
 
@@ -541,8 +566,8 @@ def activate_source_route(profile_id: int):
         activate_source(profile, actor=current_user)
         db.session.commit()
         flash(
-            f"Hakuprofiili aktivoitu: {profile.name}. Osumat ovat asiakkaan haettavissa "
-            "Kohteet-sivun Hae kohteita -painikkeella noin 10 minuutin kuluttua.",
+            f"Hakuprofiili aktivoitu: {profile.name}. Osumat näkyvät asiakkaan "
+            "Kohteet-sivulla noin 10 minuutin kuluttua.",
             "success",
         )
     except InviteServiceError as exc:
@@ -642,12 +667,7 @@ def catalogue_import():
     db.session.commit()
     flash(
         f"Tuotu {result['created']} uutta ja päivitetty {result['updated']} kohdetta. "
-        + (
-            f"Asiakkaiden haettavaksi (Hae kohteita) tuli {result['matches']} osumaa, "
-            if current_app.config.get("TARGET_FETCH_ENABLED")
-            else f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
-        )
-        + 
+        f"Asiakkaiden Kohteet-sivuille tuli {result['matches']} osumaa, "
         f"AI-analyysiin jonossa {result['queued']}.",
         "success",
     )

@@ -135,5 +135,22 @@ def test_health_db_reports_ok(client, app):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["success"] is True
-    assert payload["data"]["ok"] is True
-    assert payload["data"]["schema"]["ok"] is True
+    assert payload["data"] == {"ok": True}  # no schema details without login
+    detailed = client.get("/api/v1/health/db", headers={"X-N8N-Secret": app.config["N8N_MASTER_SECRET"]})
+    assert detailed.get_json()["data"]["schema"]["ok"] is True
+
+
+def test_bad_requests_return_4xx_not_500(client, app, org_admin):
+    """Audit 16.11.2026: these raised unhandled errors."""
+    with app.app_context():
+        other = create_organization("Other Smoke", "other-smoke")
+        db.session.flush()
+        lead = LeadService.create({"email": "o@example.com", "stage_id": get_default_stage(other.id).id}, other.id, None, actor_role="admin")
+        db.session.commit()
+        own = LeadService.create({"email": "own@example.com", "stage_id": get_default_stage(org_admin["org_id"]).id}, org_admin["org_id"], None, actor_role="admin")
+        db.session.commit()
+        foreign_id, own_id = lead.id, own.id
+    _login(client, org_admin["email"])
+    assert client.get(f"/leads/{foreign_id}/sequences", headers={"Accept": "application/json"}).status_code == 404
+    assert client.post("/tasks", json={"title": "x", "lead_id": foreign_id}).status_code == 404
+    assert client.post(f"/leads/{own_id}/meetings/schedule", json={"title": "x"}).status_code == 400

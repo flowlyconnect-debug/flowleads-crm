@@ -128,7 +128,7 @@ passiiviseksi, sen käyttäjät eivät pääse kirjautumaan ennen kuin se otetaa
   varastosta vapautuu vaihteleva määrä kohteita (`TARGET_FETCH_MIN`–`TARGET_FETCH_MAX`, oletus 3–8, uusimmat
   ensin). Yksi haku tunnissa per organisaatio (`TARGET_FETCH_COOLDOWN_MINUTES`), myös kun mitään ei löytynyt;
   superadminia raja ei koske. Superadmin näkee Kohteet-sivulla varaston koon. Päiväkooste kertoo tässä tilassa
-  vain, että uusia kohteita on haettavissa. Testit: `tests/test_target_fetch.py`.
+  vain, että uusia kohteita on haettavissa. **Poistettu 16.11.2026**, ks. alla.
 - Tämän repon pilviympäristö `flowleads-crm` sallii tuotanto-osoitteen, joten tuotantoa voi testata
   Claude-istunnosta.
 
@@ -253,9 +253,10 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
 - **Haku tavallisella kielellä** Kohteet-sivulla (säännöt; tekoäly `NL_SEARCH_AI_ENABLED=true`).
 - **Kuukausiraportti** `/reports/monthly` ja sähköposti ylläpitäjille kuun 1. päivänä klo 8 (ajastin `monthly_report`).
 - **Hinnasto ja tilaus**: julkinen `/hinnasto` (`app/billing/plans.py`: yksi paketti, kaikki ominaisuudet
-  149 €/kk + alv, käyttäjän päätös 13.11.), kokeilupyyntölomake, 14 päivän
-  kokeilu (Luo asiakas / Kutsu asiakas), Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun, peru), päättynyt kokeilu
-  estää uusien kohteiden haun ja siirron, muistutus 3 pv ennen kokeilun loppua. Laskutus edelleen käsin:
+  149 €/kk + alv, käyttäjän päätös 13.11.), yhteydenottolomake, Tilaus-sivu (tilaa, vaihda, irtisano kuun loppuun,
+  peru), päättynyt sopimus estää uusien kohteiden haun ja siirron. **Maksuton kokeilu poistettu kokonaan 16.11.**
+  (käyttäjän päätös): uusi asiakas on heti kuukausisopimuksella, migraatio `a1b2c3d4e5f7` siirtää kokeilussa olleet
+  organisaatiot aktiivisiksi (käyttämättömät sarakkeet `trial_ends_at` ja `trial_reminder_sent_at` jäävät tauluun, jotta julkaisu ei katkaise vanhaa versiota; poista myöhemmin). Laskutus edelleen käsin:
   tilaus ja irtisanominen lähettävät superadmineille sähköpostin. Vanhat organisaatiot pysyvät aktiivisina.
 - **Varmuuskopiot**: Python-dumppi (`app/backups/logical.py`) käytetään automaattisesti, kun `pg_dump` puuttuu tai
   on tietokantaa vanhempi (todennäköinen syy tuotannon `backup_failed`-riviin: Renderin pg_dump vs. Postgres 18).
@@ -268,6 +269,79 @@ ja alas SQLitellä ja Postgres 16:lla). Testit: `test_housing_signals.py`, `test
   tarjousnumeron etuliite, Kutsuttu-tila käyttäjälistalla, pois kytketyt sekvenssit/automaatiot taustalla.
 - **Järjestelmän tila** `/admin/system` ja `flask system-check`: sähköposti (myös sandbox-domainin tunnistus),
   varmuuskopiot, avaimet ja migraatiot. Aja tämä ensimmäiseksi tuotannossa.
+
+## Ensimmäisen asiakkaan läpikäynti 16.11.2026
+
+Selainläpikäynti (admin + myyjä) ja tietosuoja-auditointi: kokeilu poistettu, lomakkeiden liidien
+ylikirjoitus, lomakkeiden viittaukset toiseen organisaatioon, GDPR-anonymisoinnin jäämät, health/db-tiedot,
+X-Forwarded-Host ja muutama 500-virhe korjattu (testit `test_forms.py`, `test_gdpr.py`, `test_page_smoke.py`).
+Toinen kierros (joka asetussivu ja toiminto selaimella, admin + myyjä + kutsuttu asiakas): kutsulla luotu asiakas
+jäi ilman sekvenssejä ja automaatioita (valinnat ovat nyt oletuksena päällä), tapaamista ei voinut sopia ilman
+Google/Outlook-yhteyttä (nyt paikallinen tapaaminen, `provider="local"`), myyjä pystyi poistamaan sekvenssin ja
+kytkemään automaatioita (nyt vain ylläpitäjä), julkisen tarjoussivun muotoilut, yrityssivun paikkamerkkitekstit ja
+puuttuvan salausavaimen englanninkielinen virhe korjattu.
+**Tarkista tuotannosta:** `/admin/customers` → ensimmäisen asiakkaan "Toiminnot käytössä" -ruudut (jos kutsu tehtiin
+ennen korjausta, sekvenssit/automaatiot voivat olla pois) ja `/admin/system` (avaimet, Mailgun).
+Avoinna: isännöitsijän henkilötietojen poisto jaetusta kohdekatalogista (`Listing`) GDPR-pyynnöllä puuttuu;
+myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
+
+## Tehty 16.11.2026 (2): haku pois, kohteiden käyttö asiakaskohtaiseksi
+
+- **"Hae kohteita" on poistettu** (painike, varasto, tunnin raja, `TARGET_FETCH_*`-asetukset). Asiakas näkee
+  Kohteet-sivulla heti kaikki profiiliinsa osuvat kohteet. Migraatio `d1e2f3a4b5c6` vapauttaa varastossa
+  olleet osumat. Renderin ympäristömuuttujan `TARGET_FETCH_ENABLED` voi poistaa, sitä ei enää lueta.
+- **Kohteiden käyttö päälle/pois asiakkaittain**: `/admin/customers` → Liidejä-sarake → "Ota pois" / "Ota
+  käyttöön" (`organizations.targets_enabled`). Pois päältä asiakas näkee kohteiden määrän (Kohteet-sivu,
+  sivupalkki, kojelauta), mutta ei pääse kohteisiin: lista, kartta, siirto, piilotus, tallennetut haut ja
+  kohdeilmoitukset on suljettu, Isännöitsijät ja taloyhtiökortti näyttävät vain liideiksi siirretyt. Liidit
+  säilyvät. Päättynyt sopimus lukitsee kohteet samalla tavalla (aiemmin esti vain siirron). Superadmin näkee
+  aina kaikki kohteet. Testit: `tests/test_target_access.py`.
+
+## Tehty 16.11.2026 (3): keskeneräiset toiminnot pois asiakkailta
+
+- **Sekvenssit, automaatiot ja AI-toiminnot ovat pois päältä kaikilta asiakkailta** (migraatio `e2f3a4b5c6d7`
+  tyhjentää `enabled_features`-kentän) ja oletuksena pois uusilta (suora luonti ja kutsu). Pois päältä ne eivät
+  näy missään: ei valikossa, ei liidin sivulla (Sekvenssit-välilehti, AI-myyntisuunnitelma, AI-havainnot,
+  Rikasta AI:lla), ei raporttien AI-välilehteä. Käynnissä olevat sekvenssit pysähtyvät.
+- Takaisin päälle asiakaskohtaisesti: `/admin/customers` → "Toiminnot käytössä" → rasti ja Tallenna.
+  Testit: `tests/test_optional_modules_off.py`.
+
+## Tehty 16.11.2026 (4): kaksi uutta urakkatyyppiä
+
+- **"Ilmanvaihdon puhdistus ja säätö"** (kanavien puhdistus/nuohous, ilmamäärien mittaus, säätö, tasapainotus
+  sekä IV-koneiden ja -järjestelmän uusiminen, lisätty käyttäjän päätöksellä 16.11.) ja **"Yläpohjan lisäeristys"** ovat valittavissa urakoiksi kuten muutkin tyypit.
+- Tyypit poimitaan kohteen omasta tulevat remontit -tekstistä (`app/listings/text_types.py`), joten ne löytyvät
+  myös aiemmin tuoduista kohteista: ajastin lisää ne 10 minuutin sisällä julkaisusta. Tuotannon 294 kohteesta
+  osuu arviolta 8 ilmanvaihdon puhdistukseen ja 1 yläpohjan lisäeristykseen.
+- Asiakas saa kohteet näkyviin, kun tyypit lisätään hänen hakuprofiiliinsa (Asetukset → Urakat, tai
+  `/admin/customers` → Muokkaa). Analyzer-työnkulun kehote on päivitetty (`n8n/workflows/flowleads-analyzer.json`,
+  tuo n8n:ään kun Analyzer on käytössä). Tuontitiedostossa tyypin voi antaa myös suoraan remonttityyppi-sarakkeessa.
+
+## Tehty 16.11.2026 (5): koko järjestelmän testaus ennen ensimmäistä asiakasta
+
+Paikallinen tuotantokokoonpano (FLASK_ENV=production, gunicorn 2 workeria, Postgres 16, Mailgun-kutsut siepattu)
+ja Playwright kolmella roolilla: jokainen linkki, nappi ja lomake (myyjä 103 sivua / 44 lomaketta, ylläpitäjä
+167 / 82, superadmin 236 / 122), kaikki 23 ajastintyötä, `flask system-check`, mobiilinäkymät ja koko polku
+kutsusta tarjouksen hyväksyntään. Testit: `tests/test_qa_round_fixes.py`, koko sarja 927 läpi.
+
+Korjattu:
+- **Sähköposti liidille ei lähtenyt koskaan** käyttöliittymästä: `hidden_tag()` tulosti tyhjän `body_html`-kentän
+  editorin kentän eteen, ja järjestelmämallien tunnisteet vaihtuivat sivun ja lähetyksen välillä (kylvö ilman
+  committia), joten valittu malli oli "virheellinen valinta". Lisäksi allekirjoitus liimautui tervehdykseen
+  (Quill pudotti `<br>`:n).
+- **Liidilistan massatoiminnot eivät toimineet** (sama `hidden_tag()`-tuplakenttä: valinta katosi). Myyjälle ei enää
+  näytetä toimintoja, joihin hänellä ei ole oikeutta (aiemmin raaka 403-JSON).
+- **Myyjä ei voinut lisätä tehtävää liidisivulta** (vastuuhenkilökenttä piilossa mutta pakollinen).
+- **Tehtävät-sivulla tälle päivälle lisätty tehtävä oli heti "myöhässä"** (pelkkä päivämäärä tulkittiin klo 00 →
+  edellinen ilta UTC:nä); nyt päivän loppu Suomen aikaa, ja uuden rivin aika näytetään Suomen ajassa.
+  Epäonnistunut tallennus kertoo nyt virheestä.
+- Kohdetuonnin varmuus "0.9" / "0,75" tallentui nollaksi, jolloin rivi ei osunut yhteenkään profiiliin.
+- Superadminin kontaktin tallennus päättyi 500-virheeseen; ilmoituskello antoi 400 hallintasivuilla.
+- Puuttuvia suomennoksia (mm. lukittu tarjous, liidi ei voi vastaanottaa sähköpostia).
+
+Huomioita: tuotannon Render-lokeissa ei virheitä 14.–16.11. Sovellusloki kirjoitetaan puskuroituun stdoutiin,
+joten 500-virheen traceback voi näkyä viiveellä; `PYTHONUNBUFFERED=1` Renderin ympäristömuuttujiin korjaa sen.
+Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaikuta tuotantoon.
 
 ## Seuraavaksi
 

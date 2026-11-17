@@ -11,8 +11,8 @@
         <p class="text-muted">
           Luo organisaatio ja lähetä asiakkaalle kertakäyttöinen, 7 vuorokautta voimassa oleva
           kutsulinkki. Asiakas asettaa linkin takana vain salasanansa. Hakuprofiili aktivoituu heti,
-          kun asiakas hyväksyy kutsun, ja ensimmäiset kohteet ovat haettavissa Kohteet-sivun
-          Hae kohteita -painikkeella noin 10 minuutin kuluttua.
+          kun asiakas hyväksyy kutsun, ja ensimmäiset kohteet näkyvät Kohteet-sivulla
+          noin 10 minuutin kuluttua.
         </p>
 
         <form method="post" action="{{ url_for('admin.create_invite_route') }}" class="form-group" style="margin-top:1.5rem;">
@@ -58,7 +58,8 @@
 
           <fieldset style="margin-top:1rem;">
             <legend class="form-label">Sallitut toiminnot</legend>
-            <p class="form-helper mb-2">Asiakas valitsee näistä haluamansa kutsua hyväksyessään. Voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
+            <p class="form-helper mb-2">Nämä ovat oletuksena pois päältä: valitse vain ne, jotka ovat valmiit tämän asiakkaan käyttöön. Voit muuttaa valintoja myöhemmin asiakaslistasta.</p>
+            {# off by default (16.11.2026): a module is switched on per customer once it is ready for them #}
             {% set selected_features = form_data.get('allowed_features', []) %}
             {% for key, label in feature_catalog.items() %}
             <label class="form-check">
@@ -68,12 +69,6 @@
             </label>
             {% endfor %}
           </fieldset>
-
-          <label class="form-check" style="margin-top:1rem;">
-            <input type="checkbox" name="trial" value="y"
-              {% if form_data.get('trial', True) %}checked{% endif %}>
-            Maksuton kokeilujakso ({{ trial_days }} päivää), alkaa kun asiakas hyväksyy kutsun. Ilman: kuukausisopimus on voimassa heti.
-          </label>
 
           <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
             <button type="submit" class="btn btn-primary">Lähetä kutsu</button>

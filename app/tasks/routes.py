@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 from app.core.errors import json_error, json_success, wants_json_response
 from app.extensions import db
 from app.leads.models import Lead
+from app.leads.services import LeadServiceError
 from app.leads.permissions import can_assign_to_others, resolve_organization_id
 from app.tasks.forms import QuickTaskForm
 from app.tasks.models import Task
@@ -176,8 +177,14 @@ def create_task():
                 actor_role=current_user.role,
             )
             db.session.commit()
+            # sections and shown times in Finnish time, like the list itself
+            # (UTC put a task for today 00-02/03 into "overdue" with the wrong hour)
+            from zoneinfo import ZoneInfo
+
+            helsinki = ZoneInfo("Europe/Helsinki")
             due = _to_utc(task.due_date)
-            today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            due = due.astimezone(helsinki) if due else None
+            today = datetime.now(helsinki).replace(hour=0, minute=0, second=0, microsecond=0)
             tomorrow = today + timedelta(days=1)
             week_end = today - timedelta(days=today.weekday()) + timedelta(days=7)
             section = "later"
@@ -219,6 +226,9 @@ def create_task():
         except TaskServiceError as exc:
             db.session.rollback()
             return json_error(exc.code, exc.message, 404 if exc.code == "not_found" else 400)
+        except LeadServiceError:
+            db.session.rollback()
+            return json_error("not_found", "Lead not found.", 404)
 
     quick_form = QuickTaskForm()
     if not quick_form.validate_on_submit():

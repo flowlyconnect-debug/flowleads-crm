@@ -337,3 +337,25 @@ def test_invite_route_requires_superadmin(client, app):
         sess[TWO_FA_SESSION_KEY] = True
     response = client.get("/admin/customers/invite")
     assert response.status_code == 403
+
+
+@patch("app.email.services.EmailService.send_customer_invite_email")
+def test_invite_offers_no_optional_module_by_default(mock_send, client, app):
+    """Sequences, automations and AI are switched on per customer once they are
+    ready: the invite form ticks none, and the customer is offered only what
+    the superadmin ticked."""
+    import re
+
+    mock_send.return_value = {"success": True, "message_id": "<invite@test>", "error": None}
+    _login_superadmin(client, app)
+    form = client.get("/admin/customers/invite").get_data(as_text=True)
+    boxes = re.findall(r'<input type="checkbox" name="allowed_features" value="(\w+)"\s+(checked)?', form)
+    assert len(boxes) == 3 and not any(checked for _, checked in boxes)
+    client.post(
+        "/admin/customers/invite",
+        data={"organization_name": "Perus Oy", "admin_email": "admin@perus.fi", "remonttityypit": ["Putkiremontti"],
+              "source": "oikotie"},
+    )
+    token = mock_send.call_args.kwargs["invite_url"].rsplit("/", 1)[-1]
+    page = app.test_client().get(f"/invite/{token}").get_data(as_text=True)
+    assert 'name="enabled_features"' not in page

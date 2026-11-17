@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hinnasto — FlowLeads</title>
-  <meta name="description" content="FlowLeads-hinnasto: taloyhtiöiden tulevat remontit urakoitsijan myyntiin. Julkiset hinnat, {{ trial_days }} päivän maksuton kokeilu ja kuukausisopimus ilman määräaikaa.">
+  <meta name="description" content="FlowLeads-hinnasto: taloyhtiöiden tulevat remontit urakoitsijan myyntiin. Julkiset hinnat ja kuukausisopimus ilman määräaikaa.">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/flowly-mark.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/plex.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/pricing.css') }}">
@@ -26,7 +26,7 @@
       </p>
       <ul class="pricing-promises">
         <li>Julkiset hinnat</li>
-        <li>{{ trial_days }} päivän maksuton kokeilu, ei maksukorttia</li>
+        <li>Ei aloitusmaksua eikä maksukorttia</li>
         <li>Kuukausisopimus, irtisanottavissa milloin tahansa</li>
       </ul>
     </section>
@@ -44,8 +44,8 @@
         <ul class="pricing-plan__features">
           {% for feature in plan.features %}<li>{{ feature }}</li>{% endfor %}
         </ul>
-        <a class="pricing-btn {{ 'pricing-btn--primary' if plan.highlight else 'pricing-btn--secondary' }}" href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='kokeilu') }}">
-          {{ 'Pyydä tarjous' if plan.price is none else 'Aloita maksuton kokeilu' }}
+        <a class="pricing-btn {{ 'pricing-btn--primary' if plan.highlight else 'pricing-btn--secondary' }}" href="{{ url_for('billing.pricing', paketti=plan.key, _anchor='yhteys') }}">
+          {{ 'Pyydä tarjous' if plan.price is none else 'Ota yhteyttä' }}
         </a>
       </article>
       {% endfor %}
@@ -58,12 +58,12 @@
       </ul>
     </section>
 
-    <section class="pricing-contact" id="kokeilu" aria-labelledby="contact-title">
-      <h2 id="contact-title">Aloita maksuton kokeilu</h2>
+    <section class="pricing-contact" id="yhteys" aria-labelledby="contact-title">
+      <h2 id="contact-title">Ota yhteyttä</h2>
       {% if sent %}
-      <p class="pricing-contact__thanks" role="status">Kiitos! Otamme yhteyttä yhden arkipäivän kuluessa ja lähetämme kokeilutunnukset sähköpostiisi.</p>
+      <p class="pricing-contact__thanks" role="status">Kiitos! Otamme yhteyttä yhden arkipäivän kuluessa.</p>
       {% else %}
-      <p>Jätä yhteystietosi, niin avaamme sinulle kokeilutunnukset. Kokeilu kestää {{ trial_days }} päivää eikä muutu maksulliseksi itsestään.</p>
+      <p>Jätä yhteystietosi, niin kerromme lisää ja avaamme sinulle tunnukset.</p>
       {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}<p class="pricing-contact__error" role="alert">{{ message|fi_msg }}</p>{% endfor %}
       {% endwith %}

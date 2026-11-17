@@ -134,7 +134,10 @@ def mark_all_notifications_read():
     if current_user.is_superadmin():
         org_id = parse_organization_id_param()
     if org_id is None:
-        return json_error("validation_error", "organization_id required.", 400)
+        # superadmin with no organization chosen sees no notifications (see
+        # list_notifications), so there is nothing to mark; the bell used to
+        # answer 400 on every admin page
+        return json_success({"marked_read": 0})
     count = NotificationService.mark_all_read(current_user.id, org_id)
     db.session.commit()
     return json_success({"marked_read": count})

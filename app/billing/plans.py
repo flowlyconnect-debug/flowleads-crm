@@ -6,7 +6,6 @@ customer list all read this module. `max_users` None = no limit.
 
 from __future__ import annotations
 
-TRIAL_DAYS = 14
 VAT_PERCENT = "25,5"
 
 PLANS: tuple[dict, ...] = (
@@ -30,11 +29,10 @@ PLANS: tuple[dict, ...] = (
 )
 
 PLANS_BY_KEY = {plan["key"]: plan for plan in PLANS}
-# what a trial gets: everything of the most complete priced plan
-TRIAL_PLAN = "flowleads"
+# the plan a new customer starts on
+DEFAULT_PLAN = "flowleads"
 
 TERMS = (
-    f"Kokeilujakso kestää {TRIAL_DAYS} päivää. Se on maksuton eikä vaadi maksukorttia, eikä se muutu maksulliseksi itsestään.",
     "Kuukausisopimus: ei määräaikaa eikä aloitusmaksua. Lasku lähetetään kuukausittain etukäteen.",
     "Voit irtisanoa sopimuksen milloin tahansa palvelusta. Palvelu on käytössäsi kuluvan kuukauden loppuun, eikä seuraavaa kuukautta laskuteta.",
     "Hinnat ovat arvonlisäverottomia (ALV " + VAT_PERCENT + " % lisätään laskulle).",

@@ -164,9 +164,8 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
   ajan tasalla SQLAlchemyn `before_flush`-kuuntelijalla; `reconcile_company_key` liittää nimettömän rivin saman
   Y-tunnuksen nimettyyn taloyhtiöön vain, jos Y-tunnus osoittaa yhteen nimeen (tuontitiedostoissa on ollut
   isännöitsijän Y-tunnus taloyhtiön sarakkeessa). Vanhat rivit saavat avaimen ajastimessa (`backfill_company_keys`).
-- **Yksi kohde per taloyhtiö**: `_visible_match_ids` ryhmittelee taloyhtiön mukaan. Piilotus, palautus, "Hae kohteita"
-  ja siirto liidiksi koskevat koko taloyhtiötä; siirrossa muut ilmoitukset yhdistyvät samaan liidiin. Näkyvän
-  taloyhtiön uusi ilmoitus vapautuu heti (se on uusi signaali, ei uusi kohde). Taloyhtiö, jolla on jo liidi, ei näy
+- **Yksi kohde per taloyhtiö**: `_visible_match_ids` ryhmittelee taloyhtiön mukaan. Piilotus, palautus
+  ja siirto liidiksi koskevat koko taloyhtiötä; siirrossa muut ilmoitukset yhdistyvät samaan liidiin. Taloyhtiö, jolla on jo liidi, ei näy
   kohteena; ajastin yhdistää sen uudet ilmoitukset liidiin (`merge_into_existing_leads`, organisaatiokohtainen).
 - **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
   Kohteet-sivun Sopivuus (`app/listings/fit_services.py::company_fit`) = pisteet × 0,9 + asiakkaan aiempien

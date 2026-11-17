@@ -315,12 +315,10 @@ def score_level(total: int) -> str:
     return "low"
 
 
-def org_company_listings(organization_id: int, groups: set[str], *, include_reserve: bool = False) -> dict:
-    """{company group: [listings]} of the organization's non-reserve matches
-    (pending released ones and handled ones) for the given groups."""
+def org_company_listings(organization_id: int, groups: set[str]) -> dict:
+    """{company group: [listings]} of the organization's matches for the
+    given groups."""
     from app.listings.models import Listing, ListingMatch
-    from app.listings.services import _now
-    from app.listings.target_services import fetch_enabled
 
     if not groups:
         return {}
@@ -337,13 +335,6 @@ def org_company_listings(organization_id: int, groups: set[str], *, include_rese
     if singles:
         criteria.append(Listing.id.in_(singles))
     query = query.filter(db.or_(*criteria))
-    if fetch_enabled() and not include_reserve:
-        query = query.filter(
-            db.or_(
-                ListingMatch.status != "pending",
-                db.and_(ListingMatch.released_at.isnot(None), ListingMatch.released_at <= _now()),
-            )
-        )
     result: dict[str, list] = {}
     for listing in query.distinct().all():
         group = company_group(listing)
@@ -371,7 +362,7 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
     for org_id, matches in by_org.items():
         wanted = organization_wanted_types(org_id)
         groups = {company_group(m.listing) for m in matches}
-        listings = org_company_listings(org_id, groups, include_reserve=True)
+        listings = org_company_listings(org_id, groups)
         for match in matches:
             company = listings.get(company_group(match.listing)) or [match.listing]
             total = score_target(company, wanted, now=now)["total"]

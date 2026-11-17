@@ -44,6 +44,8 @@ class GDPRService:
             return lead
 
         now = datetime.now(timezone.utc)
+        personal_values = [v for v in (lead.email, lead.phone, lead.first_name, lead.last_name, lead.full_name if hasattr(lead, "full_name") else None) if v and len(str(v).strip()) > 2]
+        GDPRService._erase_related_personal_data(lead, organization_id, personal_values)
         lead.email = f"anonymized_{lead.id}@deleted.invalid"
         lead.first_name = "Anonymoitu"
         lead.last_name = "Henkilö"
@@ -105,6 +107,50 @@ class GDPRService:
         GDPRService._send_anonymization_confirmation(requested_by_user_id, lead, reason)
         db.session.flush()
         return lead
+
+    @staticmethod
+    def _erase_related_personal_data(lead: Lead, organization_id: int, personal_values: list) -> None:
+        """Everything outside the lead row that can hold the person's data:
+        notes and activity text, sent emails, form submissions, task and
+        meeting texts, proposal snapshots. Rows stay (history, counts and
+        sums), their free text goes. Audit 16.11.2026."""
+        from app.calendar.models import CalendarEvent
+        from app.email.models import EmailLog
+        from app.forms.models import WebFormSubmission
+        from app.proposals.models import Proposal
+        from app.tasks.models import Task
+
+        removed = "[Tiedot poistettu GDPR-pyynnöstä]"
+
+        def scrub(text):
+            if not text:
+                return text
+            for value in personal_values:
+                text = text.replace(str(value), "[poistettu]")
+            return text
+
+        for activity in Activity.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            activity.content = removed if activity.content else activity.content
+            activity.metadata_json = None
+        for log in EmailLog.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            log.subject = scrub(log.subject) or ""
+            log.body_html = None
+            log.body_text = None
+            log.error_message = None
+        for submission in WebFormSubmission.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            submission.raw_data = {}
+            submission.ip_address = None
+            submission.user_agent = None
+        for task in Task.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            task.title = (scrub(task.title) or "")[:200] or "Tehtävä"
+            task.description = None
+        for event in CalendarEvent.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            event.title = (scrub(event.title) or "")[:500] or "Tapaaminen"
+            event.description = None
+            event.attendees = []
+        for proposal in Proposal.query.filter_by(lead_id=lead.id, organization_id=organization_id).all():
+            proposal.lead_name_snapshot = None
+            proposal.lead_email_snapshot = None
 
     @staticmethod
     def verify_password(user: User, password: str) -> None:

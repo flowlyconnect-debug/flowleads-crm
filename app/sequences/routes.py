@@ -10,7 +10,7 @@ from app.extensions import db
 
 from app.leads.permissions import resolve_organization_id
 
-from app.leads.services import get_lead_for_org
+from app.leads.services import LeadServiceError, get_lead_for_org
 
 from app.sequences.models import EmailSequence, TRIGGER_TYPES
 
@@ -231,6 +231,21 @@ def _sequences_auth():
         abort(401)
 
     _require_ui_role()
+
+    # Sellers use sequences (view, enroll their leads); building, changing and
+    # deleting the organization's sequences is for admins.
+    if request.endpoint in _MANAGE_ENDPOINTS and current_user.role not in ("admin", "superadmin"):
+
+        abort(403)
+
+
+_MANAGE_ENDPOINTS = frozenset(
+    "sequences." + name
+    for name in (
+        "create_sequence", "sequence_builder", "update_sequence", "delete_sequence",
+        "add_step", "update_step", "delete_step_route", "reorder_steps",
+    )
+)
 
 
 
@@ -869,6 +884,10 @@ def list_lead_sequences(lead_id):
     try:
 
         enrollments = SequenceService.list_lead_enrollments(lead_id, organization_id)
+
+    except LeadServiceError:
+
+        abort(404)
 
     except SequenceServiceError as exc:
 

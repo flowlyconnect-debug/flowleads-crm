@@ -67,7 +67,7 @@ def test_create_customer_service_creates_full_stack(app):
         assert result.search_profile.id == profile.id
         # the superadmin knows the password, so the customer must replace it
         assert admin.must_change_password is True
-        assert org.enabled_features == ["sequences", "automations", "ai_enrichment"]
+        assert org.enabled_features == []  # optional modules are switched on per customer
 
         stages = PipelineStage.query.filter_by(organization_id=org.id).all()
         assert len(stages) >= 5

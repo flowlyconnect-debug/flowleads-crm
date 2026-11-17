@@ -6,7 +6,7 @@
   <header class="page-header">
     <div class="page-header__main">
       <h1>Raportit</h1>
-      <p class="page-subtitle">Myyntiputki, lähteet, tiimi ja AI-rikastus.</p>
+      <p class="page-subtitle">Myyntiputki, lähteet ja tiimi{% if has_feature('ai_enrichment') %} sekä AI-rikastus{% endif %}.</p>
     </div>
     <div class="page-header__actions">
       <a class="btn btn-primary btn-sm" href="{{ url_for('analytics.monthly_report_page', organization_id=organization_id) if current_user.is_superadmin() and organization_id else url_for('analytics.monthly_report_page') }}">Kuukausiraportti</a>
@@ -42,8 +42,8 @@
       ('pipeline', 'Myyntiputki'),
       ('source', 'Lähteet'),
       ('team', 'Tiimi'),
-      ('ai', 'AI-rikastus'),
     ] %}
+    {% if has_feature('ai_enrichment') %}{% set tabs = tabs + [('ai', 'AI-rikastus')] %}{% endif %}
     {% for key, label in tabs %}
     <a href="{{ url_for('analytics.reports', report=key, range=range_key, start=start_date, end=end_date, organization_id=organization_id) if current_user.is_superadmin() else url_for('analytics.reports', report=key, range=range_key, start=start_date, end=end_date) }}"
        class="{% if report_type == key %}is-active{% endif %}"

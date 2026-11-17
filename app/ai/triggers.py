@@ -18,6 +18,12 @@ def has_enrichment_fields(lead: Lead) -> bool:
     return False
 
 
+def _ai_available() -> bool:
+    """Enrichment is on and can actually run: without an OpenAI key every lead
+    would sit at "Rikastetaan..." and then fail with an internal error."""
+    return bool(current_app.config.get("AI_ENRICHMENT_ENABLED") and current_app.config.get("OPENAI_API_KEY"))
+
+
 def _organization_allows_enrichment(lead: Lead) -> bool:
     from app.core.features import organization_has_feature
 
@@ -27,7 +33,7 @@ def _organization_allows_enrichment(lead: Lead) -> bool:
 def apply_enrichment_on_create(lead: Lead) -> None:
     """Set initial enrichment status and queue background job if applicable."""
     try:
-        if not current_app.config.get("AI_ENRICHMENT_ENABLED") or not _organization_allows_enrichment(lead):
+        if not _ai_available() or not _organization_allows_enrichment(lead):
             lead.ai_enrichment_status = "disabled"
             lead.ai_enrichment_error = None
             return
@@ -51,7 +57,7 @@ def apply_enrichment_on_create(lead: Lead) -> None:
 def apply_enrichment_on_update(lead: Lead, changed_fields: set[str] | None = None) -> None:
     """Queue enrichment when enrichment fields are added and lead is not enriched."""
     try:
-        if not current_app.config.get("AI_ENRICHMENT_ENABLED"):
+        if not _ai_available():
             return
         if not current_app.config.get("AI_AUTO_ENRICH_ON_CREATE"):
             return
@@ -78,7 +84,7 @@ def apply_enrichment_on_update(lead: Lead, changed_fields: set[str] | None = Non
 
 def queue_manual_enrichment(lead: Lead) -> None:
     """Queue enrichment from a manual UI/API request."""
-    if not current_app.config.get("AI_ENRICHMENT_ENABLED") or not _organization_allows_enrichment(lead):
+    if not _ai_available() or not _organization_allows_enrichment(lead):
         raise ValueError("ai_disabled")
 
     if not has_enrichment_fields(lead):

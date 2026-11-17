@@ -18,6 +18,8 @@ from app.listings.housing import company_group, org_company_listings, score_labe
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
 from app.listings.services import _best_renovation, _merge_into_lead, _now, materialize_match
+from app.search.constants import FINNISH_REGIONS
+from app.search.municipalities import region_municipalities
 
 PER_PAGE = 25
 MAX_BULK = 200
@@ -26,18 +28,11 @@ TABS = {"available": "pending", "hidden": "dismissed"}
 _LEAD_STATUSES = ("lead_created", "merged")
 
 
-def fetch_enabled() -> bool:
-    from flask import current_app
-
-    return bool(current_app.config.get("TARGET_FETCH_ENABLED"))
-
-
 def _visible_match_ids(
     organization_id: int,
     status: str,
     *,
     profile_id: int | None = None,
-    include_reserve: bool = False,
 ):
     """One match id per housing company: a listing matched by several of the
     organization's profiles is one target, so are several listings of the same
@@ -59,12 +54,6 @@ def _visible_match_ids(
         )
         .group_by(_group_column())
     )
-    if status == "pending" and fetch_enabled() and not include_reserve:
-        # only what the customer has released with "Hae kohteita" (a release
-        # time in the future is still inside its progress animation)
-        query = query.filter(
-            ListingMatch.released_at.isnot(None), ListingMatch.released_at <= _now()
-        )
     if status == "pending":
         # hidden once = hidden for the organization, even when another of its
         # profiles matches the same listing later
@@ -301,13 +290,35 @@ def target_filter_options(organization_id: int, status: str = "pending", filters
             # a plan that started in the past ("2024-2028") is "by this year"
             years.add(max(int(timing_year), _now().year))
     region = (filters.get("region") or "").strip()
+    if region in FINNISH_REGIONS:
+        # every municipality of the region, plus the place names (villages,
+        # old municipality names) its targets actually carry
+        cities = _merge_place_names(
+            region_municipalities(region), distinct(Listing.kaupunki, Listing.maakunta == region)
+        )
+    else:
+        cities = distinct(Listing.kaupunki, *([Listing.maakunta == region] if region else []))
     return {
         "renovations": sorted(renovations),
-        "cities": distinct(Listing.kaupunki, *([Listing.maakunta == region] if region else [])),
-        "regions": distinct(Listing.maakunta),
+        "cities": cities,
+        # every maakunta is always offered, and a region stored outside the list too
+        "regions": list(FINNISH_REGIONS)
+        + [r for r in distinct(Listing.maakunta) if r not in FINNISH_REGIONS],
         "buildings": distinct(Listing.building_type),
         "years": [str(y) for y in sorted(years)],
     }
+
+
+def _merge_place_names(*groups) -> list[str]:
+    """One sorted list of place names, duplicates differing only in case or
+    surrounding space dropped (the first spelling wins)."""
+    seen: dict[str, str] = {}
+    for group in groups:
+        for name in group:
+            cleaned = " ".join(str(name).split())
+            if cleaned and cleaned.lower() not in seen:
+                seen[cleaned.lower()] = cleaned
+    return sorted(seen.values(), key=lambda n: (n.lower(), n))
 
 
 def target_row(
@@ -621,6 +632,7 @@ def send_target_digests(*, now: datetime | None = None) -> int:
     from flask import current_app
 
     from app.notifications.services import NotificationService
+    from app.billing.services import targets_locked
     from app.tasks.settings import get_organization_settings
     from app.users.models import Organization, User
 
@@ -628,25 +640,12 @@ def send_target_digests(*, now: datetime | None = None) -> int:
     notified = 0
     for organization in Organization.query.filter_by(is_active=True).all():
         settings = get_organization_settings(organization.id)
-        if not settings.targets_digest_enabled:
+        if not settings.targets_digest_enabled or targets_locked(organization.id):
             continue
         since = settings.targets_digest_sent_at or (now - timedelta(days=1))
         if since.tzinfo is None:
             since = since.replace(tzinfo=now.tzinfo)
-        reserve_mode = fetch_enabled()
-        if reserve_mode:
-            new_count = (
-                db.session.query(func.count(ListingMatch.id))
-                .filter(
-                    ListingMatch.listing_id.in_(_reserve_listing_ids(organization.id) or [-1]),
-                    ListingMatch.organization_id == organization.id,
-                    ListingMatch.created_at > since,
-                )
-                .scalar()
-                or 0
-            )
-        else:
-            new_count = count_new_targets(organization.id, since)
+        new_count = count_new_targets(organization.id, since)
         if not new_count:
             continue
         total = count_targets(organization.id)
@@ -657,18 +656,11 @@ def send_target_digests(*, now: datetime | None = None) -> int:
         ).all()
         if not users:
             continue
-        if reserve_mode:
-            title = "Uusia kohteita haettavissa"
-            message = (
-                "Hakuprofiiliisi sopivia uusia kohteita on tarjolla. Avaa Kohteet ja paina "
-                "Hae kohteita."
-            )
-        else:
-            title = "1 uusi kohde" if new_count == 1 else f"{new_count} uutta kohdetta"
-            message = (
-                f"Hakuprofiiliisi osui {title.lower()}. Kohteet-sivulla odottaa yhteensä "
-                f"{total} {'kohde' if total == 1 else 'kohdetta'}."
-            )
+        title = "1 uusi kohde" if new_count == 1 else f"{new_count} uutta kohdetta"
+        message = (
+            f"Hakuprofiiliisi osui {title.lower()}. Kohteet-sivulla odottaa yhteensä "
+            f"{total} {'kohde' if total == 1 else 'kohdetta'}."
+        )
         for user in users:
             NotificationService.create(
                 user_id=user.id,
@@ -718,174 +710,12 @@ def _email_target_digest(app, organization, users, title: str, message: str) -> 
     )
 
 
-# --- "Hae kohteita": the customer releases a batch from the reserve --------------
-
-
-class TargetFetchCooldown(Exception):
-    """The organization already fetched within the cooldown."""
-
-    def __init__(self, next_fetch_at: datetime):
-        super().__init__("cooldown")
-        self.next_fetch_at = next_fetch_at
-
-
 def _aware(value: datetime | None) -> datetime | None:
     if value is not None and value.tzinfo is None:
         from datetime import timezone
 
         return value.replace(tzinfo=timezone.utc)
     return value
-
-
-def _reserve_listing_ids(organization_id: int) -> list[int]:
-    """Listings waiting in the reserve (no released match yet), newest first."""
-    released = db.session.query(ListingMatch.listing_id).filter(
-        ListingMatch.organization_id == organization_id,
-        ListingMatch.status == "pending",
-        ListingMatch.released_at.isnot(None),
-    )
-    other = aliased(Listing)
-    released_companies = (
-        db.session.query(other.company_key)
-        .join(ListingMatch, ListingMatch.listing_id == other.id)
-        .filter(
-            ListingMatch.organization_id == organization_id,
-            ListingMatch.status == "pending",
-            ListingMatch.released_at.isnot(None),
-            other.company_key.isnot(None),
-        )
-    )
-    rows = (
-        db.session.query(Listing.id)
-        .join(ListingMatch, ListingMatch.listing_id == Listing.id)
-        .filter(
-            ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", include_reserve=True)),
-            ListingMatch.released_at.is_(None),
-            Listing.id.notin_(released),
-            or_(Listing.company_key.is_(None), Listing.company_key.notin_(released_companies)),
-        )
-        .order_by(func.coalesce(Listing.published_at, Listing.first_seen_at).desc(), Listing.id.desc())
-        .all()
-    )
-    return [listing_id for (listing_id,) in rows]
-
-
-def _interleave_by_type(organization_id: int, listing_ids: list[int]) -> list[int]:
-    """Newest first, but taking turns between the organization's renovation
-    types, so a customer with several urakat gets a mix in every batch (a
-    file import gives hundreds of listings the same timestamp)."""
-    if len(listing_ids) < 2:
-        return listing_ids
-    wanted = organization_wanted_types(organization_id)
-    best: dict[int, tuple[int, str]] = {}
-    rows = db.session.query(
-        ListingRenovation.listing_id, ListingRenovation.remonttityyppi, ListingRenovation.confidence
-    ).filter(ListingRenovation.listing_id.in_(listing_ids))
-    for listing_id, rtype, confidence in rows.all():
-        if wanted and rtype not in wanted:
-            continue
-        if listing_id not in best or confidence > best[listing_id][0]:
-            best[listing_id] = (confidence, rtype)
-    queues: dict[str, list[int]] = {}
-    for listing_id in listing_ids:
-        queues.setdefault(best.get(listing_id, (0, ""))[1], []).append(listing_id)
-    if len(queues) < 2:
-        return listing_ids
-    ordered: list[int] = []
-    lanes = list(queues.values())
-    while lanes:
-        for lane in lanes:
-            ordered.append(lane.pop(0))
-        lanes = [lane for lane in lanes if lane]
-    return ordered
-
-
-def count_reserve(organization_id: int) -> int:
-    return len(_reserve_listing_ids(organization_id)) if fetch_enabled() else 0
-
-
-def next_fetch_time(organization_id: int, *, now: datetime | None = None) -> datetime | None:
-    """When the organization may fetch again; None = right now."""
-    from datetime import timedelta
-
-    from flask import current_app
-
-    from app.tasks.settings import get_organization_settings
-
-    now = now or _now()
-    last = _aware(get_organization_settings(organization_id).targets_fetched_at)
-    if last is None:
-        return None
-    available = last + timedelta(minutes=current_app.config.get("TARGET_FETCH_COOLDOWN_MINUTES", 60))
-    return available if available > now else None
-
-
-def fetch_targets(
-    organization_id: int,
-    *,
-    now: datetime | None = None,
-    rng=None,
-    ignore_cooldown: bool = False,
-) -> dict:
-    """Release a batch of reserve targets to the Kohteet page.
-
-    The batch size varies from press to press (TARGET_FETCH_MIN..MAX, capped
-    by what the reserve holds). The targets become visible `wait_seconds`
-    from now, when the page's progress animation ends, so a reload in between
-    shows nothing early. One fetch per cooldown for the organization, also
-    when nothing was found. Raises TargetFetchCooldown."""
-    import random
-    from datetime import timedelta
-
-    from flask import current_app
-
-    from app.tasks.settings import get_organization_settings
-
-    now = now or _now()
-    rng = rng or random
-    config = current_app.config
-    if not ignore_cooldown:
-        waiting_until = next_fetch_time(organization_id, now=now)
-        if waiting_until is not None:
-            raise TargetFetchCooldown(waiting_until)
-
-    low = max(1, int(config.get("TARGET_FETCH_MIN", 3)))
-    high = max(low, int(config.get("TARGET_FETCH_MAX", 8)))
-    wait_low, wait_high = config.get("TARGET_FETCH_WAIT_SECONDS", (10, 15))
-    wait_seconds = rng.randint(int(wait_low), int(wait_high))
-
-    reserve = _interleave_by_type(organization_id, _reserve_listing_ids(organization_id))
-    chosen = reserve[: min(len(reserve), rng.randint(low, high))]
-    if chosen:
-        # every match of the organization for these listings and for the other
-        # listings of the same housing companies: a company is one target
-        keys = [
-            key
-            for (key,) in db.session.query(Listing.company_key)
-            .filter(Listing.id.in_(chosen), Listing.company_key.isnot(None))
-            .all()
-        ]
-        listing_ids = set(chosen)
-        if keys:
-            listing_ids.update(
-                listing_id
-                for (listing_id,) in db.session.query(Listing.id).filter(Listing.company_key.in_(keys)).all()
-            )
-        ListingMatch.query.filter(
-            ListingMatch.organization_id == organization_id,
-            ListingMatch.listing_id.in_(listing_ids),
-            ListingMatch.status == "pending",
-            ListingMatch.released_at.is_(None),
-        ).update({"released_at": now + timedelta(seconds=wait_seconds)}, synchronize_session=False)
-
-    settings = get_organization_settings(organization_id)
-    settings.targets_fetched_at = now
-    db.session.flush()
-    return {
-        "count": len(chosen),
-        "wait_seconds": wait_seconds,
-        "next_fetch_at": now + timedelta(minutes=config.get("TARGET_FETCH_COOLDOWN_MINUTES", 60)),
-    }
 
 
 # --- saved searches ---------------------------------------------------------------
@@ -954,8 +784,7 @@ def get_saved_search(organization_id: int, user_id: int, search_id: int) -> Save
 
 
 def _matches_for_search(saved: SavedTargetSearch, since: datetime) -> int:
-    """New targets for a saved search since `since`: released ones and, with
-    the reserve on, ones that can be fetched."""
+    """New targets for a saved search since `since`."""
     params = saved.params or {}
     try:
         profile_id = int(params["profile_id"]) if params.get("profile_id") else None
@@ -963,7 +792,7 @@ def _matches_for_search(saved: SavedTargetSearch, since: datetime) -> int:
         profile_id = None
     query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
         ListingMatch.id.in_(
-            _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id, include_reserve=True)
+            _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id)
         ),
         ListingMatch.created_at > since,
     )
@@ -987,9 +816,16 @@ def notify_saved_searches(*, now: datetime | None = None) -> int:
     from app.notifications.services import NotificationService
     from app.users.models import User
 
+    from app.billing.services import targets_locked
+
     now = now or _now()
     sent = 0
+    locked: dict[int, bool] = {}
     for saved in SavedTargetSearch.query.filter_by(notify=True).all():
+        if saved.organization_id not in locked:
+            locked[saved.organization_id] = targets_locked(saved.organization_id)
+        if locked[saved.organization_id]:
+            continue
         since = _aware(saved.last_notified_at) or _aware(saved.created_at) or now
         count = _matches_for_search(saved, since)
         if not count:
@@ -998,14 +834,11 @@ def notify_saved_searches(*, now: datetime | None = None) -> int:
         if user is None or not user.is_active:
             continue
         query = "&".join(f"{key}={value}" for key, value in (saved.params or {}).items())
-        if fetch_enabled():
-            message = "Tallennettua hakuasi vastaavia uusia kohteita on haettavissa. Avaa Kohteet ja paina Hae kohteita."
-        else:
-            message = (
-                "1 uusi kohde vastaa tallennettua hakuasi."
-                if count == 1
-                else f"{count} uutta kohdetta vastaa tallennettua hakuasi."
-            )
+        message = (
+            "1 uusi kohde vastaa tallennettua hakuasi."
+            if count == 1
+            else f"{count} uutta kohdetta vastaa tallennettua hakuasi."
+        )
         NotificationService.create(
             user_id=user.id,
             organization_id=saved.organization_id,
@@ -1022,7 +855,7 @@ def notify_saved_searches(*, now: datetime | None = None) -> int:
 
 
 def top_target_rows(organization_id: int, limit: int = 5) -> list[dict]:
-    """The best released targets for the dashboard, as Kohteet rows (fit order)."""
+    """The best targets for the dashboard, as Kohteet rows (fit order)."""
     from app.listings.fit_services import learn_preferences, score_matches
 
     page = list_targets(organization_id, page=1, per_page=limit)

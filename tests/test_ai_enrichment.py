@@ -481,3 +481,22 @@ def test_apply_enrichment_on_create_disabled_when_no_fields(app):
         db.session.flush()
         apply_enrichment_on_create(lead)
         assert lead.ai_enrichment_status == "disabled"
+
+
+def test_enrichment_disabled_without_openai_key(client, app):
+    """Without a key a lead must not sit at "Rikastetaan..." and then fail
+    with an internal English error the customer can read."""
+    ctx = _setup_org(app, "no-key")
+    _enable_ai(app)
+    app.config["OPENAI_API_KEY"] = None
+    key = _create_api_key(app, ctx["org_id"])
+    with patch("app.ai.triggers.get_enrichment_queue") as mock_queue:
+        response = client.post(
+            "/api/v1/leads",
+            data=json.dumps({"email": "nokey@example.com", "company": "Acme Corp"}),
+            headers=_auth_headers(key),
+        )
+        assert response.status_code == 201
+        mock_queue.return_value.enqueue.assert_not_called()
+    with app.app_context():
+        assert Lead.query.filter_by(email="nokey@example.com").first().ai_enrichment_status == "disabled"

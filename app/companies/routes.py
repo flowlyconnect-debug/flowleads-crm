@@ -57,8 +57,11 @@ def _list_url(**kwargs):
 
 
 def _contacts_list_url(**kwargs):
+    # pop, not get: passing organization_id twice to url_for was a 500 after
+    # a superadmin saved a contact
+    org_id = kwargs.pop("organization_id", None)
     if current_user.is_superadmin():
-        org_id = kwargs.get("organization_id") or parse_organization_id_param()
+        org_id = org_id or parse_organization_id_param()
         if org_id is not None:
             return url_for("contacts.list_contacts", organization_id=org_id, **kwargs)
     return url_for("contacts.list_contacts", **kwargs)

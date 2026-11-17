@@ -226,7 +226,7 @@ def test_login_page_shows_form_and_public_product_intro(client):
     assert "Priorisointi oppii valinnoistasi." in html
     assert "Soittolista" in html and "Tarjous ja kauppa" in html
     assert "js/login-demo.js" in html
-    # Target customers, pricing and trial
+    # Target customers and pricing (there is no free trial)
     assert "Tehty pienille remonttiurakoitsijoille" in html
     assert 'class="lp-trades"' in html and "Lukot ja kulunvalvonta" in html
     # the hero shows the product (renovation timeline), not a checklist

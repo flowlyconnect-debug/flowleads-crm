@@ -3,7 +3,7 @@ are not leads yet) and the actions that move them to leads or hide them."""
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.core.audit import log_audit
@@ -14,11 +14,6 @@ from app.listings.target_services import (
     get_saved_search,
     list_saved_searches,
     save_search,
-    TargetFetchCooldown,
-    count_reserve,
-    fetch_enabled,
-    fetch_targets,
-    next_fetch_time,
     FILTER_KEYS,
     SORT_OPTIONS,
     TABS,
@@ -45,6 +40,30 @@ UI_ROLES = ("superadmin", "admin", "user")
 def _ui_users_only():
     if current_user.role not in UI_ROLES:
         abort(403)
+
+
+def _locked(organization_id: int) -> bool:
+    """Target access switched off for the customer, or its contract ended
+    (app/billing): the page shows only how many targets there are."""
+    from app.billing.services import targets_locked
+
+    return not current_user.is_superadmin() and targets_locked(organization_id)
+
+
+@targets_bp.before_request
+def _targets_access():
+    """Without target access only the page itself opens (its locked view);
+    the map, the saved searches and every action lead back to it."""
+    if not current_user.is_authenticated or current_user.role not in UI_ROLES:
+        return None
+    if request.endpoint == "targets.index":
+        return None
+    organization_id = resolve_organization_id()
+    if not _locked(organization_id):
+        return None
+    if request.method == "POST":
+        flash("Target access is off.", "warning")
+    return redirect(url_for("targets.index", **org_query_suffix(organization_id)))
 
 
 def _back(organization_id: int):
@@ -190,6 +209,17 @@ def map_view():
 @targets_bp.route("", methods=["GET"])
 def index():
     organization_id, tab, profiles, profile_id, search, filters = _page_state()
+    if _locked(organization_id):
+        from app.users.models import Organization
+
+        organization = db.session.get(Organization, organization_id)
+        return render_template(
+            "targets/locked.html",
+            available_count=count_targets(organization_id, "pending"),
+            contract_ended=bool(organization and organization.targets_enabled),
+            organization_id=organization_id,
+            org_query=org_query_suffix(organization_id),
+        )
     pagination = list_targets(
         organization_id,
         status=TABS[tab],
@@ -228,24 +258,18 @@ def index():
 
     digest_enabled = get_organization_settings(organization_id).targets_digest_enabled
     db.session.commit()  # the settings row is created on first use
-    from app import to_helsinki
+    # targets that matched within the last day carry an "uusi" badge
+    from datetime import timedelta, timezone
+
     from app.listings.services import _now
 
-    now = _now()
-    next_fetch = next_fetch_time(organization_id, now=now) if fetch_enabled() else None
-    fetched = request.args.get("fetched", type=int)
-    new_ids = set()
-    if fetch_enabled():
-        # rows released in the last few minutes carry an "Uusi" badge
-        from datetime import timedelta
-
-        for match in pagination.items:
-            released = match.released_at
-            if released is not None:
-                if released.tzinfo is None:
-                    released = released.replace(tzinfo=now.tzinfo)
-                if now - released < timedelta(minutes=5):
-                    new_ids.add(match.id)
+    day_ago = _now() - timedelta(days=1)
+    new_ids = {
+        match.id
+        for match in pagination.items
+        if match.created_at is not None
+        and (match.created_at if match.created_at.tzinfo else match.created_at.replace(tzinfo=timezone.utc)) > day_ago
+    }
     current_params = _current_params(search, profile_id, filters)
     asked = session.pop(_ASK_KEY, None)
     saved_searches = list_saved_searches(organization_id, current_user.id)
@@ -258,12 +282,7 @@ def index():
         active_saved_id=next(
             (s.id for s in saved_searches if (s.params or {}) == current_params and current_params), None
         ),
-        fetch_enabled=fetch_enabled() and bool(profiles),
-        next_fetch_label=to_helsinki(next_fetch).strftime("%H.%M") if next_fetch else None,
-        next_fetch_seconds=max(0, int((next_fetch - now).total_seconds())) if next_fetch else 0,
-        fetched=fetched,
         new_ids=new_ids,
-        reserve_count=count_reserve(organization_id) if current_user.is_superadmin() else None,
         digest_enabled=digest_enabled,
         filters=filters,
         filter_options=target_filter_options(organization_id, TABS[tab], filters),
@@ -285,20 +304,9 @@ def index():
     )
 
 
-def _subscription_ended(organization_id: int) -> bool:
-    """A trial or contract that has ended: the targets stay visible, but no
-    new ones are fetched or moved to leads (app/billing)."""
-    from app.billing.services import organization_can_use
-
-    return not current_user.is_superadmin() and not organization_can_use(organization_id)
-
-
 @targets_bp.route("/transfer", methods=["POST"])
 def transfer():
     organization_id = resolve_organization_id()
-    if _subscription_ended(organization_id):
-        flash("The subscription has ended.", "warning")
-        return _back(organization_id)
     match_ids = _selected_ids()
     if not match_ids:
         flash("Valitse vähintään yksi kohde.", "warning")
@@ -447,57 +455,6 @@ def toggle_search_notify_route(search_id: int):
         "success",
     )
     return _back(organization_id)
-
-
-@targets_bp.route("/fetch", methods=["POST"])
-def fetch():
-    """"Hae kohteita": release a batch of the organization's reserve targets.
-    Answers JSON; the page shows its progress animation for `wait_seconds`
-    and then reloads, by which time the targets are visible."""
-    from app import to_helsinki
-
-    organization_id = resolve_organization_id()
-    if not fetch_enabled():
-        return jsonify({"success": False, "message": "Toiminto ei ole käytössä."}), 404
-    if _subscription_ended(organization_id):
-        from app.core.messages_fi import fi_message
-
-        return jsonify({"success": False, "code": "subscription", "message": fi_message("The subscription has ended.")}), 402
-    try:
-        # the platform's own superadmin can demo the button without waiting an hour
-        result = fetch_targets(organization_id, ignore_cooldown=current_user.is_superadmin())
-    except TargetFetchCooldown as cooldown:
-        db.session.rollback()
-        label = to_helsinki(cooldown.next_fetch_at).strftime("%H.%M")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "code": "cooldown",
-                    "message": f"Kohteita voi hakea kerran tunnissa. Seuraava haku on mahdollinen klo {label}.",
-                }
-            ),
-            429,
-        )
-    log_audit(
-        "targets_fetched",
-        user_id=current_user.id,
-        organization_id=organization_id,
-        target_type="listing_match",
-        target_id=None,
-        metadata={"count": result["count"]},
-    )
-    db.session.commit()
-    params = dict(org_query_suffix(organization_id))
-    params["fetched"] = result["count"]
-    return jsonify(
-        {
-            "success": True,
-            "count": result["count"],
-            "wait_seconds": result["wait_seconds"],
-            "redirect": url_for("targets.index", **params),
-        }
-    )
 
 
 @targets_bp.route("/digest", methods=["POST"])

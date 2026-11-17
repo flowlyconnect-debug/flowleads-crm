@@ -76,7 +76,6 @@ def _money(value) -> Decimal:
 def month_figures(organization_id: int, month: Month) -> dict:
     from app.leads.models import Activity, Lead
     from app.listings.models import ListingMatch
-    from app.listings.target_services import fetch_enabled
     from app.proposals.models import Proposal
 
     start, end = month.bounds()
@@ -84,7 +83,7 @@ def month_figures(organization_id: int, month: Month) -> dict:
     def between(column):
         return (column >= start) & (column < end)
 
-    received_at = ListingMatch.released_at if fetch_enabled() else ListingMatch.created_at
+    received_at = func.coalesce(ListingMatch.released_at, ListingMatch.created_at)
     from sqlalchemy import String, cast
 
     from app.listings.models import Listing

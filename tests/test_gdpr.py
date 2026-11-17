@@ -425,3 +425,37 @@ def test_patch_lead_gdpr_via_service(app):
         lead = db.session.get(Lead, lead_id)
         assert lead.gdpr_consent is True
         assert lead.gdpr_legal_basis == "contract"
+
+
+def test_anonymization_erases_related_texts(app):
+    """Audit 16.11.2026: the email stayed in notes, form submissions and emails."""
+    from app.email.models import EmailLog
+    from app.forms.models import WebForm, WebFormSubmission
+    from app.leads.models import Activity
+    from app.tasks.models import Task
+
+    ctx = _setup_org(app, "gdpr-related")
+    lead_id = _create_lead(app, ctx["org_id"], ctx["stage_id"])
+    with app.app_context():
+        org_id = ctx["org_id"]
+        LeadService.log_activity(lead_id, None, "note", content="Soitin: gdpr@example.com, Matti")
+        form = WebForm(organization_id=org_id, name="F", form_token="tok-gdpr", title="F", fields=[])
+        db.session.add(form)
+        db.session.flush()
+        db.session.add(WebFormSubmission(form_id=form.id, organization_id=org_id, lead_id=lead_id,
+                                         raw_data={"email": "gdpr@example.com"}, ip_address="1.2.3.4", status="processed"))
+        db.session.add(EmailLog(lead_id=lead_id, organization_id=org_id, subject="Hei Matti",
+                                body_text="gdpr@example.com", status="sent"))
+        db.session.add(Task(organization_id=org_id, lead_id=lead_id, title="Soita Matti Meikäläinen",
+                            description="+358401234567", type="call",
+                            assigned_to=ctx["admin_id"], due_date=datetime.now(timezone.utc)))
+        db.session.commit()
+        GDPRService.anonymize_lead(lead_id, ctx["admin_id"], org_id)
+        db.session.commit()
+        texts = [a.content or "" for a in Activity.query.filter_by(lead_id=lead_id).all()]
+        texts += [str(s.raw_data) + str(s.ip_address) for s in WebFormSubmission.query.filter_by(lead_id=lead_id).all()]
+        texts += [(e.subject or "") + (e.body_text or "") for e in EmailLog.query.filter_by(lead_id=lead_id).all()]
+        texts += [t.title + (t.description or "") for t in Task.query.filter_by(lead_id=lead_id).all()]
+        blob = " ".join(texts)
+        for secret in ("gdpr@example.com", "Matti", "Meikäläinen", "+358401234567", "1.2.3.4"):
+            assert secret not in blob, secret

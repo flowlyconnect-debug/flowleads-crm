@@ -8,16 +8,16 @@ from app.webhooks.models import WEBHOOK_PROVIDERS
 
 
 class WebhookEndpointForm(FlaskForm):
-    name = StringField("Name", validators=[DataRequired(), Length(max=200)])
+    name = StringField("Nimi", validators=[DataRequired(), Length(max=200)])
     provider = SelectField(
-        "Provider",
+        "Palvelu",
         validators=[DataRequired()],
         choices=[(provider, provider.capitalize()) for provider in WEBHOOK_PROVIDERS],
     )
     url = StringField("URL", validators=[DataRequired(), URL(), Length(max=2000)])
-    secret = StringField("Secret", validators=[Optional(), Length(max=1000)])
-    is_active = BooleanField("Active", default=True)
-    submit = SubmitField("Save")
+    secret = StringField("Salaisuus", validators=[Optional(), Length(max=1000)])
+    is_active = BooleanField("Aktiivinen", default=True)
+    submit = SubmitField("Tallenna")
 
     def validate_url(self, field):
         from app.webhooks.url_safety import UnsafeWebhookUrl, check_webhook_url

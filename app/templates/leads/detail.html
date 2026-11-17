@@ -65,7 +65,7 @@
       </div>
       <div class="lead-focus__badges lead-header-badges">
         {% if lead.close_probability is not none %}{{ probability_badge(lead.close_probability) }}{% endif %}
-        {% if lead.ai_enrichment_status not in ('disabled', none, '') %}<span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>{% endif %}
+        {% if has_feature('ai_enrichment') and lead.ai_enrichment_status not in ('disabled', none, '') %}<span class="badge badge-accent">{{ ai_status_badge(lead) }}</span>{% endif %}
       </div>
     </div>
     {% if lead_pts %}<div class="lead-focus__pts">{{ pts_cells(lead_pts, big=true) }}</div>{% endif %}
@@ -95,7 +95,8 @@
         <p class="lead-why__src">{{ lead_evidence.renovation.remonttityyppi }}{% if lead_evidence.renovation.timing %} {{ lead_evidence.renovation.timing }}{% endif %}, varmuus {{ lead_evidence.renovation.confidence }} %{% if lead_evidence.listing.published_at %}. Ilmoitus {{ (lead_evidence.listing.published_at|helsinki).strftime('%d.%m.%Y') }}{% endif %}.</p>
       </section>
       {% endif %}
-      {% set show_playbook = lead.ai_enrichment_status not in ('disabled', none, '') or playbook.ai_summary or playbook.ai_recommendation %}
+      {# AI off for the organization (app/core/features.py): no AI blocks at all #}
+      {% set show_playbook = has_feature('ai_enrichment') and (lead.ai_enrichment_status not in ('disabled', none, '') or playbook.ai_summary or playbook.ai_recommendation) %}
       {% if show_playbook %}
       <article class="card playbook-card" id="ai-playbook-card">
         <header class="playbook-card__header">
@@ -177,7 +178,7 @@
                 {# a lead from the Kohteet page never shows where its listing came from #}
                 {% set from_targets = lead.ai_contact_info is mapping and lead.ai_contact_info.get('listing_id') %}
                 <span class="badge leads-source-badge">
-                  {% if from_targets %}Kohteet{% else %}{{ source_label(lead.source) }}{% if lead.source_ref %} · {{ lead.source_ref }}{% endif %}{% endif %}
+                  {% if from_targets %}Kohteet{% else %}{{ source_label(lead.source) }}{% if lead.source_ref and lead.source in ('manual', 'webform') %} · {{ lead.source_ref }}{% endif %}{% endif %}
                 </span>
               </div>
             </div>
@@ -292,11 +293,13 @@
             <button type="button" class="lead-tab" data-tab="email" role="tab" aria-selected="false">
               Sähköposti
             </button>
+            {% if has_feature('sequences') %}
             <button type="button" class="lead-tab" data-tab="sequences" role="tab" aria-selected="false">
               Sekvenssit <span class="badge">
                 {{ sequence_enrollments|selectattr('enrollment.status', 'equalto', 'active')|list|length }}
               </span>
             </button>
+            {% endif %}
             <button type="button" class="lead-tab" data-tab="meetings" role="tab" aria-selected="false">
               Tapaamiset <span class="badge">{{ lead_meetings_upcoming|length }}</span>
             </button>
@@ -491,15 +494,9 @@
             <section id="tab-meetings" class="lead-tabpanel" role="tabpanel" aria-label="Tapaamiset">
               <div class="lead-meetings-header">
                 <h3 class="text-sm font-semibold text-secondary">Tapaamiset</h3>
-                {% if calendar_connection %}
                 <button type="button" class="btn btn-primary btn-sm" data-open-modal="meeting-modal">
                   Aikatauluta tapaaminen
                 </button>
-                {% else %}
-                <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.calendar_settings') }}">
-                  Yhdistä kalenteri
-                </a>
-                {% endif %}
               </div>
               {% if calendar_connection %}
               <p class="text-sm text-muted mt-2">
@@ -620,7 +617,7 @@
                     <div class="contact-info-item">
                       <span class="contact-info-icon" aria-hidden="true">⚖</span>
                       <div class="contact-info-value">
-                        <strong>Oikeusperuste:</strong> {{ lead.gdpr_legal_basis or '—' }}
+                        <strong>Oikeusperuste:</strong> {{ {'legitimate_interest': 'Oikeutettu etu', 'consent': 'Suostumus', 'contract': 'Sopimus'}.get(lead.gdpr_legal_basis, lead.gdpr_legal_basis or '—') }}
                       </div>
                     </div>
                     <div class="contact-info-item">
@@ -670,7 +667,7 @@
       </section>
     </div>
 
-    <aside class="lead-sidebar-column" aria-label="AI-ennuste ja signaalit">
+    <aside class="lead-sidebar-column" aria-label="Myyntiputki ja tila">
       <section class="card lead-sidebar-card">
         <header class="card-header">
           <h2 class="card-title">Myyntiputki & tila</h2>
@@ -721,7 +718,7 @@
         </div>
       </section>
 
-      {% if latest_prediction or lead.close_probability is not none or config.get("AI_ENRICHMENT_ENABLED") %}
+      {% if has_feature('ai_enrichment') and (latest_prediction or lead.close_probability is not none or config.get("AI_ENRICHMENT_ENABLED")) %}
       <section class="card ai-insights-card mt-4">
         <header class="card-header">
           <h2 class="card-title">AI-havainnot</h2>
@@ -822,12 +819,14 @@
       <label>{{ schedule_meeting_form.description.label }}{{ schedule_meeting_form.description(rows=3) }}</label>
       <label>{{ schedule_meeting_form.attendees.label }}{{ schedule_meeting_form.attendees(placeholder='email@example.com, toinen@example.com') }}</label>
       <label>{{ schedule_meeting_form.location.label }}{{ schedule_meeting_form.location() }}</label>
-      <label>{{ schedule_meeting_form.video_meeting() }} {{ schedule_meeting_form.video_meeting.label.text }}</label>
       {% if calendar_connection %}
+      <label>{{ schedule_meeting_form.video_meeting() }} {{ schedule_meeting_form.video_meeting.label.text }}</label>
       <p class="text-sm text-muted mt-2">
         Palvelu:
         {% if calendar_connection.provider == 'google' %}Google (Meet){% else %}Microsoft (Teams){% endif %}
       </p>
+      {% else %}
+      <p class="text-sm text-muted mt-2">Tapaaminen tallentuu FlowLeadsin kalenteriin ja liidin historiaan. Kutsua ei lähetetä osallistujille.</p>
       {% endif %}
       <div class="mt-3 flex gap-2">
         <button type="submit" class="btn btn-primary btn-sm">Aikatauluta</button>

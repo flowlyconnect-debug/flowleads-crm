@@ -10,6 +10,9 @@ REMONTTITYYPIT: tuple[str, ...] = (
     "Julkisivuremontti",
     "Katto- ja vesikattoremontti",
     "Huoneistoremontit",
+    # found from the listing text as well (app/listings/text_types.py)
+    "Ilmanvaihdon puhdistus ja säätö",
+    "Yläpohjan lisäeristys",
     "Muu remontti",
 )
 

@@ -4,7 +4,6 @@ after the housing company."""
 
 from __future__ import annotations
 
-import random
 from unittest.mock import patch
 
 from app.admin.invite_services import accept_invite, create_invite
@@ -141,7 +140,7 @@ def test_every_customer_sees_exactly_its_own_urakat(app):
         rematch_profiles()
 
         def seen(result):
-            ids = targets._visible_match_ids(result.organization.id, "pending", include_reserve=True)
+            ids = targets._visible_match_ids(result.organization.id, "pending")
             return sorted(m.listing.external_id for m in ListingMatch.query.filter(ListingMatch.id.in_(ids)))
 
         assert seen(pipe) == ["t-1", "t-3"]
@@ -181,7 +180,10 @@ def test_filters_offer_own_urakat_years_and_cities_of_the_region(app):
         assert options["renovations"] == [PIPE, HEAT] or options["renovations"] == sorted([PIPE, HEAT])
         assert ROOF not in options["renovations"]
         assert options["years"] == ["2026", "2029"]
-        assert targets.target_filter_options(org_id, filters={"region": "Uusimaa"})["cities"] == ["Espoo", "Helsinki"]
+        uusimaa = targets.target_filter_options(org_id, filters={"region": "Uusimaa"})["cities"]
+        # every municipality of the chosen maakunta is offered, not only those with targets
+        assert {"Espoo", "Helsinki", "Vantaa", "Pornainen"} <= set(uusimaa)
+        assert "Tampere" not in uusimaa
 
         def names(**filters):
             return sorted(m.listing.external_id for m in targets.list_targets(org_id, filters=filters).items)
@@ -193,26 +195,6 @@ def test_filters_offer_own_urakat_years_and_cities_of_the_region(app):
             targets.organization_wanted_types(org_id),
         )
         assert [r.remonttityyppi for r in row["renovations"]] == [PIPE]
-
-
-def test_fetch_mixes_the_customers_urakat(app):
-    app.config["TARGET_FETCH_ENABLED"] = True
-    try:
-        with app.app_context():
-            both = _customer("mix", [PIPE, HEAT])
-            # a file import: every listing has the same timestamp, one type after another
-            rows = [_row(i, HEAT) for i in range(1, 7)] + [_row(i, PIPE) for i in range(7, 13)]
-            import_listings(parse_listing_csv(_csv(*rows)))
-            rematch_profiles()
-            targets.fetch_targets(both.organization.id, rng=random.Random(1), ignore_cooldown=True)
-            db.session.commit()
-            released = ListingMatch.query.filter(
-                ListingMatch.organization_id == both.organization.id, ListingMatch.released_at.isnot(None)
-            ).all()
-            types = {r.remonttityyppi for m in released for r in m.listing.renovations}
-            assert types == {PIPE, HEAT}
-    finally:
-        app.config["TARGET_FETCH_ENABLED"] = False
 
 
 def test_lead_is_named_after_the_housing_company(app):

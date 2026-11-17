@@ -52,9 +52,8 @@
     <h1>{{ proposal_data.title }}</h1>
     <p class="meta">
       {{ proposal_data.reference_number }}<br>
-      {% if proposal_data.lead_company %}{{ proposal_data.lead_company }} — {% endif %}
-      {{ proposal_data.lead_name }}<br>
-      Voimassa: {{ proposal_data.valid_until or '—' }}
+      {{ proposal_data.customer_line }}<br>
+      Voimassa: {{ proposal_data.valid_until_display }}
     </p>
     <table>
       <thead>
@@ -64,9 +63,9 @@
         {% for li in proposal_data.line_items %}
         <tr>
           <td>{{ li.description }}</td>
-          <td class="num">{{ li.quantity }}</td>
-          <td class="num">{{ li.unit_price }}</td>
-          <td class="num">{{ li.total }}</td>
+          <td class="num">{{ li.quantity_display }}</td>
+          <td class="num">{{ li.unit_price_display }}</td>
+          <td class="num">{{ li.total_display }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -86,7 +85,7 @@
     </div>
     {% endif %}
     {% if proposal_data.signature_name %}
-    <p style="margin-top:1rem;color:#22c55e;">Hyväksytty: {{ proposal_data.signature_name }} ({{ proposal_data.accepted_at }})</p>
+    <p style="margin-top:1rem;color:#22c55e;">Hyväksytty: {{ proposal_data.signature_name }} ({{ proposal_data.accepted_at_display }})</p>
     {% endif %}
   </div>
 

@@ -147,21 +147,15 @@ def test_company_card_collects_listings_renovations_and_lead(client, app):
     assert "Taloyhtiön tiedot" in lead_page and "Isännöitsijän kohteet" in lead_page
 
 
-def test_card_and_managers_do_not_reveal_the_reserve_or_other_customers(client, app):
-    app.config["TARGET_FETCH_ENABLED"] = True
-    try:
-        with app.app_context():
-            org, user, profile = _org("leak")
-            reserve = _target(org, profile, 1, company="As Oy Varasto", manager="Varasto Isännöinti Oy", released=False)
-            other, _, other_profile = _org("leak2")
-            foreign = _target(other, other_profile, 2, company="As Oy Vieras")
-            email, reserve_listing, foreign_listing = user.email, reserve.listing_id, foreign.listing_id
-        _login(client, email)
-        assert client.get(f"/housing-companies/{reserve_listing}").status_code == 404
-        assert client.get(f"/housing-companies/{foreign_listing}").status_code == 404
-        assert "Varasto Isännöinti" not in client.get("/managers").get_data(as_text=True)
-    finally:
-        app.config["TARGET_FETCH_ENABLED"] = False
+def test_card_and_managers_do_not_reveal_other_customers(client, app):
+    with app.app_context():
+        org, user, profile = _org("leak")
+        other, _, other_profile = _org("leak2")
+        foreign = _target(other, other_profile, 2, company="As Oy Vieras", manager="Vieras Isännöinti Oy")
+        email, foreign_listing = user.email, foreign.listing_id
+    _login(client, email)
+    assert client.get(f"/housing-companies/{foreign_listing}").status_code == 404
+    assert "Vieras Isännöinti" not in client.get("/managers").get_data(as_text=True)
 
 
 # --- saved searches ------------------------------------------------------------------------
@@ -233,20 +227,6 @@ def test_new_matching_target_notifies_the_owner_once(app):
         _target(org, profile, 4, city="Helsinki", created=NOW + timedelta(minutes=30))
         db.session.commit()
         assert targets.notify_saved_searches(now=NOW + timedelta(minutes=31)) == 0
-
-
-def test_saved_search_alert_with_the_reserve_points_to_the_button(app):
-    app.config["TARGET_FETCH_ENABLED"] = True
-    try:
-        with app.app_context():
-            org, user, profile = _org("notifyreserve")
-            targets.save_search(org.id, user.id, "Helsinki", {"city": "Helsinki"}, now=NOW)
-            _target(org, profile, 1, city="Helsinki", created=NOW + timedelta(minutes=5), released=False)
-            assert targets.notify_saved_searches(now=NOW + timedelta(minutes=6)) == 1
-            note = Notification.query.filter_by(user_id=user.id).one()
-            assert "Hae kohteita" in note.message and "1 uusi" not in note.message
-    finally:
-        app.config["TARGET_FETCH_ENABLED"] = False
 
 
 def test_navigation_follows_the_workflow(client, app):

@@ -201,31 +201,6 @@ def test_transfer_moves_every_listing_of_the_company_into_one_lead(app):
         assert any("Samasta taloyhtiöstä" in (n or "") for n in notes)
 
 
-def test_fetch_releases_the_whole_company_and_new_signals_follow(app):
-    with app.app_context():
-        app.config["TARGET_FETCH_ENABLED"] = True
-        try:
-            org, _, _ = _org("fetchcompany")
-            _listing(1)
-            _listing(2, taloyhtio="Asunto Oy Kallio")
-            _listing(3, taloyhtio="As Oy Toinen")
-            assert targets.count_targets(org.id) == 0
-            assert targets.count_reserve(org.id) == 2  # two companies
-            import random
-
-            result = targets.fetch_targets(org.id, now=NOW - timedelta(minutes=5), rng=random.Random(1))
-            assert result["count"] == 2
-            assert all(m.released_at is not None for m in ListingMatch.query.filter_by(organization_id=org.id))
-            assert targets.count_targets(org.id) == 2
-            # another listing of a visible company is visible at once, as part of it
-            later = _listing(4)
-            assert ListingMatch.query.filter_by(listing_id=later.id).one().released_at is not None
-            assert targets.count_targets(org.id) == 2
-            assert targets.count_reserve(org.id) == 0
-        finally:
-            app.config["TARGET_FETCH_ENABLED"] = False
-
-
 # --- score ---------------------------------------------------------------------------
 
 
