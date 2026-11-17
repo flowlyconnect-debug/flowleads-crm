@@ -99,6 +99,15 @@ ul.ck li:before{content:"";position:absolute;left:2px;top:9px;width:7px;height:7
 .tip b{color:var(--deep)}
 .dark .tip b{color:var(--hl)}
 kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#fff;color:var(--ink)}
+.tag{display:inline-block;vertical-align:middle;margin-left:10px;padding:3px 10px;border-radius:999px;font-size:10.5px;letter-spacing:.06em;font-weight:700}
+.tag.paid{background:var(--hl);color:var(--ink)}
+.tag.both{background:#fff;border:1px solid var(--line);color:var(--lmut)}
+.dark .tag.both{background:var(--card);border-color:var(--card);color:var(--mut)}
+.plan{border-radius:16px;padding:24px 28px;display:flex;flex-direction:column}
+.plan h3{font-size:22px;margin:0}
+.plan .price{font-size:15px;margin-top:4px}
+.plan ul.ck{margin-top:14px}
+.plan ul.ck li{font-size:15px;margin-bottom:7px}
 </style>
 
 <!-- 1 KANSI -->
@@ -115,7 +124,47 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <div class="card"><div class="num">3</div><h3 style="margin-top:12px;font-size:18px">Siirrä liideiksi</h3><p style="font-size:14px">Soittolista ja sähköposti</p></div>
     <div class="card" style="background:#221d3f;border-color:#3a3170"><div class="num">4</div><h3 style="margin-top:12px;font-size:18px">Vie kaupaksi</h3><p style="font-size:14px">Myyntiputki ja tarjous</p></div>
   </div>
-  <div class="foot"><span>flowlysolutions.net</span><span class="mid">Kuvien tiedot ovat kuvitteellisia</span><span class="mono">1 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mid">Kuvien tiedot ovat kuvitteellisia</span><span class="mono">1 / 11</span></div>
+</section>
+
+<!-- VERSIOT -->
+<section class="s light">
+  <img class="logo" src="logo-light.png" alt="Flowly Solutions">
+  <div class="top"><div class="eyebrow">Versiot</div><h2>Ilmainen ja maksullinen versio</h2></div>
+  <div style="position:absolute;left:64px;right:64px;top:206px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="plan" style="background:#fff;border:1px solid var(--line)">
+      <div class="eyebrow">Ilmainen versio</div>
+      <h3 style="margin-top:6px">Myynnin työkalut</h3>
+      <div class="price" style="color:var(--lmut)">0 € · kaikille käyttäjille</div>
+      <ul class="ck">
+        <li>Liidit, myyntiputki ja liidien tuonti CSV-tiedostosta</li>
+        <li>Tehtävät, soittolista ja kalenteri</li>
+        <li>Sähköposti liidiltä ja viestimallit</li>
+        <li>Tarjoukset ja raportit</li>
+        <li>Rajaton määrä käyttäjiä</li>
+        <li>Kohteet-sivulla näet, montako sopivaa taloyhtiötä odottaa urakoittain ja maakunnittain, mutta et yksittäisiä kohteita.</li>
+      </ul>
+    </div>
+    <div class="plan" style="background:var(--bg);color:var(--tx)">
+      <div class="eyebrow" style="color:var(--hl)">Maksullinen versio</div>
+      <h3 style="margin-top:6px">Kohteet käyttöön</h3>
+      <div class="price" style="color:var(--hl)"><b style="font-size:20px">149 € / kk</b> + alv 25,5 % · kuukausisopimus</div>
+      <ul class="ck">
+        <li>Kaikki ilmaisen version toiminnot, ja lisäksi:</li>
+        <li>Taloyhtiöt, joissa urakkasi on tulossa, remonttiaikataulut ja sopivuuspisteet</li>
+        <li>Isännöitsijät, hallituksen puheenjohtajat ja huoltoyhtiöt yhteystietoineen</li>
+        <li>Siirto liideiksi ja soittolistalle yhdellä klikkauksella</li>
+        <li>Kartta, taloyhtiökortit, tallennetut haut ja aamun kooste uusista kohteista</li>
+      </ul>
+    </div>
+  </div>
+  <div style="position:absolute;left:64px;right:64px;top:560px;display:flex;align-items:center;gap:26px;font-size:15px">
+    <b>Näin otat kohteet käyttöön:</b>
+    <span style="display:flex;align-items:center;gap:8px"><span class="num">1</span>Avaa Kohteet</span>
+    <span style="display:flex;align-items:center;gap:8px"><span class="num">2</span>Paina <span class="ui">Ota kohteet käyttöön</span></span>
+    <span style="display:flex;align-items:center;gap:8px"><span class="num">3</span>Flowly avaa kohteet, kun sopimus on voimassa</span>
+  </div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mid">Jos sopimus päättyy, kohteet lukittuvat. Siirretyt liidit säilyvät.</span><span class="mono">2 / 11</span></div>
 </section>
 
 <!-- 2 ALOITUS -->
@@ -126,17 +175,17 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <h2>Kirjautuminen ja roolit</h2>
   </div>
   <div class="body grid c3" style="top:212px;bottom:auto;align-items:start">
-    <div class="card p"><div class="bar"></div><h3>Käyttöönotto</h3><p>Avaa Flowlyn lähettämä kutsulinkki (voimassa 7 päivää), aseta vähintään 12 merkin salasana ja paina <span class="ui">Viimeistele käyttöönotto</span>. Valmiina odottaa hakuprofiili urakoillesi koko Suomesta. Ensimmäiset kohteet näkyvät noin 10 minuutin kuluttua.</p></div>
+    <div class="card p"><div class="bar"></div><h3>Käyttöönotto</h3><p>Avaa Flowlyn lähettämä kutsulinkki (voimassa 7 päivää), aseta vähintään 12 merkin salasana ja paina <span class="ui">Viimeistele käyttöönotto</span>. Valmiina odottaa hakuprofiili urakoillesi koko Suomesta. Maksullisessa versiossa ensimmäiset kohteet näkyvät noin 10 minuutin kuluttua.</p></div>
     <div class="card"><div class="bar"></div><h3>Kaksivaiheinen tunnistautuminen</h3><p>Pakollinen ylläpitäjälle. Skannaa QR-koodi todennussovelluksella, kirjoita koodi ja tallenna varakoodit. Unohtunut salasana: <span class="ui">Unohditko salasanan?</span> kirjautumissivulla.</p></div>
     <div class="card"><div class="bar"></div><h3>Roolit</h3><p><b>Myyjä</b> käyttää kohteita, liidejä, tehtäviä, soittolistaa ja tarjouksia. Myyjän siirrot tulevat hänen omiksi liideikseen.</p><p style="margin-top:8px"><b>Ylläpitäjä</b> hallitsee lisäksi käyttäjiä, urakoita, koosteita, sähköpostia, integraatioita ja tilausta.</p></div>
   </div>
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">2 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">3 / 11</span></div>
 </section>
 
 <!-- 3 KOJELAUTA -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Kojelauta</div><h2>Päivän työt yhdellä silmäyksellä</h2></div>
+  <div class="top"><div class="eyebrow">Kojelauta<span class="tag both">MOLEMMAT VERSIOT</span></div><h2>Päivän työt yhdellä silmäyksellä</h2></div>
   <div class="col">
     <ul class="ck">
       <li><b>Tänään</b>: puhelut soittolistalla ja saatavilla olevat kohteet</li>
@@ -148,13 +197,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <div class="tip"><b>Pikahaku:</b> <kbd>Ctrl</kbd> + <kbd>K</kbd> (Mac <kbd>Cmd</kbd> + <kbd>K</kbd>) löytää liidit, tehtävät ja komennot missä tahansa.</div>
   </div>
   <img class="shot" src="kuvat/dashboard.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">3 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">4 / 11</span></div>
 </section>
 
 <!-- 4 KOHTEET -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Kohteet</div><h2>Löydä ja rajaa kohteet</h2></div>
+  <div class="top"><div class="eyebrow">Kohteet<span class="tag paid">MAKSULLINEN VERSIO</span></div><h2>Löydä ja rajaa kohteet</h2></div>
   <div class="col">
     <ul class="ck">
       <li>Uudet taloyhtiöt tulevat Kohteet-sivulle heti, kun ne löytyvät. Ne on merkitty tunnuksella <span class="ui">uusi</span>.</li>
@@ -165,13 +214,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     </ul>
   </div>
   <img class="shot" src="kuvat/targets.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">4 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">5 / 11</span></div>
 </section>
 
 <!-- 5 SOPIVUUS JA SIIRTO -->
 <section class="s dark">
   <img class="logo" src="logo-dark.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Kohteet</div><h2>Sopivuus ja siirto liideiksi</h2></div>
+  <div class="top"><div class="eyebrow">Kohteet<span class="tag paid">MAKSULLINEN VERSIO</span></div><h2>Sopivuus ja siirto liideiksi</h2></div>
   <div style="position:absolute;left:64px;top:228px;width:520px">
     <h3 style="font-size:18px;margin-bottom:8px">Sopivuus 0–100</h3>
     <table class="mini">
@@ -194,13 +243,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
       <li style="font-size:15.5px">Samasta taloyhtiöstä tulee aina vain yksi liidi.</li>
     </ul>
   </div>
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">5 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">6 / 11</span></div>
 </section>
 
 <!-- 6 TALOYHTIÖKORTTI -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Taloyhtiöt ja isännöitsijät</div><h2>Kaikki tieto yhdestä yhtiöstä</h2></div>
+  <div class="top"><div class="eyebrow">Taloyhtiöt ja isännöitsijät<span class="tag paid">MAKSULLINEN VERSIO</span></div><h2>Kaikki tieto yhdestä yhtiöstä</h2></div>
   <div class="col">
     <h3>Taloyhtiökortti</h3>
     <ul class="ck">
@@ -212,16 +261,16 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
       <li><b>Isännöitsijät</b>: kenellä on eniten sopivia kohteita, avoimia liidejä ja voitettuja kauppoja.</li>
       <li><b>Kartta</b> näyttää kohteet samoilla rajauksilla kuin lista.</li>
     </ul>
-    <p style="font-size:13px;color:var(--lmut)">Hallituksen puheenjohtajan tietoja saa käyttää vain tätä remonttia koskevaan yhteydenottoon.</p>
+    <p style="font-size:13px;color:var(--lmut)">Ilmaisessa versiossa taloyhtiökortti ja Isännöitsijät näyttävät vain sen, mikä on jo liidinä. Hallituksen puheenjohtajan tietoja saa käyttää vain tätä remonttia koskevaan yhteydenottoon.</p>
   </div>
   <img class="shot" src="kuvat/housing.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">6 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">7 / 11</span></div>
 </section>
 
 <!-- 7 LIIDIT -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Liidit ja myyntiputki</div><h2>Yksi remontti, yksi liidi</h2></div>
+  <div class="top"><div class="eyebrow">Liidit ja myyntiputki<span class="tag both">MOLEMMAT VERSIOT</span></div><h2>Yksi remontti, yksi liidi</h2></div>
   <div class="col">
     <ul class="ck">
       <li>Liidin yrityksenä on taloyhtiö ja yhteyshenkilönä isännöitsijä.</li>
@@ -232,13 +281,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     </ul>
   </div>
   <img class="shot" src="kuvat/pipeline.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">7 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">8 / 11</span></div>
 </section>
 
 <!-- 8 SOITTOLISTA -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Soittolista ja tehtävät</div><h2>Päivän puhelut järjestyksessä</h2></div>
+  <div class="top"><div class="eyebrow">Soittolista ja tehtävät<span class="tag both">MOLEMMAT VERSIOT</span></div><h2>Päivän puhelut järjestyksessä</h2></div>
   <div class="col">
     <p>Liidit tulevat listalle siirron yhteydessä. Soita, kirjoita halutessasi muistiinpano ja valitse lopputulos:</p>
     <table class="mini" style="margin-top:6px">
@@ -250,13 +299,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <p style="margin-top:12px">Jokainen lopputulos kirjataan liidille soittona. <b>Tehtävät</b>-sivulla ovat Myöhässä, Tänään, Tämä viikko ja Myöhemmin. Ajat ovat Suomen aikaa.</p>
   </div>
   <img class="shot" src="kuvat/calls.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">8 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">9 / 11</span></div>
 </section>
 
 <!-- 9 SÄHKÖPOSTI -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Sähköposti</div><h2>Viestit suoraan liidiltä</h2></div>
+  <div class="top"><div class="eyebrow">Sähköposti<span class="tag both">MOLEMMAT VERSIOT</span></div><h2>Viestit suoraan liidiltä</h2></div>
   <div class="col">
     <ul class="ck">
       <li>Avaa liidi ja paina <span class="ui">Lähetä sähköposti</span>. Painike on pois käytöstä, jos liidillä ei ole sähköpostiosoitetta.</li>
@@ -268,13 +317,13 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <div class="tip"><b>Lisätoiminnot:</b> automaattiset sähköpostisekvenssit ja automaatiot eivät ole oletuksena käytössä. Flowly avaa ne organisaatiollesi erikseen.</div>
   </div>
   <img class="shot" src="kuvat/email.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">9 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">10 / 11</span></div>
 </section>
 
 <!-- 10 TARJOUKSET JA RAPORTIT -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Tarjoukset ja raportit</div><h2>Tarjouksesta tulokseen</h2></div>
+  <div class="top"><div class="eyebrow">Tarjoukset ja raportit<span class="tag both">MOLEMMAT VERSIOT</span></div><h2>Tarjouksesta tulokseen</h2></div>
   <div class="col">
     <h3>Tarjoukset</h3>
     <ul class="ck">
@@ -289,7 +338,7 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     </ul>
   </div>
   <img class="shot" src="kuvat/monthly.jpg" alt="">
-  <div class="foot"><span>flowlysolutions.net</span><span class="mono">10 / 10</span></div>
+  <div class="foot"><span>flowlysolutions.net</span><span class="mono">11 / 11</span></div>
 </section>
 
 </body>
