@@ -24,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -115,6 +116,10 @@ class Listing(db.Model):
     # "y:<Y-tunnus>" or "n:<name>|<city>"; NULL = the listing stands alone.
     company_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
     company_name_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # An estimate, not a fact: a target published from the public registers
+    # (app/registry/publish.py, source "ryhti"). Shown as "Ennuste" everywhere
+    # and matched only for organizations with the "registry_targets" module.
+    is_estimate: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
     contact_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     contact_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -156,6 +161,10 @@ class ListingRenovation(db.Model):
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing", back_populates="renovations")
+
+    @property
+    def is_estimate(self) -> bool:
+        return bool(self.listing is not None and self.listing.is_estimate)
 
 
 class ListingMatch(db.Model):

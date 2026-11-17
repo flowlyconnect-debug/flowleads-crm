@@ -399,23 +399,26 @@ def company_timeline(organization_id: int, listings, matches, leads, *, limit: i
     for listing in listings:
         seen = listing.published_at or listing.first_seen_at
         where = ", ".join(p for p in (listing.osoite, listing.kaupunki) if p)
+        estimate = bool(getattr(listing, "is_estimate", False))
         # where the listing came from is not shown to customers
-        add(seen, "listing", "Myynti-ilmoitus löytyi", where)
+        add(seen, "listing", "Rakennus julkisista rekistereistä" if estimate else "Myynti-ilmoitus löytyi", where)
         for renovation in listing.renovations:
+            evidence = renovation.evidence and (renovation.evidence if estimate else f"“{renovation.evidence}”")
             detail = " · ".join(
                 p
                 for p in (
                     renovation.timing and f"ajankohta {renovation.timing}",
                     f"varmuus {renovation.confidence} %",
-                    renovation.evidence and f"“{renovation.evidence}”",
+                    evidence,
                 )
                 if p
             )
-            add(listing.analyzed_at or seen, "renovation", f"Remonttimaininta: {renovation.remonttityyppi}", detail)
+            title = f"Ennuste: {renovation.remonttityyppi}" if estimate else f"Remonttimaininta: {renovation.remonttityyppi}"
+            add(listing.analyzed_at or seen, "renovation", title, detail)
         if listing.has_contact and listing.contact_source:
             add(listing.analyzed_at or seen, "contact", "Isännöitsijän yhteystiedot löytyivät")
         if listing.removed_at:
-            add(listing.removed_at, "removed", "Ilmoitus poistui myynnistä", where)
+            add(listing.removed_at, "removed", "Ennuste poistui" if estimate else "Ilmoitus poistui myynnistä", where)
 
     for match in matches:
         if match.released_at and match.status == "pending":

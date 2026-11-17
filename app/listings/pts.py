@@ -1,7 +1,9 @@
 """The renovation timeline ("PTS strip") shown on Kohteet, the dashboard and a
 lead: the coming years, each with a short mark for every renovation that
 starts that year. Derived from ListingRenovation.timing_year; a renovation
-without a year is listed separately as "aikataulu auki"."""
+without a year is listed separately as "aikataulu auki". A mark from an
+estimated target (Listing.is_estimate) has `estimate` set and is drawn
+outlined ("ennuste")."""
 
 from __future__ import annotations
 
@@ -38,10 +40,10 @@ def pts_strip(renovations, *, now: datetime | None = None, span: int = PTS_SPAN)
     open_marks = []
     start_year = None
     seen = set()
-    for renovation in renovations:
-        if renovation is None:
-            continue
-        mark = renovation_mark(renovation.remonttityyppi)
+    # facts before estimates: a type and year known from a source is not an estimate
+    ordered = sorted((r for r in renovations if r is not None), key=lambda r: bool(getattr(r, "is_estimate", False)))
+    for renovation in ordered:
+        mark = dict(renovation_mark(renovation.remonttityyppi), estimate=bool(getattr(renovation, "is_estimate", False)))
         year = getattr(renovation, "timing_year", None)
         if not year:
             if mark["abbr"] not in {m["abbr"] for m in open_marks}:

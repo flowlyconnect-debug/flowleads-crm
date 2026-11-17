@@ -37,6 +37,24 @@
           virheitä {{ overview.prh_errors }}{% endif %}.
         </p>
 
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Ennustekohteet asiakkaille</h2>
+        <p class="text-sm">
+          {% if overview.publish_enabled %}
+          Julkaisu päällä: {{ overview.published }} ennustekohdetta katalogissa.
+          {% else %}
+          Julkaisu pois päältä (<code>REGISTRY_TARGETS_PUBLISH</code>): katalogissa ei ole ennustekohteita.
+          {% endif %}
+          {% if overview.estimate_orgs %}
+          Näkyy asiakkaille: {{ overview.estimate_orgs|join(', ') }}.
+          {% else %}
+          Ei näy yhdellekään asiakkaalle: toiminto "Ennustekohteet" on pois kaikilta (Asiakaslista → Toiminnot käytössä).
+          {% endif %}
+        </p>
+        <p class="text-muted text-sm">
+          Ennustekohde merkitään Kohteet-sivulla, taloyhtiökortilla ja liidillä sanalla "ennuste" ja aikajanalla katkoviivalla.
+          Taloyhtiöön yhdistämätön rakennus julkaistaan vain muutostyöluvan perusteella (<code>REGISTRY_PUBLISH_UNLINKED</code>).
+        </p>
+
         <h2 class="form-section-title" style="margin-top:1.5rem;">Haut</h2>
         <table>
           <thead><tr><th>Vaihe</th><th>Viimeisin ajo</th><th>Rivejä</th><th>Virhe</th></tr></thead>

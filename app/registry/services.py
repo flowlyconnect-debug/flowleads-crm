@@ -21,7 +21,7 @@ from app.registry.sync import fetch_addresses, link_companies, sync_buildings, s
 
 logger = logging.getLogger(__name__)
 
-STEPS = ("buildings", "permits", "addresses", "prh", "link", "signals")
+STEPS = ("buildings", "permits", "addresses", "prh", "link", "signals", "publish")
 
 
 def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, now: datetime | None = None) -> dict:
@@ -41,6 +41,10 @@ def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, n
         result["linked"] = link_companies(now=now)
     if "signals" in steps:
         result["signals"] = compute_signals(now=now)
+    if "publish" in steps:
+        from app.registry.publish import publish_targets
+
+        result["published"] = publish_targets(now=now)
     logger.info("Registry sync: %s", result)
     return result
 
@@ -87,8 +91,14 @@ def registry_overview(*, municipality: str | None = None, kind: str | None = Non
     ]
     states = RegistrySyncState.query.filter(~RegistrySyncState.name.like("prh:%")).order_by(RegistrySyncState.name).all()
     prh_states = RegistrySyncState.query.filter(RegistrySyncState.name.like("prh:%"))
+    from app.listings.models import Listing
+    from app.registry.publish import SOURCE as PUBLISH_SOURCE
+
     return {
         "enabled": bool(current_app.config.get("REGISTRY_SYNC_ENABLED")),
+        "publish_enabled": bool(current_app.config.get("REGISTRY_TARGETS_PUBLISH")),
+        "published": Listing.query.filter_by(source=PUBLISH_SOURCE, is_active=True).count(),
+        "estimate_orgs": _estimate_organizations(),
         "scope": current_app.config.get("REGISTRY_MUNICIPALITIES") or "",
         "buildings": buildings,
         "with_address": with_address,
@@ -103,3 +113,11 @@ def registry_overview(*, municipality: str | None = None, kind: str | None = Non
         "prh_done": prh_states.filter(RegistrySyncState.last_success_at.isnot(None)).count(),
         "prh_errors": prh_states.filter(RegistrySyncState.last_error.isnot(None)).count(),
     }
+
+
+def _estimate_organizations() -> list[str]:
+    """Organizations that see estimated targets (the "registry_targets" module)."""
+    from app.listings.services import ESTIMATE_FEATURE
+    from app.users.models import Organization
+
+    return sorted(o.name for o in Organization.query.filter_by(is_active=True) if o.has_feature(ESTIMATE_FEATURE))

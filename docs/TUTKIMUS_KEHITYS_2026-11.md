@@ -79,8 +79,9 @@ maksullinen sopimus).
 
 Arvio: 1–2 viikkoa. Ratkaisee tyhjän Kohteet-sivun ongelman.
 
-**Tila 17.11.2026:** keruu, yhdistäminen ja signaalit on rakennettu (`app/registry/`, superadminin sivu
-`/admin/registry`), mutta mitään ei vielä näytetä asiakkaille. Oikealla datalla todettu: Ryhdin avoimessa datassa ei ole
+**Tila 17.11.2026:** keruu, yhdistäminen, signaalit ja "ennuste"-merkityt kohteet on rakennettu (`app/registry/`,
+superadminin sivu `/admin/registry`), mutta mitään ei vielä näytetä asiakkaille (julkaisu ja asiakaskohtainen toiminto
+ovat pois päältä). Oikealla datalla todettu: Ryhdin avoimessa datassa ei ole
 korjauspäiviä, ja taloyhtiöön yhdistyy noin 19 % rakennuksista (60 % yhtiöistä on rekisteröity isännöintitoimiston
 osoitteeseen). Ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`
 ("Julkiset rekisterit").

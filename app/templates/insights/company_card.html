@@ -126,6 +126,7 @@
           <span class="insights-timeline__when">{{ renovation.timing or 'Ajankohta ei tiedossa' }}</span>
           <span class="badge badge-accent">{{ renovation.type }}</span>
           <span class="text-sm text-secondary" title="Kuinka varma tieto on">Varmuus {{ renovation.confidence }} %</span>
+          {% if renovation.estimate %}<span class="target-row__estimate" title="Arvio julkisista rekistereistä, ei varmistettu tieto">ennuste</span>{% endif %}
           {% if renovation.evidence %}<p class="insights-timeline__evidence">{{ renovation.evidence }}</p>{% endif %}
         </li>
         {% endfor %}

@@ -281,6 +281,8 @@ h2 { letter-spacing: -0.2px; }
 .pts__m--success { background: var(--color-success-soft); color: var(--color-success-emphasis); }
 .pts__m--danger  { background: var(--color-danger-soft);  color: var(--color-danger-emphasis); }
 .pts__m--neutral { background: var(--color-neutral-soft); color: var(--color-neutral-emphasis); }
+/* estimate from the public registers (Listing.is_estimate): outlined, no fill */
+.pts__m.pts__m--estimate { background: transparent; outline: 1px dashed currentColor; outline-offset: -1px; }
 .pts-open { font-size: 12px; color: var(--color-text-secondary); margin-left: 8px; }
 .pts-years {
   display: inline-grid;
@@ -356,6 +358,7 @@ h2 { letter-spacing: -0.2px; }
 .target-row__name { font-size: 14px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .target-row__name a:hover { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
 .target-row__new { font-size: 12px; font-weight: 500; color: var(--color-accent); margin-left: 4px; }
+.target-row__estimate { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-left: 4px; text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 .target-row__meta { font-size: 12.5px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .target-row__pts { display: flex; align-items: center; min-width: 0; }
 .target-row__pts .pts-open { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

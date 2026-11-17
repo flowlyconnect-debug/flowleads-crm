@@ -131,6 +131,11 @@ class Config:
     REGISTRY_PAGE_SIZE = int(os.environ.get("REGISTRY_PAGE_SIZE", "2000"))
     REGISTRY_ADDRESS_BATCH_LIMIT = int(os.environ.get("REGISTRY_ADDRESS_BATCH_LIMIT", "5000"))
     REGISTRY_PRH_LOCATIONS_PER_RUN = int(os.environ.get("REGISTRY_PRH_LOCATIONS_PER_RUN", "25"))
+    # Publish the signals as "Ennuste" targets (app/registry/publish.py). Even then only
+    # organizations with the "registry_targets" module see them (/admin/customers).
+    REGISTRY_TARGETS_PUBLISH = os.environ.get("REGISTRY_TARGETS_PUBLISH", "false").lower() in ("1", "true", "yes")
+    # also publish buildings with no linked housing company (otherwise: permits only)
+    REGISTRY_PUBLISH_UNLINKED = os.environ.get("REGISTRY_PUBLISH_UNLINKED", "false").lower() in ("1", "true", "yes")
     # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default
     # OpenStreetMap server suits light use only (tile usage policy), switch to a
     # commercial provider (e.g. MapTiler with a key in the URL) for heavy use.

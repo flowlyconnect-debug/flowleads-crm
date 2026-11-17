@@ -141,12 +141,16 @@ def _renovations(listings) -> list[dict]:
     for listing in listings:
         for renovation in listing.renovations:
             current = best.get(renovation.remonttityyppi)
-            if current is None or renovation.confidence > current["confidence"]:
+            # a fact beats an estimate of the same type, whatever the confidence
+            if current is not None and not current["estimate"] and renovation.is_estimate:
+                continue
+            if current is None or (current["estimate"] and not renovation.is_estimate) or renovation.confidence > current["confidence"]:
                 best[renovation.remonttityyppi] = {
                     "type": renovation.remonttityyppi,
                     "timing": renovation.timing or "",
                     "confidence": renovation.confidence,
                     "evidence": getattr(renovation, "evidence", None) or "",
+                    "estimate": bool(getattr(renovation, "is_estimate", False)),
                 }
     return sorted(best.values(), key=lambda r: (r["timing"] or "9999", r["type"]))
 

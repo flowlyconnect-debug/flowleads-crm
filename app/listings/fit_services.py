@@ -201,7 +201,8 @@ def company_fit(company: list, renovation: ListingRenovation | None, prefs: Pref
     contact = parts["contact"]["detail"]
     reasons.append({"puhelin ja sähköposti": "Puhelin ja sähköposti", "puhelin": "Puhelin", "sähköposti": "Sähköposti"}.get(contact, ""))
     if len(company) > 1:
-        reasons.append(f"{len(company)} ilmoitusta samasta taloyhtiöstä")
+        noun = "rakennusta" if all(getattr(l, "is_estimate", False) for l in company) else "ilmoitusta"
+        reasons.append(f"{len(company)} {noun} samasta taloyhtiöstä")
     fit = max(0, min(100, round(0.9 * base["total"] + learned)))
     return {"fit": fit, "reasons": [r for r in reasons if r], "parts": base["parts"], "learned": round(learned), "base": base["total"]}
 

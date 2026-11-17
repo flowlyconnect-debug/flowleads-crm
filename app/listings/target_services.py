@@ -421,12 +421,16 @@ def target_row(
         "people": company_contacts(company),
         "company_listings": company,
         "signal_count": len(company),
+        # the company's listings are all register buildings: "rakennusta", not "ilmoitusta"
+        "all_estimates": all(other.is_estimate for other in company),
         "title": listing.taloyhtio or listing.osoite or listing.external_id,
         "location": ", ".join(
             p for p in ((listing.osoite if listing.taloyhtio else None), listing.kaupunki or listing.maakunta) if p
         ),
         "renovation": renovation,
         "renovations": renovations,
+        # every renovation shown is an estimate from the public registers
+        "estimate": bool(renovations) and all(r.is_estimate for r in renovations),
         "seen_at": max(seen, key=lambda value: value.replace(tzinfo=None)) if seen else None,
         "base_score": score["total"],
         "score": fit[0] if fit else score["total"],

@@ -639,7 +639,9 @@ def _best_renovation(
     for renovation in listing.renovations:
         if renovation.remonttityyppi not in wanted:
             continue
-        if renovation.confidence < (profile.min_confidence or 0):
+        # min_confidence is about how sure the AI is of a listing text; an
+        # estimate from the registers is labelled as one instead
+        if not listing.is_estimate and renovation.confidence < (profile.min_confidence or 0):
             continue
         if limit_year is not None and renovation.timing_year is not None and renovation.timing_year > limit_year:
             continue
@@ -648,10 +650,24 @@ def _best_renovation(
     return best
 
 
+ESTIMATE_FEATURE = "registry_targets"
+
+
+def estimates_allowed(organization_id: int | None) -> bool:
+    """Estimated targets (Listing.is_estimate) are matched only for
+    organizations a superadmin gave the "registry_targets" module."""
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id) if organization_id else None
+    return bool(organization is not None and organization.has_feature(ESTIMATE_FEATURE))
+
+
 def _profile_wants(
     profile: SearchProfile, listing: Listing, *, now: datetime | None = None
 ) -> ListingRenovation | None:
     if not profile.is_active or profile.source != SOURCE:
+        return None
+    if listing.is_estimate and not estimates_allowed(profile.organization_id):
         return None
     if not _listing_passes(profile, listing):
         return None
@@ -719,6 +735,16 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
     if not regions or (profile.source or SOURCE) != SOURCE:
         return {}
     since = now - timedelta(days=_cfg("LISTING_MATCH_HISTORY_DAYS"))
+    # estimates are not news: no history window and no AI confidence floor,
+    # but only for organizations with the module
+    if estimates_allowed(profile.organization_id):
+        fresh_enough = or_(Listing.is_estimate.is_(True), func.coalesce(Listing.published_at, Listing.first_seen_at) >= since)
+        sure_enough = or_(Listing.is_estimate.is_(True), ListingRenovation.confidence >= (profile.min_confidence or 0))
+    else:
+        fresh_enough = and_(
+            Listing.is_estimate.is_(False), func.coalesce(Listing.published_at, Listing.first_seen_at) >= since
+        )
+        sure_enough = ListingRenovation.confidence >= (profile.min_confidence or 0)
     listings = (
         Listing.query.join(ListingRenovation, ListingRenovation.listing_id == Listing.id)
         .filter(
@@ -726,8 +752,8 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
             Listing.analysis_status == "done",
             Listing.maakunta.in_(regions),
             ListingRenovation.remonttityyppi.in_(profile.wanted_types),
-            ListingRenovation.confidence >= (profile.min_confidence or 0),
-            func.coalesce(Listing.published_at, Listing.first_seen_at) >= since,
+            sure_enough,
+            fresh_enough,
         )
         .distinct()
         .all()
@@ -827,7 +853,9 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
             f"Kohde: {', '.join(p for p in (listing.osoite, listing.kaupunki) if p)}",
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
-            renovation and renovation.evidence and f"Osuma ({rtype}): {renovation.evidence}",
+            renovation
+            and renovation.evidence
+            and f"{'Ennuste' if listing.is_estimate else 'Osuma'} ({rtype}): {renovation.evidence}",
         )
         if part
     )

@@ -254,6 +254,26 @@ erillinen myöhempi vaihe (tarvitsee "ennuste"-merkinnän Kohteet-sivulle, jotta
 | `link` | – | Rakennus → taloyhtiö, ensimmäinen osuva sääntö voittaa: 1) `name`: yhtiön nimessä oleva katuosoite ("As Oy Härmälänkatu 13", myös "Koulukatu 5-7") nimen kunnassa ("Kangasalan …"), muuten yhtiön kunnassa tai koko maassa, jos osoite on vain yhdessä kunnassa; 2) `listing`: katalogin kohde samassa osoitteessa nimeää yhtiön (Y-tunnus tai nimi); 3) `prh_address`: yhtiön rekisteröity katuosoite, jos kukaan muu yhtiö ei ole samassa osoitteessa (yhteinen osoite = isännöintitoimisto) eikä nimi sijoita yhtiötä muualle; 4) `name_street`: nimi on katu ("As Oy Valkoseläntie") ja kadun talot ovat yhdellä kiinteistöllä; 5) `property`: yhdistetyn talon kiinteistön muut talot, jos kiinteistöllä on vain yksi yhtiö. Osoitteissa on sekä suomen- että ruotsinkielinen kadunnimi. |
 | `signals` | – | `permit` (avoin muutostyölupa, tyyppi "Muu remontti", varmuus 70), `heating` (öljylämmitys → lämmitysjärjestelmän remontti, 50), `age` (tyypillinen korjausikä `housing._AGE_HINTS`, 30/25; betonielementtijulkisivu 1960–85 45 ja 25 vuoden ikkuna). |
 
+### Ennustekohteet (`app/registry/publish.py`, vaihe `publish`)
+
+Signaalit voi julkaista katalogiin kohteiksi, jotka on merkitty ennusteiksi (`Listing.is_estimate`, `source="ryhti"`,
+yksi kohde per rakennus, nimenä yhdistetty taloyhtiö). Kaksi lukkoa:
+
+1. Julkaisu tapahtuu vain, kun `REGISTRY_TARGETS_PUBLISH=true`.
+2. Ennustekohde täsmätään vain organisaatioille, joilla on toiminto "Ennustekohteet" (`registry_targets`,
+   `/admin/customers` → Toiminnot käytössä; `listings/services.py::estimates_allowed`). Oletuksena se on pois kaikilta.
+
+Ennustekohteelle ei sovelleta profiilin `min_confidence`-rajaa (se koskee AI:n varmuutta ilmoitustekstistä) eikä
+30 päivän historiaikkunaa. Taloyhtiöön yhdistämätön rakennus julkaistaan vain muutostyöluvan perusteella, ellei
+`REGISTRY_PUBLISH_UNLINKED=true`. Uudelleenjulkaisu päivittää vain muuttuneet (`content_hash`) ja poistaa käytöstä
+kohteet, joiden signaalit katosivat; odottavat osumat poistuvat samalla.
+
+Merkintä näkyy asiakkaalle: Kohteet-rivillä sana "ennuste" (selitys hiiren alla) ja "N rakennusta samasta taloyhtiöstä",
+aikajanalla (PTS) katkoviivainen merkki (`pts__m--estimate`; varma tieto voittaa saman vuoden ennusteen), Tiedot-osiossa
+"· ennuste", taloyhtiökortilla ja Isännöitsijät-sivulla merkintä, aikajanalla "Ennuste: <tyyppi>" ilman lainausmerkkejä
+ja liidin muistiinpanoissa "Ennuste (<tyyppi>): …". Jokaisen perusteen lopussa lukee "Arvio julkisista rekistereistä
+(Syke Ryhti, PRH), ei varmistettu tieto."
+
 Ajo: `flask registry-sync [--step ...]`, tai yöllä klo 1.40 ajastintyö `registry_sync`, kun `REGISTRY_SYNC_ENABLED=true`.
 Rajaus `REGISTRY_MUNICIPALITIES` (kuntien nimet pilkuilla, tyhjä = koko Suomi). Koko Suomi on noin 160 000 rakennusta ja
 100 000 yhtiötä (arviolta muutamia kymmeniä Mt): tarkista tietokannan levytila ennen kuin rajaus poistetaan.
@@ -267,8 +287,9 @@ Rajoitukset (todettu oikealla datalla 17.11.2026, Nokia ja Pirkkala):
 - PRH:n `location` osuu yhtiön postiosoitteeseen, joten yhtiö löytyy sen kunnan haulla, jossa isännöitsijä on. Koko Suomen
   ajo kattaa kaikki.
 
-Testit: `tests/test_registry.py` (mockattu rajapinta: synkka, delta, virheajo, yhdistäminen, signaalit, ei asiakkaille,
-superadmin-sivu, ajastintyö).
+Testit: `tests/test_registry.py` (mockattu rajapinta: synkka, delta, virheajo, yhdistämissäännöt, signaalit, ei
+asiakkaille, superadmin-sivu, ajastintyö) ja `tests/test_registry_estimates.py` (julkaisun lukot, täsmäys vain toiminnon
+saaneille, uudelleenjulkaisu, ennuste-merkinnät Kohteissa, aikajanalla ja liidillä).
 
 ## Testit
 

@@ -55,7 +55,7 @@
             </td>
             <td>
               {% for renovation in company.renovations %}
-              <span class="badge badge-accent">{{ renovation.type }}</span>{% if renovation.timing %} <span class="text-sm text-secondary">{{ renovation.timing }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}
+              <span class="badge badge-accent">{{ renovation.type }}</span>{% if renovation.timing %} <span class="text-sm text-secondary">{{ renovation.timing }}</span>{% endif %}{% if renovation.estimate %} <span class="target-row__estimate">ennuste</span>{% endif %}{% if not loop.last %}<br>{% endif %}
               {% else %}—{% endfor %}
             </td>
             <td><span class="insights-state insights-state--{{ company.state }}">{{ state_labels[company.state] }}</span></td>
