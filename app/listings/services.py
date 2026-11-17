@@ -1246,9 +1246,17 @@ def save_contacts(listing_id: int, payload: dict, *, now: datetime | None = None
 # ---------------------------------------------------------------------------
 
 
-def profile_match_stats(profile: SearchProfile) -> dict:
-    """Match counts of a profile."""
+def profile_match_stats(profile: SearchProfile, *, leads_only: bool = False) -> dict:
+    """Match counts of a profile. `leads_only` (target access off,
+    app/billing/services.py::targets_locked): the recent list names only
+    matches that are already leads; the counts stay."""
     criteria = [ListingMatch.profile_id == profile.id]
+    recent_criteria = list(criteria)
+    if leads_only:
+        recent_criteria += [
+            ListingMatch.lead_id.isnot(None),
+            ListingMatch.status.in_(("lead_created", "merged")),
+        ]
     rows = (
         db.session.query(ListingMatch.status, func.count(ListingMatch.id))
         .filter(*criteria)
@@ -1257,7 +1265,7 @@ def profile_match_stats(profile: SearchProfile) -> dict:
     )
     counts = {status: count for status, count in rows}
     recent = (
-        ListingMatch.query.filter(*criteria)
+        ListingMatch.query.filter(*recent_criteria)
         .order_by(ListingMatch.created_at.desc(), ListingMatch.id.desc())
         .limit(10)
         .all()

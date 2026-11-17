@@ -209,7 +209,12 @@ def map_view():
 @targets_bp.route("", methods=["GET"])
 def index():
     organization_id, tab, profiles, profile_id, search, filters = _page_state()
-    if _locked(organization_id):
+    from app.billing.services import targets_locked
+
+    # a superadmin is never locked out, but is told that the customer is and
+    # can open the page as the customer sees it (?customer_view=1)
+    customer_locked = current_user.is_superadmin() and targets_locked(organization_id)
+    if _locked(organization_id) or (customer_locked and request.args.get("customer_view") == "1"):
         from app.users.models import Organization
 
         organization = db.session.get(Organization, organization_id)
@@ -217,6 +222,7 @@ def index():
             "targets/locked.html",
             available_count=count_targets(organization_id, "pending"),
             contract_ended=bool(organization and organization.targets_enabled),
+            superadmin_preview=customer_locked,
             organization_id=organization_id,
             org_query=org_query_suffix(organization_id),
         )
@@ -301,6 +307,7 @@ def index():
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),
+        customer_locked=customer_locked,
     )
 
 

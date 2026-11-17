@@ -28,6 +28,12 @@
         Hakuprofiiliisi osuvat taloyhtiöt näkyvät täällä. Siirrä kiinnostavat liideiksi.
         {% endif %}
       </p>
+      {% if customer_locked %}
+      <p class="leads-header__sub" data-testid="targets-customer-locked">
+        Asiakkaan kohteet ovat pois käytöstä: asiakas näkee vain kohteiden määrän ja liidinsä. Näet kohteet, koska olet pääkäyttäjä.
+        <a href="{{ url_for('targets.index', customer_view=1, **org_query) }}">Näytä asiakkaan näkymä</a>
+      </p>
+      {% endif %}
     </div>
     <div class="leads-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.map_view', tab=(tab if is_hidden_tab else none), **dict(org_query, **current_params)) }}" title="Näytä nämä kohteet kartalla">Kartta</a>
