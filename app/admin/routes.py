@@ -634,6 +634,25 @@ def catalogue_status():
     )
 
 
+@admin_bp.route("/registry")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def registry_status():
+    """Julkiset rekisterit (Ryhti, PRH): internal preview, never shown to customers."""
+    from app.registry.models import SIGNAL_KINDS
+    from app.registry.services import registry_overview
+
+    municipality = (request.args.get("kunta") or "").strip() or None
+    kind = request.args.get("tyyppi") if request.args.get("tyyppi") in SIGNAL_KINDS else None
+    return render_template(
+        "admin/registry.html",
+        overview=registry_overview(municipality=municipality, kind=kind),
+        selected_municipality=municipality or "",
+        selected_kind=kind or "",
+    )
+
+
 @admin_bp.route("/catalogue/import", methods=["POST"])
 @login_required
 @require_role("superadmin")

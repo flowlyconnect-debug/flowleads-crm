@@ -372,6 +372,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Catalogue health check failed")
 
+    def run_registry_sync():
+        """Ryhti + PRH open data into registry_* (internal, REGISTRY_SYNC_ENABLED)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.registry.services import run_registry_sync as sync
+
+            try:
+                sync()
+            except Exception:
+                db.session.rollback()
+                logger.exception("Registry sync failed")
+
     def run_reap_stuck_search_jobs():
         with app.app_context():
             from app.extensions import db
@@ -531,6 +543,13 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="listing_matching",
         replace_existing=True,
     )
+    if app.config.get("REGISTRY_SYNC_ENABLED"):
+        scheduler.add_job(
+            run_registry_sync,
+            CronTrigger(hour=1, minute=40, timezone="Europe/Helsinki"),
+            id="registry_sync",
+            replace_existing=True,
+        )
     if app.config.get("GEOCODING_ENABLED"):
         scheduler.add_job(
             run_geocode_listings,

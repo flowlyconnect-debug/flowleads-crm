@@ -238,6 +238,37 @@ Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käytt
 Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
+## Julkiset rekisterit (Ryhti, PRH): vain sisäinen, ei asiakkaille
+
+`app/registry/` hakee avoimen datan (CC BY 4.0, ei avainta), yhdistää sen ja laskee siitä remonttisignaaleja.
+**Mikään ei näy asiakkaille:** se ei luo `Listing`-, `ListingMatch`- eikä kohderivejä. Superadmin näkee tilan ja
+esikatselun sivulla `/admin/registry` (asetusvalikko → Julkiset rekisterit). Signaalien julkaisu katalogiin on
+erillinen myöhempi vaihe (tarvitsee "ennuste"-merkinnän Kohteet-sivulle, jotta arviota ei luule tosiasiaksi).
+
+| Vaihe | Lähde | Mitä |
+|---|---|---|
+| `buildings` | Ryhti `ryhti_building/.../avoimet_rakennukset` | Kerrostalot ja pientalot, joissa on vähintään 3 asuntoa (= rivitalo), käytössä. Valmistumisvuosi, julkisivu, rakentamistapa, lämmitys, huoneistot, sijainti. Muutosten haku `aikaleima_utc`:n mukaan. |
+| `permits` | Ryhti `avoimet_lupa_rakennukset` | Muutostyöluvat ("Muu muutostyö", "Uudelleen rakentamiseen verrattava muutostyö") viimeisen 24 kk ajalta. Yhdistyy rakennukseen pysyvällä rakennustunnuksella (lupavaiheen `rakennusavain` on eri). |
+| `addresses` | Ryhti `open_address` | Osoitteet rakennuksille, joilla niitä ei vielä ole (100 rakennusta per kutsu, `REGISTRY_ADDRESS_BATCH_LIMIT` per ajo). |
+| `prh` | PRH YTJ v3 `companies?companyForm=AOY&location=<kunta>` | Rekisteröidyt asunto-osakeyhtiöt, enintään `REGISTRY_PRH_LOCATIONS_PER_RUN` kuntaa per ajo, kukin enintään viikoittain. |
+| `link` | – | Rakennus → taloyhtiö: 1) yhtiön nimessä oleva katuosoite ("As Oy Härmälänkatu 13") omassa kunnassa, tai koko maassa jos osoite on vain yhdessä kunnassa; 2) yhtiön rekisteröity katuosoite omassa kunnassa vain, jos kukaan muu yhtiö ei ole samassa osoitteessa (yhteinen osoite = isännöintitoimisto). |
+| `signals` | – | `permit` (avoin muutostyölupa, tyyppi "Muu remontti", varmuus 70), `heating` (öljylämmitys → lämmitysjärjestelmän remontti, 50), `age` (tyypillinen korjausikä `housing._AGE_HINTS`, 30/25; betonielementtijulkisivu 1960–85 45 ja 25 vuoden ikkuna). |
+
+Ajo: `flask registry-sync [--step ...]`, tai yöllä klo 1.40 ajastintyö `registry_sync`, kun `REGISTRY_SYNC_ENABLED=true`.
+Rajaus `REGISTRY_MUNICIPALITIES` (kuntien nimet pilkuilla, tyhjä = koko Suomi). Koko Suomi on noin 160 000 rakennusta ja
+100 000 yhtiötä (arviolta muutamia kymmeniä Mt): tarkista tietokannan levytila ennen kuin rajaus poistetaan.
+
+Rajoitukset (todettu oikealla datalla 17.11.2026, Nokia ja Pirkkala):
+- Ryhdin avoimessa datassa **ei ole korjauspäiviä**, joten ikäennuste ei tiedä, onko remontti jo tehty.
+- Muutostyölupa ei kerro, mitä muutetaan.
+- Vain noin 15 % rakennuksista yhdistyy taloyhtiöön: useimpien yhtiöiden nimessä ei ole katuosoitetta, ja PRH:n osoite on
+  yleensä isännöintitoimiston. Yhdistämättömällä rakennuksella on silti osoite, josta yhteystiedot voi rikastaa myöhemmin.
+- PRH:n `location` osuu yhtiön postiosoitteeseen, joten yhtiö löytyy sen kunnan haulla, jossa isännöitsijä on. Koko Suomen
+  ajo kattaa kaikki.
+
+Testit: `tests/test_registry.py` (mockattu rajapinta: synkka, delta, virheajo, yhdistäminen, signaalit, ei asiakkaille,
+superadmin-sivu, ajastintyö).
+
 ## Testit
 
 - `tests/test_targets.py`: Kohteet-sivu: osuma odottaa kohteena, siirto liidiksi, piilotus ja palautus, organisaatioiden

@@ -119,6 +119,18 @@ class Config:
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
+    # Public registers (app/registry/): Ryhti buildings/permits and PRH housing
+    # companies. Internal only: collected and previewed on /admin/registry, never
+    # shown to customers. The nightly job runs only with REGISTRY_SYNC_ENABLED.
+    REGISTRY_SYNC_ENABLED = os.environ.get("REGISTRY_SYNC_ENABLED", "false").lower() in ("1", "true", "yes")
+    # comma-separated kunta names, empty = whole Finland (~160k buildings)
+    REGISTRY_MUNICIPALITIES = os.environ.get("REGISTRY_MUNICIPALITIES", "")
+    RYHTI_API_BASE = os.environ.get("RYHTI_API_BASE", "https://paikkatiedot.ymparisto.fi/geoserver")
+    PRH_API_BASE = os.environ.get("PRH_API_BASE", "https://avoindata.prh.fi")
+    REGISTRY_HTTP_TIMEOUT = int(os.environ.get("REGISTRY_HTTP_TIMEOUT", "60"))
+    REGISTRY_PAGE_SIZE = int(os.environ.get("REGISTRY_PAGE_SIZE", "2000"))
+    REGISTRY_ADDRESS_BATCH_LIMIT = int(os.environ.get("REGISTRY_ADDRESS_BATCH_LIMIT", "5000"))
+    REGISTRY_PRH_LOCATIONS_PER_RUN = int(os.environ.get("REGISTRY_PRH_LOCATIONS_PER_RUN", "25"))
     # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default
     # OpenStreetMap server suits light use only (tile usage policy), switch to a
     # commercial provider (e.g. MapTiler with a key in the URL) for heavy use.
@@ -231,6 +243,7 @@ class TestingConfig(Config):
     # the older Kohteet tests expect matches to be visible at once; the fetch
     # button's own tests switch this on
     GEOCODING_ENABLED = False
+    REGISTRY_SYNC_ENABLED = False
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

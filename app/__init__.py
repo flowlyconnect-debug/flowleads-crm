@@ -194,6 +194,7 @@ def _init_extensions(app):
         from app.streams import models as streams_models  # noqa: F401
         from app.search import models as search_models  # noqa: F401
         from app.listings import models as listings_models  # noqa: F401
+        from app.registry import models as registry_models  # noqa: F401
 
 
 def _register_blueprints(app):

@@ -241,6 +241,23 @@ def register_cli(app):
         if not yes:
             click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
 
+    @app.cli.command("registry-sync")
+    @click.option(
+        "--step",
+        "steps",
+        multiple=True,
+        type=click.Choice(["buildings", "permits", "addresses", "prh", "link", "signals"]),
+        help="Aja vain nämä vaiheet (oletus: kaikki).",
+    )
+    @with_appcontext
+    def registry_sync_cmd(steps):
+        """Hae Ryhdin ja PRH:n avoin data ja laske signaalit (ei näy asiakkaille)."""
+        from app.registry.services import STEPS, run_registry_sync
+
+        result = run_registry_sync(steps=tuple(steps) or STEPS)
+        for key, value in result.items():
+            click.echo(f"{key}: {value}")
+
     @app.cli.command("run-scheduler")
     @with_appcontext
     def run_scheduler_cmd():

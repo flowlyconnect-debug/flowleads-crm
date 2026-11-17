@@ -81,6 +81,11 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
   koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`
   (`/admin/dashboard` and `/admin/api-keys` redirect). Tests: `tests/test_settings_pages.py`.
+- **Public registers, internal only** (`app/registry/`, superadmin `/admin/registry`): Ryhti buildings/permits/addresses and
+  PRH asunto-osakeyhtiöt are synced (`flask registry-sync`, job `registry_sync` only with `REGISTRY_SYNC_ENABLED`), linked
+  building → taloyhtiö and turned into `RegistrySignal`s (permit / oil heating / age). Nothing creates listings, matches or
+  targets: publishing to customers is a later step. Details in the architecture doc ("Julkiset rekisterit"). Tests:
+  `tests/test_registry.py`.
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run

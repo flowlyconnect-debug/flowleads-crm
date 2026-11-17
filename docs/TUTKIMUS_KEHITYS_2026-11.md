@@ -54,7 +54,8 @@ hakukoneotteista. **[tarkista]** = ei varmistettu ensisijaisesta lähteestä.
 - OGC API Features: `https://paikkatiedot.ymparisto.fi/geoserver/ryhti_building/ogc/features/v1` (valmiit
   rakennukset, kokoelma `open_building`) ja `.../ryhti_permit/ogc/features/v1` (lupavaiheen rakennukset).
 - CQL2-suodatus `modified_timestamp_utc > '...'` mahdollistaa päivittäisen muutossynkan; kunta- ja bbox-suodatus.
-- Kentät mm. pysyvä rakennustunnus, käyttötarkoitus (2018-luokitus), valmistumispäivä ja **korjauspäivät**.
+- Kentät mm. pysyvä rakennustunnus, käyttötarkoitus, valmistumispäivä, julkisivu, rakentamistapa, lämmitys ja
+  huoneistomäärä. **Korjauspäiviä avoimessa datassa ei ole** (tarkistettu rajapinnasta 17.11.2026).
   Huoneistomäärän, kerrosalan ja lupatyypin kenttänimet **[tarkista]** datasanakirjasta `Ryhti_rakennustiedot_EN.pdf`.
 - Osa kutsuista ei palauta sijaintia → koordinaatit osoitekokoelmasta tai MML:n maastotietokannasta.
 - Kattavuus: kuntien pitää myöntää luvat tietomallin mukaisena 1.1.2026 alkaen, siirtymäaika vuoden 2028 loppuun.
@@ -69,7 +70,7 @@ maksullinen sopimus).
 1. **Kansallinen taloyhtiörekisteri** (PRH + Ryhti, yhdistetty `company_key`-avaimeen / Y-tunnukseen). Jokainen
    taloyhtiö on olemassa ennen ilmoitusta – kohteet eivät ole enää riippuvaisia yhdestä portaalista.
 2. **Ennustekohteet omana signaalityyppinä** (`signal_kind = "ennuste"`, matala varmuus, oma merkki UI:ssa):
-   rakennusvuosi + tyyppi + Ryhdin korjauspäivät → "putkiremontti todennäköisesti edessä". Nykyinen
+   rakennusvuosi + tyyppi (+ julkisivu, lämmitys) → "putkiremontti todennäköisesti edessä". Nykyinen
    `age_based_hints()` on hyvä alku, mutta sen pitää luoda kohteita ja vaikuttaa pisteisiin.
 3. **Lupasignaalit** `ryhti_permit`-kokoelmasta (korjaus- ja muutostyöluvat) vahvimpana tuoreena signaalina.
 4. Tuonti olemassa olevan polun kautta: uusi `source="ryhti"` / `"prh"` → `app/listings/import_services.py`.
@@ -77,6 +78,11 @@ maksullinen sopimus).
 5. **Lähdekohtainen terveys** `/admin/catalogue`-näkymään (viimeisin onnistunut ajo, rivit/päivä per lähde).
 
 Arvio: 1–2 viikkoa. Ratkaisee tyhjän Kohteet-sivun ongelman.
+
+**Tila 17.11.2026:** keruu, yhdistäminen ja signaalit on rakennettu (`app/registry/`, superadminin sivu
+`/admin/registry`), mutta mitään ei vielä näytetä asiakkaille. Oikealla datalla todettu: Ryhdin avoimessa datassa ei ole
+korjauspäiviä, ja taloyhtiöön yhdistyy noin 15 % rakennuksista. Ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`
+("Julkiset rekisterit").
 
 ### 3.2 Lisämoduulit (myöhemmin)
 
