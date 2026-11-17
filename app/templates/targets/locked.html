@@ -86,7 +86,7 @@
     <aside class="targets-locked__plan" aria-labelledby="targets-locked-plan-title">
       <p class="targets-locked__eyebrow">Maksullinen versio</p>
       <h2 class="targets-locked__plan-title" id="targets-locked-plan-title">Ota kohteet käyttöön</h2>
-      <p class="targets-locked__price">{% if plan.price is not none %}<span class="mono targets-locked__price-num">{{ plan.price }}</span> € / kk{% else %}{{ plan_price }}{% endif %} <span class="targets-locked__vat">alv 0 %</span></p>
+      <p class="targets-locked__price">{% if plan.price is not none %}<span class="mono targets-locked__price-num">{{ plan.price }}</span> € / kk{% else %}{{ plan_price }}{% endif %} <span class="targets-locked__vat">+ alv {{ vat }} %</span></p>
       <ul class="targets-locked__features">
         {% for feature in plan.features %}
         <li>{{ feature }}</li>
