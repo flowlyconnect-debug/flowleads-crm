@@ -85,7 +85,12 @@ def _render_search_profiles(
         selected_profile = get_profile(organization_id, selected_id)
         if selected_profile:
             latest_job = get_latest_job(selected_profile.id)
-            match_stats = profile_match_stats(selected_profile)
+            from app.billing.services import targets_locked
+
+            match_stats = profile_match_stats(
+                selected_profile,
+                leads_only=not current_user.is_superadmin() and targets_locked(organization_id),
+            )
 
     now = datetime.now(timezone.utc)
     org_query = org_query_suffix(organization_id)

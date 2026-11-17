@@ -122,7 +122,7 @@ def test_ended_contract_keeps_leads_and_the_count_but_locks_targets(client, app)
     assert 'data-testid="targets-locked-count">1<' in page  # the count is still shown
     assert "Päättynyt" in page and "Valitse kuukausisopimus" in page
     response = client.post("/targets/transfer", data={"single_id": str(match_id)}, follow_redirects=True)
-    assert "Kohteet eivät ole käytössäsi" in response.get_data(as_text=True)
+    assert 'data-testid="targets-locked-count"' in response.get_data(as_text=True)
     with app.app_context():
         assert db.session.get(ListingMatch, match_id).status == "pending"
     # leads can still be exported

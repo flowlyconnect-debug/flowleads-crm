@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% from "components/empty_state.html" import empty_state %}
-{# Kohteet without target access (app/billing/services.py::targets_locked):
-   the count is shown, the targets themselves are not. #}
+{# Kohteet without target access (app/billing/services.py::targets_locked).
+   Counts only (target_services.locked_target_summary): no housing company,
+   address, manager or contact detail of a target is ever rendered here. The
+   preview rows are empty skeletons. #}
 {% block title %}Kohteet — FlowLeads{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/targets.css') }}">
@@ -15,19 +16,96 @@
         <span class="mono" data-testid="targets-locked-count">{{ available_count }}</span>
         {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla hakuprofiilillasi.
       </p>
+      {% if superadmin_preview %}
+      <p class="leads-header__sub" data-testid="targets-customer-preview">
+        Näin asiakas näkee Kohteet-sivun.
+        <a href="{{ url_for('targets.index', **org_query) }}">Takaisin kohteisiin</a>
+      </p>
+      {% endif %}
     </div>
     <div class="leads-header__actions">
       <a class="btn btn-secondary btn-sm" href="{{ url_for('leads.list_leads', **org_query) }}">Liidit</a>
     </div>
   </header>
-  <div class="leads-work">
-    <div class="targets-empty">
-      {% if contract_ended %}
-        {{ empty_state(none, "Kohteet eivät ole käytössäsi", "Sopimuksesi on päättynyt, joten kohteita ei voi avata eikä siirtää liideiksi. Liidit, jotka olet jo siirtänyt, ovat tallessa Liidit-sivulla.", "Valitse kuukausisopimus", url_for('billing.subscription_page', **org_query)) }}
-      {% else %}
-        {{ empty_state(none, "Kohteet eivät ole käytössäsi", "Kohteita ei voi juuri nyt avata eikä siirtää liideiksi. Liidit, jotka olet jo siirtänyt, ovat tallessa Liidit-sivulla. Ota yhteyttä FlowLeadsiin, niin avaamme kohteet uudelleen.", "Avaa liidit", url_for('leads.list_leads', **org_query)) }}
+
+  <div class="targets-locked">
+    <div class="targets-locked__main">
+      <div class="targets-locked__hero">
+        <p class="targets-locked__eyebrow">Odottaa sinua nyt</p>
+        <p class="targets-locked__total">
+          <span class="mono targets-locked__number">{{ summary.total }}</span>
+          <span class="targets-locked__unit">{{ 'taloyhtiö' if summary.total == 1 else 'taloyhtiötä' }}</span>
+        </p>
+        <p class="targets-locked__lead">
+          {% if summary.total %}
+          suunnittelee remonttia, joka sopii urakoihisi.
+          {% if summary.new_week %}<span class="targets-locked__new"><span class="mono">+{{ summary.new_week }}</span> uutta viimeisen 7 päivän aikana</span>{% endif %}
+          {% else %}
+          Uudet kohteet ilmestyvät tänne heti, kun ne löytyvät.
+          {% endif %}
+        </p>
+      </div>
+
+      {% if summary.by_type or summary.by_region %}
+      <div class="targets-locked__stats">
+        {% for title, items in (("Urakoittain", summary.by_type), ("Maakunnittain", summary.by_region)) if items %}
+        <div class="targets-locked__stat">
+          <h2 class="targets-locked__stat-title">{{ title }}</h2>
+          <ul class="targets-locked__bars">
+            {% for item in items %}
+            <li class="targets-locked__bar">
+              <span class="targets-locked__bar-name">{{ item.name }}</span>
+              <span class="targets-locked__bar-count mono">{{ item.count }}</span>
+              <span class="targets-locked__bar-track" aria-hidden="true"><span class="targets-locked__bar-fill" style="width: {{ [item.share, 4]|max }}%"></span></span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
       {% endif %}
+
+      <div class="targets-locked__preview">
+        <ul class="targets-locked__rows" aria-hidden="true">
+          {% for width in (62, 48, 70, 55, 44) %}
+          <li class="targets-locked__row">
+            <span class="targets-locked__skel targets-locked__skel--name" style="width: {{ width }}%"></span>
+            <span class="targets-locked__skel targets-locked__skel--meta"></span>
+            <span class="targets-locked__skel targets-locked__skel--chip"></span>
+            <span class="targets-locked__skel targets-locked__skel--fit"></span>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="targets-locked__veil">
+          <p class="targets-locked__veil-title">Taloyhtiöt, isännöitsijät ja yhteystiedot</p>
+          <p class="targets-locked__veil-text">Näet jokaisen kohteen remonttiaikataulun, sopivuuspisteet ja yhteyshenkilöt, ja siirrät kiinnostavat liideiksi yhdellä klikkauksella.</p>
+        </div>
+      </div>
     </div>
+
+    <aside class="targets-locked__plan" aria-labelledby="targets-locked-plan-title">
+      <p class="targets-locked__eyebrow">Maksullinen versio</p>
+      <h2 class="targets-locked__plan-title" id="targets-locked-plan-title">Ota kohteet käyttöön</h2>
+      <p class="targets-locked__price">{% if plan.price is not none %}<span class="mono targets-locked__price-num">{{ plan.price }}</span> € / kk{% else %}{{ plan_price }}{% endif %} <span class="targets-locked__vat">+ alv {{ vat }} %</span></p>
+      <ul class="targets-locked__features">
+        {% for feature in plan.features %}
+        <li>{{ feature }}</li>
+        {% endfor %}
+      </ul>
+      {% if contract_ended %}
+      <a class="btn btn-primary targets-locked__cta" href="{{ url_for('billing.subscription_page', **org_query) }}">Valitse kuukausisopimus</a>
+      <p class="targets-locked__note">Sopimuksesi on päättynyt. Liidit, jotka olet jo siirtänyt, ovat tallessa.</p>
+      {% elif access_requested %}
+      <p class="targets-locked__done" role="status" data-testid="targets-access-requested">Pyyntösi on lähetetty. Olemme yhteydessä ja avaamme kohteet heti, kun sopimus on voimassa.</p>
+      {% else %}
+      <form method="post" action="{{ url_for('targets.request_access', **org_query) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary targets-locked__cta" data-testid="targets-request-access">Ota kohteet käyttöön</button>
+      </form>
+      <p class="targets-locked__note">Kuukausisopimus ilman määräaikaa. Otamme yhteyttä ja avaamme kohteet, kun sopimus on voimassa.</p>
+      {% endif %}
+      <a class="targets-locked__more" href="{{ url_for('billing.pricing') }}">Katso hinnasto</a>
+    </aside>
   </div>
 </section>
 {% endblock %}

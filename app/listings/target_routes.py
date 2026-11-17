@@ -56,7 +56,7 @@ def _targets_access():
     the map, the saved searches and every action lead back to it."""
     if not current_user.is_authenticated or current_user.role not in UI_ROLES:
         return None
-    if request.endpoint == "targets.index":
+    if request.endpoint in ("targets.index", "targets.request_access"):
         return None
     organization_id = resolve_organization_id()
     if not _locked(organization_id):
@@ -79,6 +79,7 @@ def _back(organization_id: int):
 
 
 _TRANSFERRED_KEY = "targets_transferred_lead_ids"
+_REQUESTED_KEY = "targets_access_requested"
 
 
 def _valid_assignee(organization_id: int, user_id: int | None) -> int | None:
@@ -209,14 +210,30 @@ def map_view():
 @targets_bp.route("", methods=["GET"])
 def index():
     organization_id, tab, profiles, profile_id, search, filters = _page_state()
-    if _locked(organization_id):
+    from app.billing.services import targets_locked
+
+    # a superadmin is never locked out, but is told that the customer is and
+    # can open the page as the customer sees it (?customer_view=1)
+    customer_locked = current_user.is_superadmin() and targets_locked(organization_id)
+    if _locked(organization_id) or (customer_locked and request.args.get("customer_view") == "1"):
         from app.users.models import Organization
 
+        from app.billing.plans import PLANS_BY_KEY, DEFAULT_PLAN, VAT_PERCENT, price_label
+        from app.listings.target_services import locked_target_summary
+
         organization = db.session.get(Organization, organization_id)
+        summary = locked_target_summary(organization_id)
+        plan = PLANS_BY_KEY[DEFAULT_PLAN]
         return render_template(
             "targets/locked.html",
-            available_count=count_targets(organization_id, "pending"),
+            available_count=summary["total"],
+            summary=summary,
+            plan=plan,
+            plan_price=price_label(plan),
+            vat=VAT_PERCENT,
+            access_requested=session.get(_REQUESTED_KEY) == organization_id,
             contract_ended=bool(organization and organization.targets_enabled),
+            superadmin_preview=customer_locked,
             organization_id=organization_id,
             org_query=org_query_suffix(organization_id),
         )
@@ -301,7 +318,37 @@ def index():
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),
+        customer_locked=customer_locked,
     )
+
+
+@targets_bp.route("/request-access", methods=["POST"])
+def request_access():
+    """The locked page's "Ota kohteet käyttöön": FlowLeads is told, and turns
+    the targets on once the monthly contract is agreed (billing is manual)."""
+    from app.billing.services import request_targets_access
+    from app.users.models import Organization
+
+    organization_id = resolve_organization_id()
+    back = redirect(url_for("targets.index", **org_query_suffix(organization_id)))
+    if not _locked(organization_id):
+        return back
+    if session.get(_REQUESTED_KEY) == organization_id:
+        flash("Pyyntösi on jo lähetetty. Olemme yhteydessä pian.", "info")
+        return back
+    organization = db.session.get(Organization, organization_id)
+    request_targets_access(organization, actor=current_user)
+    log_audit(
+        "targets_access_requested",
+        user_id=current_user.id,
+        organization_id=organization_id,
+        target_type="organization",
+        target_id=organization_id,
+    )
+    db.session.commit()
+    session[_REQUESTED_KEY] = organization_id
+    flash("Kiitos! Pyyntösi on lähetetty. Olemme yhteydessä ja avaamme kohteet heti, kun sopimus on voimassa.", "success")
+    return back
 
 
 @targets_bp.route("/transfer", methods=["POST"])
