@@ -110,9 +110,9 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <p class="lead" style="margin-top:24px;width:620px">Näin löydät taloyhtiöiden tulevat remontit, siirrät parhaat kohteet liideiksi ja viet ne kaupaksi. Mukana myyjän päivittäinen työ ja ylläpitäjän asetukset.</p>
   </div>
   <div style="position:absolute;left:64px;right:64px;top:470px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
-    <div class="card"><div class="num">1</div><h3 style="margin-top:12px;font-size:18px">Hae kohteita</h3><p style="font-size:14px">Kohteet-sivu</p></div>
+    <div class="card"><div class="num">1</div><h3 style="margin-top:12px;font-size:18px">Avaa Kohteet</h3><p style="font-size:14px">Uudet taloyhtiöt heti näkyvissä</p></div>
     <div class="card"><div class="num">2</div><h3 style="margin-top:12px;font-size:18px">Valitse parhaat</h3><p style="font-size:14px">Sopivuus ja suodattimet</p></div>
-    <div class="card"><div class="num">3</div><h3 style="margin-top:12px;font-size:18px">Siirrä liideiksi</h3><p style="font-size:14px">Soittolista ja sekvenssi</p></div>
+    <div class="card"><div class="num">3</div><h3 style="margin-top:12px;font-size:18px">Siirrä liideiksi</h3><p style="font-size:14px">Soittolista ja sähköposti</p></div>
     <div class="card" style="background:#221d3f;border-color:#3a3170"><div class="num">4</div><h3 style="margin-top:12px;font-size:18px">Vie kaupaksi</h3><p style="font-size:14px">Myyntiputki ja tarjous</p></div>
   </div>
   <div class="foot"><span>flowlysolutions.net</span><span class="mid">Kuvien tiedot ovat kuvitteellisia</span><span class="mono">1 / 12</span></div>
@@ -126,7 +126,7 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <h2>Kirjautuminen ja roolit</h2>
   </div>
   <div class="body grid c3" style="top:212px;bottom:auto;align-items:start">
-    <div class="card p"><div class="bar"></div><h3>Käyttöönotto</h3><p>Avaa Flowlyn lähettämä kutsulinkki (voimassa 7 päivää), aseta vähintään 12 merkin salasana ja paina <span class="ui">Viimeistele käyttöönotto</span>. Valmiina odottavat hakuprofiili koko Suomesta, sähköpostisekvenssi ja 14 päivän kokeilu.</p></div>
+    <div class="card p"><div class="bar"></div><h3>Käyttöönotto</h3><p>Avaa Flowlyn lähettämä kutsulinkki (voimassa 7 päivää), aseta vähintään 12 merkin salasana ja paina <span class="ui">Viimeistele käyttöönotto</span>. Valmiina odottaa hakuprofiili urakoillesi koko Suomesta. Ensimmäiset kohteet näkyvät noin 10 minuutin kuluttua.</p></div>
     <div class="card"><div class="bar"></div><h3>Kaksivaiheinen tunnistautuminen</h3><p>Pakollinen ylläpitäjälle. Skannaa QR-koodi todennussovelluksella, kirjoita koodi ja tallenna varakoodit. Unohtunut salasana: <span class="ui">Unohditko salasanan?</span> kirjautumissivulla.</p></div>
     <div class="card"><div class="bar"></div><h3>Roolit</h3><p><b>Myyjä</b> käyttää kohteita, liidejä, tehtäviä, soittolistaa ja tarjouksia. Myyjän siirrot tulevat hänen omiksi liideikseen.</p><p style="margin-top:8px"><b>Ylläpitäjä</b> hallitsee lisäksi käyttäjiä, urakoita, koosteita, sähköpostia, integraatioita ja tilausta.</p></div>
   </div>
@@ -154,11 +154,11 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
 <!-- 4 KOHTEET -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Kohteet</div><h2>Hae ja rajaa kohteet</h2></div>
+  <div class="top"><div class="eyebrow">Kohteet</div><h2>Löydä ja rajaa kohteet</h2></div>
   <div class="col">
     <ul class="ck">
-      <li><span class="ui">Hae kohteita</span> tuo uudet taloyhtiöt näkyviin. Haku kestää 10–15 s, ja sen voi tehdä kerran tunnissa.</li>
-      <li>Suodattimet: <b>Remontti, Maakunta, Kaupunki, Remontti alkaa, Talotyyppi</b> ja <b>Vain yhteystiedolliset</b></li>
+      <li>Uudet taloyhtiöt tulevat Kohteet-sivulle heti, kun ne löytyvät. Ne on merkitty tunnuksella <span class="ui">uusi</span>.</li>
+      <li>Suodattimet: <b>Remontti, Maakunta, Kaupunki, Remontti alkaa, Talotyyppi</b> ja <b>Vain yhteystiedolliset</b>. Maakunnissa ovat kaikki 18, ja valitun maakunnan kaikki kunnat.</li>
       <li><b>Kerro mitä etsit</b>: kirjoita esim. ”putkiremontit Tampereella 2027 mennessä”, niin suodattimet asettuvat itse.</li>
       <li><b>Tallennetut haut</b> ilmoittavat uusista osumista (enintään 15 per käyttäjä).</li>
       <li>Puuttuva tieto ei koskaan pudota kohdetta pois rajauksesta.</li>
@@ -187,9 +187,9 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
     <h3 style="font-size:18px;margin-bottom:12px">Siirrä liideiksi</h3>
     <ul class="ck">
       <li style="font-size:15.5px">Valitse kohteet valintaruuduista.</li>
-      <li style="font-size:15.5px">Valitse <span class="ui">Vastuuhenkilö</span> (ylläpitäjä) ja <span class="ui">Sekvenssi</span>, ja rastita tarvittaessa <span class="ui">Lisää soittolistalle</span>.</li>
+      <li style="font-size:15.5px">Valitse <span class="ui">Vastuuhenkilö</span> (ylläpitäjä) ja rastita tarvittaessa <span class="ui">Lisää soittolistalle</span>.</li>
       <li style="font-size:15.5px">Paina <span class="ui">Siirrä valitut liideiksi</span>.</li>
-      <li style="font-size:15.5px">Ilman sähköpostia liidi ei mene sekvenssiin, ilman puhelinta ei soittolistalle. Sivu varoittaa ennen siirtoa.</li>
+      <li style="font-size:15.5px">Liidi ilman puhelinnumeroa ei mene soittolistalle. Sivu varoittaa ennen siirtoa.</li>
       <li style="font-size:15.5px"><span class="ui">Piilota</span> siirtää kohteen Piilotetut-välilehdelle, josta sen saa takaisin.</li>
       <li style="font-size:15.5px">Samasta taloyhtiöstä tulee aina vain yksi liidi.</li>
     </ul>
@@ -225,7 +225,7 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
   <div class="col">
     <ul class="ck">
       <li>Liidin yrityksenä on taloyhtiö ja yhteyshenkilönä isännöitsijä.</li>
-      <li>Liidisivulla: <b>Miksi kohde löytyi</b>, <span class="ui">Lähetä sähköposti</span>, <span class="ui">Kirjaa soitto</span>, tehtävät, sekvenssit, tapaamiset ja tarjoukset.</li>
+      <li>Liidisivulla: <b>Miksi kohde löytyi</b>, <span class="ui">Lähetä sähköposti</span>, <span class="ui">Kirjaa soitto</span>, muistiinpanot, tehtävät, tapaamiset ja tarjoukset.</li>
       <li><b>Myyntiputki</b>: vedä kortti vaiheesta toiseen. Uusi liidi → Kontaktoitu → Kvalifioitu → Tarjous lähetetty → Voitettu / Hävitty.</li>
       <li>Hävitylle valitaan syy, joka näkyy raporteissa.</li>
       <li><span class="ui">Tuo CSV</span> (enintään 2000 riviä) ja <span class="ui">Vie</span>: CSV, HubSpot- tai Pipedrive-tiedosto.</li>
@@ -253,24 +253,21 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
   <div class="foot"><span>flowlysolutions.net</span><span class="mono">8 / 12</span></div>
 </section>
 
-<!-- 9 SEKVENSSIT -->
+<!-- 9 SÄHKÖPOSTI -->
 <section class="s light">
   <img class="logo" src="logo-light.png" alt="Flowly Solutions">
-  <div class="top"><div class="eyebrow">Sähköposti ja sekvenssit</div><h2>Viestisarja lähtee puolestasi</h2></div>
+  <div class="top"><div class="eyebrow">Sähköposti</div><h2>Viestit suoraan liidiltä</h2></div>
   <div class="col">
-    <p>Valmis sekvenssi <b>”Taloyhtiöt: isännöitsijän lähestyminen”</b>:</p>
-    <table class="mini" style="margin-top:4px">
-      <tr><td>Heti</td><td>{{company}}: tuleva remontti</td></tr>
-      <tr><td>+4 pv</td><td>{{company}}: referenssit hallitukselle</td></tr>
-      <tr><td>+6 pv</td><td>{{company}}: palataanko asiaan myöhemmin?</td></tr>
-    </table>
-    <ul class="ck" style="margin-top:12px">
-      <li>Viestit 2 ja 3 jäävät pois, jos liidi on vastannut.</li>
-      <li>Aloita siirrossa tai liidin Sekvenssit-välilehdeltä. Lopeta: <span class="ui">Poista sekvenssistä</span>.</li>
+    <ul class="ck">
+      <li>Avaa liidi ja paina <span class="ui">Lähetä sähköposti</span>. Painike on pois käytöstä, jos liidillä ei ole sähköpostiosoitetta.</li>
+      <li>Valitse halutessasi valmis <span class="ui">Malli</span>, kirjoita aihe ja viesti ja tarkista <span class="ui">Esikatselu</span>.</li>
+      <li>Lähetetyt viestit näkyvät liidin <span class="ui">Sähköpostihistoria</span>-kohdassa.</li>
+      <li>Muualta lähetetyn viestin voi merkitä liidille painikkeella <span class="ui">Kirjaa sähköposti</span>.</li>
+      <li>Ylläpitäjä asettaa lähettäjän nimen ja osoitteen sekä viestimallit kohdassa <span class="ui">Asetukset → Sähköposti</span>. Vastaukset tulevat lähettäjän osoitteeseen.</li>
     </ul>
-    <div class="tip"><b>Ennen käyttöä:</b> muokkaa viestit omiksesi, eli lisää yrityksesi, referenssit ja yhteystiedot.</div>
+    <div class="tip"><b>Lisätoiminnot:</b> automaattiset sähköpostisekvenssit ja automaatiot eivät ole oletuksena käytössä. Flowly avaa ne organisaatiollesi erikseen.</div>
   </div>
-  <img class="shot" src="kuvat/sequence_builder.jpg" alt="">
+  <img class="shot" src="kuvat/email.jpg" alt="">
   <div class="foot"><span>flowlysolutions.net</span><span class="mono">9 / 12</span></div>
 </section>
 
@@ -301,11 +298,11 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
   <div class="top"><div class="eyebrow">Ylläpitäjälle</div><h2>Asetukset ja tilaus</h2></div>
   <div class="body grid c3" style="top:222px;bottom:auto;gap:18px">
     <div class="card" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Käyttäjät</h3><p style="font-size:16.5px"><span class="ui">Kutsu käyttäjä</span>: sähköposti, rooli ja <span class="ui">Lähetä kutsu</span>. Käyttäjiä rajattomasti.</p></div>
-    <div class="card p" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Urakat ja kohdehaku</h3><p style="font-size:16.5px">Remonttityypit ja valinnaiset rajaukset. Pidä profiili laajana ja rajaa Kohteet-sivulla.</p></div>
+    <div class="card p" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Urakat ja kohdehaku</h3><p style="font-size:16.5px">Kymmenen remonttityyppiä, esim. putki-, julkisivu- ja kattoremontti, ilmanvaihto ja yläpohjan lisäeristys. Pidä profiili laajana.</p></div>
     <div class="card" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Liidit ja koosteet</h3><p style="font-size:16.5px">Uuden liidin vaihe ja vastuuhenkilö sekä aamun koosteet uusista kohteista ja liideistä.</p></div>
     <div class="card" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Sähköposti ja tarjoukset</h3><p style="font-size:16.5px">Lähettäjän nimi ja osoite, sähköpostimallit sekä tarjousten oletukset ja logo.</p></div>
     <div class="card" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Integraatiot</h3><p style="font-size:16.5px">HubSpot (Private app -avain) tai Pipedrive (API-avain). Vienti ei luo kaksoiskappaleita.</p></div>
-    <div class="card p" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Tilaus</h3><p style="font-size:16.5px">149 €/kk (alv 0 %). 14 päivän kokeilu, kuukausisopimus, irtisanottavissa milloin tahansa.</p></div>
+    <div class="card p" style="padding:26px 28px;min-height:178px"><h3 style="font-size:21px">Tilaus</h3><p style="font-size:16.5px">149 €/kk (alv 0 %). Kuukausisopimus ilman määräaikaa, irtisanottavissa kuun loppuun. Tiedot saa aina ulos.</p></div>
   </div>
   <div class="foot"><span>flowlysolutions.net</span><span class="mono">11 / 12</span></div>
 </section>
@@ -316,9 +313,9 @@ kbd{font-family:inherit;font-size:12px;border:1px solid var(--line);border-botto
   <div class="top"><div class="eyebrow">Usein kysyttyä</div><h2>Kun jokin ei toimi</h2></div>
   <div style="position:absolute;left:64px;top:212px;width:620px">
     <table class="mini" style="font-size:14.5px">
-      <tr><td>Hae kohteita ei toimi</td><td>Haku onnistuu kerran tunnissa. Jos kokeilu tai sopimus on päättynyt, haku ja siirrot eivät ole käytössä.</td></tr>
-      <tr><td>Ei uusia kohteita</td><td>Kokeile myöhemmin, tai laajenna hakuprofiilia (urakat ja alueet).</td></tr>
-      <tr><td>Liidi ei mennyt sekvenssiin</td><td>Liidiltä puuttuu sähköposti tai viestit on peruttu. Lisää osoite ja aloita sekvenssi liidiltä.</td></tr>
+      <tr><td>Kohteet eivät aukea</td><td>Sopimus on päättynyt tai kohteet on suljettu. Liidit säilyvät. Ota yhteyttä Flowlyyn.</td></tr>
+      <tr><td>Uusia kohteita on vähän</td><td>Laajenna hakuprofiilia: lisää urakoita tai alueita kohdassa Urakat ja kohdehaku.</td></tr>
+      <tr><td>Sähköpostia ei voi lähettää</td><td>Liidiltä puuttuu sähköpostiosoite. Lisää se liidin tietoihin painikkeella Muokkaa.</td></tr>
       <tr><td>Liidi ei näy soittolistalla</td><td>Puhelinnumero puuttuu. Lisää numero ja luo Soitto-tehtävä.</td></tr>
       <tr><td>Puhelin hukassa</td><td>Kirjaudu varakoodilla tai pyydä ylläpitäjää nollaamaan tunnistautuminen.</td></tr>
     </table>
