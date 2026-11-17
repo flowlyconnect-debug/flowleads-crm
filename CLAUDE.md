@@ -37,7 +37,9 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   a target on Kohteet as soon as it is found (`released_at` = creation time).
 - **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
   `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
-  sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html`, the
+  sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html` (a sales page:
+  counts by renovation type / region from `locked_target_summary()`, empty skeleton rows, the plan card and "Ota kohteet
+  käyttöön" = `POST /targets/request-access`, which emails the superadmins; it never opens the targets), the
   map and every target action redirect there, Isännöitsijät / taloyhtiökortti show only what is already a lead,
   and digests, saved-search alerts and same-taloyhtiö merges skip the organization; the Hakuprofiilit "Viimeisimmät
   osumat" list names only leads. Leads stay. Matching goes on, so the count stays current. Superadmins are never

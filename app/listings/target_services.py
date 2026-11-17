@@ -104,6 +104,55 @@ def count_targets(organization_id: int, status: str = "pending") -> int:
     return _visible_match_ids(organization_id, status).count()
 
 
+def locked_target_summary(organization_id: int, *, now: datetime | None = None, top: int = 4) -> dict:
+    """What a customer without target access may see (targets/locked.html):
+    counts only, never a housing company, address or manager. The total, how
+    many arrived this week, and the largest renovation types and regions."""
+    from datetime import timedelta
+
+    now = now or _now()
+    visible = _visible_match_ids(organization_id, "pending")
+    total = visible.count()
+    if not total:
+        return {"total": 0, "new_week": 0, "by_type": [], "by_region": []}
+    rows = (
+        db.session.query(ListingMatch.id, ListingMatch.created_at, Listing.id, Listing.maakunta)
+        .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(ListingMatch.id.in_(visible))
+        .all()
+    )
+    week_ago = now - timedelta(days=7)
+    new_week = 0
+    regions: dict[str, int] = {}
+    listing_ids = []
+    for _, created_at, listing_id, maakunta in rows:
+        listing_ids.append(listing_id)
+        if created_at is not None:
+            aware = created_at if created_at.tzinfo else created_at.replace(tzinfo=now.tzinfo)
+            if aware > week_ago:
+                new_week += 1
+        if maakunta:
+            regions[maakunta] = regions.get(maakunta, 0) + 1
+    wanted = organization_wanted_types(organization_id)
+    types: dict[str, set[int]] = {}
+    for listing_id, kind in db.session.query(ListingRenovation.listing_id, ListingRenovation.remonttityyppi).filter(
+        ListingRenovation.listing_id.in_(listing_ids)
+    ):
+        if not wanted or kind in wanted:
+            types.setdefault(kind, set()).add(listing_id)
+
+    def _top(counts: dict[str, int]) -> list[dict]:
+        ordered = sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:top]
+        return [{"name": name, "count": count, "share": round(100 * count / total)} for name, count in ordered]
+
+    return {
+        "total": total,
+        "new_week": new_week,
+        "by_type": _top({kind: len(ids) for kind, ids in types.items()}),
+        "by_region": _top(regions),
+    }
+
+
 def list_targets(
     organization_id: int,
     *,
