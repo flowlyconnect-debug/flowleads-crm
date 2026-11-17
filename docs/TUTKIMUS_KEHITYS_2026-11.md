@@ -252,7 +252,7 @@ konsultti tekee tarjouspyynnön ja vertailun → yhtiökokous valtuuttaa. Paras 
 
 | Milloin | Mitä |
 |---|---|
-| **Viikko 1** | SSRF-korjaus automaatioon, URL-koodaus, varmuuskopio S3 + palautustesti, `SENTRY_DSN`, `PYTHONUNBUFFERED`. Viisi datasähköpostia (3.3). |
+| **Viikko 1** | SSRF-korjaus automaatioon (tehty 17.11., samalla korjattu webhookien osoitetarkistuksen aukko), URL-koodaus (tehty), `PYTHONUNBUFFERED` (tehty), datasähköpostien luonnokset (tehty: `docs/DATAKUMPPANIT_SAHKOPOSTILUONNOKSET.md`). Käyttäjälle: varmuuskopio S3 + palautustesti, `SENTRY_DSN`, sähköpostien lähetys. |
 | **Viikot 2–4** | Ryhti + PRH -tuonti, kansallinen taloyhtiörekisteri, ennustekohteet signaalityyppinä, lähdekohtainen terveys. Ensimmäisen kirjautumisen aloituslista. Piilotuksen syy. |
 | **Kuukausi 2** | Skaalautuvuuskorjaukset (6.1) ja indeksit. "Tänään"-näkymä ja soittolistan tulokset kauppaan. Energia-avustus-tunniste ja sekvenssi. Tuoteanalytiikan `events`-taulu. |
 | **Kuukausi 3** | Isännöintitoimistonäkymä ja rakennuttajakonsulttihakemisto. Tarjousseuranta ja referenssipaketti. Uudet remonttityypit (piha/salaojat, lämmitys). Kultajoukko Analyzerille. SearchJob-perinnön poisto. |

@@ -54,9 +54,13 @@ def check_webhook_url(url: str, *, resolve: bool = True) -> str:
         except (socket.gaierror, UnicodeError, OSError):
             return url
         for address in addresses:
+            # parse first, raise outside the try: UnsafeWebhookUrl is a
+            # ValueError too, and `except ValueError` swallowed it, so a name
+            # resolving to a private address used to pass
             try:
-                if _blocked(ipaddress.ip_address(address.split("%")[0])):
-                    raise UnsafeWebhookUrl("Webhook ei voi osoittaa sisäverkon tai paikalliseen osoitteeseen.")
+                ip = ipaddress.ip_address(address.split("%")[0])
             except ValueError:
                 continue
+            if _blocked(ip):
+                raise UnsafeWebhookUrl("Webhook ei voi osoittaa sisäverkon tai paikalliseen osoitteeseen.")
     return url

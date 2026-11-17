@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
+import requests
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
@@ -157,8 +156,15 @@ def evaluate_trigger_conditions(
 
 
 def _prepare_webhook_action_config(action_config: dict) -> dict:
-    """Strip plaintext secrets from headers; store encrypted_headers."""
+    """Strip plaintext secrets from headers; store encrypted_headers. The URL
+    must point at the public internet (no SSRF, app/webhooks/url_safety.py)."""
+    from app.webhooks.url_safety import UnsafeWebhookUrl, check_webhook_url
+
     config = dict(action_config or {})
+    try:
+        check_webhook_url(config.get("url") or "")
+    except UnsafeWebhookUrl as exc:
+        raise AutomationServiceError(str(exc), "validation_error") from exc
     headers = config.pop("headers", None) or {}
     secret_headers = config.pop("secret_headers", None) or {}
     if isinstance(secret_headers, dict) and secret_headers:
@@ -500,15 +506,22 @@ class AutomationEngine:
             except json.JSONDecodeError:
                 headers["Content-Type"] = "text/plain"
 
-        req = urllib.request.Request(url, data=data, method=method, headers=headers)
+        from app.webhooks.url_safety import UnsafeWebhookUrl, check_webhook_url
+
         try:
-            with urllib.request.urlopen(req, timeout=WEBHOOK_TIMEOUT_SECONDS) as resp:
-                if resp.status >= 400:
-                    return False, f"Webhook HTTP {resp.status}"
-        except urllib.error.HTTPError as exc:
-            return False, f"Webhook HTTP {exc.code}"
+            # checked again at send time (DNS may have changed, or an action
+            # saved before the check existed); redirects are not followed, so
+            # a public URL cannot bounce the request into the internal network
+            check_webhook_url(url)
+            response = requests.request(
+                method, url, data=data, headers=headers, timeout=WEBHOOK_TIMEOUT_SECONDS, allow_redirects=False
+            )
+        except UnsafeWebhookUrl as exc:
+            return False, str(exc)
         except Exception as exc:
             return False, str(exc)[:500]
+        if response.status_code >= 300:
+            return False, f"Webhook HTTP {response.status_code}"
         return True, None
 
     @staticmethod

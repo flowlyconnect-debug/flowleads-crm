@@ -1,6 +1,6 @@
 # Tuotantoon vienti – tilanne ja jatko
 
-Päivitetty 12.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
+Päivitetty 17.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
 **"Jatka FlowLeadsin tuotantoon vientiä"**, lue tämä tiedosto ja jatka kohdasta
 "Seuraavaksi". Päivitä tiedosto, kun kohtia valmistuu.
 
@@ -342,6 +342,21 @@ Korjattu:
 Huomioita: tuotannon Render-lokeissa ei virheitä 14.–16.11. Sovellusloki kirjoitetaan puskuroituun stdoutiin,
 joten 500-virheen traceback voi näkyä viiveellä; `PYTHONUNBUFFERED=1` Renderin ympäristömuuttujiin korjaa sen.
 Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaikuta tuotantoon.
+
+## Tehty 17.11.2026: julkiset rekisterit ja tutkimuksen viikon 1 korjaukset
+
+- Tutkimus `docs/TUTKIMUS_KEHITYS_2026-11.md`. Julkiset rekisterit (`app/registry/`, Ryhti + PRH) ja
+  "ennuste"-kohteet: kaikki pois päältä tuotannossa (ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`, "Julkiset rekisterit").
+  Migraatiot `f3a4b5c6d7e8` (rekisteritaulut) ja `a4b5c6d7e8f9` (`listings.is_estimate`).
+- **SSRF:** `app/webhooks/url_safety.py` päästi läpi nimen, joka osoittaa sisäverkon osoitteeseen (oma esto
+  periytyi `ValueError`ista ja jäi `except ValueError` -lohkoon). Korjattu. Automaation "Lähetä webhook" tarkistaa
+  nyt osoitteen tallennettaessa ja lähetettäessä eikä seuraa uudelleenohjauksia.
+- Tallennetun haun ilmoituslinkki URL-koodataan (ääkköset, välilyönnit, `&`).
+- `backfill_text_types` etenee kursorilla, joten osumattomat vihjerivit eivät enää tuki ensimmäistä sivua.
+- `PYTHONUNBUFFERED=1` molempiin palveluihin `render.yaml`:ssa (aseta myös Renderin dashboardissa, jos
+  blueprint-synkka ei ole käytössä).
+- Datakumppanien sähköpostiluonnokset: `docs/DATAKUMPPANIT_SAHKOPOSTILUONNOKSET.md` (käyttäjä lähettää).
+- Testit: `tests/test_registry.py`, `tests/test_registry_estimates.py`, `tests/test_week1_fixes.py`.
 
 ## Seuraavaksi
 

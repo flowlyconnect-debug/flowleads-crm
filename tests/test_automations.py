@@ -250,7 +250,7 @@ def test_failed_action_logged_without_breaking_lead_create(app):
                 {
                     "action_type": "send_webhook",
                     "action_config": {
-                        "url": "http://127.0.0.1:1/invalid",
+                        "url": "https://flowleads-test-hook.invalid/hook",
                         "method": "POST",
                         "body_template": "{}",
                     },
@@ -320,11 +320,11 @@ def test_notify_user_action(app):
         )
 
 
-@patch("urllib.request.urlopen")
-def test_webhook_action_success(mock_urlopen, app):
+@patch("app.webhooks.url_safety._resolve", return_value=["93.184.216.34"])
+@patch("app.automations.services.requests.request")
+def test_webhook_action_success(mock_request, _resolve, app):
     ctx = _setup_org(app, "webhook")
-    mock_resp = mock_urlopen.return_value.__enter__.return_value
-    mock_resp.status = 200
+    mock_request.return_value.status_code = 200
 
     with app.app_context():
         from app.automations.encryption import decrypt_webhook_headers, encrypt_webhook_headers
@@ -362,6 +362,8 @@ def test_webhook_action_success(mock_urlopen, app):
         )
         assert ok is True
         assert err is None
+        sent = mock_request.call_args
+        assert sent.kwargs["headers"]["X-Secret"] == "s3cret" and sent.kwargs["allow_redirects"] is False
         decrypted = decrypt_webhook_headers(enc)
         assert decrypted["X-Secret"] == "s3cret"
 

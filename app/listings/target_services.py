@@ -9,6 +9,7 @@ they do not want (`dismiss_targets`).
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlencode
 
 from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import aliased, contains_eager, joinedload
@@ -886,7 +887,10 @@ def notify_saved_searches(*, now: datetime | None = None) -> int:
         user = db.session.get(User, saved.user_id)
         if user is None or not user.is_active:
             continue
-        query = "&".join(f"{key}={value}" for key, value in (saved.params or {}).items())
+        # encoded: city names have umlauts and spaces, a search term may hold "&"
+        query = urlencode(
+            [(key, value) for key, value in (saved.params or {}).items() if value not in (None, "", [])], doseq=True
+        )
         message = (
             "1 uusi kohde vastaa tallennettua hakuasi."
             if count == 1
