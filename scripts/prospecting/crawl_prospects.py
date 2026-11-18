@@ -175,6 +175,9 @@ def person_from_email(e: str) -> str | None:
     return f"{a.capitalize()} {b.capitalize()}"
 
 
+FIRST_NAMES = {l.strip() for l in (Path(__file__).parent / "etunimet.txt").read_text(encoding="utf-8").splitlines()
+               if l.strip()} if (Path(__file__).parent / "etunimet.txt").exists() else set()
+
 GENERIC_LOCAL = ("info", "myynti", "toimisto", "yhteys", "asiakaspalvelu", "tarjous", "tarjoukset",
                  "palvelu", "posti", "office", "sales", "contact", "tilaukset")
 
@@ -206,8 +209,12 @@ def validate_row(r: dict) -> dict | None:
         if not (fn in local and ln[:4] in local):
             # osoite kuuluu eri henkilölle: käytetään osoitteen henkilöä yhteyshenkilönä
             r["yhteyshenkilo"], r["titteli"] = ep, ""
-    elif not ep and local not in GENERIC_LOCAL and "@" in email and email.split("@")[1] not in FREE_MAIL:
-        pass
+    # nimen pitää olla joko sähköpostiosoitteen vahvistama tai alkaa tunnetulla etunimellä
+    name = r["yhteyshenkilo"]
+    fn, _, ln = name.partition(" ")
+    confirmed = norm(fn) in local and norm(ln)[:4] in local
+    if not confirmed and FIRST_NAMES and fn.split("-")[0] not in FIRST_NAMES and fn not in FIRST_NAMES:
+        return None
     return r
 
 
