@@ -27,3 +27,4 @@ _pdfcheck.png
 *.zip.zip
 exports/prospektit*/
 exports/prospektit*.csv
+exports/flowleads_prospektit*.csv
