@@ -53,7 +53,7 @@
     <div class="leads-toolbar" role="toolbar" aria-label="Kohdelistan työkalupalkki">
       <nav class="leads-opp-tabs" aria-label="Näkymä">
         <a href="{{ tab_url('available') }}" class="leads-opp-tab{% if tab == 'available' %} is-active{% endif %}"{% if tab == 'available' %} aria-current="page"{% endif %}>
-          {{ 'Päätetyt ja suunnitellut' if need_tab else 'Saatavilla' }} <span class="targets-tab-count">{{ available_count }}</span>
+          {% if need_tab %}<span class="tab-label-long">Päätetyt ja suunnitellut</span><span class="tab-label-short">Kohteet</span>{% else %}Saatavilla{% endif %} <span class="targets-tab-count">{{ available_count }}</span>
         </a>
         {% if need_tab %}
         <a href="{{ tab_url('need') }}" class="leads-opp-tab{% if tab == 'need' %} is-active{% endif %}"{% if tab == 'need' %} aria-current="page"{% endif %} title="Taloyhtiöt, joilla remonttia ei ole päätetty eikä suunniteltu: ikäennusteet, öljylämmitys ja epämääräiset maininnat">

@@ -859,3 +859,10 @@ input[type=checkbox] { width: 24px; height: 24px; }
   .lp-facts { grid-template-columns: minmax(0, 1fr); }
   .lp-facts dt { border-bottom: 0; padding-bottom: 0; }
 }
+
+/* Kohteet tabs: the long main-list name does not fit a phone next to Tarve and Piilotetut */
+.tab-label-short { display: none; }
+@media (max-width: 640px) {
+  .tab-label-long { display: none; }
+  .tab-label-short { display: inline; }
+}
