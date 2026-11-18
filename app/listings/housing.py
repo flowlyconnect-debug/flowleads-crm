@@ -280,7 +280,7 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     independent signals point to it (5). Returns
     {"total": int, "parts": [{"key", "label", "points", "max", "detail"}]}.
     """
-    from app.listings.stages import STAGE_LABELS, STAGE_POINTS, best_stage
+    from app.listings.stages import STAGE_LABELS, STAGE_POINTS, best_stage, renovation_stage
 
     now = now or datetime.now(timezone.utc)
     listings = [l for l in listings if l is not None]
@@ -311,9 +311,11 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
         }
     )
 
-    years = [r.timing_year for r in renovations if r.timing_year]
+    # timing of the furthest renovations: an age estimate's year must not speed up a decided one
+    staged = [r for r in renovations if renovation_stage(r) == stage] or renovations
+    years = [r.timing_year for r in staged if r.timing_year]
     soonest = min(years) if years else None
-    points, detail = _timing_points(soonest, any((r.timing or "").strip() for r in renovations), now)
+    points, detail = _timing_points(soonest, any((r.timing or "").strip() for r in staged), now)
     parts.append({"key": "timing", "label": "Ajoitus", "points": points if renovations else 0, "max": 20, "detail": detail})
 
     phone = any((l.isannoitsija_puh or "").strip() or (getattr(l, "hallitus_pj_puh", None) or "").strip() for l in listings)

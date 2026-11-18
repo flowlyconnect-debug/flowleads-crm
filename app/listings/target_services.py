@@ -501,7 +501,9 @@ def list_targets(
     term = " ".join((search or "").split())
     if term:
         like = f"%{term}%"
-        query = query.filter(
+        # any listing of the housing company may carry the name (a register
+        # building of the same taloyhtiö has none): search them all
+        hits = db.session.query(Listing.id).filter(
             or_(
                 Listing.taloyhtio.ilike(like),
                 Listing.osoite.ilike(like),
@@ -509,6 +511,7 @@ def list_targets(
                 Listing.isannoitsija.ilike(like),
             )
         )
+        query = query.filter(_company_wide(hits))
     query = _apply_target_filters(query, filters or {})
     newest = func.coalesce(Listing.published_at, Listing.first_seen_at)
     sort = (filters or {}).get("sort")
@@ -798,9 +801,15 @@ def target_row(
         "signal_count": len(company),
         # the company's listings are all register buildings: "rakennusta", not "ilmoitusta"
         "all_estimates": all(other.is_estimate for other in company),
-        "title": listing.taloyhtio or listing.osoite or listing.external_id,
+        # the company's name from any source: the row's own listing may be a nameless register building
+        "title": _company_title(listing, company),
         "location": ", ".join(
-            p for p in ((listing.osoite if listing.taloyhtio else None), listing.kaupunki or listing.maakunta) if p
+            p
+            for p in (
+                (listing.osoite if _company_title(listing, company) != listing.osoite else None),
+                listing.kaupunki or listing.maakunta,
+            )
+            if p
         ),
         "renovation": renovation,
         "renovations": renovations,
@@ -819,6 +828,12 @@ def target_row(
         "fit_reasons": fit[1] if fit else [],
         "pts": pts_strip(renovations),
     }
+
+
+def _company_title(listing: Listing, company: list[Listing]) -> str:
+    housing = getattr(listing, "housing", None)
+    named = next((other.taloyhtio for other in company if other.taloyhtio), None)
+    return (housing.name if housing is not None and housing.name else None) or named or listing.osoite or listing.external_id
 
 
 def target_rows(organization_id: int, matches, wanted_types: set[str] | None = None, *, with_fit: bool = True) -> list[dict]:

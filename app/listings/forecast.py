@@ -171,9 +171,12 @@ def outlook(observations: list[Observation], done: dict[str, int], *, now: datet
         explained = False
         for rtype in PERMIT_TYPES & set(by_type):
             items = by_type[rtype]
-            if any(o.kind == "mention" and o.stage == "planned" for o in items):
+            planned = [o for o in items if o.kind == "mention" and o.stage == "planned"]
+            if planned:
+                # the permit decides it; the renovation keeps its planned year (the permit's is the decision's)
+                year = min((o.year for o in planned if o.year), default=permit.year)
                 items.append(
-                    Observation(rtype, "decided", permit.year, permit.confidence, "ryhti", "register", "permit", permit.text)
+                    Observation(rtype, "decided", year, permit.confidence, "ryhti", "register", "permit", permit.text)
                 )
                 explained = True
         if explained:

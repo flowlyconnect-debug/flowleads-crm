@@ -120,3 +120,32 @@ def test_the_outlook_raises_the_stored_score(app, org):
         _pipeline()
         after = ListingMatch.query.filter_by(listing_id=listing.id).one().score
         assert after > before  # the corroborated confidence counts
+
+
+def test_search_and_title_use_the_whole_company(app, org):
+    """The row may stand for a nameless register building: the company's name
+    still finds it and is its title."""
+    with app.app_context():
+        _building_with_signal()
+        _estimate_listing()
+        _oikotie_listing(remonttityyppi=PIPE, confidence=70, timing="2028", timing_year=2028, evidence="PTS:ssä 2028.")
+        _pipeline()
+        found = targets.list_targets(org, search="As Oy Koivukuja", segment=None).items
+        assert len(found) == 1
+        row = targets.target_rows(org, found, {PIPE, FACADE})[0]
+        assert row["title"] == "As Oy Koivukuja 5"
+
+
+def test_an_estimate_year_does_not_speed_up_a_decided_renovation(app):
+    from types import SimpleNamespace
+
+    from app.listings.housing import score_target
+
+    decided = SimpleNamespace(remonttityyppi=PIPE, confidence=80, timing_year=NOW.year + 4, timing=str(NOW.year + 4),
+                              stage="decided", evidence=None)
+    estimate = SimpleNamespace(remonttityyppi=FACADE, confidence=30, timing_year=NOW.year, timing=str(NOW.year),
+                               stage="need", evidence=None)
+    listing = SimpleNamespace(renovations=[decided, estimate], isannoitsija_puh=None, isannoitsija_email=None,
+                              isannoitsija=None, published_at=NOW, first_seen_at=NOW, housing_id=None)
+    parts = {p["key"]: p for p in score_target([listing], None, now=NOW)["parts"]}
+    assert parts["timing"]["detail"] == f"alkaa {NOW.year + 4}"

@@ -52,7 +52,7 @@ def test_listing_and_register_together_raise_the_confidence():
 
 def test_a_permit_decides_a_planned_renovation_that_needs_one():
     rows = outlook([_mention(FACADE, "planned", 2027), _register("Muu remontti", "permit", 2026, confidence=70)], {}, now=NOW)
-    assert [(r["remonttityyppi"], r["stage"]) for r in rows] == [(FACADE, "decided")]
+    assert [(r["remonttityyppi"], r["stage"], r["year"]) for r in rows] == [(FACADE, "decided", 2027)]  # the plan's year
 
 
 def test_a_permit_alone_stays_other_renovation():
