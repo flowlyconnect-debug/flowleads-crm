@@ -171,7 +171,7 @@ def test_crawler_analyzer_enricher_produce_enriched_leads(live_crm, tmp_path):
         assert l2.contact_status == "done"
         assert l2.contact_source == "finder"
         lead = Lead.query.filter_by(organization_id=org_id, source_ref="oikotie-1002").one()
-        assert lead.phone == "0409998888"
+        assert lead.phone == "040 999 8888"  # normalized (app/listings/normalize.py)
         assert lead.title == "Isännöitsijä: Avaimeton Isännöinti Oy"
 
 
