@@ -294,7 +294,7 @@ def test_locked_page_sells_without_showing_targets(client, app, monkeypatch):
         assert summary["by_region"][0]["name"] == "Uusimaa"
     _login(client, email)
     page = client.get("/targets").get_data(as_text=True)
-    assert ">149</span> € / kk" in page and PIPE in page and "Uusimaa" in page
+    assert ">149</span> € / kk" in page and "+ alv 25,5 %" in page and PIPE in page and "Uusimaa" in page
     assert 'data-testid="targets-request-access"' in page
     for text in ("As Oy Kohde", "Testitie", "Isännöinti", "Espoo"):
         assert text not in page
