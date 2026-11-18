@@ -422,6 +422,16 @@ tietää miksi ne näkyvät eikä joudu selaamaan. Muutokset:
 - Migraatio `a0b1c2d3e4f5`: profiilit ilman aikaikkunaa saavat oletuksen ja täsmätään uudelleen (asiakkaan oma arvo säilyy).
   Käyttöönotto ja kutsut asettavat saman oletuksen; vuoden vaihtuessa ikkuna siirtyy.
 
+## Tehty 18.11.2026 (8): asiakasseuranta ja asiakastiedotteet
+
+- **Asiakasseuranta** (`/admin/activity`): asiakaskohtaiset kirjautumiset ja IP-osoitteet, sivunavaukset, siirrot, viennit
+  (CSV, CRM, API) ja työstämättömät kohdeliidit; merkit "Vie liidejä ulos", "Siirtää mutta ei työstä", "Selaa paljon
+  yhteystietoja", "Tunnuksia käytetään monesta paikasta", "Massasiirto". Asiakkaan sivulla käyttäjät, päivät ja tapahtumat.
+  Laskenta alkaa tästä versiosta. Liidien CSV-vienti kirjataan nyt audit-lokiin.
+- **Asiakastiedotteet** (`/admin/announcements`): sähköposti asiakkaille Mailgunilla, testi ensin itselle, historia.
+  Vaatii `MAILGUN_FROM_EMAIL`:n ja `EMAIL_SENDING_ENABLED`:n Renderissä.
+- Migraatio `b1c2d3e4f5a6` (taulut `usage_daily`, `customer_announcements`).
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

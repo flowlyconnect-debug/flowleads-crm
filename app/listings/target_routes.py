@@ -190,6 +190,9 @@ def map_view():
     )
     rows = target_rows(organization_id, pagination.items, organization_wanted_types(organization_id))
     points = map_points(rows)
+    from app.core.usage import track
+
+    track("map_view", organization_id=organization_id)
     params = _current_params(search, profile_id, filters)
     if tab != "available":
         params["tab"] = tab
@@ -293,6 +296,9 @@ def index():
         and (seen if seen.tzinfo else seen.replace(tzinfo=timezone.utc)) > day_ago
     }
     current_params = _current_params(search, profile_id, filters)
+    from app.core.usage import track
+
+    track("targets_view", organization_id=organization_id)
     asked = session.pop(_ASK_KEY, None)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
@@ -412,6 +418,9 @@ def transfer():
         target_id=None,
         metadata={k: result[k] for k in ("created", "merged", "failed")} | {"lead_ids": result["lead_ids"][:50]},
     )
+    from app.core.usage import track
+
+    track("targets_transferred", result["created"], organization_id=organization_id, commit=False)
     db.session.commit()
 
     parts = []

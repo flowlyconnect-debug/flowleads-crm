@@ -213,6 +213,9 @@ def list_leads():
         data = list_leads_api(g.organization_id, request.args)
     except ApiServiceError as exc:
         return json_error(exc.code, exc.message, 400)
+    from app.core.usage import track
+
+    track("api_leads_read", len(data.get("leads") or []), organization_id=g.organization_id)
     return json_success(data)
 
 
@@ -224,6 +227,9 @@ def get_lead(lead_id: int):
         lead = get_lead_api(g.organization_id, lead_id)
     except ApiServiceError as exc:
         return json_error(exc.code, exc.message, 404)
+    from app.core.usage import track
+
+    track("api_leads_read", organization_id=g.organization_id)
     return json_success(
         {"lead": _serialize_lead_with_custom_fields(lead, g.organization_id)}
     )

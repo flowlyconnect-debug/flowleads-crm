@@ -334,6 +334,9 @@ def detail(lead_id):
         lead = get_lead_for_org(lead_id, organization_id)
     except LeadServiceError as exc:
         abort(404 if exc.code == "not_found" else 400)
+    from app.core.usage import track
+
+    track("lead_view", organization_id=organization_id)
 
     activities = (
         Activity.query.filter_by(lead_id=lead.id, organization_id=organization_id)
@@ -1000,11 +1003,29 @@ def import_leads_template():
     )
 
 
+def _record_export(organization_id: int, csv_data: str, mode: str) -> None:
+    """A CSV download of leads: counted for Asiakasseuranta and kept in the audit log."""
+    from app.core.audit import log_audit
+    from app.core.usage import track
+
+    rows = max(0, len([line for line in (csv_data or "").splitlines() if line.strip()]) - 1)
+    log_audit(
+        "leads_exported",
+        user_id=current_user.id,
+        organization_id=organization_id,
+        target_type="lead",
+        metadata={"rows": rows, "mode": mode},
+    )
+    track("leads_exported", rows, organization_id=organization_id, commit=False)
+    db.session.commit()
+
+
 @leads_bp.route("/export")
 def export_leads():
     organization_id = resolve_organization_id()
     filters = _filters_from_request()
     csv_data = LeadService.export_csv(organization_id, filters)
+    _record_export(organization_id, csv_data, "filter")
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return Response(
         csv_data,
@@ -1059,6 +1080,7 @@ def bulk_action():
     try:
         result = LeadService.bulk_action(action, lead_ids, organization_id, current_user.id, payload)
         if action == "export":
+            _record_export(organization_id, result["csv"], "selected")
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             return Response(
                 result["csv"],

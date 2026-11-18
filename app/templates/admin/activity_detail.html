@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% set row = detail.row %}
+{% block title %}{{ row.org.name }} — Asiakasseuranta{% endblock %}
+{% set level_class = {'check': 'badge-danger', 'watch': 'badge-warning-alt', 'ok': 'badge-neutral'} %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('activity') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <p class="text-sm"><a href="{{ url_for('admin.customer_activity_page', days=days) }}">Asiakasseuranta</a></p>
+          <h1 class="settings-panel__title">{{ row.org.name }} <span class="badge {{ level_class[row.level] }}">{{ row.level_label }}</span></h1>
+          <p class="settings-panel__subtitle">Viimeiset {{ days }} päivää ({{ detail.since.strftime('%d.%m.%Y') }} alkaen).</p>
+        </header>
+
+        <nav class="activity-periods" aria-label="Aikajakso">
+          {% for period in periods %}
+          <a href="{{ url_for('admin.customer_activity_detail_page', organization_id=row.org.id, days=period) }}" class="btn btn-sm {{ 'btn-primary' if period == days else 'btn-secondary' }}"{% if period == days %} aria-current="page"{% endif %}>{{ period }} pv</a>
+          {% endfor %}
+        </nav>
+
+        {% if row.signals %}
+        <h2 class="form-section-title">Huomiot</h2>
+        <ul class="activity-rules">
+          {% for signal in row.signals %}<li><b>{{ signal.title }}:</b> {{ signal.detail }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p>Ei huomioita tällä jaksolla.</p>
+        {% endif %}
+
+        <dl class="activity-stats">
+          <div><dt>Kirjautumiset</dt><dd>{{ row.logins }}</dd></div>
+          <div><dt>IP-osoitteet</dt><dd>{{ row.ips }}</dd></div>
+          <div><dt>Sivunavaukset</dt><dd>{{ row.views }}</dd></div>
+          <div><dt>Siirretty liideiksi</dt><dd>{{ row.transferred }}</dd></div>
+          <div><dt>Viety ulos</dt><dd>{{ row.exported }}</dd></div>
+          <div><dt>Työstämättä</dt><dd>{% if row.old_leads %}{{ row.unworked }}/{{ row.old_leads }}{% else %}–{% endif %}</dd></div>
+        </dl>
+
+        <h2 class="form-section-title">Mitä on tehty</h2>
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Toiminto</th><th class="num">Määrä</th></tr></thead>
+          <tbody>
+            {% for key, label in detail.metrics.items() %}
+            <tr><td>{{ label }}</td><td class="num mono">{{ row.usage.get(key, 0) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+
+        <h2 class="form-section-title">Käyttäjät</h2>
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Käyttäjä</th><th class="num">Kirjautumiset</th><th class="num">IP-osoitteet</th><th class="num">Sivunavaukset</th><th class="num">Siirretty</th><th class="num">Viety ulos</th></tr></thead>
+          <tbody>
+            {% for item in detail.users %}
+            <tr>
+              <td>{% if item.user %}{{ item.user.email }}{% if not item.user.is_active %} <span class="badge badge-inactive">Ei käytössä</span>{% endif %}
+                <div class="text-muted text-sm">{{ item.user.role }} · viimeksi {{ (item.user.last_login_at|helsinki).strftime('%d.%m.%Y %H:%M') if item.user.last_login_at else 'ei koskaan' }}</div>
+                {% else %}API-avaimet{% endif %}</td>
+              <td class="num mono">{{ item.logins }}</td>
+              <td class="num mono">{{ item.ips }}</td>
+              <td class="num mono">{{ item.views }}</td>
+              <td class="num mono">{{ item.transferred }}</td>
+              <td class="num mono">{{ item.exported }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+
+        <h2 class="form-section-title">Päivittäin</h2>
+        {% if detail.days %}
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Päivä</th><th class="num">Sivunavaukset</th><th class="num">Siirretty</th><th class="num">Viety ulos</th></tr></thead>
+          <tbody>
+            {% for day in detail.days %}
+            <tr><td class="mono">{{ day.day.strftime('%d.%m.%Y') }}</td><td class="num mono">{{ day.views }}</td><td class="num mono">{{ day.transferred }}</td><td class="num mono">{{ day.exported }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Ei käyttöä tällä jaksolla.</p>
+        {% endif %}
+
+        <h2 class="form-section-title">Viimeisimmät tapahtumat</h2>
+        {% if detail.events %}
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Aika</th><th>Käyttäjä</th><th>Tapahtuma</th><th>Tiedot</th><th>IP</th></tr></thead>
+          <tbody>
+            {% for event in detail.events %}
+            <tr>
+              <td class="mono">{{ (event.created_at|helsinki).strftime('%d.%m.%Y %H:%M') }}</td>
+              <td>{{ event.user.email if event.user else '–' }}</td>
+              <td>{{ event_labels.get(event.action, event.action) }}</td>
+              <td>{{ event_detail(event) }}</td>
+              <td class="mono">{{ event.ip_address or '–' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Ei tapahtumia.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

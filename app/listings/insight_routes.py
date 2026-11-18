@@ -49,6 +49,9 @@ def manager_detail():
     )
     if manager is None:
         abort(404)
+    from app.core.usage import track
+
+    track("manager_view", organization_id=organization_id)
     return render_template(
         "insights/manager_detail.html",
         manager=manager,
@@ -64,6 +67,9 @@ def company_card(listing_id: int):
     card = get_company_card(organization_id, listing_id, leads_only=_leads_only(organization_id))
     if card is None:
         abort(404)
+    from app.core.usage import track
+
+    track("company_card_view", organization_id=organization_id)
     from app.tasks.models import Task
 
     lead_ids = [lead.id for lead in card["leads"]]

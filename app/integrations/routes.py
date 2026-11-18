@@ -170,6 +170,17 @@ def export_file(provider: str):
         query = Lead.query.options(joinedload(Lead.stage))
         leads = LeadService._apply_filters(query, organization_id, _filters_from_request()).all()
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    from app.core.usage import track
+
+    log_audit(
+        "crm_file_exported",
+        user_id=current_user.id,
+        organization_id=organization_id,
+        target_type="lead",
+        metadata={"provider": provider, "rows": len(leads)},
+    )
+    track("crm_exported", len(leads), organization_id=organization_id, commit=False)
+    db.session.commit()
     return Response(
         "﻿" + import_file(provider, leads),
         mimetype="text/csv",
@@ -203,6 +214,9 @@ def _push(organization_id: int, provider: str, leads):
         target_id=None,
         metadata={"provider": provider, **{k: result[k] for k in ("created", "updated", "failed")}},
     )
+    from app.core.usage import track
+
+    track("crm_exported", result["created"] + result["updated"], organization_id=organization_id, commit=False)
     db.session.commit()
     return result
 

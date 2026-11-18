@@ -91,6 +91,16 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `plans.py`; an ended contract locks the targets like the access switch). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
+- **Asiakasseuranta** (superadmin `/admin/activity`, `app/admin/activity_services.py`): what each customer does, to spot one
+  that collects contacts to resell them. Daily counters `UsageDaily` via `app/core/usage.py::track(metric)` (page views of
+  Kohteet / taloyhtiökortti / Isännöitsijä / kartta / liidi, transfers, rows exported as CSV, to a CRM or read by API;
+  superadmins are never counted), logins with IP from the audit log, and catalogue leads with no work after 7 days. Signals
+  (thresholds at the top of the module): export, unworked, views_day / views_ratio, ips, bulk; 1 = Seuraa, 2+ = Tarkista.
+  Lead CSV exports are audited (`leads_exported`, `crm_file_exported`). Tests: `tests/test_customer_activity.py`.
+- **Asiakastiedotteet** (superadmin `/admin/announcements`, `app/admin/announcement_services.py`): one e-mail through Mailgun
+  to the customers' admins or all users, all or chosen customers; `{yritys}` = customer name, test to self first, replies go
+  to the sender, history in `CustomerAnnouncement`. Needs `EMAIL_SENDING_ENABLED` and `MAILGUN_FROM_EMAIL`.
+  Tests: `tests/test_announcements.py`.
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
   myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
   koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`

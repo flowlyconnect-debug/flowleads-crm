@@ -890,3 +890,115 @@ def reset_running_test_jobs_route():
 
     result = reset_running_test_jobs()
     return jsonify(result)
+
+
+ACTIVITY_PERIODS = (7, 30, 90)
+
+
+def _activity_days() -> int:
+    days = request.args.get("days", 30, type=int)
+    return days if days in ACTIVITY_PERIODS else 30
+
+
+@admin_bp.route("/activity")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def customer_activity_page():
+    """Asiakasseuranta: what each customer does with the targets (app/admin/activity_services.py)."""
+    from app.admin.activity_services import customer_activity
+
+    days = _activity_days()
+    return render_template(
+        "admin/activity.html", rows=customer_activity(days=days), days=days, periods=ACTIVITY_PERIODS
+    )
+
+
+@admin_bp.route("/activity/<int:organization_id>")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def customer_activity_detail_page(organization_id: int):
+    from app.admin.activity_services import EVENT_LABELS, customer_activity_detail, event_detail
+
+    days = _activity_days()
+    detail = customer_activity_detail(organization_id, days=days)
+    if detail is None:
+        abort(404)
+    return render_template(
+        "admin/activity_detail.html",
+        detail=detail,
+        days=days,
+        periods=ACTIVITY_PERIODS,
+        event_labels=EVENT_LABELS,
+        event_detail=event_detail,
+    )
+
+
+@admin_bp.route("/announcements", methods=["GET", "POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def announcements_page():
+    """Asiakastiedotteet: one e-mail to many customers through Mailgun (app/admin/announcement_services.py)."""
+    from app.admin.announcement_services import (
+        AUDIENCES,
+        AnnouncementError,
+        recent_announcements,
+        recipients,
+        send_announcement,
+    )
+    from app.core.messages_fi import fi_message
+    from app.email.services import email_sending_enabled
+    from app.users.models import Organization
+
+    form = {
+        "subject": (request.form.get("subject") or "").strip(),
+        "body": request.form.get("body") or "",
+        "audience": request.form.get("audience") or "admins",
+        "organization_ids": [int(v) for v in request.form.getlist("organization_ids") if v.isdigit()],
+    }
+    if form["audience"] not in AUDIENCES:
+        form["audience"] = "admins"
+    action = request.form.get("action") if request.method == "POST" else None
+    preview = None
+    if action in ("test", "send"):
+        try:
+            _announcement, outcome = send_announcement(
+                subject=form["subject"],
+                body=form["body"],
+                audience=form["audience"],
+                organization_ids=form["organization_ids"],
+                sender=current_user,
+                test_only=action == "test",
+            )
+        except AnnouncementError as exc:
+            flash(fi_message(str(exc)), "danger")
+        else:
+            if action == "test":
+                if outcome["failed"]:
+                    flash(f"Testiviesti epäonnistui: {outcome['failures'][0]['error']}", "danger")
+                else:
+                    flash(f"Testiviesti lähetetty osoitteeseen {current_user.email}.", "success")
+            else:
+                flash(
+                    f"Tiedote lähetetty {outcome['sent']} vastaanottajalle."
+                    + (f" {outcome['failed']} epäonnistui." if outcome["failed"] else ""),
+                    "warning" if outcome["failed"] else "success",
+                )
+                return redirect(url_for("admin.announcements_page"))
+    try:
+        preview = recipients(form["audience"], form["organization_ids"])
+    except AnnouncementError:
+        preview = []
+    return render_template(
+        "admin/announcements.html",
+        form=form,
+        audiences=AUDIENCES,
+        organizations=Organization.query.filter_by(is_active=True).order_by(Organization.name).all(),
+        preview=preview,
+        history=recent_announcements(),
+        sending_enabled=email_sending_enabled(),
+        mail_from=f"{current_app.config.get('MAILGUN_FROM_NAME') or 'FlowLeads'} <{current_app.config.get('MAILGUN_FROM_EMAIL') or 'osoite puuttuu'}>",
+        from_missing=not current_app.config.get("MAILGUN_FROM_EMAIL"),
+    )
