@@ -398,6 +398,11 @@ Ei muuta asiakkaan näkymiä vielä. Migraatio `e8f9a0b1c2d3`. Pull request
 https://github.com/flowlyconnect-debug/flowleads-crm/pull/42 on luonnos; käyttäjä päättää tuotantoon viennin,
 kaikki kerralla.
 
+## Tehty 18.11.2026 (5): ennuste taloyhtiötä kohden (vaihe 2/3)
+
+`app/listings/forecast.py` yhdistää lähteiden havainnot taloyhtiön remonttinäkymäksi (`HousingRenovation`).
+Ei muuta asiakkaan näkymiä vielä. Migraatio `f9a0b1c2d3e4`.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

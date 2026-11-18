@@ -21,7 +21,7 @@ from app.registry.sync import fetch_addresses, link_companies, sync_buildings, s
 
 logger = logging.getLogger(__name__)
 
-STEPS = ("buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "publish")
+STEPS = ("buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "outlook", "publish")
 
 
 def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, now: datetime | None = None) -> dict:
@@ -45,6 +45,12 @@ def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, n
         result["resolved"] = resolve_registry(now=now)  # the shared taloyhtiö of every row
     if "signals" in steps:
         result["signals"] = compute_signals(now=now)
+    if "outlook" in steps:
+        from app.listings.forecast import compute_outlooks
+        from app.registry.models import RegistryBuilding as _Building
+
+        ids = [cid for (cid,) in db.session.query(_Building.housing_id).filter(_Building.housing_id.isnot(None)).distinct()]
+        result["outlooks"] = compute_outlooks(company_ids=ids, now=now)  # new signals for every register company
     if "publish" in steps:
         from app.registry.publish import publish_targets
 

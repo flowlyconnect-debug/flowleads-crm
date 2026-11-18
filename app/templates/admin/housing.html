@@ -2,6 +2,7 @@
 {% from "_macros.html" import settings_nav with context %}
 {% block title %}Taloyhtiöt — Hallinta{% endblock %}
 {% set source_labels = {'oikotie': 'Oikotie', 'import': 'Tuonti', 'ryhti': 'Ryhti', 'prh': 'PRH'} %}
+{% set stage_names = {'decided': 'päätetty', 'planned': 'suunniteltu', 'need': 'tarve'} %}
 {% block content %}
 <div class="settings-page">
   <div class="settings-layout">
@@ -25,6 +26,11 @@
           <div><dt>Ryhdissä</dt><dd>{{ overview.in_ryhti }}</dd></div>
           <div><dt>Ilmoitus ja rekisteri</dt><dd>{{ overview.listings_and_registers }}</dd></div>
         </dl>
+        <p class="text-sm mt-2">
+          Remonttinäkymä: {{ overview.outlook_by_stage.get('decided', 0) }} taloyhtiöllä päätetty,
+          {{ overview.outlook_by_stage.get('planned', 0) }} suunniteltu ja {{ overview.outlook_by_stage.get('need', 0) }}
+          tarve (yhtiö voi olla useassa).
+        </p>
         <p class="text-muted text-sm mt-2">
           {{ overview.unresolved_listings }} ilmoitusta odottaa tunnistusta (ajastin käsittelee ne 10 minuutin välein).
           Nimettömät taloyhtiöt tunnetaan vain Ryhdin rakennuksen osoitteesta, kunnes jokin lähde nimeää ne.
@@ -37,7 +43,7 @@
         </form>
         {% if overview.search %}
         <table>
-          <thead><tr><th>Taloyhtiö</th><th>Sijainti</th><th>Rakennus</th><th>Lähteet</th></tr></thead>
+          <thead><tr><th>Taloyhtiö</th><th>Sijainti</th><th>Rakennus</th><th>Lähteet</th><th>Tulossa</th></tr></thead>
           <tbody>
             {% for row in overview.results %}
             {% set c = row.company %}
@@ -49,9 +55,17 @@
                 {% for s in c.sources or [] %}{{ source_labels.get(s, s) }}{% if not loop.last %}, {% endif %}{% endfor %}
                 <div class="text-muted text-sm">{{ row.listings }} ilmoitusta, {{ row.buildings }} rakennusta</div>
               </td>
+              <td class="text-sm">
+                {% for r in row.outlook %}
+                <div title="{% for e in r.evidence %}{{ source_labels.get(e.source, e.source) }}: {{ e.text }}&#10;{% endfor %}">
+                  {{ r.remonttityyppi }}: {{ stage_names[r.stage] }}{% if r.year %} {{ r.year }}{% endif %},
+                  <span class="mono">{{ r.confidence }} %</span>{% if r.estimate %} · ennuste{% endif %}
+                </div>
+                {% else %}<span class="text-muted">Ei tiedossa</span>{% endfor %}
+              </td>
             </tr>
             {% else %}
-            <tr><td colspan="4" class="text-muted">Ei osumia.</td></tr>
+            <tr><td colspan="5" class="text-muted">Ei osumia.</td></tr>
             {% endfor %}
           </tbody>
         </table>

@@ -263,9 +263,27 @@ kulkee saman putken läpi: **tunnistus → ennuste → kategorisointi asiakkaide
 - Superadmin: `/admin/housing` (Taloyhtiöt): määrät lähteittäin, montako on sekä ilmoituksessa että rekisterissä, haku.
 - Mitattu Tampere, Nokia ja Pirkkala: 9 439 taloyhtiötä 32 sekunnissa; esittelyilmoitukset löysivät Ryhdin rakennuksen
   osoitteella ja PRH:n yhtiön nimellä.
-- Seuraavaksi: vaihe 2 (havainnot ja ennustemoottori taloyhtiötä kohden: "remontti tehty" kumoaa ikäennusteen,
-  lupa nostaa vaiheen, useampi lähde nostaa varmuutta) ja vaihe 3 (täsmäys ja ryhmittely taloyhtiötasolla).
 - Testit: `tests/test_housing_registry.py`.
+
+### Vaihe 2/3: ennuste taloyhtiötä kohden (`app/listings/forecast.py`, `HousingRenovation`)
+
+Havainnot: ilmoitusten remonttimaininnat (vaihe, vuosi, varmuus, lainaus), ilmoitustekstin jo tehdyt remontit
+(`done_renovations`: "putket uusittu 2015" = tehty-verbi, mennyt vuosi, ei tulevaisuuden sanaa; tyyppi saa lähimmän
+vuoden) ja rakennusten rekisterisignaalit (lupa, öljylämmitys, ikä). Säännöt remonttityypeittäin:
+
+1. Tehty remontti tyypin tavallisen välin sisällä (putki 50 v, katto 35, julkisivu 40, sähkö 50, lämmitys 25 ...)
+   kumoaa saman tyypin ennusteet; ilmoituksen mainintaa se ei kumoa.
+2. Muutostyölupa tekee suunnitellusta luvanvaraisesta remontista (putki, julkisivu, katto, lämmitys, yläpohja)
+   päätetyn, eikä lupaa näytetä silloin erikseen "Muu remontti" -rivinä.
+3. Vaihe = pisimmälle edennyt havainto, vuosi = sen aikaisin, varmuus = paras +10, kun ilmoitus ja rekisteri
+   osoittavat samaan remonttiin (enintään 95). `estimate` = takana vain rekisteriarviot.
+4. Julkaistuja ennustekohteita (`Listing.is_estimate`) ei lasketa kahteen kertaan.
+
+Ajot: `compute_outlooks()` `listing_matching`-työssä muuttuneille (uusi tieto tai ilmoitus analysoitu edellisen
+laskennan jälkeen) ja rekisterihaun vaiheena `outlook` kaikille rekisteriin liittyville. Superadmin `/admin/housing`
+näyttää näkymän ja perusteet. Mitattu: 9 439 taloyhtiötä 1,3 sekunnissa. Testit: `tests/test_forecast.py`.
+
+Seuraavaksi: vaihe 3 (täsmäys ja ryhmittely taloyhtiötasolla, eli Kohteet lukee `HousingRenovation`-näkymää).
 
 ## Kuratoidut kohteet: laskenta, vaihe ja luokittelu ennen näkyvyyttä (18.11.2026)
 

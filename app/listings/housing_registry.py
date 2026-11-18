@@ -29,7 +29,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.listings.identity import business_id as normalize_business_id
 from app.listings.identity import company_name_key, municipality_key, street_key
-from app.listings.models import HousingCompany, HousingCompanyAddress, Listing
+from app.listings.models import HousingCompany, HousingCompanyAddress, HousingRenovation, Listing
 
 logger = logging.getLogger(__name__)
 
@@ -368,6 +368,11 @@ def housing_overview(search: str | None = None, *, limit: int = 30) -> dict:
         .distinct()
     }
     unresolved = Listing.query.filter(Listing.housing_id.is_(None)).count()
+    by_stage = dict(
+        db.session.query(HousingRenovation.stage, func.count(func.distinct(HousingRenovation.housing_id)))
+        .group_by(HousingRenovation.stage)
+        .all()
+    )
     results = []
     term = " ".join((search or "").split())
     if term:
@@ -385,6 +390,9 @@ def housing_overview(search: str | None = None, *, limit: int = 30) -> dict:
                     "company": company,
                     "listings": Listing.query.filter_by(housing_id=company.id).count(),
                     "buildings": RegistryBuilding.query.filter_by(housing_id=company.id).count(),
+                    "outlook": HousingRenovation.query.filter_by(housing_id=company.id)
+                    .order_by(HousingRenovation.confidence.desc())
+                    .all(),
                 }
             )
     return {
@@ -396,6 +404,7 @@ def housing_overview(search: str | None = None, *, limit: int = 30) -> dict:
         "in_ryhti": in_ryhti,
         "listings_and_registers": len(listing_ids & register_ids),
         "unresolved_listings": unresolved,
+        "outlook_by_stage": by_stage,
         "results": results,
         "search": term,
     }

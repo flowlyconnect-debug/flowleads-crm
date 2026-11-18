@@ -325,6 +325,8 @@ class HousingCompany(db.Model):
     sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    # when the renovation outlook (HousingRenovation, app/listings/forecast.py) was last computed
+    outlook_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     addresses: Mapped[list["HousingCompanyAddress"]] = relationship(
         "HousingCompanyAddress", back_populates="company", cascade="all, delete-orphan"
@@ -350,4 +352,31 @@ class HousingCompanyAddress(db.Model):
     municipality_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     company: Mapped[HousingCompany] = relationship("HousingCompany", back_populates="addresses")
+
+
+class HousingRenovation(db.Model):
+    """What is coming at a housing company, one row per renovation type,
+    combined from every source (app/listings/forecast.py): the furthest stage,
+    the expected year, a confidence that rises when independent sources agree,
+    and the evidence with its source."""
+
+    __tablename__ = "housing_renovations"
+    __table_args__ = (
+        UniqueConstraint("housing_id", "remonttityyppi", name="uq_housing_renovation_type"),
+        Index("ix_housing_renovations_type_stage", "remonttityyppi", "stage"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    housing_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    remonttityyppi: Mapped[str] = mapped_column(String(100), nullable=False)
+    stage: Mapped[str] = mapped_column(String(10), nullable=False)  # decided / planned / need
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[int] = mapped_column(Integer, nullable=False)
+    estimate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # only register estimates behind it
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # [{"source", "stage", "year", "confidence", "text"}], strongest first
+    evidence: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 

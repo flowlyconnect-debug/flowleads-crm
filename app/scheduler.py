@@ -292,6 +292,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 from app.listings.housing_registry import resolve_listings
 
                 resolve_listings()  # each listing to its taloyhtiö (one company across sources)
+                from app.listings.forecast import compute_outlooks
+
+                compute_outlooks(limit=2000)  # what is coming at the companies that changed
                 matched = rematch_profiles()
                 merge_into_existing_leads()
                 from app.listings.target_services import release_targets

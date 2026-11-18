@@ -246,7 +246,7 @@ def register_cli(app):
         "--step",
         "steps",
         multiple=True,
-        type=click.Choice(["buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "publish"]),
+        type=click.Choice(["buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "outlook", "publish"]),
         help="Aja vain nämä vaiheet (oletus: kaikki).",
     )
     @with_appcontext
