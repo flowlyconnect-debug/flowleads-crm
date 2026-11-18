@@ -252,6 +252,8 @@ class Crawler:
                                         follow_redirects=True, verify=True)
         self.dns_cache: dict[str, bool] = {}
         self.dns_errors = 0
+        self.last_hit = 0
+        self.stale_clients: list[httpx.AsyncClient] = []
         self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6),
                                             limits=httpx.Limits(max_connections=20))
         self.dns_sem = asyncio.Semaphore(20)
@@ -312,7 +314,7 @@ class Crawler:
                                                   headers={"accept": "application/dns-json"})
                 if r.status_code == 200:
                     data = r.json()
-                    if data.get("Status") in (0, 3):
+                    if data.get("Status") in (0, 2, 3, 5):
                         ok = bool(data.get("Answer"))
                         self.dns_cache[host] = ok
                         return ok
@@ -499,6 +501,18 @@ class Crawler:
             except Exception:
                 res = None
             self.done.add(co["y_tunnus"])
+            if res:
+                self.last_hit = len(self.done)
+            elif len(self.done) - self.last_hit > 400:
+                # 400 peräkkäistä ilman tulosta: yhteyspooli on todennäköisesti rikki -> uusi client
+                print("  vahtikoira: luodaan HTTP-client uudelleen", flush=True)
+                self.last_hit = len(self.done)
+                old, old_dns = self.client, self.dns_client
+                self.client = httpx.AsyncClient(headers=old.headers, timeout=httpx.Timeout(8, connect=5),
+                                                follow_redirects=True,
+                                                limits=httpx.Limits(max_connections=500, max_keepalive_connections=100))
+                self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6), limits=httpx.Limits(max_connections=20))
+                self.stale_clients.extend([old, old_dns])
             if len(self.done) % 100 == 0:
                 print(f"  käsitelty {len(self.done)}, hyväksyttyjä {len(self.results)}, "
                       f"DNS-virheitä {self.dns_errors}", flush=True)
