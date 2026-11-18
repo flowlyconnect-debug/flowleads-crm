@@ -18,7 +18,7 @@ from app.extensions import db
 from app.listings.housing import company_group, company_outlook, org_company_listings, score_label, score_level, score_target
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
-from app.listings.stages import best_stage
+from app.listings.stages import best_stage, renovation_stage
 from app.listings.services import _best_renovation, _merge_into_lead, _now, materialize_match
 from app.search.constants import FINNISH_REGIONS
 from app.search.municipalities import region_municipalities
@@ -827,7 +827,49 @@ def target_row(
         "fit": fit[0] if fit else None,
         "fit_reasons": fit[1] if fit else [],
         "pts": pts_strip(renovations),
+        "why": why_line(renovations, contact),
     }
+
+
+_WHY_STAGE = {"decided": "päätetty", "planned": "suunnitteilla", "need": "tarve"}
+
+
+def why_line(renovations, contact) -> str:
+    """Why the target is on the customer's list, in one plain sentence:
+    "Putkiremontti päätetty, alkaa 2027 · isännöitsijän puhelin ja sähköposti
+    tiedossa". The renovations are the customer's own types, best first."""
+    from app.listings.stages import STAGES
+
+    parts = []
+    # the furthest along first: a decided renovation is the reason, not a need beside it
+    ordered = sorted(
+        (r for r in renovations if r is not None),
+        key=lambda r: (STAGES.index(renovation_stage(r)) if renovation_stage(r) in STAGES else len(STAGES),
+                       -(r.confidence or 0) if hasattr(r, "confidence") else 0),
+    )
+    main = ordered[0] if ordered else None
+    if main is not None:
+        stage = renovation_stage(main)
+        text = f"{main.remonttityyppi} {_WHY_STAGE.get(stage, '')}".strip()
+        if main.timing_year:
+            text += f", {'alkaa' if stage == 'decided' else 'arviolta'} {main.timing_year}"
+        else:
+            text += ", aikataulu auki"
+        if getattr(main, "is_estimate", False):
+            text += " (arvio julkisista rekistereistä)"
+        others = len(ordered) - 1
+        if others:
+            text += f" + {others} {'muu urakkasi' if others == 1 else 'muuta urakkaasi'}"
+        parts.append(text)
+    phone = bool((getattr(contact, "isannoitsija_puh", None) or "").strip())
+    email = bool((getattr(contact, "isannoitsija_email", None) or "").strip())
+    if phone and email:
+        parts.append("isännöitsijän puhelin ja sähköposti tiedossa")
+    elif phone:
+        parts.append("isännöitsijän puhelin tiedossa")
+    elif email:
+        parts.append("isännöitsijän sähköposti tiedossa")
+    return " · ".join(parts)
 
 
 def _company_title(listing: Listing, company: list[Listing]) -> str:

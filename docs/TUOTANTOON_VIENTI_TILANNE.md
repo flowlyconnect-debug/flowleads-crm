@@ -410,6 +410,18 @@ ja täsmäys lukevat taloyhtiön yhdistettyä remonttinäkymää. **Näkyy asiak
 rekisterikohteet ovat yksi kohde, ja tehty remontti poistaa ennustekohteen. Ensimmäinen ajo tuotannossa tunnistaa
 kaikki ilmoitukset 2000 kerrallaan 10 minuutin välein.
 
+## Tehty 18.11.2026 (7): Kohteet näyttää profiiliin sopivat, ei 200 parasta
+
+Käyttäjän tarkennus: tavoite ei ole kiinteä määrä vaan se, että asiakas näkee profiilinsa perusteella oikeat kohteet,
+tietää miksi ne näkyvät eikä joudu selaamaan. Muutokset:
+- Kohde näkyy, kun urakan remontti on päätetty tai suunniteltu ja alkaa aikaikkunassa (oletus 3 vuotta: tänä vuonna ja
+  kahtena seuraavana). Ei 200 kohteen rajaa (`TARGETS_VISIBLE_LIMIT` 0, `TARGETS_MIN_TIER` C).
+- Tarve-välilehti → suljettu Ennakoi-osio listan alla.
+- Jokaisella rivillä selkokielinen syy; "päätetty"- ja "kuuma"-merkit poistettu (syy kertoo saman).
+- Harvemmin tarvitut hakuehdot "Lisää hakuehtoja" -kohdan taakse; alue on edelleen Koko Suomi ja asiakas rajaa sitä.
+- Migraatio `a0b1c2d3e4f5`: profiilit ilman aikaikkunaa saavat oletuksen ja täsmätään uudelleen (asiakkaan oma arvo säilyy).
+  Käyttöönotto ja kutsut asettavat saman oletuksen; vuoden vaihtuessa ikkuna siirtyy.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

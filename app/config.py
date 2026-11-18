@@ -116,21 +116,22 @@ class Config:
     LISTING_FULL_REGIONS_PER_RUN = int(os.environ.get("LISTING_FULL_REGIONS_PER_RUN", "2"))
     LISTING_FULL_REFRESH_DAYS = int(os.environ.get("LISTING_FULL_REFRESH_DAYS", "7"))
     LISTING_MATCH_HISTORY_DAYS = int(os.environ.get("LISTING_MATCH_HISTORY_DAYS", "30"))
-    # Kohteet shows a curated list, not every match: each match is scored and
-    # classified (A Kuuma / B Hyvä / C Seurattava, app/listings/housing.py::classify)
-    # when found, and only the best housing companies of the allowed classes are
-    # released to the customer, at most this many at a time; handled targets
-    # make room for the next ones. 0 = no limit. Per customer:
-    # Organization.targets_visible_limit / targets_min_tier (/admin/customers).
-    TARGETS_VISIBLE_LIMIT = int(os.environ.get("TARGETS_VISIBLE_LIMIT", "200"))
-    TARGETS_MIN_TIER = os.environ.get("TARGETS_MIN_TIER", "B").strip().upper() or "B"
+    # Kohteet shows what fits the customer's profile: every housing company whose
+    # wanted renovation is decided or planned and starts within the profile's
+    # window (SearchProfile.timing_within_years) is visible; only a need goes to
+    # the Ennakoi section. Each match is still scored and classified (A Kuuma /
+    # B Hyvä / C Seurattava, app/listings/housing.py::classify) for the order.
+    # An optional cap (0 = no limit) and lowest class remain for a superadmin,
+    # per customer: Organization.targets_visible_limit / targets_min_tier.
+    TARGETS_VISIBLE_LIMIT = int(os.environ.get("TARGETS_VISIBLE_LIMIT", "0"))
+    TARGETS_MIN_TIER = os.environ.get("TARGETS_MIN_TIER", "C").strip().upper() or "C"
     # a visible target the customer has not handled in this many days may give
     # its place to a clearly better waiting one (it goes back to the queue)
     TARGETS_SWAP_AFTER_DAYS = int(os.environ.get("TARGETS_SWAP_AFTER_DAYS", "3"))
-    # the Tarve tab: housing companies with only a need (no decided or planned
-    # renovation: age estimates, oil heating, vague mentions), at most this many
-    # at a time; -1 = no Tarve tab at all, 0 = no limit
-    TARGETS_NEED_LIMIT = int(os.environ.get("TARGETS_NEED_LIMIT", "50"))
+    # the Ennakoi section: housing companies with only a need (no decided or
+    # planned renovation: age estimates, oil heating, vague mentions), at most
+    # this many at a time; -1 = no section (needs join the main list), 0 = no limit
+    TARGETS_NEED_LIMIT = int(os.environ.get("TARGETS_NEED_LIMIT", "0"))
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))

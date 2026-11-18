@@ -80,7 +80,7 @@
                 </div>
                 <form method="post" action="{{ url_for('admin.set_customer_visibility_route', organization_id=row.org.id) }}" class="customer-sub-form">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <label class="text-sm" for="limit-{{ row.org.id }}">Näkyvissä enintään</label>
+                  <label class="text-sm" for="limit-{{ row.org.id }}">Näkyvissä enintään (0 = ei rajaa)</label>
                   <input type="number" min="0" max="5000" step="10" name="limit" id="limit-{{ row.org.id }}" value="{{ row.visible_limit }}" class="form-input form-input--compact" style="width:5.5rem;" title="0 = kaikki">
                   <select name="min_tier" class="form-input form-input--compact" aria-label="Näytettävät luokat"
                           title="A = kuumat, B = hyvät, C = seurattavat. Tarve-kohteilla on oma välilehtensä.">

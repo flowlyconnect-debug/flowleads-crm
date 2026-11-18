@@ -23,14 +23,17 @@
       <h1 class="leads-header__title">Kohteet</h1>
       <p class="leads-header__sub">
         {% if tab == 'need' %}
-        Taloyhtiöt, joilla remonttia ei ole vielä päätetty eikä suunniteltu: tarve näkyy iästä, lämmitystavasta tai
-        maininnasta. Hyviä yhteydenottoja ennen kuin hanke alkaa.
-        {% if waiting.queued %}Seuraavat {{ waiting.queued }} tulevat näkyviin, kun käsittelet näitä.{% endif %}
-        {% elif available_count %}
-        {{ available_count }} {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla{% if need_tab %}: remontti päätetty tai suunniteltu{% endif %}. Siirrä kiinnostavat liideiksi.
-        {% if waiting.queued %}Seuraavat {{ waiting.queued }} parasta tulevat näkyviin, kun käsittelet näitä.{% endif %}
+        Ennakoi: taloyhtiöt, joilla urakkasi remonttia ei ole vielä päätetty eikä suunniteltu. Tarve näkyy iästä,
+        lämmitystavasta tai maininnasta. Hyviä yhteydenottoja ennen kuin hanke alkaa.
+        <a href="{{ tab_url('available') }}">Takaisin kohteisiin</a>
+        {% elif is_hidden_tab %}
+        Piilottamasi kohteet. Palauta, jos haluat ne takaisin listalle.
         {% else %}
-        Hakuprofiiliisi osuvat taloyhtiöt näkyvät täällä. Siirrä kiinnostavat liideiksi.
+        {% if available_count %}<strong>{{ available_count }} {{ 'taloyhtiö sopii' if available_count == 1 else 'taloyhtiötä sopii' }} profiiliisi.</strong>{% endif %}
+        Näytämme taloyhtiöt, joissa {{ rule.types|join(' tai ')|lower if rule.types and rule.types|length <= 2 else 'jokin urakoistasi' }}
+        on päätetty tai suunniteltu{% if rule.until %} ja alkaa viimeistään {{ rule.until }}{% endif %}.
+        Jokaisella rivillä lukee, miksi se näkyy.
+        {% if waiting.queued %}Lisäksi {{ waiting.queued }} odottaa, kun käsittelet näitä.{% endif %}
         {% endif %}
       </p>
       {% if customer_locked %}
@@ -53,11 +56,11 @@
     <div class="leads-toolbar" role="toolbar" aria-label="Kohdelistan työkalupalkki">
       <nav class="leads-opp-tabs" aria-label="Näkymä">
         <a href="{{ tab_url('available') }}" class="leads-opp-tab{% if tab == 'available' %} is-active{% endif %}"{% if tab == 'available' %} aria-current="page"{% endif %}>
-          {% if need_tab %}<span class="tab-label-long">Päätetyt ja suunnitellut</span><span class="tab-label-short">Kohteet</span>{% else %}Saatavilla{% endif %} <span class="targets-tab-count">{{ available_count }}</span>
+          Kohteet <span class="targets-tab-count">{{ available_count }}</span>
         </a>
-        {% if need_tab %}
-        <a href="{{ tab_url('need') }}" class="leads-opp-tab{% if tab == 'need' %} is-active{% endif %}"{% if tab == 'need' %} aria-current="page"{% endif %} title="Taloyhtiöt, joilla remonttia ei ole päätetty eikä suunniteltu: ikäennusteet, öljylämmitys ja epämääräiset maininnat">
-          Tarve <span class="targets-tab-count">{{ need_count }}</span>
+        {% if tab == 'need' %}
+        <a href="{{ tab_url('need') }}" class="leads-opp-tab is-active" aria-current="page">
+          Ennakoi <span class="targets-tab-count">{{ need_count }}</span>
         </a>
         {% endif %}
         <a href="{{ tab_url('hidden') }}" class="leads-opp-tab{% if is_hidden_tab %} is-active{% endif %}"{% if is_hidden_tab %} aria-current="page"{% endif %}>
@@ -85,69 +88,15 @@
       </form>
     </div>
 
-    {# Plain-language search: the text becomes the filters below (app/listings/nl_search.py). #}
-    <form method="get" action="{{ url_for('targets.ask', **org_query) }}" class="targets-ask" role="search" aria-label="Kerro mitä etsit">
-      {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
-      {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
-      <label class="targets-ask__label" for="targets-ask-input">Kerro mitä etsit</label>
-      <input type="search" id="targets-ask-input" name="q" class="form-input targets-ask__input" maxlength="300"
-             value="{{ asked.text if asked else '' }}"
-             placeholder="esim. putkiremontit Tampereella 2027 mennessä, joilla on yhteystiedot">
-      <button type="submit" class="btn btn-secondary btn-sm">Hae</button>
-    </form>
-    {% if asked %}
-    <p class="targets-ask__result" role="status">
-      {% if asked.recognized %}
-      Tulkittiin: {% for label in asked.recognized %}<span class="badge badge-accent">{{ label }}</span>{% endfor %}
-      {% elif not asked.unknown %}
-      Haettiin nimellä tai osoitteella: <strong>{{ asked.text }}</strong>
-      {% else %}
-      Hakua ei tunnistettu.
-      {% endif %}
-      {% if asked.unknown %}<span class="targets-ask__unknown">Ei tunnistettu: {{ asked.unknown|join(', ') }}</span>{% endif %}
-      {% if asked.source == 'ai' %}<span class="targets-ask__unknown">(tekoälyn tulkinta)</span>{% endif %}
-      · Voit tarkentaa rajauksia alta.
-    </p>
-    {% endif %}
-
-    {# Saved searches: one click applies a stored filter combination; the bell turns its notifications on or off. #}
-    {% if (saved_searches or current_params) and not is_hidden_tab %}
-    <div class="targets-saved">
-      {% if saved_searches %}<span class="targets-saved__label">Tallennetut haut</span>{% endif %}
-      {% for saved in saved_searches %}
-      <span class="targets-saved__chip{% if saved.id == active_saved_id %} is-active{% endif %}">
-        <a href="{{ url_for('targets.index', **dict(org_query, **saved.params)) }}">{{ saved.name }}</a>
-        <form method="post" action="{{ url_for('targets.toggle_search_notify_route', search_id=saved.id, **org_query) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-          <button type="submit" class="targets-saved__icon{% if saved.notify %} is-on{% endif %}"
-                  title="{{ 'Ilmoitukset päällä: paina kytkeäksesi pois' if saved.notify else 'Ilmoitukset pois: paina kytkeäksesi päälle' }}"
-                  aria-label="Ilmoitukset haulle {{ saved.name }}: {{ 'päällä' if saved.notify else 'pois' }}">{{ 'ilmoitukset päällä' if saved.notify else 'ilmoitukset pois' }}</button>
-        </form>
-        <form method="post" action="{{ url_for('targets.delete_search_route', search_id=saved.id, **org_query) }}"
-              data-confirm="Poistetaanko tallennettu haku {{ saved.name }}?" onsubmit="return confirm(this.dataset.confirm);">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="targets-saved__icon" title="Poista tallennettu haku" aria-label="Poista haku {{ saved.name }}"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-        </form>
-      </span>
-      {% endfor %}
-      {% if current_params and not active_saved_id %}
-      <form method="post" class="targets-save-form" action="{{ url_for('targets.save_search_route', **org_query) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-        <input type="text" name="name" class="form-input" maxlength="80" placeholder="Nimi tälle haulle" aria-label="Tallennettavan haun nimi" required>
-        <button type="submit" class="btn btn-secondary btn-sm">Tallenna haku</button>
-      </form>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {# Filter bar: every choice applies at once. Maakunta lists all 18; a chosen maakunta lists all of its kunnat (plus villages its targets name); other filters offer only values that occur among the targets. #}
-    {% macro filter_select(name, label, options, all_label) -%}
+    {# Filter bar: the few choices most customers need stay in view (renovation, region, city, contact info);
+       the rest (start year, building type, order, plain-language search, saved searches) open under
+       "Lisää hakuehtoja". Every choice applies at once. Maakunta lists all 18; a chosen maakunta lists all of
+       its kunnat (plus villages its targets name). The extra selects join the filter form with form="". #}
+    {% macro filter_select(name, label, options, all_label, form_id=none) -%}
     {% if options|length > 1 or filters.get(name) %}
     <label class="targets-filter">
       <span class="targets-filter__label">{{ label }}</span>
-      <select name="{{ name }}" class="form-input targets-filter__select" onchange="this.form.submit()">
+      <select name="{{ name }}" class="form-input targets-filter__select" onchange="this.form.submit()"{% if form_id %} form="{{ form_id }}"{% endif %}>
         <option value="">{{ all_label }}</option>
         {% for option in options %}
         <option value="{{ option }}"{% if filters.get(name) == option %} selected{% endif %}>{{ option }}</option>
@@ -156,13 +105,13 @@
     </label>
     {% endif %}
     {%- endmacro %}
-    <form method="get" class="targets-filters" aria-label="Rajaa kohteita">
+    <form method="get" class="targets-filters" id="targets-filter-form" aria-label="Rajaa kohteita">
       {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
       {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
       {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
       {{ filter_select('renovation', 'Remontti', filter_options.renovations, 'Kaikki remontit') }}
-      {{ filter_select('region', 'Maakunta', filter_options.regions, 'Kaikki maakunnat') }}
+      {{ filter_select('region', 'Maakunta', filter_options.regions, 'Koko Suomi') }}
       <script>
         (function () {
           var region = document.currentScript.parentNode.querySelector('select[name=region]');
@@ -175,36 +124,96 @@
         })();
       </script>
       {{ filter_select('city', 'Kunta' if filters.get('region') else 'Kaupunki', filter_options.cities, 'Koko maakunta' if filters.get('region') else 'Kaikki kaupungit') }}
-      {% macro year_select() -%}
-      {% if filter_options.years|length > 1 or filters.get('year') %}
-      <label class="targets-filter">
-        <span class="targets-filter__label">Remontti alkaa</span>
-        <select name="year" class="form-input targets-filter__select" onchange="this.form.submit()">
-          <option value="">Milloin tahansa</option>
-          {% for option in filter_options.years %}
-          <option value="{{ option }}"{% if filters.get('year') == option %} selected{% endif %}>viimeistään {{ option }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      {% endif %}
-      {%- endmacro %}
-      {{ year_select() }}
-      {{ filter_select('building', 'Talotyyppi', filter_options.buildings, 'Kaikki talotyypit') }}
       <label class="targets-filter targets-filter--check">
         <input type="checkbox" name="contact" value="1"{% if filters.get('contact') == '1' %} checked{% endif %} onchange="flSubmitFilters(this.form)">
         <span>Vain yhteystiedolliset</span>
       </label>
-      <label class="targets-filter targets-filter--sort">
-        <span class="targets-filter__label">Järjestys</span>
-        <select name="sort" class="form-input targets-filter__select" onchange="flSubmitFilters(this.form)">
-          {% for value, label in sort_options %}
-          <option value="{{ value }}"{% if filters.get('sort', '') == value %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
       {% if filtered %}<a class="targets-filters__clear" href="{{ tab_url(tab) }}">Tyhjennä rajaukset</a>{% endif %}
       <noscript><button type="submit" class="btn btn-secondary btn-sm">Rajaa</button></noscript>
     </form>
+
+    {% set more_open = filters.get('year') or filters.get('building') or filters.get('sort') or asked or active_saved_id %}
+    <details class="targets-more"{% if more_open %} open{% endif %}>
+      <summary>Lisää hakuehtoja</summary>
+      <div class="targets-more__filters">
+        {% if filter_options.years|length > 1 or filters.get('year') %}
+        <label class="targets-filter">
+          <span class="targets-filter__label">Remontti alkaa</span>
+          <select name="year" class="form-input targets-filter__select" onchange="this.form.submit()" form="targets-filter-form">
+            <option value="">Milloin tahansa</option>
+            {% for option in filter_options.years %}
+            <option value="{{ option }}"{% if filters.get('year') == option %} selected{% endif %}>viimeistään {{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        {{ filter_select('building', 'Talotyyppi', filter_options.buildings, 'Kaikki talotyypit', 'targets-filter-form') }}
+        <label class="targets-filter targets-filter--sort">
+          <span class="targets-filter__label">Järjestys</span>
+          <select name="sort" class="form-input targets-filter__select" onchange="flSubmitFilters(this.form)" form="targets-filter-form">
+            {% for value, label in sort_options %}
+            <option value="{{ value }}"{% if filters.get('sort', '') == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+
+      {# Plain-language search: the text becomes the filters above (app/listings/nl_search.py). #}
+      <form method="get" action="{{ url_for('targets.ask', **org_query) }}" class="targets-ask" role="search" aria-label="Kerro mitä etsit">
+        {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
+        {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
+        <label class="targets-ask__label" for="targets-ask-input">Kerro mitä etsit</label>
+        <input type="search" id="targets-ask-input" name="q" class="form-input targets-ask__input" maxlength="300"
+               value="{{ asked.text if asked else '' }}"
+               placeholder="esim. putkiremontit Tampereella 2027 mennessä, joilla on yhteystiedot">
+        <button type="submit" class="btn btn-secondary btn-sm">Hae</button>
+      </form>
+      {% if asked %}
+      <p class="targets-ask__result" role="status">
+        {% if asked.recognized %}
+        Tulkittiin: {% for label in asked.recognized %}<span class="badge badge-accent">{{ label }}</span>{% endfor %}
+        {% elif not asked.unknown %}
+        Haettiin nimellä tai osoitteella: <strong>{{ asked.text }}</strong>
+        {% else %}
+        Hakua ei tunnistettu.
+        {% endif %}
+        {% if asked.unknown %}<span class="targets-ask__unknown">Ei tunnistettu: {{ asked.unknown|join(', ') }}</span>{% endif %}
+        {% if asked.source == 'ai' %}<span class="targets-ask__unknown">(tekoälyn tulkinta)</span>{% endif %}
+        · Voit tarkentaa rajauksia yllä.
+      </p>
+      {% endif %}
+      {# Saved searches: one click applies a stored filter combination; the bell turns its notifications on or off. #}
+      {% if (saved_searches or current_params) and not is_hidden_tab %}
+      <div class="targets-saved">
+        {% if saved_searches %}<span class="targets-saved__label">Tallennetut haut</span>{% endif %}
+        {% for saved in saved_searches %}
+        <span class="targets-saved__chip{% if saved.id == active_saved_id %} is-active{% endif %}">
+          <a href="{{ url_for('targets.index', **dict(org_query, **saved.params)) }}">{{ saved.name }}</a>
+          <form method="post" action="{{ url_for('targets.toggle_search_notify_route', search_id=saved.id, **org_query) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+            <button type="submit" class="targets-saved__icon{% if saved.notify %} is-on{% endif %}"
+                    title="{{ 'Ilmoitukset päällä: paina kytkeäksesi pois' if saved.notify else 'Ilmoitukset pois: paina kytkeäksesi päälle' }}"
+                    aria-label="Ilmoitukset haulle {{ saved.name }}: {{ 'päällä' if saved.notify else 'pois' }}">{{ 'ilmoitukset päällä' if saved.notify else 'ilmoitukset pois' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('targets.delete_search_route', search_id=saved.id, **org_query) }}"
+                data-confirm="Poistetaanko tallennettu haku {{ saved.name }}?" onsubmit="return confirm(this.dataset.confirm);">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="targets-saved__icon" title="Poista tallennettu haku" aria-label="Poista haku {{ saved.name }}"><svg class="i-x" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </form>
+        </span>
+        {% endfor %}
+        {% if current_params and not active_saved_id %}
+        <form method="post" class="targets-save-form" action="{{ url_for('targets.save_search_route', **org_query) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% for key, value in current_params.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+          <input type="text" name="name" class="form-input" maxlength="80" placeholder="Nimi tälle haulle" aria-label="Tallennettavan haun nimi" required>
+          <button type="submit" class="btn btn-secondary btn-sm">Tallenna haku</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </details>
 
     {% if transferred_leads %}
     <div class="targets-transferred" role="status">
@@ -224,11 +233,11 @@
       {% if filtered %}
         {{ empty_state(none, "Ei osumia näillä rajauksilla", "Kokeile toista hakusanaa tai väljempiä rajauksia.", "Tyhjennä rajaukset", tab_url(tab)) }}
       {% elif is_hidden_tab %}
-        {{ empty_state(none, "Ei piilotettuja kohteita", "Kohteet, jotka piilotat Saatavilla-listalta, löytyvät täältä.") }}
+        {{ empty_state(none, "Ei piilotettuja kohteita", "Kohteet, jotka piilotat, löytyvät täältä.") }}
       {% elif not profiles %}
         {{ empty_state(none, "Hakuprofiilia ei ole vielä", "Kohteet haetaan hakuprofiilin perusteella: alueet ja remonttityypit.", "Luo hakuprofiili" if can_edit_profiles else none, url_for('settings.search_profiles_list', id='new', **org_query) if can_edit_profiles else none) }}
       {% else %}
-        {{ empty_state(none, "Ei uusia kohteita juuri nyt", "Uudet hakuprofiiliisi osuvat taloyhtiöt ilmestyvät tänne sitä mukaa kun niitä löytyy.") }}
+        {{ empty_state(none, "Ei profiiliisi sopivia kohteita juuri nyt", "Taloyhtiöt, joissa urakkasi remontti päätetään tai suunnitellaan, ilmestyvät tänne sitä mukaa kun niitä löytyy.") }}
       {% endif %}
     </div>
     {% else %}
@@ -302,7 +311,8 @@
                  data-has-phone="{{ '1' if (listing.isannoitsija_puh or '').strip() else '0' }}"
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
-            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}{% if row.stage == 'decided' %} <span class="target-row__stage" title="Taloyhtiö on päättänyt remontista (yhtiökokous, kilpailutus, urakoitsija tai lupa)">päätetty</span>{% endif %}{% if row.tier == 'A' %} <span class="target-row__tier" title="Kuuma kohde: vahva signaali, remontti alkaa kahden vuoden sisällä ja yhteystiedot ovat tiedossa">kuuma</span>{% endif %}{% if row.estimate %} <span class="target-row__estimate" title="Arvio julkisista rekistereistä (rakennusvuosi, lämmitys, luvat), ei ilmoituksesta tai taloyhtiöltä saatu tieto. Tarkista ennen tarjousta.">ennuste</span>{% endif %}</span>
+            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}{% if row.estimate %} <span class="target-row__estimate" title="Arvio julkisista rekistereistä (rakennusvuosi, lämmitys, luvat), ei ilmoituksesta tai taloyhtiöltä saatu tieto. Tarkista ennen tarjousta.">ennuste</span>{% endif %}</span>
+            {% if row.why %}<span class="target-row__why">{{ row.why }}</span>{% endif %}
             <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}{% if row.signal_count > 1 %} · <a class="target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} {{ 'rakennusta' if row.all_estimates else 'ilmoitusta' }} samasta taloyhtiöstä</a>{% endif %}</span>
           </div>
           <div class="target-row__pts">{{ pts_cells(row.pts) }}</div>
@@ -393,6 +403,23 @@
       </nav>
       {% endif %}
     </footer>
+    {% endif %}
+    {% if ahead and ahead.total %}
+    {# Ennakoi: housing companies with only a need, closed under the main list (app/listings/stages.py). #}
+    <details class="targets-ahead">
+      <summary>Ennakoi: {{ ahead.total }} {{ 'taloyhtiö' if ahead.total == 1 else 'taloyhtiötä' }}, joilla urakkasi remontti on vasta tarve</summary>
+      <p class="targets-ahead__intro">Remonttia ei ole vielä päätetty eikä suunniteltu. Tarve näkyy talon iästä, lämmitystavasta
+        tai maininnasta. Näistä tulee hyviä yhteydenottoja ennen kuin hanke alkaa.</p>
+      <ul class="targets-ahead__list">
+        {% for item in ahead.rows %}
+        <li>
+          <a href="{{ url_for('insights.company_card', listing_id=item.listing.id, **org_query) }}">{{ item.title }}</a>
+          <span class="targets-ahead__why">{{ [item.location, item.why]|select|join(' · ') }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <a class="btn btn-secondary btn-sm" href="{{ tab_url('need') }}">{{ 'Avaa' if ahead.total <= ahead.rows|length else 'Näytä kaikki ' ~ ahead.total }}</a>
+    </details>
     {% endif %}
     {% if can_edit_profiles and not is_hidden_tab %}
     <form method="post" class="targets-digest" action="{{ url_for('targets.digest_setting', **org_query) }}">

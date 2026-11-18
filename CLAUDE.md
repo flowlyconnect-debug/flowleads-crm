@@ -33,17 +33,22 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
-- **Curated Kohteet** (18.11.2026; replaces "every match is visible at once"): each renovation has a **stage**
-  (`app/listings/stages.py`, `ListingRenovation.stage`: decided / planned / need; the Analyzer's `vaihe`, else rules on the
-  evidence). Each match is scored (`housing.score_target`: stage 20, confidence 30, timing 20, contact 15, fresh 10,
-  signals 5) and classified when found (`ListingMatch.tier`: A Kuuma / B Hyvä / C Seurattava for decided or planned,
-  **T Tarve** for only a need; `housing.classify`, an estimate is never A). `target_services.release_targets` makes the best
-  housing companies visible (`released_at`; NULL = waiting) on two lists: the main list (at most `TARGETS_VISIBLE_LIMIT` 200,
-  classes down to `TARGETS_MIN_TIER` B; per customer on `/admin/customers`) and the **Tarve** tab (`TARGETS_NEED_LIMIT` 50,
-  -1 = no tab, needs then count as C). Moving to leads / hiding refills at once; a clearly better waiting company (better
-  class or +10 points) replaces the weakest one visible ≥ `TARGETS_SWAP_AFTER_DAYS` (3) days. "New" = released after.
-  `TestingConfig` turns the gate and the Tarve tab off for the older catalogue tests; `tests/test_target_release.py` and
-  `tests/test_renovation_stages.py` test them with production values. Full table: architecture doc "Kuratoidut kohteet".
+- **Kohteet = what fits the profile** (18.11.2026; no fixed count): a housing company is visible when its wanted renovation
+  is **decided or planned** and starts within the profile's window (`SearchProfile.timing_within_years`, default
+  `app/search/constants.py::DEFAULT_TIMING_YEARS` 2 = this year and the next two, set by onboarding/invites and migration
+  `a0b1c2d3e4f5`; empty = any year; unknown years never exclude; `services.roll_timing_windows()` rematches when the year
+  turns). Only a need goes to the closed **Ennakoi** section under the list (`?tab=need` shows all). Each row says why in
+  one sentence (`target_services.why_line`: furthest stage first, start year, estimate, contact). The less used filters
+  (start year, building type, order, plain-language search, saved searches) sit under "Lisää hakuehtoja".
+  Each renovation has a **stage** (`app/listings/stages.py`, `ListingRenovation.stage`: decided / planned / need; the
+  Analyzer's `vaihe`, else rules on the evidence). Each match is scored (`housing.score_target`: stage 20, confidence 30,
+  timing 20, contact 15, fresh 10, signals 5) and classified (`ListingMatch.tier`: A / B / C for decided or planned, **T**
+  for only a need; `housing.classify`) for the order. `target_services.release_targets` still runs (`released_at`; NULL =
+  waiting), with the defaults `TARGETS_VISIBLE_LIMIT` 0 (no cap), `TARGETS_MIN_TIER` C and `TARGETS_NEED_LIMIT` 0; a
+  superadmin may still set a cap / lowest class per customer on `/admin/customers` (then swaps after
+  `TARGETS_SWAP_AFTER_DAYS`). `TestingConfig` turns Ennakoi off (-1) for the older catalogue tests;
+  `tests/test_profile_fit_targets.py`, `tests/test_target_release.py` (the optional cap) and `tests/test_renovation_stages.py`
+  test the rest. Full table: architecture doc "Kuratoidut kohteet".
 - **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
   `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
   sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html` (a sales page:

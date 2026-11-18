@@ -82,7 +82,10 @@ def test_a_decided_renovation_scores_above_a_planned_one(app):
 
 @pytest.fixture
 def production(app):
-    app.config.update(TARGETS_VISIBLE_LIMIT=200, TARGETS_MIN_TIER="B", TARGETS_NEED_LIMIT=50)
+    from app.config import Config  # the production defaults themselves
+
+    app.config.update(TARGETS_VISIBLE_LIMIT=Config.TARGETS_VISIBLE_LIMIT, TARGETS_MIN_TIER=Config.TARGETS_MIN_TIER,
+                      TARGETS_NEED_LIMIT=Config.TARGETS_NEED_LIMIT)
     yield
     app.config.update(TARGETS_VISIBLE_LIMIT=0, TARGETS_MIN_TIER="C", TARGETS_NEED_LIMIT=-1)
 
@@ -126,9 +129,12 @@ def test_needs_are_on_the_tarve_tab_not_the_main_list(app, client, production):
     with client.session_transaction() as session:
         session[TWO_FA_SESSION_KEY] = True
     main = client.get("/targets").get_data(as_text=True)
-    assert "As Oy Vaihe 1" in main and "As Oy Vaihe 3" not in main
-    assert 'class="target-row__stage"' in main  # "päätetty" on the decided one
-    assert "Tarve <span" in main
+    main_list, ahead = main.split('class="targets-ahead"')
+    assert "As Oy Vaihe 1" in main_list and "As Oy Vaihe 3" not in main_list
+    # each row says why it is shown; the decided one says so
+    assert f'class="target-row__why">Putkiremontti päätetty, alkaa {NOW.year + 1}' in main_list
+    # the need waits in the closed Ennakoi section under the list
+    assert "Ennakoi: 1 taloyhtiö," in ahead and "As Oy Vaihe 3" in ahead
     need = client.get("/targets?tab=need").get_data(as_text=True)
     assert "As Oy Vaihe 3" in need and "As Oy Vaihe 1" not in need
 

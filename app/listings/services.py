@@ -848,6 +848,26 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
     return added
 
 
+def roll_timing_windows(*, now: datetime | None = None) -> int:
+    """A profile's timing window ("alkaa viimeistään") counts from the current
+    year: once a year has turned, profiles with a window are rematched so
+    renovations that came within it become targets. Returns the profiles marked."""
+    now = now or _now()
+    year_start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+    stale = SearchProfile.query.filter(
+        SearchProfile.timing_within_years.isnot(None),
+        SearchProfile.is_active.is_(True),
+        SearchProfile.needs_rematch.is_(False),
+        SearchProfile.updated_at < year_start,
+    ).all()
+    for profile in stale:
+        profile.needs_rematch = True
+        profile.updated_at = now
+    if stale:
+        db.session.commit()
+    return len(stale)
+
+
 def rematch_profiles(*, now: datetime | None = None) -> int:
     total = 0
     for profile in SearchProfile.query.filter(SearchProfile.needs_rematch.is_(True)).all():

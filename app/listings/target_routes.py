@@ -327,7 +327,34 @@ def index():
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),
         customer_locked=customer_locked,
+        rule=_profile_rule(profiles, wanted_types),
+        ahead=_ahead_preview(organization_id, wanted_types) if tab == "available" and need_tab_enabled() else None,
     )
+
+
+def _profile_rule(profiles, wanted_types) -> dict:
+    """What decides which targets are shown, for the page header: the
+    customer's renovation types and the last start year of the active
+    profiles' window (None = any year)."""
+    from app.listings.services import _now
+
+    active = [p for p in profiles if p.is_active]
+    windows = [p.timing_within_years for p in active]
+    until = None if not active or any(w is None for w in windows) else _now().year + max(windows)
+    return {"types": sorted(wanted_types or []), "until": until}
+
+
+AHEAD_PREVIEW = 5
+
+
+def _ahead_preview(organization_id: int, wanted_types) -> dict:
+    """The closed Ennakoi section under the main list: how many housing
+    companies have only a need, and the best few with their reason."""
+    page = list_targets(organization_id, status="pending", segment="need", per_page=AHEAD_PREVIEW)
+    return {
+        "total": page.total,
+        "rows": target_rows(organization_id, page.items, wanted_types, with_fit=False) if page.items else [],
+    }
 
 
 @targets_bp.route("/request-access", methods=["POST"])

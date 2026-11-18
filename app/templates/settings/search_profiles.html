@@ -115,12 +115,12 @@
                 {% for city in city_suggestions %}<option value="{{ city }}">{% endfor %}
               </datalist>
 
-              <label class="form-label">Remontti enintään näin monen vuoden päässä (valinnainen)
+              <label class="form-label">Remontti alkaa enintään näin monen vuoden päästä
                 <input type="number" name="timing_within_years" class="form-input" min="0" max="30" step="1"
-                       placeholder="esim. 3"
-                       value="{{ selected_profile.timing_within_years if selected_profile and selected_profile.timing_within_years is not none else '' }}">
+                       placeholder="ei rajaa"
+                       value="{% if selected_profile %}{{ selected_profile.timing_within_years if selected_profile.timing_within_years is not none else '' }}{% else %}2{% endif %}">
               </label>
-              <p class="form-helper">Tyhjä = ajankohdalla ei väliä. Kohteet, joiden ilmoituksessa ei kerrota vuotta, tulevat aina mukaan.</p>
+              <p class="form-helper">2 = tänä vuonna ja kahtena seuraavana (oletus). Tyhjä = ajankohdalla ei väliä. Kohteet, joiden aikataulua ei tiedetä, tulevat aina mukaan.</p>
 
               {% set selected_building_types = (selected_profile.building_types or []) if selected_profile else [] %}
               <fieldset class="search-profiles-regions">

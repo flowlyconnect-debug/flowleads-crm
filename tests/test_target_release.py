@@ -252,6 +252,5 @@ def test_kohteet_tells_how_many_wait(app, client, curated):
     with client.session_transaction() as session:
         session[TWO_FA_SESSION_KEY] = True
     html = client.get("/targets").get_data(as_text=True)
-    assert "5 kohdetta saatavilla" in html and "remontti päätetty tai suunniteltu" in html
-    assert "Seuraavat 2 parasta tulevat näkyviin" in html
-    assert 'class="target-row__tier"' in html  # the hot one is marked
+    assert "5 taloyhtiötä sopii profiiliisi" in html and "on päätetty tai suunniteltu" in html
+    assert "Lisäksi 2 odottaa" in html

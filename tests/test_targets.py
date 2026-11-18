@@ -269,7 +269,7 @@ def test_targets_page_lists_and_transfers(app, client):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert "As Oy Näkyvä" in html and "As Oy Toinen" in html
-    assert "2 kohdetta saatavilla" in html
+    assert "2 taloyhtiötä sopii profiiliisi" in html
     assert "Isännöinti Näkyvä Oy" in html and LOCK in html
 
     # one row's own button
@@ -283,7 +283,7 @@ def test_targets_page_lists_and_transfers(app, client):
     response = client.post("/targets/dismiss", data={"match_ids": [ids[1]]}, follow_redirects=True)
     assert "1 kohde piilotettu" in response.get_data(as_text=True)
     assert "As Oy Toinen" in client.get("/targets?tab=hidden").get_data(as_text=True)
-    assert "Ei uusia kohteita" in client.get("/targets").get_data(as_text=True)
+    assert "Ei profiiliisi sopivia kohteita" in client.get("/targets").get_data(as_text=True)
     client.post("/targets/restore", data={"match_ids": [ids[1]], "tab": "hidden"})
     client.post("/targets/transfer", data={"match_ids": [ids[1]]})
     with app.app_context():

@@ -299,9 +299,19 @@ täsmätään uudelleen (`forecast._rematch`).
   siis ennustekohteen asiakkaalta.
 - Testit: `tests/test_housing_targets.py`.
 
-## Kuratoidut kohteet: laskenta, vaihe ja luokittelu ennen näkyvyyttä (18.11.2026)
+## Kuratoidut kohteet: profiiliin sopivat, selitettyinä (18.11.2026)
 
-Asiakas ei näe jokaista osumaa. Osumat lasketaan ja luokitellaan ensin, ja Kohteet-sivulle päästetään vain parhaat.
+Kohteet-sivu näyttää sen, mikä sopii asiakkaan profiiliin, ei kiinteää määrää parhaita. Taloyhtiö näkyy, kun
+- sen remontti on asiakkaan urakka ja profiilin alueella (oletus Koko Suomi, asiakas rajaa suodattimilla),
+- remontti on **päätetty tai suunniteltu** ja
+- se alkaa profiilin aikaikkunassa (`SearchProfile.timing_within_years`, oletus 2 = tänä vuonna ja kahtena seuraavana,
+  `DEFAULT_TIMING_YEARS`; tyhjä = ei rajaa; tuntematon vuosi ei sulje pois; vuoden vaihtuessa profiilit täsmätään
+  uudelleen, `roll_timing_windows`).
+
+Pelkät tarpeet ovat listan alla suljetussa **Ennakoi**-osiossa (5 parasta ja "Näytä kaikki" → `?tab=need`).
+Jokaisella rivillä on yksi selkokielinen syy (`target_services.why_line`), esim. "Putkiremontti päätetty, alkaa 2027 ·
+isännöitsijän puhelin ja sähköposti tiedossa". Harvemmin tarvitut hakuehdot (alkamisvuosi, talotyyppi, järjestys,
+"Kerro mitä etsit", tallennetut haut) ovat "Lisää hakuehtoja" -kohdan takana. Pisteet ja luokat järjestävät listan.
 
 ### 1. Remontin vaihe (`app/listings/stages.py`, `ListingRenovation.stage`)
 
@@ -336,20 +346,20 @@ Kohteet-sivun Sopivuus = pisteet × 0,9 + asiakkaan siirroista ja piilotuksista 
   (yhteystiedot ≥ 10). Ennuste ei ole koskaan A.
 - **B Hyvä**: päätetty tai suunniteltu, pisteet ≥ 50.
 - **C Seurattava**: päätetty tai suunniteltu, heikompi.
-- **T Tarve**: vain tarve. Näytetään omalla **Tarve**-välilehdellä, ei koskaan päälistalla.
+- **T Tarve**: vain tarve. Näytetään **Ennakoi**-osiossa, ei koskaan päälistalla.
 
 ### 4. Läpipäästö (`target_services.release_targets`, `released_at`; NULL = jonossa)
 
-Kaksi listaa, kumpikin omalla rajallaan: **päälista** ("Päätetyt ja suunnitellut") enintään `TARGETS_VISIBLE_LIMIT` (200)
-taloyhtiötä luokista `TARGETS_MIN_TIER` (B) ylöspäin, ja **Tarve** enintään `TARGETS_NEED_LIMIT` (50; -1 = ei
-välilehteä, jolloin tarve on päälistalla C:nä). Asiakaskohtaisesti `/admin/customers` (`targets_visible_limit`,
+Kaksi listaa: **päälista** (päätetyt ja suunnitellut) ja **Ennakoi** (tarpeet). Oletuksena kaikki profiiliin sopivat
+näkyvät: `TARGETS_VISIBLE_LIMIT` 0 (ei rajaa), `TARGETS_MIN_TIER` C, `TARGETS_NEED_LIMIT` 0 (-1 = ei Ennakoi-osiota,
+jolloin tarve on päälistalla C:nä). Superadmin voi silti asettaa asiakkaalle ylärajan tai alimman luokan. Asiakaskohtaisesti `/admin/customers` (`targets_visible_limit`,
 `targets_min_tier`). Parhaat ensin; saman taloyhtiön uusi ilmoitus liittyy näkyvään kohteeseen ilman paikkaa.
 Siirto ja piilotus täyttävät heti; täydellä listalla selvästi parempi (parempi luokka tai +10 pistettä) vaihtaa paikkaa
 heikoimman sellaisen kanssa, joka on ollut näkyvissä `TARGETS_SWAP_AFTER_DAYS` (3) päivää käsittelemättä.
 "Uusi" = näkyviin päästetty (päiväkooste, tallennetut haut, "uusi"-merkki; vain päälista). Sivupalkin luku on päälistan.
 
 Ajot: täsmäyksen jälkeen, `listing_matching` (10 min), `target_scores` (tunti), siirto, piilotus ja asetusmuutos.
-Testit: `tests/test_renovation_stages.py`, `tests/test_target_release.py`.
+Testit: `tests/test_profile_fit_targets.py`, `tests/test_renovation_stages.py`, `tests/test_target_release.py`.
 
 ## Julkiset rekisterit (Ryhti, PRH): vain sisäinen, ei asiakkaille
 
