@@ -376,6 +376,14 @@ tuntityökseen, "Sopivimmat ensin" pisteyttää vain sivulle mahtuvat ehdokkaat,
 `listing_matches(organization_id, status)` ja `listing_matches(lead_id)` (migraatio `b5c6d7e8f9a0`).
 Testit: `tests/test_scale_fixes.py`.
 
+## Tehty 18.11.2026 (2): kohteet luokitellaan ennen kuin asiakas näkee ne
+
+Käyttäjän pyyntö: asiakkaalla ei voi olla 12 000 kohdetta näkyvissä. Jokainen osuma pisteytetään ja luokitellaan heti
+(A Kuuma, B Hyvä, C Seurattava), ja Kohteet-sivulle päästetään enintään 200 parasta luokista A–B. Käsitellyt korvautuvat
+seuraavilla, ja selvästi parempi syrjäyttää heikoimman kolmen päivän jälkeen. Superadmin säätää rajan ja alimman luokan
+asiakaslistalla. Migraatio `c6d7e8f9a0b1` (jo näkyvät kohteet pysyvät näkyvissä). Kuvaus:
+`docs/ARKKITEHTUURI_KOHDEKATALOGI.md` ("Kuratoidut kohteet"). Testit: `tests/test_target_release.py`.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

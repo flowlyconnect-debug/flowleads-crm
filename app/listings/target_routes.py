@@ -20,6 +20,7 @@ from app.listings.target_services import (
     target_filter_options,
     organization_wanted_types,
     count_targets,
+    waiting_summary,
     dismiss_targets,
     enroll_transferred_leads,
     sequences_for_transfer,
@@ -284,8 +285,8 @@ def index():
     new_ids = {
         match.id
         for match in pagination.items
-        if match.created_at is not None
-        and (match.created_at if match.created_at.tzinfo else match.created_at.replace(tzinfo=timezone.utc)) > day_ago
+        if (seen := match.released_at or match.created_at) is not None
+        and (seen if seen.tzinfo else seen.replace(tzinfo=timezone.utc)) > day_ago
     }
     current_params = _current_params(search, profile_id, filters)
     asked = session.pop(_ASK_KEY, None)
@@ -315,6 +316,7 @@ def index():
         profiles=profiles,
         available_count=count_targets(organization_id, "pending"),
         hidden_count=count_targets(organization_id, "dismissed"),
+        waiting=waiting_summary(organization_id) if TABS[tab] == "pending" else {"queued": 0, "below": 0},
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),

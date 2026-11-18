@@ -182,6 +182,8 @@ class ListingMatch(db.Model):
         Index("ix_listing_matches_org_status", "organization_id", "status"),
         # FK with ON DELETE SET NULL, and same-taloyhtiö lead lookups
         Index("ix_listing_matches_lead_id", "lead_id"),
+        # curated release: the organization's waiting and visible matches
+        Index("ix_listing_matches_release", "organization_id", "status", "released_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -202,13 +204,17 @@ class ListingMatch(db.Model):
     confidence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     lead_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # When the match became visible on Kohteet: at creation (rows from the
-    # removed "Hae kohteita" reserve were released by migration d1e2f3a4b5c6).
+    # When the match became visible on Kohteet; NULL = classified but waiting
+    # (below the customer's class, or beyond the visible limit), see
+    # target_services.release_targets.
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 0-100, app/listings/housing.py::score_target over the housing company's
     # listings; refreshed by the scheduler (timing and freshness drift)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # A Kuuma / B Hyvä / C Seurattava (housing.classify), with the score. Only
+    # the allowed classes are released to Kohteet (released_at), best first.
+    tier: Mapped[str | None] = mapped_column(String(1), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing")
     profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821

@@ -33,8 +33,15 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
-- **No reserve** (the "Hae kohteita" button and `TARGET_FETCH_ENABLED` were removed 16.11.2026): every match is
-  a target on Kohteet as soon as it is found (`released_at` = creation time).
+- **Curated Kohteet** (18.11.2026; replaces "every match is visible at once"): each match is scored and classified when
+  found (`ListingMatch.score` / `tier`: A Kuuma = score ≥ 70 + renovation within 2 years + phone or email, B Hyvä ≥ 50,
+  C Seurattava; `housing.classify`, an estimate is never A). `target_services.release_targets` makes the best housing
+  companies of the allowed classes visible (`released_at`; NULL = waiting), at most `TARGETS_VISIBLE_LIMIT` (200) at a time,
+  classes down to `TARGETS_MIN_TIER` (B); per customer on `/admin/customers` (`Organization.targets_visible_limit`,
+  `targets_min_tier`). Moving to leads / hiding refills at once; a clearly better waiting company (better class or +10
+  points) replaces the weakest one visible ≥ `TARGETS_SWAP_AFTER_DAYS` (3) days, which goes back to the queue. "New" =
+  released after (digest, saved searches, the "uusi" badge). Kohteet says how many wait. `TestingConfig` turns the gate off
+  (limit 0, class C) for the older catalogue tests; `tests/test_target_release.py` tests it with production values.
 - **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
   `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
   sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html` (a sales page:

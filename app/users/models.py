@@ -44,6 +44,11 @@ class Organization(db.Model):
     # how many targets it has, but cannot open, move or hide them; its leads
     # stay (app/billing/services.py::targets_locked).
     targets_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true(), nullable=False)
+    # Curated Kohteet (app/listings/target_services.py::release_targets): how many
+    # housing companies are visible at a time and the lowest class shown.
+    # NULL = TARGETS_VISIBLE_LIMIT / TARGETS_MIN_TIER.
+    targets_visible_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    targets_min_tier: Mapped[str | None] = mapped_column(String(1), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

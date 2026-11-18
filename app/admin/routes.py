@@ -92,6 +92,50 @@ def set_customer_targets_route(organization_id: int):
     return redirect(url_for("admin.customers_list"))
 
 
+@admin_bp.route("/customers/<int:organization_id>/targets-visibility", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_visibility_route(organization_id: int):
+    """How many targets the customer sees at a time and the lowest class
+    (A Kuuma / B Hyvä / C Seurattava). Raising them releases more at once;
+    lowering them hides nothing that is already visible."""
+    from app.core.audit import log_audit
+    from app.listings.target_services import release_targets
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    try:
+        limit = max(0, min(5000, int(request.form.get("limit") or 0)))
+    except ValueError:
+        flash("Anna näkyvien kohteiden määrä numerona.", "danger")
+        return redirect(url_for("admin.customers_list"))
+    tier = (request.form.get("min_tier") or "B").upper()
+    if tier not in ("A", "B", "C"):
+        tier = "B"
+    organization.targets_visible_limit = limit
+    organization.targets_min_tier = tier
+    log_audit(
+        "customer_targets_visibility_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"limit": limit, "min_tier": tier},
+    )
+    db.session.commit()
+    released = release_targets(organization.id)
+    db.session.commit()
+    flash(
+        f"{organization.name}: näkyvissä enintään {limit or 'kaikki'} kohdetta, luokat A–{tier}"
+        + (f". {released} uutta tuli näkyviin." if released else "."),
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
 @login_required
 @require_role("superadmin")
@@ -211,6 +255,7 @@ AUDIT_ACTION_LABELS_FI = {
     "organization_features_updated": "Asiakkaan toiminnot muutettu",
     "source_activated": "Hakuprofiili aktivoitu",
     "catalogue_import": "Kohteita tuotu katalogiin",
+    "customer_targets_visibility_changed": "Asiakkaan näkyvät kohteet muutettu",
     "catalogue_offices_import": "Isännöintitoimistoja tuotu",
     "catalogue_alert_sent": "Katalogihälytys lähetetty",
     "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",

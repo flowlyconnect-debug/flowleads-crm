@@ -8,7 +8,7 @@ they do not want (`dismiss_targets`).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from sqlalchemy import String, cast, func, or_
@@ -56,18 +56,249 @@ def _visible_match_ids(
         .group_by(_group_column())
     )
     if status == "pending":
-        # hidden once = hidden for the organization, even when another of its
-        # profiles matches the same listing later
-        hidden = db.session.query(ListingMatch.listing_id).filter(
-            ListingMatch.organization_id == organization_id,
-            ListingMatch.status == "dismissed",
-        )
-        query = query.filter(
-            ListingMatch.listing_id.notin_(hidden), _not_in_companies(organization_id, ("dismissed",))
-        )
+        query = query.filter(*_not_hidden(organization_id))
+        # classified but not released yet (release_targets): not on Kohteet
+        query = query.filter(ListingMatch.released_at.isnot(None))
     if profile_id:
         query = query.filter(ListingMatch.profile_id == profile_id)
     return query
+
+
+def _not_hidden(organization_id: int) -> list:
+    """Hidden once = hidden for the organization, even when another of its
+    profiles matches the same listing (or company) later."""
+    hidden = db.session.query(ListingMatch.listing_id).filter(
+        ListingMatch.organization_id == organization_id,
+        ListingMatch.status == "dismissed",
+    )
+    return [ListingMatch.listing_id.notin_(hidden), _not_in_companies(organization_id, ("dismissed",))]
+
+
+# --- curated release ------------------------------------------------------------
+
+
+def visibility_settings(organization_id: int) -> tuple[int, str]:
+    """(how many housing companies may be visible at a time, 0 = no limit;
+    the lowest class shown) for the organization."""
+    from flask import current_app
+
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    limit = organization.targets_visible_limit if organization and organization.targets_visible_limit is not None else None
+    if limit is None:
+        limit = int(current_app.config.get("TARGETS_VISIBLE_LIMIT", 200) or 0)
+    tier = (organization.targets_min_tier if organization and organization.targets_min_tier else None) or str(
+        current_app.config.get("TARGETS_MIN_TIER", "B")
+    )
+    return max(0, int(limit)), tier.upper()
+
+
+def _waiting_query(organization_id: int, *columns):
+    """Open matches not released yet, outside housing companies that are
+    leads or hidden."""
+    already_lead = db.session.query(ListingMatch.listing_id).filter(
+        ListingMatch.organization_id == organization_id,
+        ListingMatch.status.in_(_LEAD_STATUSES),
+    )
+    return (
+        db.session.query(*columns)
+        .select_from(ListingMatch)
+        .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status == "pending",
+            ListingMatch.released_at.is_(None),
+            Listing.is_active.is_(True),
+            ListingMatch.listing_id.notin_(already_lead),
+            _not_in_companies(organization_id, _LEAD_STATUSES, with_lead=True),
+            *_not_hidden(organization_id),
+        )
+    )
+
+
+def _waiting_rows(organization_id: int):
+    """(match id, score, tier, company group) of the waiting matches."""
+    return _waiting_query(organization_id, ListingMatch.id, ListingMatch.score, ListingMatch.tier, _group_column()).all()
+
+
+def _visible_groups(organization_id: int) -> set[str]:
+    return {
+        group
+        for (group,) in db.session.query(_group_column())
+        .join(ListingMatch, ListingMatch.listing_id == Listing.id)
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")))
+    }
+
+
+def _pick_release(rows, visible: set[str], limit: int, min_tier: str) -> tuple[list[int], int, dict]:
+    """Which waiting matches to release: those of companies already visible
+    (free), then the best companies of an allowed class while there is room.
+    Returns (match ids, companies released, {group: (best score, best tier)}
+    of the companies still waiting)."""
+    from app.listings.housing import tier_allowed
+
+    release: list[int] = []
+    groups: dict[str, list] = {}
+    for match_id, score, tier, group in rows:
+        if group in visible:
+            release.append(match_id)
+        else:
+            groups.setdefault(group, []).append((match_id, score, tier))
+    best: dict[str, tuple[int, str | None]] = {}
+    for group, items in groups.items():
+        allowed = [i for i in items if tier_allowed(i[2], min_tier)]
+        top = max(allowed or items, key=lambda i: (i[1] if i[1] is not None else -1))
+        best[group] = (top[1] if top[1] is not None else -1, top[2] if allowed else None)
+    eligible = sorted((g for g, (_, tier) in best.items() if tier is not None), key=lambda g: (-best[g][0], g))
+    room = len(eligible) if not limit else max(0, limit - len(visible))
+    chosen = eligible[:room]
+    for group in chosen:
+        release.extend(match_id for match_id, _, _ in groups[group])
+        best.pop(group)
+    return release, len(chosen), best
+
+
+def release_targets(organization_id: int | None = None, *, now: datetime | None = None) -> int:
+    """Make the best classified matches visible on Kohteet. A customer sees
+    at most `limit` housing companies at a time, only of class `min_tier` or
+    better (visibility_settings), best score first; handling targets (moving
+    to leads, hiding) makes room for the next. Another listing of a company
+    that is already visible joins it at once. Returns the companies released.
+    Without `organization_id`: every organization with waiting matches."""
+    now = now or _now()
+    if organization_id is None:
+        ids = [
+            org_id
+            for (org_id,) in db.session.query(ListingMatch.organization_id)
+            .filter(ListingMatch.status == "pending", ListingMatch.released_at.is_(None))
+            .distinct()
+        ]
+        total = sum(release_targets(org_id, now=now) for org_id in ids)
+        db.session.commit()
+        return total
+    rows = _waiting_rows(organization_id)
+    if not rows:
+        return 0
+    limit, min_tier = visibility_settings(organization_id)
+    release, companies, waiting = _pick_release(rows, _visible_groups(organization_id), limit, min_tier)
+    withdraw: list[int] = []
+    if limit:
+        swap_in, withdraw, swapped = _swaps(organization_id, rows, waiting, now)
+        release.extend(swap_in)
+        companies += swapped
+    _set_released(release, now)
+    _set_released(withdraw, None)
+    if release or withdraw:
+        db.session.flush()
+        db.session.expire_all()
+    return companies
+
+
+def _set_released(match_ids: list[int], value) -> None:
+    for start in range(0, len(match_ids), 500):
+        ListingMatch.query.filter(ListingMatch.id.in_(match_ids[start : start + 500])).update(
+            {ListingMatch.released_at: value}, synchronize_session=False
+        )
+
+
+# A full list improves over time: a clearly better waiting company (a better
+# class, or this many more points) takes the place of the weakest visible one
+# that the customer has had for TARGETS_SWAP_AFTER_DAYS without handling it.
+# The one that leaves goes back to the queue. Fresh targets never vanish.
+SWAP_MARGIN = 10
+
+
+def _swaps(organization_id: int, rows, waiting: dict, now: datetime) -> tuple[list[int], list[int], int]:
+    """(match ids to release, match ids to send back to the queue, companies swapped)."""
+    from flask import current_app
+
+    from app.listings.housing import TIERS
+
+    days = int(current_app.config.get("TARGETS_SWAP_AFTER_DAYS", 3))
+    cutoff = now - timedelta(days=days)
+    eligible = sorted(
+        ((group, score, tier) for group, (score, tier) in waiting.items() if tier is not None),
+        key=lambda item: (TIERS.index(item[2]), -item[1]),
+    )
+    if not eligible:
+        return [], [], 0
+    visible_rows = (
+        db.session.query(ListingMatch.id, ListingMatch.score, ListingMatch.tier, ListingMatch.released_at, _group_column())
+        .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(
+            ListingMatch.organization_id == organization_id,
+            ListingMatch.status == "pending",
+            ListingMatch.released_at.isnot(None),
+            Listing.is_active.is_(True),
+        )
+        .all()
+    )
+    companies: dict[str, dict] = {}
+    for match_id, score, tier, released_at, group in visible_rows:
+        company = companies.setdefault(group, {"ids": [], "score": -1, "tier": "C", "since": released_at})
+        company["ids"].append(match_id)
+        company["score"] = max(company["score"], score if score is not None else -1)
+        if tier in TIERS and TIERS.index(tier) < TIERS.index(company["tier"]):
+            company["tier"] = tier
+        if released_at is not None and (company["since"] is None or released_at < company["since"]):
+            company["since"] = released_at
+
+    def old_enough(company) -> bool:
+        since = company["since"]
+        if since is None:
+            return True
+        return (since if since.tzinfo else since.replace(tzinfo=timezone.utc)) <= cutoff
+
+    weakest = sorted(
+        (c for c in companies.values() if old_enough(c)),
+        key=lambda c: (-TIERS.index(c["tier"]), c["score"]),
+    )
+    ids_by_group: dict[str, list[int]] = {}
+    for match_id, _, _, group in rows:
+        ids_by_group.setdefault(group, []).append(match_id)
+    swap_in: list[int] = []
+    withdraw: list[int] = []
+    swapped = 0
+    for group, score, tier in eligible:
+        if not weakest:
+            break
+        out = weakest[0]
+        better_class = TIERS.index(tier) < TIERS.index(out["tier"])
+        if not (better_class or (tier == out["tier"] and score >= out["score"] + SWAP_MARGIN)):
+            break  # the rest of the queue is no better
+        weakest.pop(0)
+        withdraw.extend(out["ids"])
+        swap_in.extend(ids_by_group.get(group, []))
+        swapped += 1
+    return swap_in, withdraw, swapped
+
+
+def waiting_summary(organization_id: int) -> dict:
+    """Companies classified but not visible: {"queued": of an allowed class,
+    waiting for room; "below": below the customer's class}. Counted in SQL:
+    shown on every Kohteet page."""
+    from app.listings.housing import TIERS
+
+    _, min_tier = visibility_settings(organization_id)
+    allowed = list(TIERS[: TIERS.index(min_tier if min_tier in TIERS else "B") + 1])
+    group = _group_column()
+    visible = (
+        db.session.query(group)
+        .select_from(ListingMatch)
+        .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")))
+    )
+    total = (
+        _waiting_query(organization_id, func.count(func.distinct(group))).filter(group.notin_(visible)).scalar() or 0
+    )
+    queued = (
+        _waiting_query(organization_id, func.count(func.distinct(group)))
+        .filter(group.notin_(visible), ListingMatch.tier.in_(allowed))
+        .scalar()
+        or 0
+    )
+    return {"queued": queued, "below": total - queued}
 
 
 def _group_column():
@@ -117,7 +348,7 @@ def locked_target_summary(organization_id: int, *, now: datetime | None = None, 
     if not total:
         return {"total": 0, "new_week": 0, "by_type": [], "by_region": []}
     rows = (
-        db.session.query(ListingMatch.id, ListingMatch.created_at, Listing.id, Listing.maakunta)
+        db.session.query(ListingMatch.id, ListingMatch.released_at, Listing.id, Listing.maakunta)
         .join(Listing, Listing.id == ListingMatch.listing_id)
         .filter(ListingMatch.id.in_(visible))
         .all()
@@ -472,6 +703,7 @@ def target_row(
         ),
         "renovation": renovation,
         "renovations": renovations,
+        "tier": match.tier,
         # every renovation shown is an estimate from the public registers
         "estimate": bool(renovations) and all(r.is_estimate for r in renovations),
         "seen_at": max(seen, key=lambda value: value.replace(tzinfo=None)) if seen else None,
@@ -611,6 +843,9 @@ def transfer_targets(
                 _merge_into_lead(sibling, sibling.listing, lead, now)
                 logged.add(sibling.listing_id)
         db.session.commit()
+    if result["created"] or result["merged"]:
+        release_targets(organization_id, now=now)  # room for the next ones
+        db.session.commit()
     return result
 
 
@@ -689,6 +924,9 @@ def _set_status(organization_id: int, match_ids, *, from_status: str, to_status:
                 item.status = to_status
                 item.dismissed_at = now if to_status == "dismissed" else None
     db.session.commit()
+    if changed and to_status == "dismissed":
+        release_targets(organization_id, now=now)  # room for the next ones
+        db.session.commit()
     return changed
 
 
@@ -706,12 +944,12 @@ def restore_targets(organization_id: int, match_ids) -> int:
 
 
 def count_new_targets(organization_id: int, since: datetime) -> int:
-    """Available targets whose match appeared after `since`."""
+    """Available targets that became visible (were released) after `since`."""
     return (
         db.session.query(func.count(ListingMatch.id))
         .filter(
             ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")),
-            ListingMatch.created_at > since,
+            ListingMatch.released_at > since,
         )
         .scalar()
         or 0
@@ -890,7 +1128,7 @@ def _matches_for_search(saved: SavedTargetSearch, since: datetime) -> int:
         ListingMatch.id.in_(
             _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id)
         ),
-        ListingMatch.created_at > since,
+        ListingMatch.released_at > since,
     )
     term = " ".join((params.get("search") or "").split())
     if term:

@@ -295,6 +295,36 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     return {"total": max(0, min(100, sum(p["points"] for p in parts))), "parts": parts}
 
 
+# Classes of a target, decided when it is found (before the customer sees it):
+# A = hot (strong, soon, reachable), B = good, C = keep an eye on. Kohteet
+# shows only the classes the customer gets (TARGETS_MIN_TIER), best first.
+TIERS = ("A", "B", "C")
+TIER_LABELS = {"A": "Kuuma", "B": "Hyvä", "C": "Seurattava"}
+TIER_A_SCORE = 70
+TIER_B_SCORE = 50
+
+
+def classify(score: dict, *, estimate: bool = False) -> str:
+    """The class of a scored housing company (score = score_target(...)).
+    A needs a high score, a renovation within two years (timing >= 20 of 25)
+    and a phone or an email (contact >= 10 of 15); an estimate from the public
+    registers is never A."""
+    parts = {p["key"]: p["points"] for p in score["parts"]}
+    total = score["total"]
+    if not estimate and total >= TIER_A_SCORE and parts.get("timing", 0) >= 20 and parts.get("contact", 0) >= 10:
+        return "A"
+    if total >= TIER_B_SCORE:
+        return "B"
+    return "C"
+
+
+def tier_allowed(tier: str | None, min_tier: str) -> bool:
+    """True when `tier` is `min_tier` or better (A is best)."""
+    if tier not in TIERS:
+        return False
+    return TIERS.index(tier) <= TIERS.index(min_tier if min_tier in TIERS else "B")
+
+
 def score_label(total: int) -> str:
     if total >= 75:
         return "Erinomainen"
@@ -347,9 +377,10 @@ def org_company_listings(organization_id: int, groups: set[str]) -> dict:
 
 
 def refresh_scores(organization_id: int | None = None, *, now: datetime | None = None) -> int:
-    """Recompute the stored score of every open (pending) match: the sort key
-    of Kohteet "Parhaat ensin". Timing and freshness drift with time, so the
-    scheduler runs this regularly. Returns how many scores changed."""
+    """Recompute the stored score and class of every open (pending) match:
+    the sort key of Kohteet "Sopivimmat ensin" and what release_targets lets
+    through. Timing and freshness drift with time, so the scheduler runs this
+    hourly. Returns how many changed."""
     from app.listings.models import Listing, ListingMatch
     from app.listings.target_services import organization_wanted_types
 
@@ -370,9 +401,11 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
         listings = org_company_listings(org_id, groups)
         for match in matches:
             company = listings.get(company_group(match.listing)) or [match.listing]
-            total = score_target(company, wanted, now=now)["total"]
-            if match.score != total:
-                match.score = total
+            score = score_target(company, wanted, now=now)
+            tier = classify(score, estimate=all(l.is_estimate for l in company))
+            if match.score != score["total"] or match.tier != tier:
+                match.score = score["total"]
+                match.tier = tier
                 changed += 1
     if changed:
         db.session.commit()

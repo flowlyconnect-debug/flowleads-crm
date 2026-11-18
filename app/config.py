@@ -116,6 +116,17 @@ class Config:
     LISTING_FULL_REGIONS_PER_RUN = int(os.environ.get("LISTING_FULL_REGIONS_PER_RUN", "2"))
     LISTING_FULL_REFRESH_DAYS = int(os.environ.get("LISTING_FULL_REFRESH_DAYS", "7"))
     LISTING_MATCH_HISTORY_DAYS = int(os.environ.get("LISTING_MATCH_HISTORY_DAYS", "30"))
+    # Kohteet shows a curated list, not every match: each match is scored and
+    # classified (A Kuuma / B Hyvä / C Seurattava, app/listings/housing.py::classify)
+    # when found, and only the best housing companies of the allowed classes are
+    # released to the customer, at most this many at a time; handled targets
+    # make room for the next ones. 0 = no limit. Per customer:
+    # Organization.targets_visible_limit / targets_min_tier (/admin/customers).
+    TARGETS_VISIBLE_LIMIT = int(os.environ.get("TARGETS_VISIBLE_LIMIT", "200"))
+    TARGETS_MIN_TIER = os.environ.get("TARGETS_MIN_TIER", "B").strip().upper() or "B"
+    # a visible target the customer has not handled in this many days may give
+    # its place to a clearly better waiting one (it goes back to the queue)
+    TARGETS_SWAP_AFTER_DAYS = int(os.environ.get("TARGETS_SWAP_AFTER_DAYS", "3"))
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
@@ -249,6 +260,10 @@ class TestingConfig(Config):
     # button's own tests switch this on
     GEOCODING_ENABLED = False
     REGISTRY_SYNC_ENABLED = False
+    # the older catalogue tests expect every match on Kohteet at once; the curated
+    # release has its own tests (tests/test_target_release.py)
+    TARGETS_VISIBLE_LIMIT = 0
+    TARGETS_MIN_TIER = "C"
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

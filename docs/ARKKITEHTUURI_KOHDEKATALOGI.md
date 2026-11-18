@@ -243,6 +243,33 @@ Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käytt
 Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
+## Kuratoidut kohteet: luokittelu ennen näkyvyyttä (18.11.2026)
+
+Asiakas ei näe jokaista osumaa. Koko Suomen profiililla osumia voi olla kymmeniä tuhansia, joten ne lasketaan ja
+luokitellaan ensin, ja Kohteet-sivulle päästetään vain parhaat.
+
+1. **Luokittelu heti löydettäessä** (`match_listing` / `rematch_profile` → `housing.score_target` + `housing.classify`,
+   tallennetaan `ListingMatch.score` ja `tier`; tunnin välein `target_scores`-työ päivittää molemmat):
+   - **A Kuuma**: pisteet ≥ 70, remontti alkaa kahden vuoden sisällä (ajoitus ≥ 20/25) ja puhelin tai sähköposti on tiedossa.
+     Ennuste (`Listing.is_estimate`) ei ole koskaan A.
+   - **B Hyvä**: pisteet ≥ 50.
+   - **C Seurattava**: loput.
+2. **Läpipäästö** (`target_services.release_targets`, `released_at`; NULL = jonossa): näkyviin enintään
+   `TARGETS_VISIBLE_LIMIT` (200) taloyhtiötä kerrallaan, luokat `TARGETS_MIN_TIER` (B) ja paremmat, pisteiden mukaan
+   parhaat ensin. Asiakaskohtaisesti `/admin/customers` (`Organization.targets_visible_limit`, `targets_min_tier`).
+   Saman taloyhtiön uusi ilmoitus liittyy näkyvään kohteeseen ilman paikkaa.
+3. **Täyttö ja parantuminen**: liidiksi siirto ja piilotus vapauttavat paikan heti seuraavalle. Täydellä listalla selvästi
+   parempi jonossa oleva (parempi luokka tai +10 pistettä) vaihtaa paikkaa heikoimman sellaisen kanssa, joka on ollut
+   näkyvissä vähintään `TARGETS_SWAP_AFTER_DAYS` (3) päivää käsittelemättä; se palaa jonoon. Iso erä (uuden asiakkaan
+   täsmäys, tuonti) käsitellään suoraan paremmuusjärjestyksessä.
+4. **"Uusi"** tarkoittaa näkyviin päästettyä (`released_at`): päiväkooste, tallennetut haut ja "uusi"-merkki.
+   Kohteet-otsikko kertoo jonossa odottavien määrän ("Seuraavat N parasta tulevat näkyviin, kun käsittelet näitä"),
+   ja asiakaslista näyttää superadminille jonon ja alle luokan jäävät.
+
+Ajot: `release_targets()` täsmäyksen jälkeen, `listing_matching`-työssä (10 min), `target_scores`-työssä (tunti) sekä
+siirron, piilotuksen ja asetusmuutoksen jälkeen. Mitattu 40 000 kohteella: Kohteet-sivu 0,7 s, kojelauta 0,4 s.
+Testit: `tests/test_target_release.py`.
+
 ## Julkiset rekisterit (Ryhti, PRH): vain sisäinen, ei asiakkaille
 
 `app/registry/` hakee avoimen datan (CC BY 4.0, ei avainta), yhdistää sen ja laskee siitä remonttisignaaleja.

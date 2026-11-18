@@ -291,6 +291,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 backfill_text_types()  # renovation types read from the listing text
                 matched = rematch_profiles()
                 merge_into_existing_leads()
+                from app.listings.target_services import release_targets
+
+                release_targets()  # the best classified matches onto Kohteet, within each limit
                 from app.listings.target_services import notify_saved_searches
 
                 notify_saved_searches()
@@ -311,6 +314,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
 
             try:
                 refresh_scores()
+                from app.listings.target_services import release_targets
+
+                release_targets()  # a class may have changed with the scores
             except Exception:
                 db.session.rollback()
                 logger.exception("Target score refresh failed")

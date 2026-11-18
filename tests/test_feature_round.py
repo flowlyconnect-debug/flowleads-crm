@@ -104,6 +104,7 @@ def _target(org, profile, ext, *, city="Espoo", rtype=PIPE, building="kerrostalo
         status="pending",
         confidence=90,
         created_at=created or NOW,
+        released_at=created or NOW,  # a visible target (curated Kohteet: released)
     )
     db.session.add(match)
     db.session.commit()

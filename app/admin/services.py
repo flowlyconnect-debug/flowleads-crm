@@ -67,7 +67,7 @@ def list_customers_summary() -> list[dict]:
 
     from app.admin.models import CustomerInvite
     from app.extensions import db
-    from app.listings.target_services import count_targets
+    from app.listings.target_services import count_targets, visibility_settings, waiting_summary
 
     customers = []
     for org in get_accessible_organizations():
@@ -82,6 +82,8 @@ def list_customers_summary() -> list[dict]:
         )
         # targets waiting on the customer's Kohteet page
         pending = count_targets(org.id) if profiles else 0
+        waiting = waiting_summary(org.id) if profiles else {"queued": 0, "below": 0}
+        visible_limit, min_tier = visibility_settings(org.id)
         admin = (
             User.query.filter_by(organization_id=org.id, role="admin").order_by(User.id.asc()).first()
         )
@@ -90,6 +92,9 @@ def list_customers_summary() -> list[dict]:
             {
                 "org": org,
                 "profiles": profiles,
+                "waiting": waiting,
+                "visible_limit": visible_limit,
+                "min_tier": min_tier,
                 "profile_name": first.name if first else None,
                 "profile_id": first.id if first else None,
                 "profile_is_active": first.is_active if first else None,

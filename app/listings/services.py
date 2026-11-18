@@ -708,6 +708,7 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
         renovation = _profile_wants(profile, listing, now=now)
         if renovation is None:
             continue
+        score, tier = _initial_rating(profile.organization_id, listing, now)
         match = ListingMatch(
             organization_id=profile.organization_id,
             profile_id=profile.id,
@@ -715,14 +716,20 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
             status="pending",
             confidence=renovation.confidence,
             created_at=now,
-            released_at=now,
-            score=_initial_score(profile.organization_id, listing, now),
+            released_at=None,  # classified first; release_targets decides
+            score=score,
+            tier=tier,
         )
         db.session.add(match)
         created.append(match)
     if created:
         _ensure_contact_queued(listing)
     db.session.flush()
+    if created:
+        from app.listings.target_services import release_targets
+
+        for organization_id in {m.organization_id for m in created}:
+            release_targets(organization_id, now=now)
     return created
 
 
@@ -805,8 +812,8 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 status="pending",
                 confidence=conf,
                 created_at=now,
-                released_at=now,
-                score=None,  # scored for the whole organization below, in one pass
+                released_at=None,  # scored, classified and released below
+                score=None,
             )
         )
         _ensure_contact_queued(listing)
@@ -816,8 +823,11 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
     db.session.commit()
     if added:
         from app.listings.housing import refresh_scores
+        from app.listings.target_services import release_targets
 
         refresh_scores(profile.organization_id, now=now)
+        release_targets(profile.organization_id, now=now)
+        db.session.commit()
     return added
 
 
@@ -1009,16 +1019,17 @@ def _valid_email_or_none(value) -> str | None:
     return email if email and validate_email(email) else None
 
 
-def _initial_score(organization_id: int, listing: Listing, now: datetime) -> int:
-    """Score of a new match with the organization's other listings of the
-    same housing company: Kohteet "Sopivimmat ensin" relies on it until the
-    hourly refresh (housing.refresh_scores)."""
-    from app.listings.housing import company_group, org_company_listings, score_target
+def _initial_rating(organization_id: int, listing: Listing, now: datetime) -> tuple[int, str]:
+    """(score, class) of a new match with the organization's other listings
+    of the same housing company, before anyone sees it: release_targets and
+    Kohteet "Sopivimmat ensin" rely on them until the hourly refresh."""
+    from app.listings.housing import classify, company_group, org_company_listings, score_target
     from app.listings.target_services import organization_wanted_types
 
     group = company_group(listing)
-    company = [l for l in org_company_listings(organization_id, {group}).get(group, []) if l.id != listing.id]
-    return score_target([listing, *company], organization_wanted_types(organization_id), now=now)["total"]
+    company = [listing] + [l for l in org_company_listings(organization_id, {group}).get(group, []) if l.id != listing.id]
+    score = score_target(company, organization_wanted_types(organization_id), now=now)
+    return score["total"], classify(score, estimate=all(l.is_estimate for l in company))
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:

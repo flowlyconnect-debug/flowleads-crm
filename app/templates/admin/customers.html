@@ -76,7 +76,19 @@
                 {{ row.lead_count }}
                 <div class="text-muted text-sm">
                   <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>
+                  {% if row.waiting.queued or row.waiting.below %}<br>{{ row.waiting.queued }} jonossa, {{ row.waiting.below }} alle luokan{% endif %}
                 </div>
+                <form method="post" action="{{ url_for('admin.set_customer_visibility_route', organization_id=row.org.id) }}" class="customer-sub-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="text-sm" for="limit-{{ row.org.id }}">Näkyvissä enintään</label>
+                  <input type="number" min="0" max="5000" step="10" name="limit" id="limit-{{ row.org.id }}" value="{{ row.visible_limit }}" class="form-input form-input--compact" style="width:5.5rem;" title="0 = kaikki">
+                  <select name="min_tier" class="form-input form-input--compact" aria-label="Alin näytettävä luokka">
+                    <option value="A"{% if row.min_tier == 'A' %} selected{% endif %}>Vain kuumat (A)</option>
+                    <option value="B"{% if row.min_tier == 'B' %} selected{% endif %}>Kuumat ja hyvät (A–B)</option>
+                    <option value="C"{% if row.min_tier == 'C' %} selected{% endif %}>Kaikki (A–C)</option>
+                  </select>
+                  <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
+                </form>
                 <form method="post" action="{{ url_for('admin.set_customer_targets_route', organization_id=row.org.id) }}" class="customer-sub-form"
                       data-name="{{ row.org.name }}"
                       {% if row.org.targets_enabled %}onsubmit="return confirm('Otetaanko kohteiden käyttö pois asiakkaalta ' + this.dataset.name + '? Asiakas näkee kohteiden määrän, mutta ei pääse kohteisiin. Liidit säilyvät.');"{% endif %}>
