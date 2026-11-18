@@ -510,6 +510,8 @@ class Crawler:
             except Exception:
                 res = None
             self.done.add(co["y_tunnus"])
+            if len(self.done) % 20 == 0:
+                (self.out / "heartbeat").touch()
             if res:
                 self.last_hit = len(self.done)
             elif len(self.done) - self.last_hit > 400:
