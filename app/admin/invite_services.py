@@ -31,6 +31,7 @@ from app.core.audit import log_audit
 from app.core.security import validate_password
 from app.extensions import db
 from app.search.models import SearchProfile
+from app.search.constants import DEFAULT_TIMING_YEARS
 from app.search.profile_services import SearchProfileServiceError, activate_profile, create_profile
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_organization, create_user
@@ -259,6 +260,7 @@ def accept_invite(
             regions=regions,
             is_active=True,
             source=invite.source,
+            timing_within_years=DEFAULT_TIMING_YEARS,
         )
 
         organization.enabled_features = chosen_features

@@ -194,6 +194,7 @@ def _init_extensions(app):
         from app.streams import models as streams_models  # noqa: F401
         from app.search import models as search_models  # noqa: F401
         from app.listings import models as listings_models  # noqa: F401
+        from app.registry import models as registry_models  # noqa: F401
 
 
 def _register_blueprints(app):
@@ -520,6 +521,13 @@ def _register_static_caching(app):
         values["v"] = version
 
 
+def _renovation_stage_label(renovation) -> str:
+    """Päätetty / Suunniteltu / Tarve for a ListingRenovation (app/listings/stages.py)."""
+    from app.listings.stages import STAGE_LABELS, renovation_stage
+
+    return STAGE_LABELS.get(renovation_stage(renovation), "")
+
+
 def _register_root_routes(app):
     @app.context_processor
     def inject_ui_helpers():
@@ -534,6 +542,7 @@ def _register_root_routes(app):
             "active_org_name": _nav_org_name(),
             "has_endpoint": has_endpoint,
             "stage_label": stage_label_fi,
+            "renovation_stage_label": _renovation_stage_label,
             "source_label": source_label_fi,
             "STAGE_LABELS_FI": STAGE_LABELS_FI,
             "ACTIVITY_LABELS_FI": ACTIVITY_LABELS_FI,

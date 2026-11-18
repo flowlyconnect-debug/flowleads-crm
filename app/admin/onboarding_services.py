@@ -10,6 +10,7 @@ from flask import current_app
 from app.core.audit import log_audit
 from app.extensions import db
 from app.search.models import SearchProfile
+from app.search.constants import DEFAULT_TIMING_YEARS
 from app.search.profile_services import SearchProfileServiceError, create_profile
 from app.users.models import Organization, User
 from app.users.services import UserServiceError, create_organization, create_user
@@ -180,6 +181,7 @@ def create_customer(
             min_confidence=min_confidence,
             daily_lead_limit=daily_lead_limit,
             cities=cities,
+            timing_within_years=DEFAULT_TIMING_YEARS,
         )
         db.session.flush()
         from app.sequences.defaults import ensure_default_sequences

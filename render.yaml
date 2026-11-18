@@ -20,6 +20,9 @@ services:
         value: run.py
       - key: FLASK_ENV
         value: production
+      # logs straight to Render (buffered stdout hid scheduler logs until exit)
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: DATABASE_URL
@@ -103,6 +106,9 @@ services:
         value: run.py
       - key: FLASK_ENV
         value: production
+      # logs straight to Render (buffered stdout hid scheduler logs until exit)
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: DATABASE_URL

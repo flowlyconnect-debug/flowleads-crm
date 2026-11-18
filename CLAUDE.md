@@ -33,8 +33,22 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
-- **No reserve** (the "Hae kohteita" button and `TARGET_FETCH_ENABLED` were removed 16.11.2026): every match is
-  a target on Kohteet as soon as it is found (`released_at` = creation time).
+- **Kohteet = what fits the profile** (18.11.2026; no fixed count): a housing company is visible when its wanted renovation
+  is **decided or planned** and starts within the profile's window (`SearchProfile.timing_within_years`, default
+  `app/search/constants.py::DEFAULT_TIMING_YEARS` 2 = this year and the next two, set by onboarding/invites and migration
+  `a0b1c2d3e4f5`; empty = any year; unknown years never exclude; `services.roll_timing_windows()` rematches when the year
+  turns). Only a need goes to the closed **Ennakoi** section under the list (`?tab=need` shows all). Each row says why in
+  one sentence (`target_services.why_line`: furthest stage first, start year, estimate, contact). The less used filters
+  (start year, building type, order, plain-language search, saved searches) sit under "Lisää hakuehtoja".
+  Each renovation has a **stage** (`app/listings/stages.py`, `ListingRenovation.stage`: decided / planned / need; the
+  Analyzer's `vaihe`, else rules on the evidence). Each match is scored (`housing.score_target`: stage 20, confidence 30,
+  timing 20, contact 15, fresh 10, signals 5) and classified (`ListingMatch.tier`: A / B / C for decided or planned, **T**
+  for only a need; `housing.classify`) for the order. `target_services.release_targets` still runs (`released_at`; NULL =
+  waiting), with the defaults `TARGETS_VISIBLE_LIMIT` 0 (no cap), `TARGETS_MIN_TIER` C and `TARGETS_NEED_LIMIT` 0; a
+  superadmin may still set a cap / lowest class per customer on `/admin/customers` (then swaps after
+  `TARGETS_SWAP_AFTER_DAYS`). `TestingConfig` turns Ennakoi off (-1) for the older catalogue tests;
+  `tests/test_profile_fit_targets.py`, `tests/test_target_release.py` (the optional cap) and `tests/test_renovation_stages.py`
+  test the rest. Full table: architecture doc "Kuratoidut kohteet".
 - **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
   `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
   sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html` (a sales page:
@@ -77,10 +91,54 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `plans.py`; an ended contract locks the targets like the access switch). Superadmin `/admin/system` and
   `flask system-check` show email/backup/key status. Backups fall back to a Python dump (`app/backups/logical.py`)
   when pg_dump is older than the server. Typed task times are Finnish time, stored UTC (`tasks/services.local_to_utc`).
+- **Asiakasseuranta** (superadmin `/admin/activity`, `app/admin/activity_services.py`): what each customer does, to spot one
+  that collects contacts to resell them. Daily counters `UsageDaily` via `app/core/usage.py::track(metric)` (page views of
+  Kohteet / taloyhtiökortti / Isännöitsijä / kartta / liidi, transfers, rows exported as CSV, to a CRM or read by API;
+  superadmins are never counted), logins with IP from the audit log, and catalogue leads with no work after 7 days. Signals
+  (thresholds at the top of the module): export, unworked, views_day / views_ratio, ips, bulk; 1 = Seuraa, 2+ = Tarkista.
+  Lead CSV exports are audited (`leads_exported`, `crm_file_exported`). Tests: `tests/test_customer_activity.py`.
+- **Asiakastiedotteet** (superadmin `/admin/announcements`, `app/admin/announcement_services.py`): one e-mail through Mailgun
+  to the customers' admins or all users, all or chosen customers; `{yritys}` = customer name, test to self first, replies go
+  to the sender, history in `CustomerAnnouncement`. Needs `EMAIL_SENDING_ENABLED` and `MAILGUN_FROM_EMAIL`.
+  Tests: `tests/test_announcements.py`.
+- **Lead export limits** (`app/core/export_limits.py`): CSV / CRM file / CRM push only for admins, at most
+  `EXPORT_DAILY_ROWS` (200) rows a day per customer (`Organization.export_daily_limit` on `/admin/customers`, 0 = none);
+  refusals are audited (`export_blocked`). Daily `activity_alerts` job mails superadmins about customers turning
+  "Tarkista". Tests: `tests/test_export_limits.py`, `tests/test_customer_activity.py`.
+- **Off switches** (env, no deploy): `PROFILE_TIMING_WINDOW_ENABLED`, `USAGE_TRACKING_ENABLED`, `ACTIVITY_ALERTS_ENABLED`,
+  `EXPORT_LIMITS_ENABLED`, `ANNOUNCEMENTS_ENABLED`. After a deploy: `flask smoke-check` (read-only, `app/admin/smoke.py`)
+  and `python scripts/smoke_http.py <url>`. Browser tests: `tests/test_e2e_browser.py` (Playwright, CI installs it;
+  locally `pip install playwright==1.63.0`, here `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`).
+- **Data quality** (superadmin `/admin/data-quality`, `app/listings/quality.py`): coverage of contacts (on customers'
+  targets), names, Y-tunnus, build year, publish date, renovation years / stages / "Muu remontti". `catalogue_health` also
+  flags an Enricher that has not claimed contacts for matched listings (mail via the catalogue alert). Rules from the
+  production data: a renovation dated in an earlier year without "going on" words is "mahdollisesti jo tehty" (timing 4 points,
+  reason says so), more than `PAST_YEARS_KEPT` (1) year back it is no target (`stages.possibly_done` / `too_old`); the
+  analyser's own notes ("Tarkista onko jo tehty") are stripped from evidence (`stages.clean_evidence`, model validator,
+  `clean_old_evidence()`); `backfill_stages()` stores stages of older rows; phones / e-mails are normalised on save
+  (`app/listings/normalize.py`, `normalize_old_contacts()`), offices group by `manager_key` (company form ignored).
+  Tests: `tests/test_data_quality_rules.py`.
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
   myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
   koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`
   (`/admin/dashboard` and `/admin/api-keys` redirect). Tests: `tests/test_settings_pages.py`.
+- **One taloyhtiö across sources** (phase 1 of identify → forecast → categorise): `HousingCompany` /
+  `HousingCompanyAddress` (`app/listings/models.py`), `app/listings/housing_registry.py::resolve(Candidate)` (Y-tunnus →
+  name + municipality → street address, merges when a row proves two are one), keys in `app/listings/identity.py`.
+  Listings, PRH companies and Ryhti buildings link via `housing_id`; a new source only needs an adapter that yields
+  `Candidate`s. Phase 2: `app/listings/forecast.py` combines every source's observations into `HousingRenovation`
+  (one row per type: stage, year, confidence; a done renovation cancels estimates, a permit decides a planned one,
+  listing + register agreement adds 10). Phase 3: a resolved listing's `company_key` is `h:<housing id>`, so every
+  "one taloyhtiö = one target" path groups across sources, and scoring, classes, the target row and matching read the
+  company outlook (`housing.company_outlook` / `company_renovations`) when it exists. Superadmin `/admin/housing`.
+  Tests: `tests/test_housing_registry.py`, `tests/test_forecast.py`, `tests/test_housing_targets.py`.
+- **Public registers, internal only** (`app/registry/`, superadmin `/admin/registry`): Ryhti buildings/permits/addresses and
+  PRH asunto-osakeyhtiöt are synced (`flask registry-sync`, job `registry_sync` only with `REGISTRY_SYNC_ENABLED`), linked
+  building → taloyhtiö and turned into `RegistrySignal`s (permit / oil heating / age). `app/registry/publish.py` turns them
+  into catalogue targets marked **"ennuste"** (`Listing.is_estimate`) only with `REGISTRY_TARGETS_PUBLISH`, and they are matched
+  only for organizations with the `registry_targets` module (off for everyone). Every place that shows a renovation must
+  keep the estimate visible. Details in the architecture doc ("Julkiset rekisterit"). Tests: `tests/test_registry.py`,
+  `tests/test_registry_estimates.py`.
 - n8n ↔ CRM API: `/api/v1/n8n/listings/*` (`app/listings/routes.py`), auth header `X-N8N-Secret`.
 - n8n workflows: `n8n/workflows/flowleads-{crawler,analyzer,enricher}.json`. They are **generated**:
   edit `n8n/tools/build_catalogue_workflows.py` and run

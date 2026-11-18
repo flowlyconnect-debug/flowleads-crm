@@ -212,13 +212,16 @@ def test_settings_and_export_pages(client, app, monkeypatch):
     monkeypatch.setattr(crm.requests, "Session", lambda: FakeHttp())
     _login(client, seller_email)
     assert client.get("/settings/integrations").status_code in (302, 403)
+    # a seller may not take leads out (app/core/export_limits.py)
+    refused = client.get("/leads/export/hubspot.csv", follow_redirects=True)
+    assert "vain pääkäyttäjille" in refused.get_data(as_text=True)
+    client.get("/auth/logout")
+
+    _login(client, admin_email)
     response = client.get("/leads/export/hubspot.csv")
     assert response.status_code == 200 and "Company name" in response.get_data(as_text=True)
     assert "As Oy Koivikko" in client.get(f"/leads/export/pipedrive.csv?ids={lead_id}").get_data(as_text=True)
     assert client.get("/leads/export/salesforce.csv").status_code == 404
-    client.get("/auth/logout")
-
-    _login(client, admin_email)
     page = client.get("/settings/integrations").get_data(as_text=True)
     assert "HubSpot" in page and "Pipedrive" in page and "Ei yhdistetty" in page
     response = client.post("/settings/integrations/hubspot/connect", data={"token": "pat-eu1-1234567890"}, follow_redirects=True)

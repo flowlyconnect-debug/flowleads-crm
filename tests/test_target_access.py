@@ -99,17 +99,25 @@ def test_every_match_is_visible_at_once(client, app):
         email = user.email
     _login(client, email)
     page = client.get("/targets").get_data(as_text=True)
-    assert "12 kohdetta saatavilla" in page and "As Oy Kohde 7" in page
+    assert "12 taloyhtiötä sopii profiiliisi" in page and "As Oy Kohde 7" in page
     assert "Hae kohteita</button>" not in page and "targets-fetch-btn" not in page
     assert client.post("/targets/fetch").status_code == 404
 
 
-def test_old_reserve_rows_are_visible_too(app):
-    """Matches stored by the previous release with released_at NULL."""
+def test_waiting_rows_appear_once_classified_and_released(app):
+    """released_at NULL = classified but waiting (curated Kohteet,
+    target_services.release_targets); the hourly score job classifies rows
+    that have no class yet and releases them."""
+    from app.listings.housing import refresh_scores
+
     with app.app_context():
         org, _, _ = _org("oldreserve")
         _match(3)
-        ListingMatch.query.filter_by(organization_id=org.id).update({"released_at": None})
+        ListingMatch.query.filter_by(organization_id=org.id).update({"released_at": None, "tier": None})
+        db.session.commit()
+        assert targets.count_targets(org.id) == 0
+        refresh_scores(org.id)
+        targets.release_targets(org.id)
         db.session.commit()
         assert targets.count_targets(org.id) == 3
 

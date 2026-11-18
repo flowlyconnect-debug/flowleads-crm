@@ -350,7 +350,9 @@ def test_invite_offers_no_optional_module_by_default(mock_send, client, app):
     _login_superadmin(client, app)
     form = client.get("/admin/customers/invite").get_data(as_text=True)
     boxes = re.findall(r'<input type="checkbox" name="allowed_features" value="(\w+)"\s+(checked)?', form)
-    assert len(boxes) == 3 and not any(checked for _, checked in boxes)
+    from app.admin.constants import FEATURE_CATALOG
+
+    assert len(boxes) == len(FEATURE_CATALOG) and not any(checked for _, checked in boxes)
     client.post(
         "/admin/customers/invite",
         data={"organization_name": "Perus Oy", "admin_email": "admin@perus.fi", "remonttityypit": ["Putkiremontti"],

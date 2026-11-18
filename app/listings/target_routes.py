@@ -16,10 +16,13 @@ from app.listings.target_services import (
     save_search,
     FILTER_KEYS,
     SORT_OPTIONS,
+    TAB_SEGMENTS,
+    need_tab_enabled,
     TABS,
     target_filter_options,
     organization_wanted_types,
     count_targets,
+    waiting_summary,
     dismiss_targets,
     enroll_transferred_leads,
     sequences_for_transfer,
@@ -112,7 +115,7 @@ def _page_state():
     shared by the list and the map."""
     organization_id = resolve_organization_id()
     tab = request.args.get("tab")
-    if tab not in TABS:
+    if tab not in TABS or (tab == "need" and not need_tab_enabled()):
         tab = "available"
     profiles = list_profiles(organization_id)
     profile_id = request.args.get("profile_id", type=int)
@@ -154,7 +157,7 @@ def ask():
         params["profile_id"] = profile_id
     if not text:
         return redirect(url_for("targets.index", **params))
-    result = interpret(text, target_filter_options(organization_id, TABS[tab]))
+    result = interpret(text, target_filter_options(organization_id, TABS[tab], segment=TAB_SEGMENTS[tab]))
     params.update(result["params"])
     if result["search"]:
         params["search"] = result["search"]
@@ -183,9 +186,13 @@ def map_view():
         filters=filters,
         page=1,
         per_page=MAX_MAP_POINTS,
+        segment=TAB_SEGMENTS[tab],
     )
     rows = target_rows(organization_id, pagination.items, organization_wanted_types(organization_id))
     points = map_points(rows)
+    from app.core.usage import track
+
+    track("map_view", organization_id=organization_id)
     params = _current_params(search, profile_id, filters)
     if tab != "available":
         params["tab"] = tab
@@ -244,6 +251,7 @@ def index():
         search=search,
         filters=filters,
         page=request.args.get("page", 1, type=int) or 1,
+        segment=TAB_SEGMENTS[tab],
     )
     if not pagination.items and pagination.total and pagination.page > 1:
         # the last page emptied out (everything on it was moved or hidden)
@@ -284,10 +292,13 @@ def index():
     new_ids = {
         match.id
         for match in pagination.items
-        if match.created_at is not None
-        and (match.created_at if match.created_at.tzinfo else match.created_at.replace(tzinfo=timezone.utc)) > day_ago
+        if (seen := match.released_at or match.created_at) is not None
+        and (seen if seen.tzinfo else seen.replace(tzinfo=timezone.utc)) > day_ago
     }
     current_params = _current_params(search, profile_id, filters)
+    from app.core.usage import track
+
+    track("targets_view", organization_id=organization_id)
     asked = session.pop(_ASK_KEY, None)
     saved_searches = list_saved_searches(organization_id, current_user.id)
     wanted_types = organization_wanted_types(organization_id)
@@ -302,7 +313,7 @@ def index():
         new_ids=new_ids,
         digest_enabled=digest_enabled,
         filters=filters,
-        filter_options=target_filter_options(organization_id, TABS[tab], filters),
+        filter_options=target_filter_options(organization_id, TABS[tab], filters, segment=TAB_SEGMENTS[tab]),
         sort_options=SORT_OPTIONS,
         transferred_leads=transferred_leads,
         assignees=assignees,
@@ -314,12 +325,45 @@ def index():
         profile_id=profile_id,
         profiles=profiles,
         available_count=count_targets(organization_id, "pending"),
+        need_count=count_targets(organization_id, "pending", segment="need"),
+        need_tab=need_tab_enabled(),
         hidden_count=count_targets(organization_id, "dismissed"),
+        waiting=waiting_summary(organization_id, TAB_SEGMENTS[tab]) if TABS[tab] == "pending" else {"queued": 0, "below": 0},
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),
         customer_locked=customer_locked,
+        rule=_profile_rule(profiles, wanted_types),
+        ahead=_ahead_preview(organization_id, wanted_types) if tab == "available" and need_tab_enabled() else None,
     )
+
+
+def _profile_rule(profiles, wanted_types) -> dict:
+    """What decides which targets are shown, for the page header: the
+    customer's renovation types and the last start year of the active
+    profiles' window (None = any year)."""
+    from app.listings.services import _now
+
+    active = [p for p in profiles if p.is_active]
+    windows = [p.timing_within_years for p in active]
+    from flask import current_app
+
+    window_on = current_app.config.get("PROFILE_TIMING_WINDOW_ENABLED", True)
+    until = None if not window_on or not active or any(w is None for w in windows) else _now().year + max(windows)
+    return {"types": sorted(wanted_types or []), "until": until}
+
+
+AHEAD_PREVIEW = 5
+
+
+def _ahead_preview(organization_id: int, wanted_types) -> dict:
+    """The closed Ennakoi section under the main list: how many housing
+    companies have only a need, and the best few with their reason."""
+    page = list_targets(organization_id, status="pending", segment="need", per_page=AHEAD_PREVIEW)
+    return {
+        "total": page.total,
+        "rows": target_rows(organization_id, page.items, wanted_types, with_fit=False) if page.items else [],
+    }
 
 
 @targets_bp.route("/request-access", methods=["POST"])
@@ -377,6 +421,9 @@ def transfer():
         target_id=None,
         metadata={k: result[k] for k in ("created", "merged", "failed")} | {"lead_ids": result["lead_ids"][:50]},
     )
+    from app.core.usage import track
+
+    track("targets_transferred", result["created"], organization_id=organization_id, commit=False)
     db.session.commit()
 
     parts = []

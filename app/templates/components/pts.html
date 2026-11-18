@@ -1,11 +1,12 @@
 {# The renovation timeline (app/listings/pts.py): one cell per coming year,
-   a short mark where a renovation starts. `big` is the lead page's version. #}
+   a short mark where a renovation starts. `big` is the lead page's version.
+   An outlined mark is an estimate from the public registers. #}
 {% macro pts_cells(pts, big=false) -%}
 <span class="pts{% if big %} pts--big{% endif %}" aria-label="Remontit vuosittain">
   {%- for cell in pts.years -%}
-  <span class="pts__y">{% for mark in cell.marks %}<b class="pts__m pts__m--{{ mark.tone }}" title="{{ mark.name }} {{ mark.year }}">{{ mark.short if big else mark.abbr }}</b>{% endfor %}</span>
+  <span class="pts__y">{% for mark in cell.marks %}<b class="pts__m pts__m--{{ mark.tone }}{% if mark.estimate %} pts__m--estimate{% endif %}" title="{{ mark.name }} {{ mark.year }}{% if mark.estimate %} (ennuste){% endif %}">{{ mark.short if big else mark.abbr }}</b>{% endfor %}</span>
   {%- endfor -%}
 </span>
 {%- if big %}<span class="pts-years pts-years--big">{% for cell in pts.years %}<span>{{ cell.year }}</span>{% endfor %}</span>{% endif %}
-{%- if pts.open %}<span class="pts-open">{% for mark in pts.open %}{{ mark.short }}{% if mark.year %} {{ mark.year }}{% else %}, aikataulu auki{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}
+{%- if pts.open %}<span class="pts-open">{% for mark in pts.open %}{{ mark.short }}{% if mark.year %} {{ mark.year }}{% else %}, aikataulu auki{% endif %}{% if mark.estimate %} (ennuste){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}
 {%- endmacro %}

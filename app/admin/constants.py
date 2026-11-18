@@ -6,4 +6,6 @@ FEATURE_CATALOG: dict[str, str] = {
     "sequences": "Sähköpostisekvenssit",
     "automations": "Automaatiot",
     "ai_enrichment": "AI-rikastus liideille",
+    # targets estimated from the public registers (app/registry/publish.py)
+    "registry_targets": "Ennustekohteet (julkiset rekisterit)",
 }

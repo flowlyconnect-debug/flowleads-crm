@@ -45,5 +45,10 @@ jobs:
           flask db downgrade
           flask db upgrade
 
+      - name: Browser for the end-to-end tests (tests/test_e2e_browser.py)
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install --with-deps chromium
+
       - name: Tests
         run: python -m pytest -q -p no:cacheprovider

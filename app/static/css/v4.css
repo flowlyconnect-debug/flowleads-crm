@@ -281,6 +281,8 @@ h2 { letter-spacing: -0.2px; }
 .pts__m--success { background: var(--color-success-soft); color: var(--color-success-emphasis); }
 .pts__m--danger  { background: var(--color-danger-soft);  color: var(--color-danger-emphasis); }
 .pts__m--neutral { background: var(--color-neutral-soft); color: var(--color-neutral-emphasis); }
+/* estimate from the public registers (Listing.is_estimate): outlined, no fill */
+.pts__m.pts__m--estimate { background: transparent; outline: 1px dashed currentColor; outline-offset: -1px; }
 .pts-open { font-size: 12px; color: var(--color-text-secondary); margin-left: 8px; }
 .pts-years {
   display: inline-grid;
@@ -356,6 +358,10 @@ h2 { letter-spacing: -0.2px; }
 .target-row__name { font-size: 14px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .target-row__name a:hover { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
 .target-row__new { font-size: 12px; font-weight: 500; color: var(--color-accent); margin-left: 4px; }
+.target-row__stage { font-size: 12px; font-weight: 600; color: var(--color-success-emphasis); margin-left: 4px; }
+.target-row__tier { font-size: 12px; font-weight: 600; color: var(--color-accent); margin-left: 4px; }
+.target-row__estimate { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-left: 4px; text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.target-row__why { font-size: 13px; color: var(--color-text-primary); line-height: 1.4; overflow-wrap: anywhere; }
 .target-row__meta { font-size: 12.5px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .target-row__pts { display: flex; align-items: center; min-width: 0; }
 .target-row__pts .pts-open { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -854,3 +860,50 @@ input[type=checkbox] { width: 24px; height: 24px; }
   .lp-facts { grid-template-columns: minmax(0, 1fr); }
   .lp-facts dt { border-bottom: 0; padding-bottom: 0; }
 }
+
+/* Kohteet tabs: the long main-list name does not fit a phone next to Tarve and Piilotetut */
+.tab-label-short { display: none; }
+@media (max-width: 640px) {
+  .tab-label-long { display: none; }
+  .tab-label-short { display: inline; }
+}
+
+/* Kohteet: the extra filters and searches under one closed "Lisää hakuehtoja" */
+.targets-more { border-bottom: 1px solid var(--color-border); padding: 0 16px; }
+.targets-more > summary { cursor: pointer; padding: 10px 0; font-size: 13.5px; font-weight: 500; color: var(--color-text-secondary); }
+.targets-more > summary:hover { color: var(--color-text-primary); }
+.targets-more[open] > summary { color: var(--color-text-primary); }
+.targets-more__filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding-bottom: 8px; }
+.targets-more .targets-saved { padding: 8px 0; border-bottom: 0; }
+/* Ennakoi: housing companies with only a need, closed under the main list */
+.targets-ahead { margin-top: 16px; padding: 0 16px 12px; border-top: 1px solid var(--color-border); }
+.targets-ahead > summary { cursor: pointer; padding: 12px 0; font-size: 14px; font-weight: 500; }
+.targets-ahead__intro { max-width: 72ch; margin: 0 0 8px; font-size: 13.5px; color: var(--color-text-secondary); }
+.targets-ahead__list { list-style: none; margin: 0 0 12px; padding: 0; }
+.targets-ahead__list li { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-border-light); }
+.targets-ahead__list a { font-size: 14px; font-weight: 500; }
+.targets-ahead__why { font-size: 13px; color: var(--color-text-secondary); max-width: 80ch; }
+
+/* Asiakasseuranta and Asiakastiedotteet (superadmin) */
+.activity-periods { display: flex; gap: 6px; margin: 16px 0; }
+.table-scroll { overflow-x: auto; }
+.activity-table { width: 100%; font-size: 13.5px; }
+.activity-table td:first-child { min-width: 200px; }
+.activity-table th { white-space: nowrap; }
+.activity-table th.num, .activity-table td.num { text-align: right; white-space: nowrap; }
+.activity-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 24px; margin: 16px 0 8px; }
+.activity-stats dt { font-size: 12.5px; color: var(--color-text-secondary); }
+.activity-stats dd { margin: 0; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 20px; }
+.activity-signal { font-size: 12.5px; color: var(--color-text-secondary); margin-top: 4px; cursor: help; }
+.activity-rules { margin: 8px 0 16px; padding-left: 20px; font-size: 13.5px; color: var(--color-text-secondary); max-width: 80ch; }
+.activity-rules li { margin-bottom: 6px; }
+.announcement-form { display: grid; gap: 8px; max-width: 720px; margin-top: 16px; }
+.announcement-form textarea { font-family: inherit; line-height: 1.5; }
+.announcement-fieldset { border: 0; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+.announcement-choice { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.announcement-orgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+.announcement-recipients { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; }
+.announcement-recipient-list { margin: 8px 0 0; padding-left: 20px; font-size: 13px; max-height: 240px; overflow-y: auto; }
+.announcement-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.announcement-warning { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-warning-soft); color: var(--color-warning-emphasis); }
+.announcement-body { white-space: pre-wrap; font-size: 13.5px; color: var(--color-text-secondary); margin: 8px 0; max-width: 72ch; }

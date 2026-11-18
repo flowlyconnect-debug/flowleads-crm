@@ -131,7 +131,9 @@ def _force_two_factor():
 def _inject_feature_helpers():
     from app.core.features import current_user_has_feature
 
-    return {"has_feature": current_user_has_feature}
+    from app.core.export_limits import user_may_export
+
+    return {"has_feature": current_user_has_feature, "can_export": user_may_export}
 
 
 def _is_safe_next(target: str | None) -> bool:

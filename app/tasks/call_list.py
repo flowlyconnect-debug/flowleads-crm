@@ -91,6 +91,8 @@ def prepare_call_tasks(
             None,
         )
         if auto is not None:
+            # the call belongs to the lead's owner
+            auto.assigned_to = lead.assigned_to or auto.assigned_to or user_id
             auto.type = "call"
             auto.title = call_title(lead)
             auto.due_date = due

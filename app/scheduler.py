@@ -283,15 +283,35 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             )
 
             try:
-                from app.listings.housing import backfill_company_keys, refresh_scores
+                from app.listings.housing import backfill_company_keys
 
                 backfill_company_keys()  # listings stored before housing-company keys
                 from app.listings.text_types import backfill_text_types
 
                 backfill_text_types()  # renovation types read from the listing text
+                from app.listings.stages import clean_old_evidence
+
+                clean_old_evidence()  # the analyser's own reminders out of older evidence
+                from app.listings.stages import backfill_stages
+
+                backfill_stages()  # the stage stored on renovations saved before the column
+                from app.listings.normalize import normalize_old_contacts
+
+                normalize_old_contacts()  # phone numbers and e-mails of older listings in one form
+                from app.listings.housing_registry import resolve_listings
+
+                resolve_listings()  # each listing to its taloyhtiö (one company across sources)
+                from app.listings.forecast import compute_outlooks
+
+                compute_outlooks(limit=2000)  # what is coming at the companies that changed
+                from app.listings.services import roll_timing_windows
+
+                roll_timing_windows()  # a new year moves every profile's timing window
                 matched = rematch_profiles()
                 merge_into_existing_leads()
-                refresh_scores()  # timing and freshness change with time
+                from app.listings.target_services import release_targets
+
+                release_targets()  # the best classified matches onto Kohteet, within each limit
                 from app.listings.target_services import notify_saved_searches
 
                 notify_saved_searches()
@@ -301,6 +321,23 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Listing matching failed")
+
+    def run_target_scores():
+        """Stored target scores (Kohteet "Sopivimmat ensin" reads them to skip
+        targets that cannot reach a page). Timing and freshness change by the
+        day, so hourly is plenty; a full pass is seconds of CPU per 10k targets."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.housing import refresh_scores
+
+            try:
+                refresh_scores()
+                from app.listings.target_services import release_targets
+
+                release_targets()  # a class may have changed with the scores
+            except Exception:
+                db.session.rollback()
+                logger.exception("Target score refresh failed")
 
     def run_geocode_listings():
         """Street-address positions for the Kohteet map (GEOCODING_ENABLED)."""
@@ -344,6 +381,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Target digest failed")
 
+    def run_activity_alerts():
+        """Superadmins hear of customers that turned "Tarkista" on Asiakasseuranta."""
+        with app.app_context():
+            from app.admin.activity_services import send_activity_alerts
+            from app.extensions import db
+
+            try:
+                count = send_activity_alerts()
+                if count:
+                    logger.info("Activity alerts: %s customer(s) flagged", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Activity alerts failed")
+
     def run_monthly_report():
         """Last month's results to each customer's admins (1st of the month)."""
         with app.app_context():
@@ -371,6 +422,18 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Catalogue health check failed")
+
+    def run_registry_sync():
+        """Ryhti + PRH open data into registry_* (internal, REGISTRY_SYNC_ENABLED)."""
+        with app.app_context():
+            from app.extensions import db
+            from app.registry.services import run_registry_sync as sync
+
+            try:
+                sync()
+            except Exception:
+                db.session.rollback()
+                logger.exception("Registry sync failed")
 
     def run_reap_stuck_search_jobs():
         with app.app_context():
@@ -531,6 +594,19 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         id="listing_matching",
         replace_existing=True,
     )
+    if app.config.get("REGISTRY_SYNC_ENABLED"):
+        scheduler.add_job(
+            run_registry_sync,
+            CronTrigger(hour=1, minute=40, timezone="Europe/Helsinki"),
+            id="registry_sync",
+            replace_existing=True,
+        )
+    scheduler.add_job(
+        run_target_scores,
+        IntervalTrigger(hours=1),
+        id="target_scores",
+        replace_existing=True,
+    )
     if app.config.get("GEOCODING_ENABLED"):
         scheduler.add_job(
             run_geocode_listings,
@@ -542,6 +618,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_listing_retention,
         CronTrigger(hour=3, minute=30, timezone="UTC"),
         id="listing_retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_activity_alerts,
+        CronTrigger(hour=8, minute=10, timezone="Europe/Helsinki"),
+        id="activity_alerts",
         replace_existing=True,
     )
     scheduler.add_job(

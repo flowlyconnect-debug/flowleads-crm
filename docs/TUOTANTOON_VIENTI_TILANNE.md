@@ -1,6 +1,6 @@
 # Tuotantoon vienti – tilanne ja jatko
 
-Päivitetty 12.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
+Päivitetty 18.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
 **"Jatka FlowLeadsin tuotantoon vientiä"**, lue tämä tiedosto ja jatka kohdasta
 "Seuraavaksi". Päivitä tiedosto, kun kohtia valmistuu.
 
@@ -342,6 +342,133 @@ Korjattu:
 Huomioita: tuotannon Render-lokeissa ei virheitä 14.–16.11. Sovellusloki kirjoitetaan puskuroituun stdoutiin,
 joten 500-virheen traceback voi näkyä viiveellä; `PYTHONUNBUFFERED=1` Renderin ympäristömuuttujiin korjaa sen.
 Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaikuta tuotantoon.
+
+## Tehty 17.11.2026: julkiset rekisterit ja tutkimuksen viikon 1 korjaukset
+
+- Tutkimus `docs/TUTKIMUS_KEHITYS_2026-11.md`. Julkiset rekisterit (`app/registry/`, Ryhti + PRH) ja
+  "ennuste"-kohteet: kaikki pois päältä tuotannossa (ks. `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`, "Julkiset rekisterit").
+  Migraatiot `f3a4b5c6d7e8` (rekisteritaulut) ja `a4b5c6d7e8f9` (`listings.is_estimate`).
+- **SSRF:** `app/webhooks/url_safety.py` päästi läpi nimen, joka osoittaa sisäverkon osoitteeseen (oma esto
+  periytyi `ValueError`ista ja jäi `except ValueError` -lohkoon). Korjattu. Automaation "Lähetä webhook" tarkistaa
+  nyt osoitteen tallennettaessa ja lähetettäessä eikä seuraa uudelleenohjauksia.
+- Tallennetun haun ilmoituslinkki URL-koodataan (ääkköset, välilyönnit, `&`).
+- `backfill_text_types` etenee kursorilla, joten osumattomat vihjerivit eivät enää tuki ensimmäistä sivua.
+- `PYTHONUNBUFFERED=1` molempiin palveluihin `render.yaml`:ssa (aseta myös Renderin dashboardissa, jos
+  blueprint-synkka ei ole käytössä).
+- Datakumppanien sähköpostiluonnokset: `docs/DATAKUMPPANIT_SAHKOPOSTILUONNOKSET.md` (käyttäjä lähettää).
+- Testit: `tests/test_registry.py`, `tests/test_registry_estimates.py`, `tests/test_week1_fixes.py`.
+
+## Tehty 18.11.2026: skaalautuvuus (40 000 kohdetta, 10 asiakasta)
+
+Mitattu paikallisella Postgresilla 40 000 kohteella ja 10 koko Suomen asiakkaalla (~12 000 osumaa kullakin):
+
+| | Ennen | Jälkeen |
+|---|---|---|
+| `listing_matching`-ajo (10 min välein) | yli 3 min | noin 2 s |
+| `merge_into_existing_leads` | 126 s, 158 000 kyselyä | 0,05 s, 1 kysely |
+| `refresh_scores` | 61 s joka ajossa | 13 s kerran tunnissa (oma työ `target_scores`) |
+| Kohteet-sivu (Sopivimmat ensin) | 3,9 s, 3 300 kyselyä | 1,5 s, 128 kyselyä |
+| Kojelauta | 3,2 s | 1,2 s |
+| `rematch_profile` ilman muutoksia | 5,1 s, 12 000 kyselyä | 1,3 s, 28 kyselyä |
+
+Muutokset: yhdistäminen yhdellä EXISTS-kyselyllä, remontit eräladattuna (`selectinload`), pisteiden päivitys omaksi
+tuntityökseen, "Sopivimmat ensin" pisteyttää vain sivulle mahtuvat ehdokkaat, indeksit
+`listing_matches(organization_id, status)` ja `listing_matches(lead_id)` (migraatio `b5c6d7e8f9a0`).
+Testit: `tests/test_scale_fixes.py`.
+
+## Tehty 18.11.2026 (2): kohteet luokitellaan ennen kuin asiakas näkee ne
+
+Käyttäjän pyyntö: asiakkaalla ei voi olla 12 000 kohdetta näkyvissä. Jokainen osuma pisteytetään ja luokitellaan heti
+(A Kuuma, B Hyvä, C Seurattava), ja Kohteet-sivulle päästetään enintään 200 parasta luokista A–B. Käsitellyt korvautuvat
+seuraavilla, ja selvästi parempi syrjäyttää heikoimman kolmen päivän jälkeen. Superadmin säätää rajan ja alimman luokan
+asiakaslistalla. Migraatio `c6d7e8f9a0b1` (jo näkyvät kohteet pysyvät näkyvissä). Kuvaus:
+`docs/ARKKITEHTUURI_KOHDEKATALOGI.md` ("Kuratoidut kohteet"). Testit: `tests/test_target_release.py`.
+
+## Tehty 18.11.2026 (3): remontin vaihe ja Tarve-välilehti
+
+Jokaisella remontilla on vaihe: päätetty, suunniteltu tai tarve (Analyzer palauttaa sen, muuten säännöt perusteesta).
+Vaihe on pisteiden uusi osa (20). Kohteet, joilla on vain tarve (ikäennusteet, öljylämmitys, "edessä joskus"), ovat
+omalla Tarve-välilehdellä (enintään 50), eivät päälistalla. Päätetyt merkitään rivillä. Migraatio `d7e8f9a0b1c2`.
+**Analyzer-workflow muuttui** (`n8n/workflows/flowleads-analyzer.json`): tuo se n8n:ään uudelleen.
+
+## Tehty 18.11.2026 (4): yksi taloyhtiö kaikista lähteistä (vaihe 1/3)
+
+Kaikki lähteet tunnistetaan samaan taloyhtiöön (`app/listings/housing_registry.py`, superadmin `/admin/housing`).
+Ei muuta asiakkaan näkymiä vielä. Migraatio `e8f9a0b1c2d3`. Pull request
+https://github.com/flowlyconnect-debug/flowleads-crm/pull/42 on luonnos; käyttäjä päättää tuotantoon viennin,
+kaikki kerralla.
+
+## Tehty 18.11.2026 (5): ennuste taloyhtiötä kohden (vaihe 2/3)
+
+`app/listings/forecast.py` yhdistää lähteiden havainnot taloyhtiön remonttinäkymäksi (`HousingRenovation`).
+Ei muuta asiakkaan näkymiä vielä. Migraatio `f9a0b1c2d3e4`.
+
+## Tehty 18.11.2026 (6): Kohteet taloyhtiötasolla (vaihe 3/3)
+
+Tunnistettu ilmoitus ryhmitellään taloyhtiön mukaan (`company_key` = `h:<id>`), ja pisteet, luokka, rivin remontit
+ja täsmäys lukevat taloyhtiön yhdistettyä remonttinäkymää. **Näkyy asiakkaalle:** saman taloyhtiön ilmoitukset ja
+rekisterikohteet ovat yksi kohde, ja tehty remontti poistaa ennustekohteen. Ensimmäinen ajo tuotannossa tunnistaa
+kaikki ilmoitukset 2000 kerrallaan 10 minuutin välein.
+
+## Tehty 18.11.2026 (7): Kohteet näyttää profiiliin sopivat, ei 200 parasta
+
+Käyttäjän tarkennus: tavoite ei ole kiinteä määrä vaan se, että asiakas näkee profiilinsa perusteella oikeat kohteet,
+tietää miksi ne näkyvät eikä joudu selaamaan. Muutokset:
+- Kohde näkyy, kun urakan remontti on päätetty tai suunniteltu ja alkaa aikaikkunassa (oletus 3 vuotta: tänä vuonna ja
+  kahtena seuraavana). Ei 200 kohteen rajaa (`TARGETS_VISIBLE_LIMIT` 0, `TARGETS_MIN_TIER` C).
+- Tarve-välilehti → suljettu Ennakoi-osio listan alla.
+- Jokaisella rivillä selkokielinen syy; "päätetty"- ja "kuuma"-merkit poistettu (syy kertoo saman).
+- Harvemmin tarvitut hakuehdot "Lisää hakuehtoja" -kohdan taakse; alue on edelleen Koko Suomi ja asiakas rajaa sitä.
+- Migraatio `a0b1c2d3e4f5`: profiilit ilman aikaikkunaa saavat oletuksen ja täsmätään uudelleen (asiakkaan oma arvo säilyy).
+  Käyttöönotto ja kutsut asettavat saman oletuksen; vuoden vaihtuessa ikkuna siirtyy.
+
+## Tehty 18.11.2026 (8): asiakasseuranta ja asiakastiedotteet
+
+- **Asiakasseuranta** (`/admin/activity`): asiakaskohtaiset kirjautumiset ja IP-osoitteet, sivunavaukset, siirrot, viennit
+  (CSV, CRM, API) ja työstämättömät kohdeliidit; merkit "Vie liidejä ulos", "Siirtää mutta ei työstä", "Selaa paljon
+  yhteystietoja", "Tunnuksia käytetään monesta paikasta", "Massasiirto". Asiakkaan sivulla käyttäjät, päivät ja tapahtumat.
+  Laskenta alkaa tästä versiosta. Liidien CSV-vienti kirjataan nyt audit-lokiin.
+- **Asiakastiedotteet** (`/admin/announcements`): sähköposti asiakkaille Mailgunilla, testi ensin itselle, historia.
+  Vaatii `MAILGUN_FROM_EMAIL`:n ja `EMAIL_SENDING_ENABLED`:n Renderissä.
+- Migraatio `b1c2d3e4f5a6` (taulut `usage_daily`, `customer_announcements`).
+
+## Tehty 18.11.2026 (9): viennin turvaaminen
+
+- **Kytkimet** (Renderin ympäristömuuttujat, ei uutta versiota): `PROFILE_TIMING_WINDOW_ENABLED`, `USAGE_TRACKING_ENABLED`,
+  `ACTIVITY_ALERTS_ENABLED`, `EXPORT_LIMITS_ENABLED` (+ `EXPORT_DAILY_ROWS`, oletus 200), `ANNOUNCEMENTS_ENABLED`.
+  Kaikki oletuksena päällä; `false` kytkee osan pois. Ennakoi pois: `TARGETS_NEED_LIMIT=-1`.
+- **Vientirajat:** liidien vienti vain pääkäyttäjille, 200 riviä/päivä/asiakas, asiakaskohtainen raja asiakaslistalla.
+- **Hälytys:** ajastin `activity_alerts` (klo 8.10) mailaa superadmineille Tarkista-tilaan nousseet asiakkaat.
+- **Asiakastiedotteen luonnos:** `docs/ASIAKASTIEDOTE_KOHTEET_11-2026.md`.
+- **Selaintestit** `tests/test_e2e_browser.py` (CI:ssä), **savutesti** `flask smoke-check` ja `scripts/smoke_http.py`.
+- **Datakoe tuotannon datalla** (lukuoikeus, 18.11.): 1714 remonttia: 92 % suunniteltu, 6 % päätetty, 2 % tarve. Uusi
+  sääntö pienentää asiakkaiden listaa noin 15 % (esim. 152 → 130). Kaksi vaihesääntöä korjattu.
+- **Löydetty bugi:** myyjän siirtämän liidin puhelu meni soittolistalla liidin reitityksen käyttäjälle; korjattu.
+
+### Vientiharjoitus tuotannon datan kopiolla (18.11.)
+Koko tuotantokanta (54 taulua, 3913 riviä) luettiin lukuoikeudella ja palautettiin paikalliseen Postgresiin
+tuotannon migraatioversioon `e2f3a4b5c6d7`; rivimäärät täsmäsivät. Sen päälle: 9 migraatiota 1,2 s, ensimmäinen
+ajastinkierros 7 s (1083 ilmoitusta taloyhtiöiksi, 1080 ennustetta), `flask smoke-check` OK. Asiakkaiden kohteet:
+Esimerkki Sähkö 121 → 102 + Ennakoi 5, Nooa Haapala 152 → 128 + 4, Lämminkoti 188 → 146 + 17, Jopair 189 → 147 + 17.
+Kaikki 650 näkyvää osumaa pysyivät näkyvissä migraatiossa; ikkunan ulkopuoliset poistuvat ensimmäisessä täsmäyksessä.
+
+### Datan laatu (18.11., tuotannon datan kopiolla)
+- **Yhteystietohakua ei ole ajettu koskaan:** n8n:ssä Enricher, Analyzer ja Crawler ovat pois päältä (vanhat
+  "Lead Worker (Enriched)" ja "Job Dispatcher" ovat päällä). Asiakkaiden 362 kohteesta vain 82:ssa (23 %) on
+  yhteystieto; 280 odottaa. **Käyttäjän tehtävä:** ota "FlowLeads – Yhteystietohaku (Enricher)" käyttöön n8n:ssä ja
+  harkitse vanhojen Lead Worker / Job Dispatcher -workflowien pysäyttämistä (legacy, ei käytössä).
+- Taloyhtiön nimi puuttuu 60 %:lta, julkaisupäivä kaikilta (CSV-tuonnissa ei ollut saraketta).
+- Korjattu tässä paketissa: Datan laatu -sivu, Enricher-jumin hälytys, menneet vuodet ("mahdollisesti jo tehty", yli
+  vuoden vanhat pois), tekoälyn huomiot pois perusteista (71 riviä), puhelinnumerot yhteen muotoon (90 riviä),
+  isännöintitoimistot ryhmittyvät yhtiömuodosta riippumatta (193 → 183), vaiheet tallennettu vanhoille riveille.
+  Analyzer-workflow muuttui taas (ohje: ei omia huomioita perusteeseen).
+
+### Vientipäivän järjestys
+1. Varmuuskopio Renderistä (Postgres → Recovery → Export) ja palautuskoe.
+2. Renderiin: `MAILGUN_FROM_EMAIL`, `EMAIL_SENDING_ENABLED=true`.
+3. PR #42 yhdistetään → Render deployaa (migraatiot ajetaan käynnistyksessä).
+4. `python scripts/smoke_http.py https://flowleads-crm-zv0a.onrender.com` ja Render Shellissä `flask smoke-check`.
+5. Analyzer-workflow n8n:ään uudelleen; asiakastiedote lähetetään.
 
 ## Seuraavaksi
 

@@ -137,3 +137,47 @@ def test_user_cannot_record_another_users_call(app, client):
     assert "Voit kirjata vain omia puheluitasi." in response.get_data(as_text=True)
     with app.app_context():
         assert db.session.get(Task, task_id).status == "pending"
+
+
+def test_a_sellers_transfer_puts_the_call_on_their_own_list(app, client):
+    """The lead is routed to someone else when created (here the admin); the
+    seller who moved it owns it, and so its call (found by the browser test)."""
+    from datetime import datetime, timezone
+
+    from app.core.permissions import TWO_FA_SESSION_KEY
+    from app.extensions import db
+    from app.listings import services as svc
+    from app.listings.models import Listing, ListingMatch, ListingRenovation
+    from app.search.models import SearchProfile
+    from app.tasks.models import Task
+    from app.users.services import create_organization, create_user
+
+    now = datetime.now(timezone.utc)
+    with app.app_context():
+        org = create_organization("Soitto Oy", "soitto-oy")
+        db.session.flush()
+        create_user("admin@soitto-oy.fi", "securepassword1", role="admin", organization_id=org.id)
+        seller = create_user("myyja@soitto-oy.fi", "securepassword1", role="user", organization_id=org.id)
+        seller.totp_enabled = True
+        db.session.add(SearchProfile(organization_id=org.id, name="P", remonttityyppi="Putkiremontti", regions=["Koko Suomi"],
+                                     source="oikotie", is_active=True, min_confidence=50, needs_rematch=False))
+        db.session.commit()
+        listing = Listing(source="import", external_id="soitto-1", maakunta="Pirkanmaa", taloyhtio="As Oy Soitto",
+                          analysis_status="done", first_seen_at=now, last_seen_at=now, isannoitsija="I",
+                          isannoitsija_puh="040 1", isannoitsija_email="i@soitto.example")
+        db.session.add(listing)
+        db.session.flush()
+        db.session.add(ListingRenovation(listing_id=listing.id, remonttityyppi="Putkiremontti", confidence=85,
+                                         evidence="Yhtiökokous päätti putkiremontista.", timing_year=now.year + 1))
+        db.session.flush()
+        svc.match_listing(listing, now=now)
+        db.session.commit()
+        match_id, seller_id = ListingMatch.query.filter_by(organization_id=org.id).one().id, seller.id
+    client.post("/auth/login", data={"email": "myyja@soitto-oy.fi", "password": "securepassword1"})
+    with client.session_transaction() as session:
+        session[TWO_FA_SESSION_KEY] = True
+    client.post("/targets/transfer", data={"match_ids": str(match_id), "call_list": "1"})
+    with app.app_context():
+        calls = Task.query.filter_by(type="call").all()
+        assert [t.assigned_to for t in calls] == [seller_id]
+    assert "As Oy Soitto" in client.get("/tasks/calls").get_data(as_text=True)

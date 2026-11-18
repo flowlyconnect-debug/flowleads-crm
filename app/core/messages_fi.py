@@ -9,6 +9,14 @@ Messages that are already Finnish, and unknown ones, pass through unchanged.
 from __future__ import annotations
 
 _MESSAGES: dict[str, str] = {
+    # --- asiakastiedotteet (app/admin/announcement_services.py) ---
+    "Choose who receives the message.": "Valitse, kenelle viesti lähetetään.",
+    "Write a subject.": "Kirjoita aihe.",
+    "Write the message.": "Kirjoita viesti.",
+    "The message is too long.": "Viesti on liian pitkä.",
+    "Email sending is not enabled.": "Sähköpostin lähetys ei ole käytössä (EMAIL_SENDING_ENABLED).",
+    "The sender address is not set.": "Lähettäjän osoite puuttuu (MAILGUN_FROM_EMAIL).",
+    "No recipients.": "Valinnoilla ei ole yhtään vastaanottajaa.",
     # --- auth ---
     "You have been signed out.": "Olet kirjautunut ulos.",
     "Your password has been updated.": "Salasana on vaihdettu.",

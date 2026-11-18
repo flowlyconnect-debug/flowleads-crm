@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Asiakastiedotteet — Hallinta{% endblock %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('announcements') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Asiakastiedotteet</h1>
+          <p class="settings-panel__subtitle">
+            Lähetä sähköposti asiakkaille Mailgunin kautta, esimerkiksi kun julkaiset päivityksen. Lähettäjä on
+            <span class="mono">{{ mail_from }}</span>, ja vastaukset tulevat osoitteeseesi {{ current_user.email }}.
+          </p>
+        </header>
+
+        {% if from_missing %}
+        <p class="announcement-warning" role="status">Lähettäjän osoite puuttuu (<code>MAILGUN_FROM_EMAIL</code>). Aseta se
+          Renderiin ennen lähetystä.</p>
+        {% endif %}
+        {% if not sending_enabled %}
+        <p class="announcement-warning" role="status">Sähköpostin lähetys ei ole päällä (<code>EMAIL_SENDING_ENABLED</code>).
+          Viestejä ei voi lähettää ennen kuin se kytketään.</p>
+        {% endif %}
+
+        <form method="post" class="announcement-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <label class="form-label" for="announcement-subject">Aihe</label>
+          <input type="text" id="announcement-subject" name="subject" class="form-input" maxlength="200" required
+                 value="{{ form.subject }}" placeholder="esim. Uutta FlowLeadsissa: kohteet profiilisi mukaan">
+
+          <label class="form-label" for="announcement-body">Viesti</label>
+          <textarea id="announcement-body" name="body" class="form-input" rows="12" maxlength="20000" required
+                    placeholder="Hei,&#10;&#10;kirjoita viesti tähän. Tyhjä rivi aloittaa uuden kappaleen.">{{ form.body }}</textarea>
+          <p class="form-helper"><code>{yritys}</code> korvautuu asiakkaan nimellä. Viestin loppuun lisätään rivi
+            "Saat tämän viestin FlowLeadsin asiakkaana. Voit vastata suoraan tähän viestiin."</p>
+
+          <fieldset class="announcement-fieldset">
+            <legend class="form-label">Vastaanottajat</legend>
+            {% for key, label in audiences.items() %}
+            <label class="announcement-choice">
+              <input type="radio" name="audience" value="{{ key }}"{% if form.audience == key %} checked{% endif %}>
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </fieldset>
+
+          <fieldset class="announcement-fieldset">
+            <legend class="form-label">Asiakkaat</legend>
+            <p class="form-helper">Ei valintoja = kaikki aktiiviset asiakkaat.</p>
+            <div class="announcement-orgs">
+              {% for org in organizations %}
+              <label class="announcement-choice">
+                <input type="checkbox" name="organization_ids" value="{{ org.id }}"{% if org.id in form.organization_ids %} checked{% endif %}>
+                <span>{{ org.name }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <div class="announcement-recipients">
+            <p><strong>{{ preview|length }} vastaanottajaa</strong>
+              <button type="submit" name="action" value="preview" class="btn btn-ghost btn-sm" formnovalidate>Päivitä vastaanottajat</button></p>
+            {% if preview %}
+            <details>
+              <summary>Näytä vastaanottajat</summary>
+              <ul class="announcement-recipient-list">
+                {% for item in preview %}<li>{{ item.email }} <span class="text-muted">· {{ item.organization_name }}</span></li>{% endfor %}
+              </ul>
+            </details>
+            {% endif %}
+          </div>
+
+          <div class="announcement-actions">
+            <button type="submit" name="action" value="test" class="btn btn-secondary"{% if not sending_enabled %} disabled{% endif %}>Lähetä testi itselleni</button>
+            <button type="submit" name="action" value="send" class="btn btn-primary"{% if not sending_enabled or not preview %} disabled{% endif %}
+                    data-confirm="Lähetetäänkö tiedote {{ preview|length }} vastaanottajalle? Tätä ei voi perua."
+                    onclick="return confirm(this.dataset.confirm);">Lähetä {{ preview|length }} vastaanottajalle</button>
+          </div>
+        </form>
+
+        <h2 class="form-section-title">Lähetetyt tiedotteet</h2>
+        {% if history %}
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Lähetetty</th><th>Aihe</th><th>Vastaanottajat</th><th class="num">Lähetetty</th><th class="num">Epäonnistui</th><th>Lähettäjä</th></tr></thead>
+          <tbody>
+            {% for item in history %}
+            <tr>
+              <td class="mono">{{ (item.sent_at|helsinki).strftime('%d.%m.%Y %H:%M') }}</td>
+              <td>
+                <details>
+                  <summary>{{ item.subject }}</summary>
+                  <div class="announcement-body">{{ item.body }}</div>
+                  {% if item.failures %}<p class="text-sm">Epäonnistuneet: {% for f in item.failures %}{{ f.email }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+                </details>
+              </td>
+              <td>{{ audiences.get(item.audience, item.audience) }}{% if item.organization_ids %} · {{ item.organization_ids|length }} asiakasta{% else %} · kaikki asiakkaat{% endif %}</td>
+              <td class="num mono">{{ item.recipients - item.failed }}</td>
+              <td class="num mono">{{ item.failed }}</td>
+              <td>{{ item.sent_by.email if item.sent_by else '–' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Ei vielä lähetettyjä tiedotteita.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

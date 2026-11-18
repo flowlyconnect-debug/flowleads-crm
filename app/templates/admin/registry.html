@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Julkiset rekisterit — Hallinta{% endblock %}
+{% macro when(value) %}{% if value %}{{ (value|helsinki).strftime('%d.%m.%Y %H:%M') }}{% else %}—{% endif %}{% endmacro %}
+{% set kind_labels = {'permit': 'Muutostyölupa', 'heating': 'Öljylämmitys', 'age': 'Ikäennuste'} %}
+{% set step_labels = {'ryhti_buildings': 'Ryhti: rakennukset', 'ryhti_permits': 'Ryhti: muutostyöluvat', 'ryhti_addresses': 'Ryhti: osoitteet'} %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('registry') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Julkiset rekisterit</h1>
+          <p class="settings-panel__subtitle">
+            Ryhdin (SYKE) rakennukset ja muutostyöluvat sekä PRH:n asunto-osakeyhtiöt. Vain sisäiseen käyttöön:
+            mikään tämän sivun tieto ei näy asiakkaille eikä tule heidän Kohteet-sivulleen.
+          </p>
+        </header>
+
+        {% if not overview.enabled %}
+        <div class="flash info">
+          Yöajo on pois päältä (<code>REGISTRY_SYNC_ENABLED</code>). Tiedot haetaan käsin komennolla
+          <code>flask registry-sync</code>.
+        </div>
+        {% endif %}
+
+        <dl class="search-profiles-stats" style="margin-top:1.5rem;">
+          <div><dt>Rakennuksia</dt><dd>{{ overview.buildings }}</dd></div>
+          <div><dt>Osoite haettu</dt><dd>{{ overview.with_address }}</dd></div>
+          <div><dt>Yhdistetty taloyhtiöön</dt><dd>{{ overview.linked }}</dd></div>
+          <div><dt>Asunto-osakeyhtiöitä</dt><dd>{{ overview.companies }}</dd></div>
+          <div><dt>Muutostyölupia</dt><dd>{{ overview.permits }}</dd></div>
+        </dl>
+        <p class="text-muted text-sm mt-2">
+          Rajaus: {{ overview.scope or 'koko Suomi' }}. PRH haettu {{ overview.prh_done }} kunnasta{% if overview.prh_errors %},
+          virheitä {{ overview.prh_errors }}{% endif %}.
+        </p>
+
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Ennustekohteet asiakkaille</h2>
+        <p class="text-sm">
+          {% if overview.publish_enabled %}
+          Julkaisu päällä: {{ overview.published }} ennustekohdetta katalogissa.
+          {% else %}
+          Julkaisu pois päältä (<code>REGISTRY_TARGETS_PUBLISH</code>): katalogissa ei ole ennustekohteita.
+          {% endif %}
+          {% if overview.estimate_orgs %}
+          Näkyy asiakkaille: {{ overview.estimate_orgs|join(', ') }}.
+          {% else %}
+          Ei näy yhdellekään asiakkaalle: toiminto "Ennustekohteet" on pois kaikilta (Asiakaslista → Toiminnot käytössä).
+          {% endif %}
+        </p>
+        <p class="text-muted text-sm">
+          Ennustekohde merkitään Kohteet-sivulla, taloyhtiökortilla ja liidillä sanalla "ennuste" ja aikajanalla katkoviivalla.
+          Taloyhtiöön yhdistämätön rakennus julkaistaan vain muutostyöluvan perusteella (<code>REGISTRY_PUBLISH_UNLINKED</code>).
+        </p>
+
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Haut</h2>
+        <table>
+          <thead><tr><th>Vaihe</th><th>Viimeisin ajo</th><th>Rivejä</th><th>Virhe</th></tr></thead>
+          <tbody>
+            {% for row in overview.states %}
+            <tr>
+              {% set step, _, place = row.name.partition(':') %}
+              <td>{{ step_labels.get(step, step) }}{% if place %} ({{ place }}){% endif %}</td>
+              <td>{{ when(row.last_run_at) }}</td>
+              <td>{{ row.last_rows }}</td>
+              <td>{% if row.last_error %}<span style="color:var(--color-danger-emphasis);">{{ row.last_error[:160] }}</span>{% else %}—{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">Ei ajettu vielä.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Signaalit</h2>
+        <p class="text-muted text-sm">
+          Arvioita, eivät tosiasioita. Ryhdin avoimessa datassa ei ole korjauspäiviä, joten ikäennuste ei tiedä, onko
+          remontti jo tehty. Muutostyölupa ei kerro, mitä muutetaan.
+        </p>
+        <table>
+          <thead><tr><th>Signaali</th><th>Määrä</th></tr></thead>
+          <tbody>
+            {% for kind, label in kind_labels.items() %}
+            <tr><td>{{ label }}</td><td>{{ overview.signals_by_kind.get(kind, 0) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if overview.signals_by_type %}
+        <p class="text-muted text-sm mt-2">
+          Remonttityypeittäin:
+          {% for rtype, count in overview.signals_by_type %}{{ rtype }} {{ count }}{% if not loop.last %} · {% endif %}{% endfor %}
+        </p>
+        {% endif %}
+
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Esikatselu</h2>
+        <form method="get" action="{{ url_for('admin.registry_status') }}" class="targets-filter" style="margin-bottom:0.75rem;">
+          <select name="kunta" class="form-input targets-filter__select" aria-label="Kunta" onchange="this.form.submit()">
+            <option value="">Kaikki kunnat</option>
+            {% for name in overview.municipalities %}
+            <option value="{{ name }}"{% if name == selected_municipality %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <select name="tyyppi" class="form-input targets-filter__select" aria-label="Signaali" onchange="this.form.submit()">
+            <option value="">Kaikki signaalit</option>
+            {% for kind, label in kind_labels.items() %}
+            <option value="{{ kind }}"{% if kind == selected_kind %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <noscript><button type="submit" class="btn btn-secondary">Näytä</button></noscript>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Taloyhtiö</th><th>Rakennus</th><th>Signaali</th><th>Varmuus</th><th>Peruste</th></tr>
+          </thead>
+          <tbody>
+            {% for signal, building, company in overview.sample %}
+            <tr>
+              <td>
+                {% if company %}{{ company.name }}<div class="text-muted text-sm">{{ company.business_id }}{% if building.link_method == 'prh_address' %} · PRH-osoitteesta{% endif %}</div>
+                {% else %}<span class="text-muted">Ei yhdistetty</span>{% endif %}
+              </td>
+              <td>
+                {{ building.address or building.building_id or '—' }}, {{ building.municipality or '' }}
+                <div class="text-muted text-sm">{{ building.building_type }}{% if building.completion_year %} {{ building.completion_year }}{% endif %}{% if building.apartments %} · {{ building.apartments }} as.{% endif %}</div>
+              </td>
+              <td>{{ kind_labels.get(signal.kind, signal.kind) }}: {{ signal.renovation_type }}{% if signal.due_year %} ({{ signal.due_year }}){% endif %}</td>
+              <td>{{ signal.confidence }}</td>
+              <td class="text-sm">{{ signal.reason }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Ei signaaleja.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="text-muted text-sm mt-2">Lähteet: Syke Ryhti ja PRH avoin data, lisenssi CC BY 4.0.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

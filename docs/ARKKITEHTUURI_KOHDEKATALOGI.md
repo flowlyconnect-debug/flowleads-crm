@@ -167,10 +167,16 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
 - **Yksi kohde per taloyhtiö**: `_visible_match_ids` ryhmittelee taloyhtiön mukaan. Piilotus, palautus
   ja siirto liidiksi koskevat koko taloyhtiötä; siirrossa muut ilmoitukset yhdistyvät samaan liidiin. Taloyhtiö, jolla on jo liidi, ei näy
   kohteena; ajastin yhdistää sen uudet ilmoitukset liidiin (`merge_into_existing_leads`, organisaatiokohtainen).
-- **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
+- **Pisteet 0–100** (`score_target`): vaihe 20, varmuus 30, ajoitus 20, yhteystiedot 15, tuoreus 10, signaalit 5
+  (ks. "Kuratoidut kohteet").
   Kohteet-sivun Sopivuus (`app/listings/fit_services.py::company_fit`) = pisteet × 0,9 + asiakkaan aiempien
   siirtojen ja piilotusten ±25; oletusjärjestys "Sopivimmat ensin". `listing_matches.score` tallentaa pohjapisteet
-  (`refresh_scores` `listing_matching`-ajossa). Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
+  (oma ajastintyö `target_scores` kerran tunnissa, uusille osumille heti: `rematch_profile` pisteyttää organisaation
+  yhdellä ajolla ja `match_listing` laskee alkupisteet saman taloyhtiön muiden kohteiden kanssa). "Sopivimmat ensin"
+  (`target_services._list_by_fit`) ei pisteytä kaikkia kohteita: se laskee jokaiselle parhaan mahdollisen Sopivuuden
+  tallennetuista pisteistä ja opitun bonuksen ylärajasta (tyyppi, maakunta, vuosikymmen, `Preferences.bonus_upper_bound`)
+  ja lopettaa, kun seuraava ei enää voi nousta sivulle (varmuusvara `_FIT_SLACK`). Järjestys on sama kuin kaikkien
+  pisteyttämällä (`tests/test_scale_fixes.py`). Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
   vaikuta pisteisiin.
 - **Taloyhtiökortti**: pisteet, signaalien aikajana (ilmoitukset, remonttimaininnat, yhteystiedot, kohteen tila,
   liidin myyntityö) sekä hallituksen puheenjohtaja, huoltoyhtiö ja isännöintitoimiston tiedot.
@@ -237,6 +243,176 @@ mutta ajastin ei luo jobeja (`SEARCH_JOBS_ENABLED=false`), eikä sille ole enä�
 Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käyttämättömiä, eikä niitä näytetä lomakkeella.
 Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
+
+## Yksi taloyhtiö kaikista lähteistä (vaihe 1/3, 18.11.2026)
+
+Tavoite: jokainen lähde (Oikotie, tuonnit, PRH, Ryhti ja myöhemmin esim. Hilma, Lupapiste, Varken avustukset)
+kulkee saman putken läpi: **tunnistus → ennuste → kategorisointi asiakkaiden profiileihin**. Vaihe 1 tunnistaa.
+
+- `HousingCompany` (`housing_companies`) on taloyhtiö lähteestä riippumatta; `HousingCompanyAddress` sen katuosoitteet
+  (`identity.street_key`, esim. `koulukatu5`) kunnittain. Linkit: `Listing.housing_id`,
+  `RegistryHousingCompany.housing_id`, `RegistryBuilding.housing_id`.
+- `housing_registry.resolve(Candidate)`: sama sääntö kaikille lähteille. 1) Y-tunnus, 2) normalisoitu nimi samassa
+  kunnassa (ei, jos Y-tunnukset eroavat), 3) katuosoite samassa kunnassa, kun nimet eivät ole ristiriidassa. Jos mikään
+  ei osu, syntyy uusi yhtiö. Kun rivi osoittaa kaksi yhtiötä samaksi (Y-tunnus löytää yhden, nimi toisen), ne yhdistetään
+  (`merge_companies`). Nimetön yhtiö (Ryhdin rakennus) saa nimen, kun ilmoitus samassa osoitteessa nimeää sen.
+- Tiedot täydentävät, eivät korvaa; rakennuksen fyysisissä tiedoissa (vuosi, asunnot, tyyppi, sijainti) Ryhti voittaa.
+- Ajot: `resolve_listings()` `listing_matching`-työssä (uudet ja uudelleennimetyt ilmoitukset; nimen tai kaupungin muutos
+  nollaa `housing_id`:n), `resolve_registry()` rekisterihaun vaiheena `resolve`. Uusi lähde tarvitsee vain sovittimen,
+  joka tekee riveistään `Candidate`-olioita.
+- Superadmin: `/admin/housing` (Taloyhtiöt): määrät lähteittäin, montako on sekä ilmoituksessa että rekisterissä, haku.
+- Mitattu Tampere, Nokia ja Pirkkala: 9 439 taloyhtiötä 32 sekunnissa; esittelyilmoitukset löysivät Ryhdin rakennuksen
+  osoitteella ja PRH:n yhtiön nimellä.
+- Testit: `tests/test_housing_registry.py`.
+
+### Vaihe 2/3: ennuste taloyhtiötä kohden (`app/listings/forecast.py`, `HousingRenovation`)
+
+Havainnot: ilmoitusten remonttimaininnat (vaihe, vuosi, varmuus, lainaus), ilmoitustekstin jo tehdyt remontit
+(`done_renovations`: "putket uusittu 2015" = tehty-verbi, mennyt vuosi, ei tulevaisuuden sanaa; tyyppi saa lähimmän
+vuoden) ja rakennusten rekisterisignaalit (lupa, öljylämmitys, ikä). Säännöt remonttityypeittäin:
+
+1. Tehty remontti tyypin tavallisen välin sisällä (putki 50 v, katto 35, julkisivu 40, sähkö 50, lämmitys 25 ...)
+   kumoaa saman tyypin ennusteet; ilmoituksen mainintaa se ei kumoa.
+2. Muutostyölupa tekee suunnitellusta luvanvaraisesta remontista (putki, julkisivu, katto, lämmitys, yläpohja)
+   päätetyn, eikä lupaa näytetä silloin erikseen "Muu remontti" -rivinä.
+3. Vaihe = pisimmälle edennyt havainto, vuosi = sen aikaisin, varmuus = paras +10, kun ilmoitus ja rekisteri
+   osoittavat samaan remonttiin (enintään 95). `estimate` = takana vain rekisteriarviot.
+4. Julkaistuja ennustekohteita (`Listing.is_estimate`) ei lasketa kahteen kertaan.
+
+Ajot: `compute_outlooks()` `listing_matching`-työssä muuttuneille (uusi tieto tai ilmoitus analysoitu edellisen
+laskennan jälkeen) ja rekisterihaun vaiheena `outlook` kaikille rekisteriin liittyville. Superadmin `/admin/housing`
+näyttää näkymän ja perusteet. Mitattu: 9 439 taloyhtiötä 1,3 sekunnissa. Testit: `tests/test_forecast.py`.
+
+Kun taloyhtiön remonttityypit muuttuvat (tehty remontti kumosi yhden, uusi lähde toi toisen), sen ilmoitukset
+täsmätään uudelleen (`forecast._rematch`).
+
+### Vaihe 3/3: Kohteet taloyhtiötasolla
+
+- **Ryhmittely:** tunnistetun ilmoituksen `company_key` on `h:<taloyhtiön id>` (`housing._refresh_keys`). Kaikki
+  "yksi taloyhtiö = yksi kohde" -logiikka (Kohteet, siirto, piilotus, liidiin yhdistäminen, taloyhtiökortti) toimii
+  siis lähteiden yli: Oikotie-ilmoitus, tuontirivi ja saman yhtiön rekisteriennuste ovat yksi kohde.
+  Yhdistäminen (`merge_companies`) päivittää avaimet. Tunnistamaton ilmoitus käyttää edelleen nimeä ja kaupunkia.
+- **Pisteet, luokka ja rivin remontit** luetaan taloyhtiön näkymästä (`housing.company_outlook` /
+  `company_renovations`, `OutlookRenovation`), kun se on laskettu: vaihe, vuosi, kahden lähteen varmuus, lähteet ja
+  perusteet. Muuten ilmoitusten omat remontit kuten ennen.
+- **Täsmäys:** `_best_renovation` hyväksyy vain remonttityypit, jotka ovat yhtiön näkymässä; tehty remontti poistaa
+  siis ennustekohteen asiakkaalta.
+- Testit: `tests/test_housing_targets.py`.
+
+## Kuratoidut kohteet: profiiliin sopivat, selitettyinä (18.11.2026)
+
+Kohteet-sivu näyttää sen, mikä sopii asiakkaan profiiliin, ei kiinteää määrää parhaita. Taloyhtiö näkyy, kun
+- sen remontti on asiakkaan urakka ja profiilin alueella (oletus Koko Suomi, asiakas rajaa suodattimilla),
+- remontti on **päätetty tai suunniteltu** ja
+- se alkaa profiilin aikaikkunassa (`SearchProfile.timing_within_years`, oletus 2 = tänä vuonna ja kahtena seuraavana,
+  `DEFAULT_TIMING_YEARS`; tyhjä = ei rajaa; tuntematon vuosi ei sulje pois; vuoden vaihtuessa profiilit täsmätään
+  uudelleen, `roll_timing_windows`).
+
+Pelkät tarpeet ovat listan alla suljetussa **Ennakoi**-osiossa (5 parasta ja "Näytä kaikki" → `?tab=need`).
+Jokaisella rivillä on yksi selkokielinen syy (`target_services.why_line`), esim. "Putkiremontti päätetty, alkaa 2027 ·
+isännöitsijän puhelin ja sähköposti tiedossa". Harvemmin tarvitut hakuehdot (alkamisvuosi, talotyyppi, järjestys,
+"Kerro mitä etsit", tallennetut haut) ovat "Lisää hakuehtoja" -kohdan takana. Pisteet ja luokat järjestävät listan.
+
+### 1. Remontin vaihe (`app/listings/stages.py`, `ListingRenovation.stage`)
+
+| Vaihe | Milloin | Esimerkkejä |
+|---|---|---|
+| Päätetty (`decided`) | taloyhtiö on päättänyt | yhtiökokous päätti, urakoitsija valittu tai kilpailutus käynnissä, työt alkaneet, lupa myönnetty |
+| Suunniteltu (`planned`) | suunnitelmassa, ei päätetty | PTS tai suunnitelma vuodella, hankesuunnittelu tai kuntotutkimus käynnissä, "ei vielä päätetty, PTS 2029" |
+| Tarve (`need`) | ei päätöstä eikä suunnitelmaa | "edessä lähivuosina", ikäennuste, öljylämmitys |
+
+Analyzer palauttaa vaiheen kentässä `vaihe` (`paatetty` / `suunniteltu` / `tarve`, epävarmassa alempi). Kun sitä ei ole
+(tuonti, vanhat rivit, rekisterit), vaihe luetaan perusteesta ja ajoituksesta säännöillä: päätössanat, paitsi kun ne
+koskevat suunnittelua tai kuntotutkimusta ("hyväksyi hankesuunnittelun" = suunniteltu); vuosi tai suunnitelmasana =
+suunniteltu; muuten tarve. Rekisteriennusteessa vain muutostyölupa on päätös. Tallennetaan flushissa
+(`housing._refresh_keys`); vanhat NULL-rivit luetaan lennossa.
+
+### 2. Pisteet 0–100 (`housing.score_target`, taloyhtiön kaikki ilmoitukset, vain asiakkaan urakat)
+
+| Osa | Max | Laskenta |
+|---|---|---|
+| Vaihe | 20 | pisimmällä oleva remontti: päätetty 20, suunniteltu 10, tarve 0 |
+| Varmuus | 30 | varmin remontti: varmuus % × 0,3 |
+| Ajoitus | 20 | aikaisin vuosi: tänä tai ensi vuonna 20, kahden vuoden päästä 16, 3–4 v 10, myöhemmin 4; pelkkä "suunnitteilla" 8, ei tietoa 5 |
+| Yhteystiedot | 15 | puhelin ja sähköposti 15, toinen 10, pelkkä nimi 4 (isännöitsijä tai hallituksen pj) |
+| Tuoreus | 10 | uusin signaali alle 30 pv 10, alle 3 kk 6, vanhempi 2 |
+| Signaalit | 5 | ilmoituksia + remonttityyppejä: 2 → 3, 3+ → 5 |
+
+Kohteet-sivun Sopivuus = pisteet × 0,9 + asiakkaan siirroista ja piilotuksista opittu ±25 (`fit_services`).
+
+### 3. Luokka (`housing.classify`, `ListingMatch.tier`)
+
+- **A Kuuma**: päätetty tai suunniteltu, pisteet ≥ 70, alkaa kahden vuoden sisällä (ajoitus ≥ 16) ja puhelin tai sähköposti
+  (yhteystiedot ≥ 10). Ennuste ei ole koskaan A.
+- **B Hyvä**: päätetty tai suunniteltu, pisteet ≥ 50.
+- **C Seurattava**: päätetty tai suunniteltu, heikompi.
+- **T Tarve**: vain tarve. Näytetään **Ennakoi**-osiossa, ei koskaan päälistalla.
+
+### 4. Läpipäästö (`target_services.release_targets`, `released_at`; NULL = jonossa)
+
+Kaksi listaa: **päälista** (päätetyt ja suunnitellut) ja **Ennakoi** (tarpeet). Oletuksena kaikki profiiliin sopivat
+näkyvät: `TARGETS_VISIBLE_LIMIT` 0 (ei rajaa), `TARGETS_MIN_TIER` C, `TARGETS_NEED_LIMIT` 0 (-1 = ei Ennakoi-osiota,
+jolloin tarve on päälistalla C:nä). Superadmin voi silti asettaa asiakkaalle ylärajan tai alimman luokan. Asiakaskohtaisesti `/admin/customers` (`targets_visible_limit`,
+`targets_min_tier`). Parhaat ensin; saman taloyhtiön uusi ilmoitus liittyy näkyvään kohteeseen ilman paikkaa.
+Siirto ja piilotus täyttävät heti; täydellä listalla selvästi parempi (parempi luokka tai +10 pistettä) vaihtaa paikkaa
+heikoimman sellaisen kanssa, joka on ollut näkyvissä `TARGETS_SWAP_AFTER_DAYS` (3) päivää käsittelemättä.
+"Uusi" = näkyviin päästetty (päiväkooste, tallennetut haut, "uusi"-merkki; vain päälista). Sivupalkin luku on päälistan.
+
+Ajot: täsmäyksen jälkeen, `listing_matching` (10 min), `target_scores` (tunti), siirto, piilotus ja asetusmuutos.
+Testit: `tests/test_profile_fit_targets.py`, `tests/test_renovation_stages.py`, `tests/test_target_release.py`.
+
+## Julkiset rekisterit (Ryhti, PRH): vain sisäinen, ei asiakkaille
+
+`app/registry/` hakee avoimen datan (CC BY 4.0, ei avainta), yhdistää sen ja laskee siitä remonttisignaaleja.
+**Mikään ei näy asiakkaille:** se ei luo `Listing`-, `ListingMatch`- eikä kohderivejä. Superadmin näkee tilan ja
+esikatselun sivulla `/admin/registry` (asetusvalikko → Julkiset rekisterit). Signaalien julkaisu katalogiin on
+erillinen myöhempi vaihe (tarvitsee "ennuste"-merkinnän Kohteet-sivulle, jotta arviota ei luule tosiasiaksi).
+
+| Vaihe | Lähde | Mitä |
+|---|---|---|
+| `buildings` | Ryhti `ryhti_building/.../avoimet_rakennukset` | Kerrostalot ja pientalot, joissa on vähintään 3 asuntoa (= rivitalo), käytössä. Valmistumisvuosi, julkisivu, rakentamistapa, lämmitys, huoneistot, sijainti. Muutosten haku `aikaleima_utc`:n mukaan. |
+| `permits` | Ryhti `avoimet_lupa_rakennukset` | Muutostyöluvat ("Muu muutostyö", "Uudelleen rakentamiseen verrattava muutostyö") viimeisen 24 kk ajalta. Yhdistyy rakennukseen pysyvällä rakennustunnuksella (lupavaiheen `rakennusavain` on eri). |
+| `addresses` | Ryhti `open_address` | Osoitteet rakennuksille, joilla niitä ei vielä ole (100 rakennusta per kutsu, `REGISTRY_ADDRESS_BATCH_LIMIT` per ajo). |
+| `prh` | PRH YTJ v3 `companies?companyForm=AOY&location=<kunta>` | Rekisteröidyt asunto-osakeyhtiöt, enintään `REGISTRY_PRH_LOCATIONS_PER_RUN` kuntaa per ajo, kukin enintään viikoittain. |
+| `link` | – | Rakennus → taloyhtiö, ensimmäinen osuva sääntö voittaa: 1) `name`: yhtiön nimessä oleva katuosoite ("As Oy Härmälänkatu 13", myös "Koulukatu 5-7") nimen kunnassa ("Kangasalan …"), muuten yhtiön kunnassa tai koko maassa, jos osoite on vain yhdessä kunnassa; 2) `listing`: katalogin kohde samassa osoitteessa nimeää yhtiön (Y-tunnus tai nimi); 3) `prh_address`: yhtiön rekisteröity katuosoite, jos kukaan muu yhtiö ei ole samassa osoitteessa (yhteinen osoite = isännöintitoimisto) eikä nimi sijoita yhtiötä muualle; 4) `name_street`: nimi on katu ("As Oy Valkoseläntie") ja kadun talot ovat yhdellä kiinteistöllä; 5) `property`: yhdistetyn talon kiinteistön muut talot, jos kiinteistöllä on vain yksi yhtiö. Osoitteissa on sekä suomen- että ruotsinkielinen kadunnimi. |
+| `signals` | – | `permit` (avoin muutostyölupa, tyyppi "Muu remontti", varmuus 70), `heating` (öljylämmitys → lämmitysjärjestelmän remontti, 50), `age` (tyypillinen korjausikä `housing._AGE_HINTS`, 30/25; betonielementtijulkisivu 1960–85 45 ja 25 vuoden ikkuna). |
+
+### Ennustekohteet (`app/registry/publish.py`, vaihe `publish`)
+
+Signaalit voi julkaista katalogiin kohteiksi, jotka on merkitty ennusteiksi (`Listing.is_estimate`, `source="ryhti"`,
+yksi kohde per rakennus, nimenä yhdistetty taloyhtiö). Kaksi lukkoa:
+
+1. Julkaisu tapahtuu vain, kun `REGISTRY_TARGETS_PUBLISH=true`.
+2. Ennustekohde täsmätään vain organisaatioille, joilla on toiminto "Ennustekohteet" (`registry_targets`,
+   `/admin/customers` → Toiminnot käytössä; `listings/services.py::estimates_allowed`). Oletuksena se on pois kaikilta.
+
+Ennustekohteelle ei sovelleta profiilin `min_confidence`-rajaa (se koskee AI:n varmuutta ilmoitustekstistä) eikä
+30 päivän historiaikkunaa. Taloyhtiöön yhdistämätön rakennus julkaistaan vain muutostyöluvan perusteella, ellei
+`REGISTRY_PUBLISH_UNLINKED=true`. Uudelleenjulkaisu päivittää vain muuttuneet (`content_hash`) ja poistaa käytöstä
+kohteet, joiden signaalit katosivat; odottavat osumat poistuvat samalla.
+
+Merkintä näkyy asiakkaalle: Kohteet-rivillä sana "ennuste" (selitys hiiren alla) ja "N rakennusta samasta taloyhtiöstä",
+aikajanalla (PTS) katkoviivainen merkki (`pts__m--estimate`; varma tieto voittaa saman vuoden ennusteen), Tiedot-osiossa
+"· ennuste", taloyhtiökortilla ja Isännöitsijät-sivulla merkintä, aikajanalla "Ennuste: <tyyppi>" ilman lainausmerkkejä
+ja liidin muistiinpanoissa "Ennuste (<tyyppi>): …". Jokaisen perusteen lopussa lukee "Arvio julkisista rekistereistä
+(Syke Ryhti, PRH), ei varmistettu tieto."
+
+Ajo: `flask registry-sync [--step ...]`, tai yöllä klo 1.40 ajastintyö `registry_sync`, kun `REGISTRY_SYNC_ENABLED=true`.
+Rajaus `REGISTRY_MUNICIPALITIES` (kuntien nimet pilkuilla, tyhjä = koko Suomi). Koko Suomi on noin 160 000 rakennusta ja
+100 000 yhtiötä (arviolta muutamia kymmeniä Mt): tarkista tietokannan levytila ennen kuin rajaus poistetaan.
+
+Rajoitukset (todettu oikealla datalla 17.11.2026, Nokia ja Pirkkala):
+- Ryhdin avoimessa datassa **ei ole korjauspäiviä**, joten ikäennuste ei tiedä, onko remontti jo tehty.
+- Muutostyölupa ei kerro, mitä muutetaan.
+- Noin 19 % rakennuksista yhdistyy taloyhtiöön (Tampere, Nokia ja Pirkkala: 1 722 / 9 021). Suurin este: 60 % yhtiöistä on
+  rekisteröity isännöintitoimiston yhteiseen osoitteeseen, eikä niiden nimessä ole katuosoitetta. Yhdistämättömällä
+  rakennuksella on silti osoite, josta yhtiön voi rikastaa myöhemmin (esim. Asiakastieto/Finder osoitteella).
+- PRH:n `location` osuu yhtiön postiosoitteeseen, joten yhtiö löytyy sen kunnan haulla, jossa isännöitsijä on. Koko Suomen
+  ajo kattaa kaikki.
+
+Testit: `tests/test_registry.py` (mockattu rajapinta: synkka, delta, virheajo, yhdistämissäännöt, signaalit, ei
+asiakkaille, superadmin-sivu, ajastintyö) ja `tests/test_registry_estimates.py` (julkaisun lukot, täsmäys vain toiminnon
+saaneille, uudelleenjulkaisu, ennuste-merkinnät Kohteissa, aikajanalla ja liidillä).
 
 ## Testit
 

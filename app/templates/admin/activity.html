@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Asiakasseuranta — Hallinta{% endblock %}
+{% set level_class = {'check': 'badge-danger', 'watch': 'badge-warning-alt', 'ok': 'badge-neutral'} %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('activity') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Asiakasseuranta</h1>
+          <p class="settings-panel__subtitle">
+            Mitä asiakkaat tekevät kohteilla: selaavatko, siirtävätkö ja työstävätkö liidejä vai vievätkö niitä ulos.
+            Merkit ovat syitä katsoa tarkemmin, eivät tuomioita. Pääkäyttäjien omia käyntejä ei lasketa.
+          </p>
+        </header>
+
+        <nav class="activity-periods" aria-label="Aikajakso">
+          {% for period in periods %}
+          <a href="{{ url_for('admin.customer_activity_page', days=period) }}" class="btn btn-sm {{ 'btn-primary' if period == days else 'btn-secondary' }}"{% if period == days %} aria-current="page"{% endif %}>{{ period }} pv</a>
+          {% endfor %}
+        </nav>
+
+        {% if rows %}
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Asiakas</th>
+              <th>Tila</th>
+              <th class="num" title="Kirjautumiset">Kirjaut.</th>
+              <th class="num" title="Eri IP-osoitteet">IP</th>
+              <th class="num" title="Kohde-, taloyhtiö-, isännöitsijä-, kartta- ja liidisivujen avaukset">Avaukset</th>
+              <th class="num" title="Kohteita siirretty liideiksi">Siirretty</th>
+              <th class="num" title="Liidejä viety CSV:nä, CRM:ään tai API:lla">Viety ulos</th>
+              <th class="num" title="Yli viikon vanhat kohdeliidit ilman työtä / kaikki">Työstämättä</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>
+                <a href="{{ url_for('admin.customer_activity_detail_page', organization_id=row.org.id, days=days) }}">{{ row.org.name }}</a>
+                {% if not row.org.is_active %}<span class="badge badge-inactive">Ei aktiivinen</span>{% endif %}
+                <div class="text-muted text-sm">{{ row.users }} {{ 'käyttäjä' if row.users == 1 else 'käyttäjää' }} · kirjautunut {{ (row.last_login|helsinki).strftime('%d.%m.%Y') if row.last_login else 'ei koskaan' }}</div>
+              </td>
+              <td>
+                <span class="badge {{ level_class[row.level] }}">{{ row.level_label }}</span>
+                {% for signal in row.signals %}
+                <div class="activity-signal" title="{{ signal.detail }}">{{ signal.title }}</div>
+                {% endfor %}
+              </td>
+              <td class="num mono">{{ row.logins }}</td>
+              <td class="num mono">{{ row.ips }}</td>
+              <td class="num mono">{{ row.views }}</td>
+              <td class="num mono">{{ row.transferred }}</td>
+              <td class="num mono">{{ row.exported }}</td>
+              <td class="num mono">{% if row.old_leads %}{{ row.unworked }}/{{ row.old_leads }}{% else %}–{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Ei asiakkaita.</p>
+        {% endif %}
+
+        <h2 class="form-section-title">Miten merkit lasketaan</h2>
+        <ul class="activity-rules">
+          <li><b>Vie liidejä ulos:</b> vähintään 50 liidiä viety CSV:nä, CRM:ään tai API:lla, tai vähintään puolet siirretyistä (yli 20).</li>
+          <li><b>Siirtää mutta ei työstä:</b> vähintään 20 yli viikon vanhaa kohdeliidiä, joista 80 % ilman soittoa, muistiinpanoa, viestiä, tehtävää tai vaiheen muutosta.</li>
+          <li><b>Selaa paljon yhteystietoja:</b> yli 300 kohde-, taloyhtiö-, isännöitsijä- tai liidisivun avausta yhtenä päivänä. <b>Selaa mutta ei siirrä:</b> yli 500 avausta ja alle yksi siirto 40 avausta kohden.</li>
+          <li><b>Tunnuksia käytetään monesta paikasta:</b> vähintään 6 eri IP-osoitetta ja vähintään 3 käyttäjää kohden.</li>
+          <li><b>Massasiirto:</b> vähintään 50 kohdetta siirretty liideiksi yhtenä päivänä.</li>
+          <li><b>Tila:</b> yksi merkki = Seuraa, kaksi tai useampi = Tarkista.</li>
+        </ul>
+        <p class="text-muted text-sm">Laskenta alkaa tästä versiosta: aiemmilta päiviltä on vain kirjautumiset ja siirrot audit-lokissa.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

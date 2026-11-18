@@ -60,3 +60,9 @@ SEARCH_JOB_STATUS_LABELS: dict[str, str] = {
     "completed": "Valmis",
     "failed": "Epäonnistui",
 }
+
+
+# A new profile shows renovations starting this year or in the next two
+# ("3 vuotta"): SearchProfile.timing_within_years. The customer can widen it
+# or clear it (no limit) on Hakuprofiilit. Unknown years never exclude.
+DEFAULT_TIMING_YEARS = 2

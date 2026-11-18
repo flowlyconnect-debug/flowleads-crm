@@ -76,7 +76,28 @@
                 {{ row.lead_count }}
                 <div class="text-muted text-sm">
                   <a href="{{ url_for('targets.index', organization_id=row.org.id) }}">{{ row.pending_matches }} {{ 'kohde' if row.pending_matches == 1 else 'kohdetta' }} saatavilla</a>
+                  {% if row.waiting.queued or row.waiting.below %}<br>{{ row.waiting.queued }} jonossa, {{ row.waiting.below }} alle luokan{% endif %}
                 </div>
+                <form method="post" action="{{ url_for('admin.set_customer_visibility_route', organization_id=row.org.id) }}" class="customer-sub-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="text-sm" for="limit-{{ row.org.id }}">Näkyvissä enintään (0 = ei rajaa)</label>
+                  <input type="number" min="0" max="5000" step="1" name="limit" id="limit-{{ row.org.id }}" value="{{ row.visible_limit }}" class="form-input form-input--compact" style="width:5.5rem;" title="0 = kaikki">
+                  <select name="min_tier" class="form-input form-input--compact" aria-label="Näytettävät luokat"
+                          title="A = kuumat, B = hyvät, C = seurattavat. Tarve-kohteilla on oma välilehtensä.">
+                    <option value="A"{% if row.min_tier == 'A' %} selected{% endif %}>Luokka A</option>
+                    <option value="B"{% if row.min_tier == 'B' %} selected{% endif %}>Luokat A–B</option>
+                    <option value="C"{% if row.min_tier == 'C' %} selected{% endif %}>Luokat A–C</option>
+                  </select>
+                  <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
+                </form>
+                <form method="post" action="{{ url_for('admin.set_customer_export_limit_route', organization_id=row.org.id) }}" class="customer-sub-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="text-sm" for="export-{{ row.org.id }}">Vientiraja / päivä (tyhjä = {{ config.get('EXPORT_DAILY_ROWS', 200) }}, 0 = ei rajaa)</label>
+                  <input type="number" min="0" max="100000" step="1" name="export_limit" id="export-{{ row.org.id }}"
+                         value="{{ row.org.export_daily_limit if row.org.export_daily_limit is not none else '' }}"
+                         placeholder="{{ config.get('EXPORT_DAILY_ROWS', 200) }}" class="form-input form-input--compact" style="width:5.5rem;">
+                  <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
+                </form>
                 <form method="post" action="{{ url_for('admin.set_customer_targets_route', organization_id=row.org.id) }}" class="customer-sub-form"
                       data-name="{{ row.org.name }}"
                       {% if row.org.targets_enabled %}onsubmit="return confirm('Otetaanko kohteiden käyttö pois asiakkaalta ' + this.dataset.name + '? Asiakas näkee kohteiden määrän, mutta ei pääse kohteisiin. Liidit säilyvät.');"{% endif %}>

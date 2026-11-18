@@ -116,9 +116,55 @@ class Config:
     LISTING_FULL_REGIONS_PER_RUN = int(os.environ.get("LISTING_FULL_REGIONS_PER_RUN", "2"))
     LISTING_FULL_REFRESH_DAYS = int(os.environ.get("LISTING_FULL_REFRESH_DAYS", "7"))
     LISTING_MATCH_HISTORY_DAYS = int(os.environ.get("LISTING_MATCH_HISTORY_DAYS", "30"))
+    # Kohteet shows what fits the customer's profile: every housing company whose
+    # wanted renovation is decided or planned and starts within the profile's
+    # window (SearchProfile.timing_within_years) is visible; only a need goes to
+    # the Ennakoi section. Each match is still scored and classified (A Kuuma /
+    # B Hyvä / C Seurattava, app/listings/housing.py::classify) for the order.
+    # An optional cap (0 = no limit) and lowest class remain for a superadmin,
+    # per customer: Organization.targets_visible_limit / targets_min_tier.
+    TARGETS_VISIBLE_LIMIT = int(os.environ.get("TARGETS_VISIBLE_LIMIT", "0"))
+    TARGETS_MIN_TIER = os.environ.get("TARGETS_MIN_TIER", "C").strip().upper() or "C"
+    # a visible target the customer has not handled in this many days may give
+    # its place to a clearly better waiting one (it goes back to the queue)
+    TARGETS_SWAP_AFTER_DAYS = int(os.environ.get("TARGETS_SWAP_AFTER_DAYS", "3"))
+    # the Ennakoi section: housing companies with only a need (no decided or
+    # planned renovation: age estimates, oil heating, vague mentions), at most
+    # this many at a time; -1 = no section (needs join the main list), 0 = no limit
+    TARGETS_NEED_LIMIT = int(os.environ.get("TARGETS_NEED_LIMIT", "0"))
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
+    # Public registers (app/registry/): Ryhti buildings/permits and PRH housing
+    # companies. Internal only: collected and previewed on /admin/registry, never
+    # shown to customers. The nightly job runs only with REGISTRY_SYNC_ENABLED.
+    REGISTRY_SYNC_ENABLED = os.environ.get("REGISTRY_SYNC_ENABLED", "false").lower() in ("1", "true", "yes")
+    # comma-separated kunta names, empty = whole Finland (~160k buildings)
+    REGISTRY_MUNICIPALITIES = os.environ.get("REGISTRY_MUNICIPALITIES", "")
+    RYHTI_API_BASE = os.environ.get("RYHTI_API_BASE", "https://paikkatiedot.ymparisto.fi/geoserver")
+    PRH_API_BASE = os.environ.get("PRH_API_BASE", "https://avoindata.prh.fi")
+    REGISTRY_HTTP_TIMEOUT = int(os.environ.get("REGISTRY_HTTP_TIMEOUT", "60"))
+    REGISTRY_PAGE_SIZE = int(os.environ.get("REGISTRY_PAGE_SIZE", "2000"))
+    REGISTRY_ADDRESS_BATCH_LIMIT = int(os.environ.get("REGISTRY_ADDRESS_BATCH_LIMIT", "5000"))
+    REGISTRY_PRH_LOCATIONS_PER_RUN = int(os.environ.get("REGISTRY_PRH_LOCATIONS_PER_RUN", "25"))
+    # Publish the signals as "Ennuste" targets (app/registry/publish.py). Even then only
+    # organizations with the "registry_targets" module see them (/admin/customers).
+    REGISTRY_TARGETS_PUBLISH = os.environ.get("REGISTRY_TARGETS_PUBLISH", "false").lower() in ("1", "true", "yes")
+    # Off switches for the 18.11.2026 release: each part turns off with one Render
+    # environment variable, no new deploy (docs/TUOTANTOON_VIENTI_TILANNE.md "Kytkimet").
+    # The profile's timing window ("alkaa viimeistään"); off = every year shows
+    PROFILE_TIMING_WINDOW_ENABLED = os.environ.get("PROFILE_TIMING_WINDOW_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Asiakasseuranta's counters (app/core/usage.py)
+    USAGE_TRACKING_ENABLED = os.environ.get("USAGE_TRACKING_ENABLED", "true").lower() in ("1", "true", "yes")
+    # the daily e-mail to superadmins when a customer turns "Tarkista"
+    ACTIVITY_ALERTS_ENABLED = os.environ.get("ACTIVITY_ALERTS_ENABLED", "true").lower() in ("1", "true", "yes")
+    # lead exports: admins only and at most this many rows a day per customer
+    EXPORT_LIMITS_ENABLED = os.environ.get("EXPORT_LIMITS_ENABLED", "true").lower() in ("1", "true", "yes")
+    EXPORT_DAILY_ROWS = int(os.environ.get("EXPORT_DAILY_ROWS", "200"))
+    # Asiakastiedotteet (superadmin e-mails to customers)
+    ANNOUNCEMENTS_ENABLED = os.environ.get("ANNOUNCEMENTS_ENABLED", "true").lower() in ("1", "true", "yes")
+    # also publish buildings with no linked housing company (otherwise: permits only)
+    REGISTRY_PUBLISH_UNLINKED = os.environ.get("REGISTRY_PUBLISH_UNLINKED", "false").lower() in ("1", "true", "yes")
     # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default
     # OpenStreetMap server suits light use only (tile usage policy), switch to a
     # commercial provider (e.g. MapTiler with a key in the URL) for heavy use.
@@ -231,6 +277,12 @@ class TestingConfig(Config):
     # the older Kohteet tests expect matches to be visible at once; the fetch
     # button's own tests switch this on
     GEOCODING_ENABLED = False
+    REGISTRY_SYNC_ENABLED = False
+    # the older catalogue tests expect every match on Kohteet at once; the curated
+    # release has its own tests (tests/test_target_release.py)
+    TARGETS_VISIBLE_LIMIT = 0
+    TARGETS_MIN_TIER = "C"
+    TARGETS_NEED_LIMIT = -1  # no Tarve tab: the older tests' renovations have no timing
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

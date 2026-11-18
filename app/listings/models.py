@@ -24,8 +24,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.extensions import db
 
@@ -115,6 +116,15 @@ class Listing(db.Model):
     # "y:<Y-tunnus>" or "n:<name>|<city>"; NULL = the listing stands alone.
     company_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
     company_name_key: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # An estimate, not a fact: a target published from the public registers
+    # (app/registry/publish.py, source "ryhti"). Shown as "Ennuste" everywhere
+    # and matched only for organizations with the "registry_targets" module.
+    is_estimate: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    # the taloyhtiö this listing is about (app/listings/housing_registry.py);
+    # NULL = not resolved yet, reset when the name, Y-tunnus or city changes
+    housing_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     contact_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     contact_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -127,6 +137,22 @@ class Listing(db.Model):
         back_populates="listing",
         cascade="all, delete-orphan",
     )
+    # the taloyhtiö across sources and its combined outlook (housing_registry, forecast)
+    housing: Mapped["HousingCompany | None"] = relationship("HousingCompany", foreign_keys=[housing_id])
+    # phone numbers and e-mails put in one form (app/listings/normalize.py); NULL = rows from before
+    contacts_normalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @validates("isannoitsija_puh", "hallitus_pj_puh", "huoltoyhtio_puh")
+    def _normalize_phone(self, _key, value):
+        from app.listings.normalize import normalize_phone
+
+        return normalize_phone(value)
+
+    @validates("isannoitsija_email", "hallitus_pj_email", "huoltoyhtio_email")
+    def _normalize_email(self, _key, value):
+        from app.listings.normalize import normalize_email
+
+        return normalize_email(value)
 
     @property
     def source_ref(self) -> str:
@@ -154,8 +180,21 @@ class ListingRenovation(db.Model):
     # first year mentioned in `timing` (e.g. "PTS 2027-2029" -> 2027), if any
     timing_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # decided / planned / need (app/listings/stages.py), set on flush from the
+    # evidence and timing; NULL on rows saved before the column (read on the fly)
+    stage: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing", back_populates="renovations")
+
+    @validates("evidence")
+    def _clean_evidence(self, _key, value):
+        from app.listings.stages import clean_evidence
+
+        return clean_evidence(value)
+
+    @property
+    def is_estimate(self) -> bool:
+        return bool(self.listing is not None and self.listing.is_estimate)
 
 
 class ListingMatch(db.Model):
@@ -169,6 +208,12 @@ class ListingMatch(db.Model):
     __table_args__ = (
         UniqueConstraint("profile_id", "listing_id", name="uq_listing_match_profile_listing"),
         Index("ix_listing_matches_status", "status", "profile_id"),
+        # every Kohteet query filters by organization and status
+        Index("ix_listing_matches_org_status", "organization_id", "status"),
+        # FK with ON DELETE SET NULL, and same-taloyhtiö lead lookups
+        Index("ix_listing_matches_lead_id", "lead_id"),
+        # curated release: the organization's waiting and visible matches
+        Index("ix_listing_matches_release", "organization_id", "status", "released_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -189,13 +234,17 @@ class ListingMatch(db.Model):
     confidence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     lead_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # When the match became visible on Kohteet: at creation (rows from the
-    # removed "Hae kohteita" reserve were released by migration d1e2f3a4b5c6).
+    # When the match became visible on Kohteet; NULL = classified but waiting
+    # (below the customer's class, or beyond the visible limit), see
+    # target_services.release_targets.
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 0-100, app/listings/housing.py::score_target over the housing company's
     # listings; refreshed by the scheduler (timing and freshness drift)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # A Kuuma / B Hyvä / C Seurattava (housing.classify), with the score. Only
+    # the allowed classes are released to Kohteet (released_at), best first.
+    tier: Mapped[str | None] = mapped_column(String(1), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing")
     profile: Mapped["SearchProfile | None"] = relationship("SearchProfile")  # noqa: F821
@@ -267,3 +316,92 @@ class PropertyManagerOffice(db.Model):
     source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class HousingCompany(db.Model):
+    """One taloyhtiö, whatever the source: every catalogue listing and every
+    public-register row is resolved to one of these
+    (app/listings/housing_registry.py: Y-tunnus, then name and municipality,
+    then street address). A company may be nameless (known only by the
+    address of a register building) until a source names it."""
+
+    __tablename__ = "housing_companies"
+    __table_args__ = (
+        Index("ix_housing_companies_name", "name_key", "municipality_key"),
+        Index("ix_housing_companies_municipality", "municipality_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[str | None] = mapped_column(String(12), unique=True, nullable=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    name_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    municipality: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    municipality_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    build_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    building_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    apartments: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # every source that has told about this company ("oikotie", "import", "ryhti", "prh", ...)
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    # when the renovation outlook (HousingRenovation, app/listings/forecast.py) was last computed
+    outlook_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    addresses: Mapped[list["HousingCompanyAddress"]] = relationship(
+        "HousingCompanyAddress", back_populates="company", cascade="all, delete-orphan"
+    )
+    outlook: Mapped[list["HousingRenovation"]] = relationship(
+        "HousingRenovation", order_by="HousingRenovation.confidence.desc()", viewonly=True
+    )
+
+
+class HousingCompanyAddress(db.Model):
+    """A street address of a housing company ("koulukatu5", identity.street_key)
+    in a municipality: how a nameless register building and a listing find
+    the same company."""
+
+    __tablename__ = "housing_company_addresses"
+    __table_args__ = (
+        UniqueConstraint("housing_id", "address_key", name="uq_housing_company_address"),
+        Index("ix_housing_company_addresses_key", "address_key", "municipality_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    housing_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="CASCADE"), nullable=False
+    )
+    address_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    municipality_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    company: Mapped[HousingCompany] = relationship("HousingCompany", back_populates="addresses")
+
+
+class HousingRenovation(db.Model):
+    """What is coming at a housing company, one row per renovation type,
+    combined from every source (app/listings/forecast.py): the furthest stage,
+    the expected year, a confidence that rises when independent sources agree,
+    and the evidence with its source."""
+
+    __tablename__ = "housing_renovations"
+    __table_args__ = (
+        UniqueConstraint("housing_id", "remonttityyppi", name="uq_housing_renovation_type"),
+        Index("ix_housing_renovations_type_stage", "remonttityyppi", "stage"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    housing_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    remonttityyppi: Mapped[str] = mapped_column(String(100), nullable=False)
+    stage: Mapped[str] = mapped_column(String(10), nullable=False)  # decided / planned / need
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[int] = mapped_column(Integer, nullable=False)
+    estimate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # only register estimates behind it
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # [{"source", "stage", "year", "confidence", "text"}], strongest first
+    evidence: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+

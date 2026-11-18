@@ -90,9 +90,14 @@
     <div class="lead-main-column">
       {% if lead_evidence %}
       <section class="lead-why">
+        {% if lead_evidence.renovation.is_estimate %}
+        <h2 class="lead-why__title">Miksi kohde löytyi <span class="target-row__estimate">ennuste</span></h2>
+        <p class="lead-why__quote">{{ lead_evidence.text }}</p>
+        {% else %}
         <h2 class="lead-why__title">Miksi kohde löytyi</h2>
         <p class="lead-why__quote">”{{ lead_evidence.text }}”</p>
-        <p class="lead-why__src">{{ lead_evidence.renovation.remonttityyppi }}{% if lead_evidence.renovation.timing %} {{ lead_evidence.renovation.timing }}{% endif %}, varmuus {{ lead_evidence.renovation.confidence }} %{% if lead_evidence.listing.published_at %}. Ilmoitus {{ (lead_evidence.listing.published_at|helsinki).strftime('%d.%m.%Y') }}{% endif %}.</p>
+        {% endif %}
+        <p class="lead-why__src">{{ lead_evidence.renovation.remonttityyppi }}{% if lead_evidence.renovation.timing %} {{ lead_evidence.renovation.timing }}{% endif %}, varmuus {{ lead_evidence.renovation.confidence }} %{% if lead_evidence.listing.published_at and not lead_evidence.listing.is_estimate %}. Ilmoitus {{ (lead_evidence.listing.published_at|helsinki).strftime('%d.%m.%Y') }}{% endif %}.</p>
       </section>
       {% endif %}
       {# AI off for the organization (app/core/features.py): no AI blocks at all #}
@@ -231,7 +236,7 @@
         </div>
       </section>
 
-      {% set crm_connected = crm_providers_for(organization_id) %}
+      {% set crm_connected = crm_providers_for(organization_id) if can_export() else [] %}
       {% if crm_connected %}
       {% set crm_links = crm_links_for(lead.id) %}
       <section class="card mt-4 lead-crm-export" aria-label="Vienti omaan CRM:ään">

@@ -115,7 +115,7 @@ def test_ended_contract_keeps_leads_and_the_count_but_locks_targets(client, app)
         match = ListingMatch(organization_id=org.id, listing_id=listing.id, status="pending", released_at=datetime.now(timezone.utc) - timedelta(days=1))
         db.session.add(match)
         db.session.commit()
-        match_id, email = match.id, seller.email
+        match_id, email, admin_email = match.id, seller.email, admin.email
     _login(client, email)
     page = client.get("/targets").get_data(as_text=True)
     assert "As Oy Loppu" not in page  # the targets themselves are closed
@@ -125,7 +125,9 @@ def test_ended_contract_keeps_leads_and_the_count_but_locks_targets(client, app)
     assert 'data-testid="targets-locked-count"' in response.get_data(as_text=True)
     with app.app_context():
         assert db.session.get(ListingMatch, match_id).status == "pending"
-    # leads can still be exported
+    # leads can still be exported (by an admin: app/core/export_limits.py)
+    client.get("/auth/logout")
+    _login(client, admin_email)
     assert client.get("/leads/export").status_code == 200
 
 

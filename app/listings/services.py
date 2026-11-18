@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 from sqlalchemy import and_, func, or_, update
+from sqlalchemy.orm import aliased, selectinload
 
 from app.extensions import db
 from app.listings.models import CrawlState, Listing, ListingMatch, ListingRenovation
@@ -513,6 +514,14 @@ def _get_listing(listing_id: int) -> Listing:
     return listing
 
 
+# Analyzer "vaihe" (and the English API name) -> ListingRenovation.stage
+_ANALYZER_STAGES = {
+    "paatetty": "decided", "päätetty": "decided", "decided": "decided",
+    "suunniteltu": "planned", "planned": "planned",
+    "tarve": "need", "need": "need",
+}
+
+
 def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None) -> dict:
     now = now or _now()
     listing = _get_listing(listing_id)
@@ -575,6 +584,8 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
             timing=_clean(item.get("timing"), 100),
             timing_year=_parse_year(item.get("timing"), low=2000),
             evidence=_clean(item.get("evidence"), 2000),
+            # the Analyzer's own reading; without it the flush reads the evidence (app/listings/stages.py)
+            stage=_ANALYZER_STAGES.get(str(item.get("vaihe") or item.get("stage") or "").strip().lower()),
         )
     for renovation in best.values():
         listing.renovations.append(renovation)
@@ -633,25 +644,53 @@ def _best_renovation(
     now = now or _now()
     wanted = set(profile.wanted_types)
     limit_year = None
-    if profile.timing_within_years is not None:
+    from flask import current_app
+
+    if profile.timing_within_years is not None and current_app.config.get("PROFILE_TIMING_WINDOW_ENABLED", True):
         limit_year = now.year + int(profile.timing_within_years)
+    from app.listings.housing import company_outlook
+    from app.listings.stages import too_old
+
+    # the company's combined outlook (app/listings/forecast.py) decides what is
+    # still coming: a type it dropped (done since, say) is no target any more
+    outlook = company_outlook([listing])
+    if outlook is not None:
+        wanted &= {r.remonttityyppi for r in outlook}
     best = None
     for renovation in listing.renovations:
         if renovation.remonttityyppi not in wanted:
             continue
-        if renovation.confidence < (profile.min_confidence or 0):
+        # min_confidence is about how sure the AI is of a listing text; an
+        # estimate from the registers is labelled as one instead
+        if not listing.is_estimate and renovation.confidence < (profile.min_confidence or 0):
             continue
         if limit_year is not None and renovation.timing_year is not None and renovation.timing_year > limit_year:
             continue
+        if too_old(renovation, now):
+            continue  # dated years back and not going on: most likely done
         if best is None or renovation.confidence > best.confidence:
             best = renovation
     return best
+
+
+ESTIMATE_FEATURE = "registry_targets"
+
+
+def estimates_allowed(organization_id: int | None) -> bool:
+    """Estimated targets (Listing.is_estimate) are matched only for
+    organizations a superadmin gave the "registry_targets" module."""
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id) if organization_id else None
+    return bool(organization is not None and organization.has_feature(ESTIMATE_FEATURE))
 
 
 def _profile_wants(
     profile: SearchProfile, listing: Listing, *, now: datetime | None = None
 ) -> ListingRenovation | None:
     if not profile.is_active or profile.source != SOURCE:
+        return None
+    if listing.is_estimate and not estimates_allowed(profile.organization_id):
         return None
     if not _listing_passes(profile, listing):
         return None
@@ -691,6 +730,7 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
         renovation = _profile_wants(profile, listing, now=now)
         if renovation is None:
             continue
+        score, tier = _initial_rating(profile.organization_id, listing, now)
         match = ListingMatch(
             organization_id=profile.organization_id,
             profile_id=profile.id,
@@ -698,14 +738,20 @@ def match_listing(listing: Listing, *, now: datetime | None = None) -> list[List
             status="pending",
             confidence=renovation.confidence,
             created_at=now,
-            released_at=now,
-            score=_initial_score(profile.organization_id, listing, now),
+            released_at=None,  # classified first; release_targets decides
+            score=score,
+            tier=tier,
         )
         db.session.add(match)
         created.append(match)
     if created:
         _ensure_contact_queued(listing)
     db.session.flush()
+    if created:
+        from app.listings.target_services import release_targets
+
+        for organization_id in {m.organization_id for m in created}:
+            release_targets(organization_id, now=now)
     return created
 
 
@@ -719,6 +765,16 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
     if not regions or (profile.source or SOURCE) != SOURCE:
         return {}
     since = now - timedelta(days=_cfg("LISTING_MATCH_HISTORY_DAYS"))
+    # estimates are not news: no history window and no AI confidence floor,
+    # but only for organizations with the module
+    if estimates_allowed(profile.organization_id):
+        fresh_enough = or_(Listing.is_estimate.is_(True), func.coalesce(Listing.published_at, Listing.first_seen_at) >= since)
+        sure_enough = or_(Listing.is_estimate.is_(True), ListingRenovation.confidence >= (profile.min_confidence or 0))
+    else:
+        fresh_enough = and_(
+            Listing.is_estimate.is_(False), func.coalesce(Listing.published_at, Listing.first_seen_at) >= since
+        )
+        sure_enough = ListingRenovation.confidence >= (profile.min_confidence or 0)
     listings = (
         Listing.query.join(ListingRenovation, ListingRenovation.listing_id == Listing.id)
         .filter(
@@ -726,9 +782,10 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
             Listing.analysis_status == "done",
             Listing.maakunta.in_(regions),
             ListingRenovation.remonttityyppi.in_(profile.wanted_types),
-            ListingRenovation.confidence >= (profile.min_confidence or 0),
-            func.coalesce(Listing.published_at, Listing.first_seen_at) >= since,
+            sure_enough,
+            fresh_enough,
         )
+        .options(selectinload(Listing.renovations))
         .distinct()
         .all()
     )
@@ -777,8 +834,8 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 status="pending",
                 confidence=conf,
                 created_at=now,
-                released_at=now,
-                score=_initial_score(profile.organization_id, listing, now),
+                released_at=None,  # scored, classified and released below
+                score=None,
             )
         )
         _ensure_contact_queued(listing)
@@ -786,7 +843,34 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
 
     profile.needs_rematch = False
     db.session.commit()
+    if added:
+        from app.listings.housing import refresh_scores
+        from app.listings.target_services import release_targets
+
+        refresh_scores(profile.organization_id, now=now)
+        release_targets(profile.organization_id, now=now)
+        db.session.commit()
     return added
+
+
+def roll_timing_windows(*, now: datetime | None = None) -> int:
+    """A profile's timing window ("alkaa viimeistään") counts from the current
+    year: once a year has turned, profiles with a window are rematched so
+    renovations that came within it become targets. Returns the profiles marked."""
+    now = now or _now()
+    year_start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+    stale = SearchProfile.query.filter(
+        SearchProfile.timing_within_years.isnot(None),
+        SearchProfile.is_active.is_(True),
+        SearchProfile.needs_rematch.is_(False),
+        SearchProfile.updated_at < year_start,
+    ).all()
+    for profile in stale:
+        profile.needs_rematch = True
+        profile.updated_at = now
+    if stale:
+        db.session.commit()
+    return len(stale)
 
 
 def rematch_profiles(*, now: datetime | None = None) -> int:
@@ -827,7 +911,9 @@ def _lead_payload(listing: Listing, profile: SearchProfile) -> dict:
             f"Kohde: {', '.join(p for p in (listing.osoite, listing.kaupunki) if p)}",
             building and f"Rakennus: {building}",
             listing.tulevat_remontit and f"Tulevat remontit: {listing.tulevat_remontit}",
-            renovation and renovation.evidence and f"Osuma ({rtype}): {renovation.evidence}",
+            renovation
+            and renovation.evidence
+            and f"{'Ennuste' if listing.is_estimate else 'Osuma'} ({rtype}): {renovation.evidence}",
         )
         if part
     )
@@ -975,13 +1061,18 @@ def _valid_email_or_none(value) -> str | None:
     return email if email and validate_email(email) else None
 
 
-def _initial_score(organization_id: int, listing: Listing, now: datetime) -> int:
-    """Score of a new match from its own listing; the scheduler refreshes it
-    with the rest of the housing company (housing.refresh_scores)."""
-    from app.listings.housing import score_target
+def _initial_rating(organization_id: int, listing: Listing, now: datetime) -> tuple[int, str]:
+    """(score, class) of a new match with the organization's other listings
+    of the same housing company, before anyone sees it: release_targets and
+    Kohteet "Sopivimmat ensin" rely on them until the hourly refresh."""
+    from app.listings.housing import classify, company_group, is_estimate_company, org_company_listings, score_target
     from app.listings.target_services import organization_wanted_types
 
-    return score_target([listing], organization_wanted_types(organization_id), now=now)["total"]
+    group = company_group(listing)
+    company = [listing] + [l for l in org_company_listings(organization_id, {group}).get(group, []) if l.id != listing.id]
+    wanted = organization_wanted_types(organization_id)
+    score = score_target(company, wanted, now=now)
+    return score["total"], classify(score, estimate=is_estimate_company(company, wanted))
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:
@@ -1024,10 +1115,26 @@ def merge_into_existing_leads(
     """Another apartment of a housing company that already has a lead joins
     that lead instead of waiting as a separate target. Creates no leads."""
     now = now or _now()
+    # only matches whose housing company already has a lead of the same
+    # organization: one query instead of one lookup per pending match
+    other_match = aliased(ListingMatch)
+    other_listing = aliased(Listing)
+    has_lead = (
+        db.session.query(other_match.id)
+        .join(other_listing, other_listing.id == other_match.listing_id)
+        .filter(
+            other_match.organization_id == ListingMatch.organization_id,
+            other_match.id != ListingMatch.id,
+            other_match.lead_id.isnot(None),
+            other_listing.company_key == Listing.company_key,
+        )
+        .exists()
+    )
     query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
         ListingMatch.status == "pending",
         Listing.is_active.is_(True),
         Listing.company_key.isnot(None),
+        has_lead,
     )
     if profile_ids:
         query = query.filter(ListingMatch.profile_id.in_(profile_ids))
@@ -1274,7 +1381,7 @@ def profile_match_stats(profile: SearchProfile, *, leads_only: bool = False) -> 
 
     # the same rule as the Kohteet page (one target per listing, not already a
     # lead or hidden through another profile, active listing)
-    available = _visible_match_ids(profile.organization_id, "pending", profile_id=profile.id).count()
+    available = _visible_match_ids(profile.organization_id, "pending", profile_id=profile.id, segment="main").count()
     return {
         "total": sum(counts.values()),
         "lead_created": counts.get("lead_created", 0),
@@ -1439,6 +1546,22 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
                 f"Analyysi (Analyzer) ei ole käsitellyt kohteita yli {hours} tuntiin, "
                 f"jonossa {analysis['pending']} kohdetta."
             )
+    # contacts are looked up only for listings a profile matched: those waiting
+    # with no lookup within the stale window mean the Enricher is not running
+    waiting_contacts = (
+        db.session.query(func.count(func.distinct(Listing.id)))
+        .join(ListingMatch, ListingMatch.listing_id == Listing.id)
+        .filter(Listing.is_active.is_(True), Listing.contact_status == "pending", ListingMatch.status == "pending")
+        .scalar()
+        or 0
+    )
+    last_contact = _aware(db.session.query(func.max(Listing.contact_claimed_at)).scalar())
+    if waiting_contacts and (last_contact is None or now - last_contact > stale_after):
+        problems.append(
+            f"Yhteystietohaku (Enricher) ei ole hakenut yhteystietoja yli {hours} tuntiin"
+            + (f" (viimeksi {_helsinki_label(last_contact)})" if last_contact else " (ei koskaan)")
+            + f", {waiting_contacts} asiakkaiden kohdetta odottaa."
+        )
     total_active = sum(counts.values())
     if total_active and analysis["failed"] > max(50, total_active // 10):
         problems.append(f"Analyysi on epäonnistunut {analysis['failed']} kohteelle.")

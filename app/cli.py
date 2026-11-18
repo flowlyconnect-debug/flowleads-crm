@@ -153,6 +153,19 @@ def register_cli(app):
         if counts["fail"]:
             raise SystemExit(1)
 
+    @app.cli.command("smoke-check")
+    def smoke_check_command():
+        """Read-only check of the new code paths right after a deploy (app/admin/smoke.py)."""
+        from app.admin.smoke import run_smoke
+
+        results = run_smoke()
+        for item in results:
+            click.echo(f"  [{'OK  ' if item['ok'] else 'VIRHE'}] {item['name']}: {item['detail']}")
+        failed = sum(1 for item in results if not item["ok"])
+        click.echo(f"\n{failed} virhettä.")
+        if failed:
+            raise SystemExit(1)
+
     @app.cli.command("send-test-email")
     @click.argument("email")
     @with_appcontext
@@ -240,6 +253,23 @@ def register_cli(app):
                 click.echo(f"  {table}: {n}")
         if not yes:
             click.echo("Aja uudelleen valitsimella --yes poistaaksesi pysyvästi.")
+
+    @app.cli.command("registry-sync")
+    @click.option(
+        "--step",
+        "steps",
+        multiple=True,
+        type=click.Choice(["buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "outlook", "publish"]),
+        help="Aja vain nämä vaiheet (oletus: kaikki).",
+    )
+    @with_appcontext
+    def registry_sync_cmd(steps):
+        """Hae Ryhdin ja PRH:n avoin data ja laske signaalit (ei näy asiakkaille)."""
+        from app.registry.services import STEPS, run_registry_sync
+
+        result = run_registry_sync(steps=tuple(steps) or STEPS)
+        for key, value in result.items():
+            click.echo(f"{key}: {value}")
 
     @app.cli.command("run-scheduler")
     @with_appcontext

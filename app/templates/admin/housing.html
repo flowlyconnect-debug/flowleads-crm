@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Taloyhtiöt — Hallinta{% endblock %}
+{% set source_labels = {'oikotie': 'Oikotie', 'import': 'Tuonti', 'ryhti': 'Ryhti', 'prh': 'PRH'} %}
+{% set stage_names = {'decided': 'päätetty', 'planned': 'suunniteltu', 'need': 'tarve'} %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('housing') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Taloyhtiöt</h1>
+          <p class="settings-panel__subtitle">
+            Yksi taloyhtiö kaikista lähteistä: ilmoitukset, tuonnit, PRH ja Ryhti tunnistetaan samaan yhtiöön
+            Y-tunnuksen, nimen ja kunnan tai osoitteen perusteella. Vain sisäiseen käyttöön.
+          </p>
+        </header>
+
+        <dl class="search-profiles-stats" style="margin-top:1.5rem;">
+          <div><dt>Taloyhtiöitä</dt><dd>{{ overview.total }}</dd></div>
+          <div><dt>Nimi tiedossa</dt><dd>{{ overview.named }}</dd></div>
+          <div><dt>Y-tunnus tiedossa</dt><dd>{{ overview.with_business_id }}</dd></div>
+          <div><dt>Ilmoituksissa</dt><dd>{{ overview.in_listings }}</dd></div>
+          <div><dt>PRH:ssa</dt><dd>{{ overview.in_prh }}</dd></div>
+          <div><dt>Ryhdissä</dt><dd>{{ overview.in_ryhti }}</dd></div>
+          <div><dt>Ilmoitus ja rekisteri</dt><dd>{{ overview.listings_and_registers }}</dd></div>
+        </dl>
+        <p class="text-sm mt-2">
+          Remonttinäkymä: {{ overview.outlook_by_stage.get('decided', 0) }} taloyhtiöllä päätetty,
+          {{ overview.outlook_by_stage.get('planned', 0) }} suunniteltu ja {{ overview.outlook_by_stage.get('need', 0) }}
+          tarve (yhtiö voi olla useassa).
+        </p>
+        <p class="text-muted text-sm mt-2">
+          {{ overview.unresolved_listings }} ilmoitusta odottaa tunnistusta (ajastin käsittelee ne 10 minuutin välein).
+          Nimettömät taloyhtiöt tunnetaan vain Ryhdin rakennuksen osoitteesta, kunnes jokin lähde nimeää ne.
+        </p>
+
+        <h2 class="form-section-title" style="margin-top:1.5rem;">Hae taloyhtiötä</h2>
+        <form method="get" action="{{ url_for('admin.housing_status') }}" class="targets-filter" style="margin-bottom:0.75rem;">
+          <input type="search" name="q" id="housing-q" value="{{ overview.search }}" class="form-input" placeholder="Nimi, osoite tai Y-tunnus" aria-label="Hae taloyhtiötä">
+          <button type="submit" class="btn btn-secondary">Hae</button>
+        </form>
+        {% if overview.search %}
+        <table>
+          <thead><tr><th>Taloyhtiö</th><th>Sijainti</th><th>Rakennus</th><th>Lähteet</th><th>Tulossa</th></tr></thead>
+          <tbody>
+            {% for row in overview.results %}
+            {% set c = row.company %}
+            <tr>
+              <td>{{ c.name or 'Nimetön' }}<div class="text-muted text-sm">{{ c.business_id or 'ei Y-tunnusta' }}</div></td>
+              <td>{{ c.address or '—' }}<div class="text-muted text-sm">{{ c.municipality or '' }}</div></td>
+              <td>{{ c.building_type or '—' }}{% if c.build_year %} {{ c.build_year }}{% endif %}{% if c.apartments %}<div class="text-muted text-sm">{{ c.apartments }} as.</div>{% endif %}</td>
+              <td>
+                {% for s in c.sources or [] %}{{ source_labels.get(s, s) }}{% if not loop.last %}, {% endif %}{% endfor %}
+                <div class="text-muted text-sm">{{ row.listings }} ilmoitusta, {{ row.buildings }} rakennusta</div>
+              </td>
+              <td class="text-sm">
+                {% for r in row.outlook %}
+                <div title="{% for e in r.evidence %}{{ source_labels.get(e.source, e.source) }}: {{ e.text }}&#10;{% endfor %}">
+                  {{ r.remonttityyppi }}: {{ stage_names[r.stage] }}{% if r.year %} {{ r.year }}{% endif %},
+                  <span class="mono">{{ r.confidence }} %</span>{% if r.estimate %} · ennuste{% endif %}
+                </div>
+                {% else %}<span class="text-muted">Ei tiedossa</span>{% endfor %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Ei osumia.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

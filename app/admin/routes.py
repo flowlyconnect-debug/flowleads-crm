@@ -92,6 +92,85 @@ def set_customer_targets_route(organization_id: int):
     return redirect(url_for("admin.customers_list"))
 
 
+@admin_bp.route("/customers/<int:organization_id>/export-limit", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_export_limit_route(organization_id: int):
+    """Lead rows the customer may export a day (app/core/export_limits.py);
+    empty = the default (EXPORT_DAILY_ROWS), 0 = no limit."""
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    raw = (request.form.get("export_limit") or "").strip()
+    try:
+        limit = None if raw == "" else max(0, min(100000, int(raw)))
+    except ValueError:
+        flash("Anna vientiraja numerona.", "danger")
+        return redirect(url_for("admin.customers_list"))
+    organization.export_daily_limit = limit
+    log_audit(
+        "customer_export_limit_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"limit": limit},
+    )
+    db.session.commit()
+    default = current_app.config.get("EXPORT_DAILY_ROWS", 200)
+    shown = f"oletus {default}" if limit is None else ("ei rajaa" if limit == 0 else str(limit))
+    flash(f"{organization.name}: liidien vientiraja {shown} riviä päivässä.", "success")
+    return redirect(url_for("admin.customers_list"))
+
+
+@admin_bp.route("/customers/<int:organization_id>/targets-visibility", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_visibility_route(organization_id: int):
+    """How many targets the customer sees at a time and the lowest class
+    (A Kuuma / B Hyvä / C Seurattava). Raising them releases more at once;
+    lowering them hides nothing that is already visible."""
+    from app.core.audit import log_audit
+    from app.listings.target_services import release_targets
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    try:
+        limit = max(0, min(5000, int(request.form.get("limit") or 0)))
+    except ValueError:
+        flash("Anna näkyvien kohteiden määrä numerona.", "danger")
+        return redirect(url_for("admin.customers_list"))
+    tier = (request.form.get("min_tier") or "B").upper()
+    if tier not in ("A", "B", "C"):
+        tier = "B"
+    organization.targets_visible_limit = limit
+    organization.targets_min_tier = tier
+    log_audit(
+        "customer_targets_visibility_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"limit": limit, "min_tier": tier},
+    )
+    db.session.commit()
+    released = release_targets(organization.id)
+    db.session.commit()
+    flash(
+        f"{organization.name}: näkyvissä enintään {limit or 'kaikki'} kohdetta, luokat A–{tier}"
+        + (f". {released} uutta tuli näkyviin." if released else "."),
+        "success",
+    )
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/customers/<int:organization_id>/active", methods=["POST"])
 @login_required
 @require_role("superadmin")
@@ -211,6 +290,13 @@ AUDIT_ACTION_LABELS_FI = {
     "organization_features_updated": "Asiakkaan toiminnot muutettu",
     "source_activated": "Hakuprofiili aktivoitu",
     "catalogue_import": "Kohteita tuotu katalogiin",
+    "customer_targets_visibility_changed": "Asiakkaan näkyvät kohteet muutettu",
+    "customer_export_limit_changed": "Asiakkaan vientiraja muutettu",
+    "export_blocked": "Liidien vienti estetty (raja tai rooli)",
+    "leads_exported": "Liidejä viety CSV:nä",
+    "crm_file_exported": "CRM-tuontitiedosto ladattu",
+    "announcement_sent": "Asiakastiedote lähetetty",
+    "activity_alert_sent": "Asiakasseurannan hälytys lähetetty",
     "catalogue_offices_import": "Isännöintitoimistoja tuotu",
     "catalogue_alert_sent": "Katalogihälytys lähetetty",
     "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",
@@ -634,6 +720,36 @@ def catalogue_status():
     )
 
 
+@admin_bp.route("/housing")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def housing_status():
+    """Taloyhtiöt: one company across every source (internal, never shown to customers)."""
+    from app.listings.housing_registry import housing_overview
+
+    return render_template("admin/housing.html", overview=housing_overview(request.args.get("q")))
+
+
+@admin_bp.route("/registry")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def registry_status():
+    """Julkiset rekisterit (Ryhti, PRH): internal preview, never shown to customers."""
+    from app.registry.models import SIGNAL_KINDS
+    from app.registry.services import registry_overview
+
+    municipality = (request.args.get("kunta") or "").strip() or None
+    kind = request.args.get("tyyppi") if request.args.get("tyyppi") in SIGNAL_KINDS else None
+    return render_template(
+        "admin/registry.html",
+        overview=registry_overview(municipality=municipality, kind=kind),
+        selected_municipality=municipality or "",
+        selected_kind=kind or "",
+    )
+
+
 @admin_bp.route("/catalogue/import", methods=["POST"])
 @login_required
 @require_role("superadmin")
@@ -815,3 +931,129 @@ def reset_running_test_jobs_route():
 
     result = reset_running_test_jobs()
     return jsonify(result)
+
+
+ACTIVITY_PERIODS = (7, 30, 90)
+
+
+def _activity_days() -> int:
+    days = request.args.get("days", 30, type=int)
+    return days if days in ACTIVITY_PERIODS else 30
+
+
+@admin_bp.route("/activity")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def customer_activity_page():
+    """Asiakasseuranta: what each customer does with the targets (app/admin/activity_services.py)."""
+    from app.admin.activity_services import customer_activity
+
+    days = _activity_days()
+    return render_template(
+        "admin/activity.html", rows=customer_activity(days=days), days=days, periods=ACTIVITY_PERIODS
+    )
+
+
+@admin_bp.route("/activity/<int:organization_id>")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def customer_activity_detail_page(organization_id: int):
+    from app.admin.activity_services import EVENT_LABELS, customer_activity_detail, event_detail
+
+    days = _activity_days()
+    detail = customer_activity_detail(organization_id, days=days)
+    if detail is None:
+        abort(404)
+    return render_template(
+        "admin/activity_detail.html",
+        detail=detail,
+        days=days,
+        periods=ACTIVITY_PERIODS,
+        event_labels=EVENT_LABELS,
+        event_detail=event_detail,
+    )
+
+
+@admin_bp.route("/announcements", methods=["GET", "POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def announcements_page():
+    """Asiakastiedotteet: one e-mail to many customers through Mailgun (app/admin/announcement_services.py)."""
+    from app.admin.announcement_services import (
+        AUDIENCES,
+        AnnouncementError,
+        recent_announcements,
+        recipients,
+        send_announcement,
+    )
+    from app.core.messages_fi import fi_message
+    from app.email.services import email_sending_enabled
+    from app.users.models import Organization
+
+    if not current_app.config.get("ANNOUNCEMENTS_ENABLED", True):
+        abort(404)
+    form = {
+        "subject": (request.form.get("subject") or "").strip(),
+        "body": request.form.get("body") or "",
+        "audience": request.form.get("audience") or "admins",
+        "organization_ids": [int(v) for v in request.form.getlist("organization_ids") if v.isdigit()],
+    }
+    if form["audience"] not in AUDIENCES:
+        form["audience"] = "admins"
+    action = request.form.get("action") if request.method == "POST" else None
+    preview = None
+    if action in ("test", "send"):
+        try:
+            _announcement, outcome = send_announcement(
+                subject=form["subject"],
+                body=form["body"],
+                audience=form["audience"],
+                organization_ids=form["organization_ids"],
+                sender=current_user,
+                test_only=action == "test",
+            )
+        except AnnouncementError as exc:
+            flash(fi_message(str(exc)), "danger")
+        else:
+            if action == "test":
+                if outcome["failed"]:
+                    flash(f"Testiviesti epäonnistui: {outcome['failures'][0]['error']}", "danger")
+                else:
+                    flash(f"Testiviesti lähetetty osoitteeseen {current_user.email}.", "success")
+            else:
+                flash(
+                    f"Tiedote lähetetty {outcome['sent']} vastaanottajalle."
+                    + (f" {outcome['failed']} epäonnistui." if outcome["failed"] else ""),
+                    "warning" if outcome["failed"] else "success",
+                )
+                return redirect(url_for("admin.announcements_page"))
+    try:
+        preview = recipients(form["audience"], form["organization_ids"])
+    except AnnouncementError:
+        preview = []
+    return render_template(
+        "admin/announcements.html",
+        form=form,
+        audiences=AUDIENCES,
+        organizations=Organization.query.filter_by(is_active=True).order_by(Organization.name).all(),
+        preview=preview,
+        history=recent_announcements(),
+        sending_enabled=email_sending_enabled(),
+        mail_from=f"{current_app.config.get('MAILGUN_FROM_NAME') or 'FlowLeads'} <{current_app.config.get('MAILGUN_FROM_EMAIL') or 'osoite puuttuu'}>",
+        from_missing=not current_app.config.get("MAILGUN_FROM_EMAIL"),
+    )
+
+
+@admin_bp.route("/data-quality")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def data_quality_page():
+    """Datan laatu: how complete and clean the catalogue is (app/listings/quality.py)."""
+    from app.listings.quality import data_quality
+    from app.listings.services import catalogue_health
+
+    return render_template("admin/data_quality.html", quality=data_quality(), problems=catalogue_health()["problems"])

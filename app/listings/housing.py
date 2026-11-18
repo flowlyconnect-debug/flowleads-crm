@@ -29,6 +29,7 @@ import unicodedata
 from datetime import datetime, timezone
 
 from sqlalchemy import event
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.extensions import db
 
@@ -86,6 +87,47 @@ def plain_company_key(listing) -> str | None:
     return f"y:{ytunnus}" if ytunnus else None
 
 
+class OutlookRenovation:
+    """A row of a housing company's combined outlook (HousingRenovation, app/listings/forecast.py)
+    in the shape of a ListingRenovation, so scoring, the PTS strip and the target row read
+    either one."""
+
+    def __init__(self, row):
+        self.remonttityyppi = row.remonttityyppi
+        self.confidence = row.confidence
+        self.timing_year = row.year
+        self.timing = str(row.year) if row.year else None
+        self.stage = row.stage
+        self.is_estimate = bool(row.estimate)
+        self.sources = list(row.sources or [])
+        evidence = row.evidence or []
+        self.evidence = evidence[0]["text"] if evidence and evidence[0].get("text") else None
+        self.evidence_items = evidence
+
+
+def company_outlook(listings) -> list | None:
+    """The combined outlook of the housing company the listings belong to, or
+    None when they are not resolved to one company or its outlook has not
+    been computed yet (then the listings' own renovations count)."""
+    listings = [l for l in listings if l is not None]
+    ids = {getattr(l, "housing_id", None) for l in listings}
+    if len(ids) != 1 or None in ids:
+        return None
+    housing = getattr(listings[0], "housing", None)
+    if housing is None or housing.outlook_at is None:
+        return None
+    return [OutlookRenovation(row) for row in housing.outlook]
+
+
+def company_renovations(listings) -> list:
+    """What is coming at the company: its outlook when there is one, else every
+    renovation its listings mention."""
+    outlook = company_outlook(listings)
+    if outlook is not None:
+        return outlook
+    return [r for l in listings if l is not None for r in l.renovations]
+
+
 def company_group(listing) -> str:
     """The grouping value: the company key, or the listing alone."""
     return listing.company_key or f"l:{listing.id}"
@@ -94,21 +136,31 @@ def company_group(listing) -> str:
 def _refresh_keys(session, _flush_context, _instances) -> None:
     """Keep the keys in step with the name, city and Y-tunnus, whichever code
     path changed them (crawler, analyzer, import, tests)."""
-    from app.listings.models import Listing
+    from app.listings.models import Listing, ListingRenovation
+    from app.listings.stages import classify_stage
 
     for obj in list(session.new) + list(session.dirty):
+        if isinstance(obj, ListingRenovation):
+            # decided / planned / need, from the renovation's own words (app/listings/stages.py)
+            if obj.stage is None:
+                obj.stage = classify_stage(obj.evidence, obj.timing, obj.timing_year)
+            continue
         if not isinstance(obj, Listing):
             continue
         # "" = processed, no name (NULL marks rows stored before keys existed)
         name = name_key(obj.taloyhtio, obj.kaupunki) or ""
         if obj.company_name_key != name:
+            if obj.company_name_key is not None and obj.housing_id is not None:
+                # renamed or moved: resolve the taloyhtiö again (housing_registry.resolve_listings)
+                obj.housing_id = None
             obj.company_name_key = name
-        plain = plain_company_key(obj)
+        # resolved to a taloyhtiö across sources (housing_registry): that groups it
+        plain = f"h:{obj.housing_id}" if obj.housing_id else plain_company_key(obj)
         current = obj.company_key or ""
         if plain is None:
             if obj.company_key is not None:
                 obj.company_key = None
-        elif plain.startswith("y:") and current.startswith("n:"):
+        elif plain.startswith("y:") and current.startswith("n:") and not obj.housing_id:
             pass  # nameless listing joined to the named company of its Y-tunnus
         elif current != plain:
             obj.company_key = plain
@@ -203,54 +255,74 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def _timing_points(year: int | None, has_timing_text: bool, now: datetime) -> tuple[int, str]:
+    """Out of 20: this or next year 20, in two years 16, in 3-4 years 10."""
     if year is not None:
         ahead = year - now.year
         if ahead <= 1:
-            return 25, f"alkaa {year}"
-        if ahead == 2:
             return 20, f"alkaa {year}"
+        if ahead == 2:
+            return 16, f"alkaa {year}"
         if ahead <= 4:
-            return 12, f"alkaa {year}"
-        return 5, f"alkaa {year}"
+            return 10, f"alkaa {year}"
+        return 4, f"alkaa {year}"
     if has_timing_text:
-        return 10, "suunnitteilla, vuosi ei tiedossa"
-    return 6, "ajankohta ei tiedossa"
+        return 8, "suunnitteilla, vuosi ei tiedossa"
+    return 5, "ajankohta ei tiedossa"
 
 
 def score_target(listings, wanted_types: set[str] | None = None, *, now: datetime | None = None) -> dict:
     """How promising one housing company is for the organization, 0–100.
 
-    Parts (max points): confidence of the best wanted renovation (40), how
-    soon it starts (25), reachable contacts (15), how many independent signals
-    point to it (10) and how fresh the newest signal is (10). Returns
+    Parts (max points): how far the furthest wanted renovation is (stage:
+    decided 20, planned 10, only a need 0; app/listings/stages.py), confidence
+    of the best wanted renovation (30), how soon it starts (20), reachable
+    contacts (15), how fresh the newest signal is (10) and how many
+    independent signals point to it (5). Returns
     {"total": int, "parts": [{"key", "label", "points", "max", "detail"}]}.
     """
+    from app.listings.stages import STAGE_LABELS, STAGE_POINTS, best_stage, is_ongoing, possibly_done, renovation_stage
+
     now = now or datetime.now(timezone.utc)
     listings = [l for l in listings if l is not None]
-    renovations = [
-        r
-        for listing in listings
-        for r in listing.renovations
-        if not wanted_types or r.remonttityyppi in wanted_types
-    ]
+    renovations = [r for r in company_renovations(listings) if not wanted_types or r.remonttityyppi in wanted_types]
     best = max(renovations, key=lambda r: (r.confidence, -(r.timing_year or 9999)), default=None)
     parts = []
+
+    stage = best_stage(renovations)
+    parts.append(
+        {
+            "key": "stage",
+            "label": "Vaihe",
+            "points": STAGE_POINTS.get(stage, 0),
+            "max": 20,
+            "detail": STAGE_LABELS[stage].lower() if stage else "ei osuvaa remonttia",
+            "stage": stage,
+        }
+    )
 
     confidence = best.confidence if best else 0
     parts.append(
         {
             "key": "confidence",
             "label": "Varmuus",
-            "points": round(confidence * 40 / 100),
-            "max": 40,
+            "points": round(confidence * 30 / 100),
+            "max": 30,
             "detail": f"{best.remonttityyppi} {confidence} %" if best else "ei osuvaa remonttia",
         }
     )
 
-    years = [r.timing_year for r in renovations if r.timing_year]
+    # timing of the furthest renovations: an age estimate's year must not speed up a decided one
+    staged = [r for r in renovations if renovation_stage(r) == stage] or renovations
+    # an earlier year: going on counts as this year, otherwise it may be done already
+    years = [now.year if (r.timing_year < now.year and is_ongoing(r)) else r.timing_year
+             for r in staged if r.timing_year and not possibly_done(r, now)]
+    past = [r.timing_year for r in staged if possibly_done(r, now)]
     soonest = min(years) if years else None
-    points, detail = _timing_points(soonest, any((r.timing or "").strip() for r in renovations), now)
-    parts.append({"key": "timing", "label": "Ajoitus", "points": points if renovations else 0, "max": 25, "detail": detail})
+    if soonest is None and past:
+        points, detail = 4, f"merkitty vuodelle {max(past)}, mahdollisesti jo tehty"
+    else:
+        points, detail = _timing_points(soonest, any((r.timing or "").strip() for r in staged), now)
+    parts.append({"key": "timing", "label": "Ajoitus", "points": points if renovations else 0, "max": 20, "detail": detail})
 
     phone = any((l.isannoitsija_puh or "").strip() or (getattr(l, "hallitus_pj_puh", None) or "").strip() for l in listings)
     email = any((l.isannoitsija_email or "").strip() or (getattr(l, "hallitus_pj_email", None) or "").strip() for l in listings)
@@ -268,13 +340,13 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     parts.append({"key": "contact", "label": "Yhteystiedot", "points": contact, "max": 15, "detail": contact_detail})
 
     signal_count = len(listings) + max(0, len({r.remonttityyppi for r in renovations}) - 1)
-    signal_points = 0 if signal_count <= 1 else (6 if signal_count == 2 else 10)
+    signal_points = 0 if signal_count <= 1 else (3 if signal_count == 2 else 5)
     parts.append(
         {
             "key": "signals",
             "label": "Signaalit",
             "points": signal_points,
-            "max": 10,
+            "max": 5,
             "detail": f"{signal_count} {'signaali' if signal_count == 1 else 'signaalia'}",
         }
     )
@@ -292,6 +364,51 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     parts.append({"key": "fresh", "label": "Tuoreus", "points": fresh, "max": 10, "detail": fresh_detail})
 
     return {"total": max(0, min(100, sum(p["points"] for p in parts))), "parts": parts}
+
+
+# Classes of a target, decided when it is found (before the customer sees it).
+# A, B and C are renovations the housing company has decided or planned:
+# A = hot (strong, soon, reachable), B = good, C = keep an eye on. T = only a
+# need (no decision, no plan: an age estimate, oil heating, "edessä joskus"):
+# Kohteet keeps these on a tab of their own (Tarve), never mixed with the rest.
+TIERS = ("A", "B", "C")
+NEED_TIER = "T"
+TIER_LABELS = {"A": "Kuuma", "B": "Hyvä", "C": "Seurattava", "T": "Tarve"}
+TIER_A_SCORE = 70
+TIER_B_SCORE = 50
+
+
+def is_estimate_company(listings, wanted_types=None) -> bool:
+    """Only register estimates behind what the organization wants here: never class A."""
+    renovations = [r for r in company_renovations(listings) if not wanted_types or r.remonttityyppi in wanted_types]
+    if renovations:
+        return all(getattr(r, "is_estimate", False) for r in renovations)
+    return all(getattr(l, "is_estimate", False) for l in listings)
+
+
+def classify(score: dict, *, estimate: bool = False) -> str:
+    """The class of a scored housing company (score = score_target(...)).
+    Only a need (stage "need") -> T. A needs a high score, a renovation within
+    two years (timing >= 16 of 20) and a phone or an email (contact >= 10 of
+    15); an estimate from the public registers is never A."""
+    parts = {p["key"]: p for p in score["parts"]}
+    stage = parts.get("stage", {}).get("stage")
+    if stage in (None, "need"):
+        return NEED_TIER
+    points = {key: part["points"] for key, part in parts.items()}
+    total = score["total"]
+    if not estimate and total >= TIER_A_SCORE and points.get("timing", 0) >= 16 and points.get("contact", 0) >= 10:
+        return "A"
+    if total >= TIER_B_SCORE:
+        return "B"
+    return "C"
+
+
+def tier_allowed(tier: str | None, min_tier: str) -> bool:
+    """True when `tier` is `min_tier` or better (A is best)."""
+    if tier not in TIERS:
+        return False
+    return TIERS.index(tier) <= TIERS.index(min_tier if min_tier in TIERS else "B")
 
 
 def score_label(total: int) -> str:
@@ -318,7 +435,7 @@ def score_level(total: int) -> str:
 def org_company_listings(organization_id: int, groups: set[str]) -> dict:
     """{company group: [listings]} of the organization's matches for the
     given groups."""
-    from app.listings.models import Listing, ListingMatch
+    from app.listings.models import HousingCompany, Listing, ListingMatch
 
     if not groups:
         return {}
@@ -328,6 +445,8 @@ def org_company_listings(organization_id: int, groups: set[str]) -> dict:
         db.session.query(Listing)
         .join(ListingMatch, ListingMatch.listing_id == Listing.id)
         .filter(ListingMatch.organization_id == organization_id, Listing.is_active.is_(True))
+        # scoring reads every listing's renovations and its company's outlook: few queries
+        .options(selectinload(Listing.renovations), selectinload(Listing.housing).selectinload(HousingCompany.outlook))
     )
     criteria = []
     if keys:
@@ -344,14 +463,18 @@ def org_company_listings(organization_id: int, groups: set[str]) -> dict:
 
 
 def refresh_scores(organization_id: int | None = None, *, now: datetime | None = None) -> int:
-    """Recompute the stored score of every open (pending) match: the sort key
-    of Kohteet "Parhaat ensin". Timing and freshness drift with time, so the
-    scheduler runs this regularly. Returns how many scores changed."""
-    from app.listings.models import ListingMatch
+    """Recompute the stored score and class of every open (pending) match:
+    the sort key of Kohteet "Sopivimmat ensin" and what release_targets lets
+    through. Timing and freshness drift with time, so the scheduler runs this
+    hourly. Returns how many changed."""
+    from app.listings.models import HousingCompany, Listing, ListingMatch
     from app.listings.target_services import organization_wanted_types
 
     now = now or datetime.now(timezone.utc)
-    query = ListingMatch.query.filter(ListingMatch.status == "pending")
+    query = ListingMatch.query.filter(ListingMatch.status == "pending").options(
+        joinedload(ListingMatch.listing).selectinload(Listing.renovations),
+        joinedload(ListingMatch.listing).selectinload(Listing.housing).selectinload(HousingCompany.outlook),
+    )
     if organization_id is not None:
         query = query.filter(ListingMatch.organization_id == organization_id)
     by_org: dict[int, list] = {}
@@ -365,9 +488,11 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
         listings = org_company_listings(org_id, groups)
         for match in matches:
             company = listings.get(company_group(match.listing)) or [match.listing]
-            total = score_target(company, wanted, now=now)["total"]
-            if match.score != total:
-                match.score = total
+            score = score_target(company, wanted, now=now)
+            tier = classify(score, estimate=is_estimate_company(company, wanted))
+            if match.score != score["total"] or match.tier != tier:
+                match.score = score["total"]
+                match.tier = tier
                 changed += 1
     if changed:
         db.session.commit()
@@ -399,23 +524,26 @@ def company_timeline(organization_id: int, listings, matches, leads, *, limit: i
     for listing in listings:
         seen = listing.published_at or listing.first_seen_at
         where = ", ".join(p for p in (listing.osoite, listing.kaupunki) if p)
+        estimate = bool(getattr(listing, "is_estimate", False))
         # where the listing came from is not shown to customers
-        add(seen, "listing", "Myynti-ilmoitus löytyi", where)
+        add(seen, "listing", "Rakennus julkisista rekistereistä" if estimate else "Myynti-ilmoitus löytyi", where)
         for renovation in listing.renovations:
+            evidence = renovation.evidence and (renovation.evidence if estimate else f"“{renovation.evidence}”")
             detail = " · ".join(
                 p
                 for p in (
                     renovation.timing and f"ajankohta {renovation.timing}",
                     f"varmuus {renovation.confidence} %",
-                    renovation.evidence and f"“{renovation.evidence}”",
+                    evidence,
                 )
                 if p
             )
-            add(listing.analyzed_at or seen, "renovation", f"Remonttimaininta: {renovation.remonttityyppi}", detail)
+            title = f"Ennuste: {renovation.remonttityyppi}" if estimate else f"Remonttimaininta: {renovation.remonttityyppi}"
+            add(listing.analyzed_at or seen, "renovation", title, detail)
         if listing.has_contact and listing.contact_source:
             add(listing.analyzed_at or seen, "contact", "Isännöitsijän yhteystiedot löytyivät")
         if listing.removed_at:
-            add(listing.removed_at, "removed", "Ilmoitus poistui myynnistä", where)
+            add(listing.removed_at, "removed", "Ennuste poistui" if estimate else "Ilmoitus poistui myynnistä", where)
 
     for match in matches:
         if match.released_at and match.status == "pending":

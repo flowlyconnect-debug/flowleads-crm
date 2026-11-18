@@ -110,11 +110,19 @@ def add_text_types(listing: Listing) -> list[ListingRenovation]:
     return added
 
 
+# Where each type's backfill continues (listing id), kept in the scheduler
+# process. The SQL hints are wider than the patterns ("%IV-%" also matches
+# "aktiivi-"), so a hinted listing may stay without the type for good: without
+# the cursor the same first `limit` rows were read again every run and later
+# listings were never reached. A restart only starts the round from the top.
+_BACKFILL_CURSOR: dict[str, int] = {}
+
+
 def backfill_text_types(*, limit: int = 2000) -> int:
     """Listings analysed before these types existed: add the types their text
     mentions and match them to the profiles. Returns the number of listings
-    changed. Cheap to repeat: only listings whose text hints at a type they do
-    not have are read."""
+    changed. Each run reads the next `limit` hinted listings per type (in id
+    order, wrapping around), so every one is reached."""
     from sqlalchemy import or_
 
     from app.listings.services import match_listing
@@ -131,10 +139,14 @@ def backfill_text_types(*, limit: int = 2000) -> int:
                 Listing.analysis_status == "done",
                 Listing.id.notin_(has_type),
                 or_(*[Listing.tulevat_remontit.ilike(hint) for hint in hints], Listing.id.in_(in_evidence)),
+                Listing.id > _BACKFILL_CURSOR.get(rtype, 0),
             )
+            .order_by(Listing.id)
             .limit(limit)
             .all()
         )
+        # a short page ends the round: start from the top next time
+        _BACKFILL_CURSOR[rtype] = listings[-1].id if len(listings) >= limit else 0
         for listing in listings:
             if add_text_types(listing):
                 db.session.flush()

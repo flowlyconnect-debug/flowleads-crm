@@ -52,6 +52,17 @@ class Preferences:
     def evidence(self, feature: str, value) -> int:
         return self.transferred[feature][value] + self.dismissed[feature][value]
 
+    def bonus_upper_bound(self, types, region, build_year) -> float:
+        """The most the learned bonus can give a listing with these renovation
+        types, region and build year (learning_bonus uses one of the types).
+        The Kohteet sort uses it to skip targets that cannot reach a page."""
+        type_lean = max((self.lean("type", t) for t in types), default=0.0) if types else 0.0
+        return (
+            _WEIGHTS["type"] * type_lean
+            + _WEIGHTS["region"] * self.lean("region", region)
+            + _WEIGHTS["decade"] * self.lean("decade", _decade(build_year))
+        )
+
 
 def learn_preferences(organization_id: int, wanted_types: set[str] | None = None) -> Preferences:
     """Count the organization's earlier decisions on the Kohteet page."""
@@ -142,8 +153,9 @@ class ListPage:
     """The parts of Flask-SQLAlchemy's Pagination the Kohteet page uses, for a
     list sorted in Python."""
 
-    def __init__(self, items: list, page: int, per_page: int):
-        self.total = len(items)
+    def __init__(self, items: list, page: int, per_page: int, *, total: int | None = None):
+        # `items` may be only the best part of a longer list (`total` rows)
+        self.total = len(items) if total is None else total
         self.per_page = per_page
         self.pages = max(1, -(-self.total // per_page)) if self.total else 0
         self.page = max(1, page)
@@ -196,12 +208,15 @@ def company_fit(company: list, renovation: ListingRenovation | None, prefs: Pref
     learned, learned_reasons = learning_bonus(company[0], renovation, prefs)
     reasons = list(learned_reasons)
     parts = {p["key"]: p for p in base["parts"]}
-    if parts["timing"]["points"] >= 20:
+    if parts.get("stage", {}).get("stage") == "decided":
+        reasons.append("Remontti päätetty")
+    if parts["timing"]["points"] >= 16:
         reasons.append("Remontti " + parts["timing"]["detail"].replace("alkaa ", ""))
     contact = parts["contact"]["detail"]
     reasons.append({"puhelin ja sähköposti": "Puhelin ja sähköposti", "puhelin": "Puhelin", "sähköposti": "Sähköposti"}.get(contact, ""))
     if len(company) > 1:
-        reasons.append(f"{len(company)} ilmoitusta samasta taloyhtiöstä")
+        noun = "rakennusta" if all(getattr(l, "is_estimate", False) for l in company) else "ilmoitusta"
+        reasons.append(f"{len(company)} {noun} samasta taloyhtiöstä")
     fit = max(0, min(100, round(0.9 * base["total"] + learned)))
     return {"fit": fit, "reasons": [r for r in reasons if r], "parts": base["parts"], "learned": round(learned), "base": base["total"]}
 
