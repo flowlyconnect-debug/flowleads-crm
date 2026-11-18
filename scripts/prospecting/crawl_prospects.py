@@ -516,6 +516,7 @@ class Crawler:
                 self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6), limits=httpx.Limits(max_connections=20))
                 self.stale_clients.extend([old, old_dns])
             if len(self.done) % 100 == 0:
+                self.save_state()
                 print(f"  käsitelty {len(self.done)}, hyväksyttyjä {len(self.results)}, "
                       f"DNS-virheitä {self.dns_errors}", flush=True)
             if res:
