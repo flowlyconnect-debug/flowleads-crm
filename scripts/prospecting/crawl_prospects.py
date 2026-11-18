@@ -49,6 +49,10 @@ BUSINESS_LINES = [
     ("4339", "Muu viimeistely"),
     ("4120", "Rakentaminen / saneeraus"),
     ("4332", "Rakennuspuusepän asennus"),
+    ("4311", "Purku / asbesti"),
+    ("4331", "Rappaus"),
+    ("4333", "Lattia- ja seinäpäällysteet"),
+    ("8122", "IV-puhdistus / rakennussiivous"),
 ]
 # 16 = Osakeyhtiö, 5 = Kommandiittiyhtiö, 4 = Avoin yhtiö, 14 = Osuuskunta
 ALLOWED_FORMS = {"16", "5", "4", "14"}
