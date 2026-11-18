@@ -251,6 +251,7 @@ class Crawler:
                                         limits=httpx.Limits(max_connections=500, max_keepalive_connections=100),
                                         follow_redirects=True, verify=True)
         self.dns_cache: dict[str, bool] = {}
+        self.dns_errors = 0
         self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6),
                                             limits=httpx.Limits(max_connections=20))
         self.dns_sem = asyncio.Semaphore(20)
@@ -300,18 +301,26 @@ class Crawler:
 
     # ---------- web ----------
     async def resolves(self, host: str) -> bool:
+        """DNS over HTTPS. Errors are retried on another resolver and never cached as 'no domain'."""
         if host in self.dns_cache:
             return self.dns_cache[host]
-        ok = False
-        try:
-            async with self.dns_sem:
-                r = await self.dns_client.get(DOH_URL, params={"name": host, "type": "A"},
-                                              headers={"accept": "application/dns-json"})
-            ok = r.status_code == 200 and bool(r.json().get("Answer"))
-        except Exception:
-            ok = False
-        self.dns_cache[host] = ok
-        return ok
+        for attempt in range(4):
+            url = DOH_URL if attempt % 2 == 0 else "https://dns.google/resolve"
+            try:
+                async with self.dns_sem:
+                    r = await self.dns_client.get(url, params={"name": host, "type": "A"},
+                                                  headers={"accept": "application/dns-json"})
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get("Status") in (0, 3):
+                        ok = bool(data.get("Answer"))
+                        self.dns_cache[host] = ok
+                        return ok
+            except Exception:
+                pass
+            self.dns_errors += 1
+            await asyncio.sleep(1 + attempt * 2)
+        raise RuntimeError("dns unavailable")
 
     async def fetch(self, url: str) -> tuple[str, str] | None:
         try:
@@ -485,11 +494,14 @@ class Crawler:
         if True:
             try:
                 res = await asyncio.wait_for(self.scrape(co), timeout=60)
+            except RuntimeError:
+                return  # DNS-palvelu ei vastannut: ei merkitä käsitellyksi, yritetään seuraavalla ajolla
             except Exception:
                 res = None
             self.done.add(co["y_tunnus"])
             if len(self.done) % 100 == 0:
-                print(f"  käsitelty {len(self.done)}, hyväksyttyjä {len(self.results)}", flush=True)
+                print(f"  käsitelty {len(self.done)}, hyväksyttyjä {len(self.results)}, "
+                      f"DNS-virheitä {self.dns_errors}", flush=True)
             if res:
                 d = res["domain"]
                 if d in self.exclude or res["sahkoposti"] in self.exclude:
