@@ -25,3 +25,5 @@ docs/design-mockups-temp/
 # One-off debug/dev artifacts
 _pdfcheck.png
 *.zip.zip
+exports/prospektit*/
+exports/prospektit*.csv
