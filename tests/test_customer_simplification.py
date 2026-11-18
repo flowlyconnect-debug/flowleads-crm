@@ -165,7 +165,7 @@ def test_filters_offer_own_urakat_years_and_cities_of_the_region(app):
             parse_listing_csv(
                 _csv(
                     _row(1, f"{PIPE}, {ROOF}", timing="2026-2027"),
-                    _row(2, HEAT, region="Pirkanmaa", city="Tampere", timing="2029"),
+                    _row(2, HEAT, region="Pirkanmaa", city="Tampere", timing="2028"),
                     _row(3, HEAT, city="Espoo", timing=""),
                 )
             )
@@ -179,7 +179,7 @@ def test_filters_offer_own_urakat_years_and_cities_of_the_region(app):
         options = targets.target_filter_options(org_id)
         assert options["renovations"] == [PIPE, HEAT] or options["renovations"] == sorted([PIPE, HEAT])
         assert ROOF not in options["renovations"]
-        assert options["years"] == ["2026", "2029"]
+        assert options["years"] == ["2026", "2028"]  # within the default window (this year + 2)
         uusimaa = targets.target_filter_options(org_id, filters={"region": "Uusimaa"})["cities"]
         # every municipality of the chosen maakunta is offered, not only those with targets
         assert {"Espoo", "Helsinki", "Vantaa", "Pornainen"} <= set(uusimaa)
