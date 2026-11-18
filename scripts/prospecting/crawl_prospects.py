@@ -251,6 +251,10 @@ class Crawler:
                                         limits=httpx.Limits(max_connections=500, max_keepalive_connections=100),
                                         follow_redirects=True, verify=True)
         self.dns_cache: dict[str, bool] = {}
+        self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6),
+                                            limits=httpx.Limits(max_connections=20))
+        self.dns_sem = asyncio.Semaphore(20)
+        self.web_sem = asyncio.Semaphore(150)
 
     # ---------- PRH ----------
     async def prh_page(self, line: str, page: int) -> dict:
@@ -300,8 +304,9 @@ class Crawler:
             return self.dns_cache[host]
         ok = False
         try:
-            r = await self.client.get(DOH_URL, params={"name": host, "type": "A"},
-                                      headers={"accept": "application/dns-json"})
+            async with self.dns_sem:
+                r = await self.dns_client.get(DOH_URL, params={"name": host, "type": "A"},
+                                              headers={"accept": "application/dns-json"})
             ok = r.status_code == 200 and bool(r.json().get("Answer"))
         except Exception:
             ok = False
@@ -310,7 +315,8 @@ class Crawler:
 
     async def fetch(self, url: str) -> tuple[str, str] | None:
         try:
-            r = await self.client.get(url)
+            async with self.web_sem:
+                r = await self.client.get(url)
         except Exception:
             return None
         ctype = r.headers.get("content-type", "")
@@ -321,7 +327,8 @@ class Crawler:
     async def robots(self, base: str) -> RobotFileParser:
         rp = RobotFileParser()
         try:
-            r = await self.client.get(urljoin(base, "/robots.txt"))
+            async with self.web_sem:
+                r = await self.client.get(urljoin(base, "/robots.txt"))
             rp.parse(r.text.splitlines() if r.status_code == 200 else [])
         except Exception:
             rp.parse([])
@@ -541,6 +548,7 @@ class Crawler:
         await asyncio.gather(*tasks)
         self.save_state()
         await self.client.aclose()
+        await self.dns_client.aclose()
 
 
 def write_csv(results: list[dict], path: Path) -> None:
