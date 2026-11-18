@@ -95,9 +95,15 @@ def company_group(listing) -> str:
 def _refresh_keys(session, _flush_context, _instances) -> None:
     """Keep the keys in step with the name, city and Y-tunnus, whichever code
     path changed them (crawler, analyzer, import, tests)."""
-    from app.listings.models import Listing
+    from app.listings.models import Listing, ListingRenovation
+    from app.listings.stages import classify_stage
 
     for obj in list(session.new) + list(session.dirty):
+        if isinstance(obj, ListingRenovation):
+            # decided / planned / need, from the renovation's own words (app/listings/stages.py)
+            if obj.stage is None:
+                obj.stage = classify_stage(obj.evidence, obj.timing, obj.timing_year)
+            continue
         if not isinstance(obj, Listing):
             continue
         # "" = processed, no name (NULL marks rows stored before keys existed)
@@ -204,28 +210,33 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def _timing_points(year: int | None, has_timing_text: bool, now: datetime) -> tuple[int, str]:
+    """Out of 20: this or next year 20, in two years 16, in 3-4 years 10."""
     if year is not None:
         ahead = year - now.year
         if ahead <= 1:
-            return 25, f"alkaa {year}"
-        if ahead == 2:
             return 20, f"alkaa {year}"
+        if ahead == 2:
+            return 16, f"alkaa {year}"
         if ahead <= 4:
-            return 12, f"alkaa {year}"
-        return 5, f"alkaa {year}"
+            return 10, f"alkaa {year}"
+        return 4, f"alkaa {year}"
     if has_timing_text:
-        return 10, "suunnitteilla, vuosi ei tiedossa"
-    return 6, "ajankohta ei tiedossa"
+        return 8, "suunnitteilla, vuosi ei tiedossa"
+    return 5, "ajankohta ei tiedossa"
 
 
 def score_target(listings, wanted_types: set[str] | None = None, *, now: datetime | None = None) -> dict:
     """How promising one housing company is for the organization, 0–100.
 
-    Parts (max points): confidence of the best wanted renovation (40), how
-    soon it starts (25), reachable contacts (15), how many independent signals
-    point to it (10) and how fresh the newest signal is (10). Returns
+    Parts (max points): how far the furthest wanted renovation is (stage:
+    decided 20, planned 10, only a need 0; app/listings/stages.py), confidence
+    of the best wanted renovation (30), how soon it starts (20), reachable
+    contacts (15), how fresh the newest signal is (10) and how many
+    independent signals point to it (5). Returns
     {"total": int, "parts": [{"key", "label", "points", "max", "detail"}]}.
     """
+    from app.listings.stages import STAGE_LABELS, STAGE_POINTS, best_stage
+
     now = now or datetime.now(timezone.utc)
     listings = [l for l in listings if l is not None]
     renovations = [
@@ -237,13 +248,25 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     best = max(renovations, key=lambda r: (r.confidence, -(r.timing_year or 9999)), default=None)
     parts = []
 
+    stage = best_stage(renovations)
+    parts.append(
+        {
+            "key": "stage",
+            "label": "Vaihe",
+            "points": STAGE_POINTS.get(stage, 0),
+            "max": 20,
+            "detail": STAGE_LABELS[stage].lower() if stage else "ei osuvaa remonttia",
+            "stage": stage,
+        }
+    )
+
     confidence = best.confidence if best else 0
     parts.append(
         {
             "key": "confidence",
             "label": "Varmuus",
-            "points": round(confidence * 40 / 100),
-            "max": 40,
+            "points": round(confidence * 30 / 100),
+            "max": 30,
             "detail": f"{best.remonttityyppi} {confidence} %" if best else "ei osuvaa remonttia",
         }
     )
@@ -251,7 +274,7 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     years = [r.timing_year for r in renovations if r.timing_year]
     soonest = min(years) if years else None
     points, detail = _timing_points(soonest, any((r.timing or "").strip() for r in renovations), now)
-    parts.append({"key": "timing", "label": "Ajoitus", "points": points if renovations else 0, "max": 25, "detail": detail})
+    parts.append({"key": "timing", "label": "Ajoitus", "points": points if renovations else 0, "max": 20, "detail": detail})
 
     phone = any((l.isannoitsija_puh or "").strip() or (getattr(l, "hallitus_pj_puh", None) or "").strip() for l in listings)
     email = any((l.isannoitsija_email or "").strip() or (getattr(l, "hallitus_pj_email", None) or "").strip() for l in listings)
@@ -269,13 +292,13 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     parts.append({"key": "contact", "label": "Yhteystiedot", "points": contact, "max": 15, "detail": contact_detail})
 
     signal_count = len(listings) + max(0, len({r.remonttityyppi for r in renovations}) - 1)
-    signal_points = 0 if signal_count <= 1 else (6 if signal_count == 2 else 10)
+    signal_points = 0 if signal_count <= 1 else (3 if signal_count == 2 else 5)
     parts.append(
         {
             "key": "signals",
             "label": "Signaalit",
             "points": signal_points,
-            "max": 10,
+            "max": 5,
             "detail": f"{signal_count} {'signaali' if signal_count == 1 else 'signaalia'}",
         }
     )
@@ -295,23 +318,30 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
     return {"total": max(0, min(100, sum(p["points"] for p in parts))), "parts": parts}
 
 
-# Classes of a target, decided when it is found (before the customer sees it):
-# A = hot (strong, soon, reachable), B = good, C = keep an eye on. Kohteet
-# shows only the classes the customer gets (TARGETS_MIN_TIER), best first.
+# Classes of a target, decided when it is found (before the customer sees it).
+# A, B and C are renovations the housing company has decided or planned:
+# A = hot (strong, soon, reachable), B = good, C = keep an eye on. T = only a
+# need (no decision, no plan: an age estimate, oil heating, "edessä joskus"):
+# Kohteet keeps these on a tab of their own (Tarve), never mixed with the rest.
 TIERS = ("A", "B", "C")
-TIER_LABELS = {"A": "Kuuma", "B": "Hyvä", "C": "Seurattava"}
+NEED_TIER = "T"
+TIER_LABELS = {"A": "Kuuma", "B": "Hyvä", "C": "Seurattava", "T": "Tarve"}
 TIER_A_SCORE = 70
 TIER_B_SCORE = 50
 
 
 def classify(score: dict, *, estimate: bool = False) -> str:
     """The class of a scored housing company (score = score_target(...)).
-    A needs a high score, a renovation within two years (timing >= 20 of 25)
-    and a phone or an email (contact >= 10 of 15); an estimate from the public
-    registers is never A."""
-    parts = {p["key"]: p["points"] for p in score["parts"]}
+    Only a need (stage "need") -> T. A needs a high score, a renovation within
+    two years (timing >= 16 of 20) and a phone or an email (contact >= 10 of
+    15); an estimate from the public registers is never A."""
+    parts = {p["key"]: p for p in score["parts"]}
+    stage = parts.get("stage", {}).get("stage")
+    if stage in (None, "need"):
+        return NEED_TIER
+    points = {key: part["points"] for key, part in parts.items()}
     total = score["total"]
-    if not estimate and total >= TIER_A_SCORE and parts.get("timing", 0) >= 20 and parts.get("contact", 0) >= 10:
+    if not estimate and total >= TIER_A_SCORE and points.get("timing", 0) >= 16 and points.get("contact", 0) >= 10:
         return "A"
     if total >= TIER_B_SCORE:
         return "B"

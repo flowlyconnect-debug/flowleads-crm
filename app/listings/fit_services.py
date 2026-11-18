@@ -208,7 +208,9 @@ def company_fit(company: list, renovation: ListingRenovation | None, prefs: Pref
     learned, learned_reasons = learning_bonus(company[0], renovation, prefs)
     reasons = list(learned_reasons)
     parts = {p["key"]: p for p in base["parts"]}
-    if parts["timing"]["points"] >= 20:
+    if parts.get("stage", {}).get("stage") == "decided":
+        reasons.append("Remontti päätetty")
+    if parts["timing"]["points"] >= 16:
         reasons.append("Remontti " + parts["timing"]["detail"].replace("alkaa ", ""))
     contact = parts["contact"]["detail"]
     reasons.append({"puhelin ja sähköposti": "Puhelin ja sähköposti", "puhelin": "Puhelin", "sähköposti": "Sähköposti"}.get(contact, ""))

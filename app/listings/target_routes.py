@@ -16,6 +16,8 @@ from app.listings.target_services import (
     save_search,
     FILTER_KEYS,
     SORT_OPTIONS,
+    TAB_SEGMENTS,
+    need_tab_enabled,
     TABS,
     target_filter_options,
     organization_wanted_types,
@@ -113,7 +115,7 @@ def _page_state():
     shared by the list and the map."""
     organization_id = resolve_organization_id()
     tab = request.args.get("tab")
-    if tab not in TABS:
+    if tab not in TABS or (tab == "need" and not need_tab_enabled()):
         tab = "available"
     profiles = list_profiles(organization_id)
     profile_id = request.args.get("profile_id", type=int)
@@ -155,7 +157,7 @@ def ask():
         params["profile_id"] = profile_id
     if not text:
         return redirect(url_for("targets.index", **params))
-    result = interpret(text, target_filter_options(organization_id, TABS[tab]))
+    result = interpret(text, target_filter_options(organization_id, TABS[tab], segment=TAB_SEGMENTS[tab]))
     params.update(result["params"])
     if result["search"]:
         params["search"] = result["search"]
@@ -184,6 +186,7 @@ def map_view():
         filters=filters,
         page=1,
         per_page=MAX_MAP_POINTS,
+        segment=TAB_SEGMENTS[tab],
     )
     rows = target_rows(organization_id, pagination.items, organization_wanted_types(organization_id))
     points = map_points(rows)
@@ -245,6 +248,7 @@ def index():
         search=search,
         filters=filters,
         page=request.args.get("page", 1, type=int) or 1,
+        segment=TAB_SEGMENTS[tab],
     )
     if not pagination.items and pagination.total and pagination.page > 1:
         # the last page emptied out (everything on it was moved or hidden)
@@ -303,7 +307,7 @@ def index():
         new_ids=new_ids,
         digest_enabled=digest_enabled,
         filters=filters,
-        filter_options=target_filter_options(organization_id, TABS[tab], filters),
+        filter_options=target_filter_options(organization_id, TABS[tab], filters, segment=TAB_SEGMENTS[tab]),
         sort_options=SORT_OPTIONS,
         transferred_leads=transferred_leads,
         assignees=assignees,
@@ -315,8 +319,10 @@ def index():
         profile_id=profile_id,
         profiles=profiles,
         available_count=count_targets(organization_id, "pending"),
+        need_count=count_targets(organization_id, "pending", segment="need"),
+        need_tab=need_tab_enabled(),
         hidden_count=count_targets(organization_id, "dismissed"),
-        waiting=waiting_summary(organization_id) if TABS[tab] == "pending" else {"queued": 0, "below": 0},
+        waiting=waiting_summary(organization_id, TAB_SEGMENTS[tab]) if TABS[tab] == "pending" else {"queued": 0, "below": 0},
         organization_id=organization_id,
         org_query=org_query_suffix(organization_id),
         can_edit_profiles=current_user.role in ("admin", "superadmin"),

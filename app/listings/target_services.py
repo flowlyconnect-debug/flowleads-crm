@@ -18,6 +18,7 @@ from app.extensions import db
 from app.listings.housing import company_group, org_company_listings, score_label, score_level, score_target
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
+from app.listings.stages import best_stage
 from app.listings.services import _best_renovation, _merge_into_lead, _now, materialize_match
 from app.search.constants import FINNISH_REGIONS
 from app.search.municipalities import region_municipalities
@@ -25,8 +26,32 @@ from app.search.municipalities import region_municipalities
 PER_PAGE = 25
 MAX_BULK = 200
 # tab on the page -> match status
-TABS = {"available": "pending", "hidden": "dismissed"}
+TABS = {"available": "pending", "need": "pending", "hidden": "dismissed"}
+# which targets a tab lists: "main" = decided or planned renovations (A-C),
+# "need" = only a need (class T, the Tarve tab), None = both (the hidden tab)
+TAB_SEGMENTS = {"available": "main", "need": "need", "hidden": None}
 _LEAD_STATUSES = ("lead_created", "merged")
+
+
+def need_tab_enabled() -> bool:
+    """TARGETS_NEED_LIMIT -1 = no Tarve tab: needs stay on the main list as C."""
+    from flask import current_app
+
+    return int(current_app.config.get("TARGETS_NEED_LIMIT", 50)) >= 0
+
+
+def _segment_filter(segment: str | None):
+    from sqlalchemy import false
+
+    from app.listings.housing import NEED_TIER
+
+    if not need_tab_enabled():
+        return false() if segment == "need" else None
+    if segment == "need":
+        return ListingMatch.tier == NEED_TIER
+    if segment == "main":
+        return or_(ListingMatch.tier.is_(None), ListingMatch.tier != NEED_TIER)
+    return None
 
 
 def _visible_match_ids(
@@ -34,6 +59,7 @@ def _visible_match_ids(
     status: str,
     *,
     profile_id: int | None = None,
+    segment: str | None = None,
 ):
     """One match id per housing company: a listing matched by several of the
     organization's profiles is one target, so are several listings of the same
@@ -61,6 +87,9 @@ def _visible_match_ids(
         query = query.filter(ListingMatch.released_at.isnot(None))
     if profile_id:
         query = query.filter(ListingMatch.profile_id == profile_id)
+    segment_filter = _segment_filter(segment)
+    if segment_filter is not None:
+        query = query.filter(segment_filter)
     return query
 
 
@@ -122,35 +151,81 @@ def _waiting_rows(organization_id: int):
     return _waiting_query(organization_id, ListingMatch.id, ListingMatch.score, ListingMatch.tier, _group_column()).all()
 
 
-def _visible_groups(organization_id: int) -> set[str]:
+def _visible_groups(organization_id: int, segment: str | None = None) -> set[str]:
     return {
         group
         for (group,) in db.session.query(_group_column())
         .join(ListingMatch, ListingMatch.listing_id == Listing.id)
-        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")))
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", segment=segment)))
     }
 
 
-def _pick_release(rows, visible: set[str], limit: int, min_tier: str) -> tuple[list[int], int, dict]:
-    """Which waiting matches to release: those of companies already visible
-    (free), then the best companies of an allowed class while there is room.
-    Returns (match ids, companies released, {group: (best score, best tier)}
-    of the companies still waiting)."""
-    from app.listings.housing import tier_allowed
+def _segments(organization_id: int) -> list[dict]:
+    """The two lists a customer gets, each released on its own: the main list
+    (decided or planned renovations, classes down to the customer's lowest)
+    and the Tarve tab (class T: only a need)."""
+    from flask import current_app
 
+    from app.listings.housing import NEED_TIER, TIERS, tier_allowed
+
+    limit, min_tier = visibility_settings(organization_id)
+    need_limit = int(current_app.config.get("TARGETS_NEED_LIMIT", 50))
+    if need_limit < 0:
+        # no Tarve tab: a need is a C on the main list
+        def as_main(tier):
+            return "C" if tier == NEED_TIER else tier
+
+        return [
+            {
+                "name": "main",
+                "limit": limit,
+                "allowed": lambda tier: tier_allowed(as_main(tier), min_tier),
+                "rank": lambda tier: TIERS.index(as_main(tier)) if as_main(tier) in TIERS else len(TIERS),
+                "member": lambda tier: True,
+            }
+        ]
+    return [
+        {
+            "name": "main",
+            "limit": limit,
+            "allowed": lambda tier: tier_allowed(tier, min_tier),
+            "rank": lambda tier: TIERS.index(tier) if tier in TIERS else len(TIERS),
+            "member": lambda tier: tier != NEED_TIER,
+        },
+        {
+            "name": "need",
+            "limit": need_limit,
+            "allowed": lambda tier: tier == NEED_TIER,
+            "rank": lambda tier: 0,
+            "member": lambda tier: tier == NEED_TIER,
+        },
+    ]
+
+
+def _pick_release(rows, visible: set[str], segment: dict) -> tuple[list[int], int, dict]:
+    """Which waiting matches of one list to release: those of companies
+    already visible in it (free), then the best companies of an allowed class
+    while there is room. Returns (match ids, companies released, {group:
+    (best score, best tier or None when no allowed class)} still waiting)."""
     release: list[int] = []
     groups: dict[str, list] = {}
     for match_id, score, tier, group in rows:
+        if not segment["member"](tier):
+            continue
         if group in visible:
             release.append(match_id)
         else:
             groups.setdefault(group, []).append((match_id, score, tier))
     best: dict[str, tuple[int, str | None]] = {}
     for group, items in groups.items():
-        allowed = [i for i in items if tier_allowed(i[2], min_tier)]
+        allowed = [i for i in items if segment["allowed"](i[2])]
         top = max(allowed or items, key=lambda i: (i[1] if i[1] is not None else -1))
         best[group] = (top[1] if top[1] is not None else -1, top[2] if allowed else None)
-    eligible = sorted((g for g, (_, tier) in best.items() if tier is not None), key=lambda g: (-best[g][0], g))
+    eligible = sorted(
+        (g for g, (_, tier) in best.items() if tier is not None),
+        key=lambda g: (segment["rank"](best[g][1]), -best[g][0], g),
+    )
+    limit = segment["limit"]
     room = len(eligible) if not limit else max(0, limit - len(visible))
     chosen = eligible[:room]
     for group in chosen:
@@ -160,10 +235,10 @@ def _pick_release(rows, visible: set[str], limit: int, min_tier: str) -> tuple[l
 
 
 def release_targets(organization_id: int | None = None, *, now: datetime | None = None) -> int:
-    """Make the best classified matches visible on Kohteet. A customer sees
-    at most `limit` housing companies at a time, only of class `min_tier` or
-    better (visibility_settings), best score first; handling targets (moving
-    to leads, hiding) makes room for the next. Another listing of a company
+    """Make the best classified matches visible on Kohteet. Each list (the
+    main list and the Tarve tab, `_segments`) shows at most its limit of
+    housing companies at a time, only of the allowed classes, best first;
+    handling targets makes room for the next. Another listing of a company
     that is already visible joins it at once. Returns the companies released.
     Without `organization_id`: every organization with waiting matches."""
     now = now or _now()
@@ -180,13 +255,19 @@ def release_targets(organization_id: int | None = None, *, now: datetime | None 
     rows = _waiting_rows(organization_id)
     if not rows:
         return 0
-    limit, min_tier = visibility_settings(organization_id)
-    release, companies, waiting = _pick_release(rows, _visible_groups(organization_id), limit, min_tier)
+    release: list[int] = []
     withdraw: list[int] = []
-    if limit:
-        swap_in, withdraw, swapped = _swaps(organization_id, rows, waiting, now)
-        release.extend(swap_in)
-        companies += swapped
+    companies = 0
+    for segment in _segments(organization_id):
+        visible = _visible_groups(organization_id, segment["name"])
+        picked, count, waiting = _pick_release(rows, visible, segment)
+        release.extend(picked)
+        companies += count
+        if segment["limit"]:
+            swap_in, swap_out, swapped = _swaps(organization_id, rows, waiting, segment, now)
+            release.extend(swap_in)
+            withdraw.extend(swap_out)
+            companies += swapped
     _set_released(release, now)
     _set_released(withdraw, None)
     if release or withdraw:
@@ -209,40 +290,50 @@ def _set_released(match_ids: list[int], value) -> None:
 SWAP_MARGIN = 10
 
 
-def _swaps(organization_id: int, rows, waiting: dict, now: datetime) -> tuple[list[int], list[int], int]:
-    """(match ids to release, match ids to send back to the queue, companies swapped)."""
+def _swaps(organization_id: int, rows, waiting: dict, segment: dict, now: datetime) -> tuple[list[int], list[int], int]:
+    """(match ids to release, match ids to send back to the queue, companies swapped) in one list."""
     from flask import current_app
-
-    from app.listings.housing import TIERS
 
     days = int(current_app.config.get("TARGETS_SWAP_AFTER_DAYS", 3))
     cutoff = now - timedelta(days=days)
+    rank = segment["rank"]
     eligible = sorted(
         ((group, score, tier) for group, (score, tier) in waiting.items() if tier is not None),
-        key=lambda item: (TIERS.index(item[2]), -item[1]),
+        key=lambda item: (rank(item[2]), -item[1]),
     )
     if not eligible:
         return [], [], 0
     visible_rows = (
         db.session.query(ListingMatch.id, ListingMatch.score, ListingMatch.tier, ListingMatch.released_at, _group_column())
         .join(Listing, Listing.id == ListingMatch.listing_id)
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", segment=segment["name"])))
+        .all()
+    )
+    visible_groups = {row[4] for row in visible_rows}
+    if not visible_groups:
+        return [], [], 0
+    # every pending released match of those companies leaves together
+    member_ids = (
+        db.session.query(ListingMatch.id, _group_column())
+        .join(Listing, Listing.id == ListingMatch.listing_id)
         .filter(
             ListingMatch.organization_id == organization_id,
             ListingMatch.status == "pending",
             ListingMatch.released_at.isnot(None),
-            Listing.is_active.is_(True),
+            _group_column().in_(visible_groups),
         )
         .all()
     )
     companies: dict[str, dict] = {}
     for match_id, score, tier, released_at, group in visible_rows:
-        company = companies.setdefault(group, {"ids": [], "score": -1, "tier": "C", "since": released_at})
-        company["ids"].append(match_id)
+        company = companies.setdefault(group, {"ids": [], "score": -1, "rank": rank(tier), "since": released_at})
         company["score"] = max(company["score"], score if score is not None else -1)
-        if tier in TIERS and TIERS.index(tier) < TIERS.index(company["tier"]):
-            company["tier"] = tier
+        company["rank"] = min(company["rank"], rank(tier))
         if released_at is not None and (company["since"] is None or released_at < company["since"]):
             company["since"] = released_at
+    for match_id, group in member_ids:
+        if group in companies:
+            companies[group]["ids"].append(match_id)
 
     def old_enough(company) -> bool:
         since = company["since"]
@@ -250,10 +341,7 @@ def _swaps(organization_id: int, rows, waiting: dict, now: datetime) -> tuple[li
             return True
         return (since if since.tzinfo else since.replace(tzinfo=timezone.utc)) <= cutoff
 
-    weakest = sorted(
-        (c for c in companies.values() if old_enough(c)),
-        key=lambda c: (-TIERS.index(c["tier"]), c["score"]),
-    )
+    weakest = sorted((c for c in companies.values() if old_enough(c)), key=lambda c: (-c["rank"], c["score"]))
     ids_by_group: dict[str, list[int]] = {}
     for match_id, _, _, group in rows:
         ids_by_group.setdefault(group, []).append(match_id)
@@ -264,8 +352,8 @@ def _swaps(organization_id: int, rows, waiting: dict, now: datetime) -> tuple[li
         if not weakest:
             break
         out = weakest[0]
-        better_class = TIERS.index(tier) < TIERS.index(out["tier"])
-        if not (better_class or (tier == out["tier"] and score >= out["score"] + SWAP_MARGIN)):
+        better_class = rank(tier) < out["rank"]
+        if not (better_class or (rank(tier) == out["rank"] and score >= out["score"] + SWAP_MARGIN)):
             break  # the rest of the queue is no better
         weakest.pop(0)
         withdraw.extend(out["ids"])
@@ -274,30 +362,32 @@ def _swaps(organization_id: int, rows, waiting: dict, now: datetime) -> tuple[li
     return swap_in, withdraw, swapped
 
 
-def waiting_summary(organization_id: int) -> dict:
-    """Companies classified but not visible: {"queued": of an allowed class,
-    waiting for room; "below": below the customer's class}. Counted in SQL:
-    shown on every Kohteet page."""
-    from app.listings.housing import TIERS
+def waiting_summary(organization_id: int, segment: str = "main") -> dict:
+    """Companies classified but not visible in one list: {"queued": of an
+    allowed class, waiting for room; "below": below the customer's class}.
+    Counted in SQL: shown on every Kohteet page."""
+    from app.listings.housing import NEED_TIER, TIERS
 
-    _, min_tier = visibility_settings(organization_id)
-    allowed = list(TIERS[: TIERS.index(min_tier if min_tier in TIERS else "B") + 1])
     group = _group_column()
     visible = (
         db.session.query(group)
         .select_from(ListingMatch)
         .join(Listing, Listing.id == ListingMatch.listing_id)
-        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")))
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", segment=segment)))
     )
-    total = (
-        _waiting_query(organization_id, func.count(func.distinct(group))).filter(group.notin_(visible)).scalar() or 0
-    )
-    queued = (
-        _waiting_query(organization_id, func.count(func.distinct(group)))
-        .filter(group.notin_(visible), ListingMatch.tier.in_(allowed))
-        .scalar()
-        or 0
-    )
+    base = _waiting_query(organization_id, func.count(func.distinct(group))).filter(group.notin_(visible))
+    segment_filter = _segment_filter(segment)
+    if segment_filter is not None:
+        base = base.filter(segment_filter)
+    if segment == "need":
+        queued = base.filter(ListingMatch.tier == NEED_TIER).scalar() or 0
+        return {"queued": queued, "below": 0}
+    _, min_tier = visibility_settings(organization_id)
+    allowed = list(TIERS[: TIERS.index(min_tier if min_tier in TIERS else "B") + 1])
+    if not need_tab_enabled() and "C" in allowed:
+        allowed.append(NEED_TIER)
+    total = base.scalar() or 0
+    queued = base.filter(ListingMatch.tier.in_(allowed)).scalar() or 0
     return {"queued": queued, "below": total - queued}
 
 
@@ -332,8 +422,10 @@ def _company_wide(listing_ids):
     return or_(Listing.id.in_(listing_ids), Listing.company_key.in_(keys))
 
 
-def count_targets(organization_id: int, status: str = "pending") -> int:
-    return _visible_match_ids(organization_id, status).count()
+def count_targets(organization_id: int, status: str = "pending", segment: str | None = "main") -> int:
+    """Visible targets; by default the main list (decided or planned
+    renovations), not the Tarve tab."""
+    return _visible_match_ids(organization_id, status, segment=segment if status == "pending" else None).count()
 
 
 def locked_target_summary(organization_id: int, *, now: datetime | None = None, top: int = 4) -> dict:
@@ -343,7 +435,7 @@ def locked_target_summary(organization_id: int, *, now: datetime | None = None, 
     from datetime import timedelta
 
     now = now or _now()
-    visible = _visible_match_ids(organization_id, "pending")
+    visible = _visible_match_ids(organization_id, "pending", segment="main")
     total = visible.count()
     if not total:
         return {"total": 0, "new_week": 0, "by_type": [], "by_region": []}
@@ -394,6 +486,7 @@ def list_targets(
     filters: dict | None = None,
     page: int = 1,
     per_page: int = PER_PAGE,
+    segment: str | None = None,
 ):
     """Paginated targets, newest listings first. Items are ListingMatch rows
     with `listing`, its renovations and `profile` loaded."""
@@ -403,7 +496,7 @@ def list_targets(
             contains_eager(ListingMatch.listing).selectinload(Listing.renovations),
             joinedload(ListingMatch.profile),
         )
-        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, status, profile_id=profile_id)))
+        .filter(ListingMatch.id.in_(_visible_match_ids(organization_id, status, profile_id=profile_id, segment=segment)))
     )
     term = " ".join((search or "").split())
     if term:
@@ -582,12 +675,14 @@ def organization_wanted_types(organization_id: int) -> set[str]:
     return types
 
 
-def target_filter_options(organization_id: int, status: str = "pending", filters: dict | None = None) -> dict:
+def target_filter_options(
+    organization_id: int, status: str = "pending", filters: dict | None = None, segment: str | None = None
+) -> dict:
     """The values that actually occur among the organization's targets, so the
     filter bar offers only choices that lead somewhere. Cities follow the
     chosen region."""
     filters = filters or {}
-    visible = _visible_match_ids(organization_id, status)
+    visible = _visible_match_ids(organization_id, status, segment=segment)
     listing_ids = db.session.query(ListingMatch.listing_id).filter(ListingMatch.id.in_(visible))
     wanted = organization_wanted_types(organization_id)
 
@@ -704,6 +799,8 @@ def target_row(
         "renovation": renovation,
         "renovations": renovations,
         "tier": match.tier,
+        # the furthest stage of the renovations shown: decided / planned / need
+        "stage": best_stage(renovations),
         # every renovation shown is an estimate from the public registers
         "estimate": bool(renovations) and all(r.is_estimate for r in renovations),
         "seen_at": max(seen, key=lambda value: value.replace(tzinfo=None)) if seen else None,
@@ -948,7 +1045,7 @@ def count_new_targets(organization_id: int, since: datetime) -> int:
     return (
         db.session.query(func.count(ListingMatch.id))
         .filter(
-            ListingMatch.id.in_(_visible_match_ids(organization_id, "pending")),
+            ListingMatch.id.in_(_visible_match_ids(organization_id, "pending", segment="main")),
             ListingMatch.released_at > since,
         )
         .scalar()
@@ -1126,7 +1223,7 @@ def _matches_for_search(saved: SavedTargetSearch, since: datetime) -> int:
         profile_id = None
     query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
         ListingMatch.id.in_(
-            _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id)
+            _visible_match_ids(saved.organization_id, "pending", profile_id=profile_id, segment="main")
         ),
         ListingMatch.released_at > since,
     )

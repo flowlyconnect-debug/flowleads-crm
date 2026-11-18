@@ -384,6 +384,13 @@ seuraavilla, ja selvästi parempi syrjäyttää heikoimman kolmen päivän jälk
 asiakaslistalla. Migraatio `c6d7e8f9a0b1` (jo näkyvät kohteet pysyvät näkyvissä). Kuvaus:
 `docs/ARKKITEHTUURI_KOHDEKATALOGI.md` ("Kuratoidut kohteet"). Testit: `tests/test_target_release.py`.
 
+## Tehty 18.11.2026 (3): remontin vaihe ja Tarve-välilehti
+
+Jokaisella remontilla on vaihe: päätetty, suunniteltu tai tarve (Analyzer palauttaa sen, muuten säännöt perusteesta).
+Vaihe on pisteiden uusi osa (20). Kohteet, joilla on vain tarve (ikäennusteet, öljylämmitys, "edessä joskus"), ovat
+omalla Tarve-välilehdellä (enintään 50), eivät päälistalla. Päätetyt merkitään rivillä. Migraatio `d7e8f9a0b1c2`.
+**Analyzer-workflow muuttui** (`n8n/workflows/flowleads-analyzer.json`): tuo se n8n:ään uudelleen.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

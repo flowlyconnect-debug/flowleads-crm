@@ -127,6 +127,10 @@ class Config:
     # a visible target the customer has not handled in this many days may give
     # its place to a clearly better waiting one (it goes back to the queue)
     TARGETS_SWAP_AFTER_DAYS = int(os.environ.get("TARGETS_SWAP_AFTER_DAYS", "3"))
+    # the Tarve tab: housing companies with only a need (no decided or planned
+    # renovation: age estimates, oil heating, vague mentions), at most this many
+    # at a time; -1 = no Tarve tab at all, 0 = no limit
+    TARGETS_NEED_LIMIT = int(os.environ.get("TARGETS_NEED_LIMIT", "50"))
     LISTING_MAX_ATTEMPTS = int(os.environ.get("LISTING_MAX_ATTEMPTS", "3"))
     LISTING_CLAIM_TIMEOUT_MINUTES = int(os.environ.get("LISTING_CLAIM_TIMEOUT_MINUTES", "30"))
     LISTING_RETENTION_DAYS = int(os.environ.get("LISTING_RETENTION_DAYS", "90"))
@@ -264,6 +268,7 @@ class TestingConfig(Config):
     # release has its own tests (tests/test_target_release.py)
     TARGETS_VISIBLE_LIMIT = 0
     TARGETS_MIN_TIER = "C"
+    TARGETS_NEED_LIMIT = -1  # no Tarve tab: the older tests' renovations have no timing
     LOGIN_RATE_LIMIT = "1000/minute"
     API_RATE_LIMIT = _env_or_default("TEST_API_RATE_LIMIT", "1000/hour")
     FORM_SUBMISSION_RATE_LIMIT = _env_or_default("TEST_FORM_SUBMISSION_RATE_LIMIT", "1000/hour")

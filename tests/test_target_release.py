@@ -27,9 +27,9 @@ PASSWORD = "securepassword1"
 @pytest.fixture
 def curated(app):
     """Production defaults on a small scale: at most 5 visible, classes A-B."""
-    app.config.update(TARGETS_VISIBLE_LIMIT=5, TARGETS_MIN_TIER="B")
+    app.config.update(TARGETS_VISIBLE_LIMIT=5, TARGETS_MIN_TIER="B", TARGETS_NEED_LIMIT=50)
     yield
-    app.config.update(TARGETS_VISIBLE_LIMIT=0, TARGETS_MIN_TIER="C")
+    app.config.update(TARGETS_VISIBLE_LIMIT=0, TARGETS_MIN_TIER="C", TARGETS_NEED_LIMIT=-1)
 
 
 def _org(slug: str):
@@ -94,7 +94,7 @@ def _listing(n: int, quality: str, *, company: str | None = None, confidence: in
 
 
 def _visible(org_id: int) -> list[Listing]:
-    return [m.listing for m in targets.list_targets(org_id, filters={"sort": "newest"}, per_page=100).items]
+    return [m.listing for m in targets.list_targets(org_id, filters={"sort": "newest"}, per_page=100, segment="main").items]
 
 
 def test_classes(app):
@@ -109,7 +109,7 @@ def test_classes(app):
     assert scored(95, 1, False, False) == "B"  # no contact: not hot
     assert scored(95, 4, True, True) == "B"  # not within two years: not hot
     assert scored(*QUALITY["good"]) == "B"
-    assert scored(*QUALITY["weak"]) == "C"
+    assert scored(*QUALITY["weak"]) == "T"  # no decision, no plan, no year: only a need
     assert scored(*QUALITY["hot"], estimate=True) == "B"  # an estimate is never hot
 
 
@@ -119,7 +119,7 @@ def test_only_the_best_allowed_companies_are_visible(app, curated):
             for n in range(4):
                 _listing(n, "weak")
             for n in range(4, 10):
-                _listing(n, "good", confidence=60 + n)  # 64..69: later ones are better
+                _listing(n, "good", confidence=60 + 4 * (n - 4))  # 60..80: later ones are better
             for n in range(10, 12):
                 _listing(n, "hot")
 
@@ -128,20 +128,21 @@ def test_only_the_best_allowed_companies_are_visible(app, curated):
         assert len(visible) == 5 and targets.count_targets(org.id) == 5
         names = {l.taloyhtio for l in visible}
         assert {"As Oy hot 10", "As Oy hot 11", "As Oy good 9", "As Oy good 8", "As Oy good 7"} == names
-        assert not any(name.startswith("As Oy weak") for name in names)  # class C never shown
+        assert not any(name.startswith("As Oy weak") for name in names)  # a need is never on the main list
         matches = ListingMatch.query.filter_by(organization_id=org.id).all()
         assert all(m.tier and m.score is not None for m in matches)
-        assert targets.waiting_summary(org.id) == {"queued": 3, "below": 4}
+        assert targets.waiting_summary(org.id) == {"queued": 3, "below": 0}
+        assert targets.count_targets(org.id, segment="need") == 4  # on the Tarve tab instead
 
 
 def test_handling_targets_makes_room_for_the_next_best(app, curated):
     with app.app_context():
         org, _ = _org("refill")
         for n in range(8):
-            _listing(n, "good", confidence=60 + n)
+            _listing(n, "good", confidence=60 + 4 * n)
         visible = _visible(org.id)
-        assert len(visible) == 5  # the first five to arrive (60..64)
-        best_waiting = "As Oy good 7"  # confidence 67: the best of the three waiting (65, 66, 67)
+        assert len(visible) == 5  # the first five to arrive (60..76)
+        best_waiting = "As Oy good 7"  # confidence 88: the best of the three waiting (80, 84, 88)
         assert best_waiting not in {l.taloyhtio for l in visible}
 
         first = ListingMatch.query.filter_by(organization_id=org.id, listing_id=visible[0].id).one()
@@ -196,12 +197,12 @@ def test_superadmin_sets_the_limit_and_class(app, client, curated):
     with client.session_transaction() as session:
         session[TWO_FA_SESSION_KEY] = True
     page = client.get("/admin/customers").get_data(as_text=True)
-    assert "2 jonossa, 3 alle luokan" in page
+    assert "2 jonossa, 0 alle luokan" in page
     client.post(f"/admin/customers/{org_id}/targets-visibility", data={"limit": "0", "min_tier": "C"})
     with app.app_context():
         organization = db.session.get(Organization, org_id)
         assert organization.targets_visible_limit == 0 and organization.targets_min_tier == "C"
-        assert targets.count_targets(org_id) == 10
+        assert targets.count_targets(org_id) == 7 and targets.count_targets(org_id, segment="need") == 3
 
 
 def test_a_clearly_better_target_replaces_the_weakest_after_a_few_days(app, curated):
@@ -251,6 +252,6 @@ def test_kohteet_tells_how_many_wait(app, client, curated):
     with client.session_transaction() as session:
         session[TWO_FA_SESSION_KEY] = True
     html = client.get("/targets").get_data(as_text=True)
-    assert "5 kohdetta saatavilla" in html
+    assert "5 kohdetta saatavilla" in html and "remontti päätetty tai suunniteltu" in html
     assert "Seuraavat 2 parasta tulevat näkyviin" in html
     assert 'class="target-row__tier"' in html  # the hot one is marked

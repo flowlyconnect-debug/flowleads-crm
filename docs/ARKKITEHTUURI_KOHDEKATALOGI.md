@@ -167,7 +167,8 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
 - **Yksi kohde per taloyhtiö**: `_visible_match_ids` ryhmittelee taloyhtiön mukaan. Piilotus, palautus
   ja siirto liidiksi koskevat koko taloyhtiötä; siirrossa muut ilmoitukset yhdistyvät samaan liidiin. Taloyhtiö, jolla on jo liidi, ei näy
   kohteena; ajastin yhdistää sen uudet ilmoitukset liidiin (`merge_into_existing_leads`, organisaatiokohtainen).
-- **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
+- **Pisteet 0–100** (`score_target`): vaihe 20, varmuus 30, ajoitus 20, yhteystiedot 15, tuoreus 10, signaalit 5
+  (ks. "Kuratoidut kohteet").
   Kohteet-sivun Sopivuus (`app/listings/fit_services.py::company_fit`) = pisteet × 0,9 + asiakkaan aiempien
   siirtojen ja piilotusten ±25; oletusjärjestys "Sopivimmat ensin". `listing_matches.score` tallentaa pohjapisteet
   (oma ajastintyö `target_scores` kerran tunnissa, uusille osumille heti: `rematch_profile` pisteyttää organisaation
@@ -243,32 +244,57 @@ Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käytt
 Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
-## Kuratoidut kohteet: luokittelu ennen näkyvyyttä (18.11.2026)
+## Kuratoidut kohteet: laskenta, vaihe ja luokittelu ennen näkyvyyttä (18.11.2026)
 
-Asiakas ei näe jokaista osumaa. Koko Suomen profiililla osumia voi olla kymmeniä tuhansia, joten ne lasketaan ja
-luokitellaan ensin, ja Kohteet-sivulle päästetään vain parhaat.
+Asiakas ei näe jokaista osumaa. Osumat lasketaan ja luokitellaan ensin, ja Kohteet-sivulle päästetään vain parhaat.
 
-1. **Luokittelu heti löydettäessä** (`match_listing` / `rematch_profile` → `housing.score_target` + `housing.classify`,
-   tallennetaan `ListingMatch.score` ja `tier`; tunnin välein `target_scores`-työ päivittää molemmat):
-   - **A Kuuma**: pisteet ≥ 70, remontti alkaa kahden vuoden sisällä (ajoitus ≥ 20/25) ja puhelin tai sähköposti on tiedossa.
-     Ennuste (`Listing.is_estimate`) ei ole koskaan A.
-   - **B Hyvä**: pisteet ≥ 50.
-   - **C Seurattava**: loput.
-2. **Läpipäästö** (`target_services.release_targets`, `released_at`; NULL = jonossa): näkyviin enintään
-   `TARGETS_VISIBLE_LIMIT` (200) taloyhtiötä kerrallaan, luokat `TARGETS_MIN_TIER` (B) ja paremmat, pisteiden mukaan
-   parhaat ensin. Asiakaskohtaisesti `/admin/customers` (`Organization.targets_visible_limit`, `targets_min_tier`).
-   Saman taloyhtiön uusi ilmoitus liittyy näkyvään kohteeseen ilman paikkaa.
-3. **Täyttö ja parantuminen**: liidiksi siirto ja piilotus vapauttavat paikan heti seuraavalle. Täydellä listalla selvästi
-   parempi jonossa oleva (parempi luokka tai +10 pistettä) vaihtaa paikkaa heikoimman sellaisen kanssa, joka on ollut
-   näkyvissä vähintään `TARGETS_SWAP_AFTER_DAYS` (3) päivää käsittelemättä; se palaa jonoon. Iso erä (uuden asiakkaan
-   täsmäys, tuonti) käsitellään suoraan paremmuusjärjestyksessä.
-4. **"Uusi"** tarkoittaa näkyviin päästettyä (`released_at`): päiväkooste, tallennetut haut ja "uusi"-merkki.
-   Kohteet-otsikko kertoo jonossa odottavien määrän ("Seuraavat N parasta tulevat näkyviin, kun käsittelet näitä"),
-   ja asiakaslista näyttää superadminille jonon ja alle luokan jäävät.
+### 1. Remontin vaihe (`app/listings/stages.py`, `ListingRenovation.stage`)
 
-Ajot: `release_targets()` täsmäyksen jälkeen, `listing_matching`-työssä (10 min), `target_scores`-työssä (tunti) sekä
-siirron, piilotuksen ja asetusmuutoksen jälkeen. Mitattu 40 000 kohteella: Kohteet-sivu 0,7 s, kojelauta 0,4 s.
-Testit: `tests/test_target_release.py`.
+| Vaihe | Milloin | Esimerkkejä |
+|---|---|---|
+| Päätetty (`decided`) | taloyhtiö on päättänyt | yhtiökokous päätti, urakoitsija valittu tai kilpailutus käynnissä, työt alkaneet, lupa myönnetty |
+| Suunniteltu (`planned`) | suunnitelmassa, ei päätetty | PTS tai suunnitelma vuodella, hankesuunnittelu tai kuntotutkimus käynnissä, "ei vielä päätetty, PTS 2029" |
+| Tarve (`need`) | ei päätöstä eikä suunnitelmaa | "edessä lähivuosina", ikäennuste, öljylämmitys |
+
+Analyzer palauttaa vaiheen kentässä `vaihe` (`paatetty` / `suunniteltu` / `tarve`, epävarmassa alempi). Kun sitä ei ole
+(tuonti, vanhat rivit, rekisterit), vaihe luetaan perusteesta ja ajoituksesta säännöillä: päätössanat, paitsi kun ne
+koskevat suunnittelua tai kuntotutkimusta ("hyväksyi hankesuunnittelun" = suunniteltu); vuosi tai suunnitelmasana =
+suunniteltu; muuten tarve. Rekisteriennusteessa vain muutostyölupa on päätös. Tallennetaan flushissa
+(`housing._refresh_keys`); vanhat NULL-rivit luetaan lennossa.
+
+### 2. Pisteet 0–100 (`housing.score_target`, taloyhtiön kaikki ilmoitukset, vain asiakkaan urakat)
+
+| Osa | Max | Laskenta |
+|---|---|---|
+| Vaihe | 20 | pisimmällä oleva remontti: päätetty 20, suunniteltu 10, tarve 0 |
+| Varmuus | 30 | varmin remontti: varmuus % × 0,3 |
+| Ajoitus | 20 | aikaisin vuosi: tänä tai ensi vuonna 20, kahden vuoden päästä 16, 3–4 v 10, myöhemmin 4; pelkkä "suunnitteilla" 8, ei tietoa 5 |
+| Yhteystiedot | 15 | puhelin ja sähköposti 15, toinen 10, pelkkä nimi 4 (isännöitsijä tai hallituksen pj) |
+| Tuoreus | 10 | uusin signaali alle 30 pv 10, alle 3 kk 6, vanhempi 2 |
+| Signaalit | 5 | ilmoituksia + remonttityyppejä: 2 → 3, 3+ → 5 |
+
+Kohteet-sivun Sopivuus = pisteet × 0,9 + asiakkaan siirroista ja piilotuksista opittu ±25 (`fit_services`).
+
+### 3. Luokka (`housing.classify`, `ListingMatch.tier`)
+
+- **A Kuuma**: päätetty tai suunniteltu, pisteet ≥ 70, alkaa kahden vuoden sisällä (ajoitus ≥ 16) ja puhelin tai sähköposti
+  (yhteystiedot ≥ 10). Ennuste ei ole koskaan A.
+- **B Hyvä**: päätetty tai suunniteltu, pisteet ≥ 50.
+- **C Seurattava**: päätetty tai suunniteltu, heikompi.
+- **T Tarve**: vain tarve. Näytetään omalla **Tarve**-välilehdellä, ei koskaan päälistalla.
+
+### 4. Läpipäästö (`target_services.release_targets`, `released_at`; NULL = jonossa)
+
+Kaksi listaa, kumpikin omalla rajallaan: **päälista** ("Päätetyt ja suunnitellut") enintään `TARGETS_VISIBLE_LIMIT` (200)
+taloyhtiötä luokista `TARGETS_MIN_TIER` (B) ylöspäin, ja **Tarve** enintään `TARGETS_NEED_LIMIT` (50; -1 = ei
+välilehteä, jolloin tarve on päälistalla C:nä). Asiakaskohtaisesti `/admin/customers` (`targets_visible_limit`,
+`targets_min_tier`). Parhaat ensin; saman taloyhtiön uusi ilmoitus liittyy näkyvään kohteeseen ilman paikkaa.
+Siirto ja piilotus täyttävät heti; täydellä listalla selvästi parempi (parempi luokka tai +10 pistettä) vaihtaa paikkaa
+heikoimman sellaisen kanssa, joka on ollut näkyvissä `TARGETS_SWAP_AFTER_DAYS` (3) päivää käsittelemättä.
+"Uusi" = näkyviin päästetty (päiväkooste, tallennetut haut, "uusi"-merkki; vain päälista). Sivupalkin luku on päälistan.
+
+Ajot: täsmäyksen jälkeen, `listing_matching` (10 min), `target_scores` (tunti), siirto, piilotus ja asetusmuutos.
+Testit: `tests/test_renovation_stages.py`, `tests/test_target_release.py`.
 
 ## Julkiset rekisterit (Ryhti, PRH): vain sisäinen, ei asiakkaille
 

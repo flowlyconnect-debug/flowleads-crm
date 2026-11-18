@@ -159,6 +159,9 @@ class ListingRenovation(db.Model):
     # first year mentioned in `timing` (e.g. "PTS 2027-2029" -> 2027), if any
     timing_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # decided / planned / need (app/listings/stages.py), set on flush from the
+    # evidence and timing; NULL on rows saved before the column (read on the fly)
+    stage: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing", back_populates="renovations")
 

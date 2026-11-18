@@ -217,8 +217,9 @@ def test_score_parts_and_bounds(app):
         _listing(2, taloyhtio="As Oy Kallio", renovations=((PIPE, 60, ""),))
         score = housing.score_target([strong, Listing.query.filter_by(external_id="2").one()], {PIPE}, now=NOW)
         parts = {p["key"]: p["points"] for p in score["parts"]}
-        assert parts == {"confidence": 40, "timing": 25, "contact": 15, "signals": 6, "fresh": 10}
-        assert score["total"] == 96
+        # a year and no decision: planned (10 of 20, app/listings/stages.py)
+        assert parts == {"stage": 10, "confidence": 30, "timing": 20, "contact": 15, "signals": 3, "fresh": 10}
+        assert score["total"] == 88
 
         weak = Listing(source="import", external_id="w", maakunta="Uusimaa", published_at=NOW - timedelta(days=200))
         weak.renovations.append(ListingRenovation(remonttityyppi=PIPE, confidence=50, timing=""))
@@ -266,7 +267,7 @@ def test_card_has_score_timeline_and_age_hints(app):
         targets.transfer_targets(org.id, [target.id])
         card = insights.get_company_card(org.id, first.id)
         assert len(card["listing_list"]) == 2
-        assert 0 < card["score"] <= 100 and len(card["score_parts"]) == 5
+        assert 0 < card["score"] <= 100 and len(card["score_parts"]) == 6  # stage, confidence, timing, contact, signals, fresh
         kinds = [event["kind"] for event in card["timeline"]]
         assert kinds.count("listing") == 2 and "renovation" in kinds and "lead" in kinds
         assert all(card["timeline"][i]["at"] >= card["timeline"][i + 1]["at"] for i in range(len(kinds) - 1))

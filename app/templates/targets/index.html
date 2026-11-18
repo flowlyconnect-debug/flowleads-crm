@@ -14,7 +14,7 @@
   {{- url_for('targets.index', tab=(name if name != 'available' else none), **org_query) -}}
 {%- endmacro %}
 {% macro page_url(number) -%}
-  {{- url_for('targets.index', tab=(tab if is_hidden_tab else none), search=search or none, profile_id=profile_id, page=number, **dict(org_query, **filter_args)) -}}
+  {{- url_for('targets.index', tab=(tab if tab != 'available' else none), search=search or none, profile_id=profile_id, page=number, **dict(org_query, **filter_args)) -}}
 {%- endmacro %}
 
 <section class="leads-page targets-page">
@@ -22,8 +22,12 @@
     <div class="leads-header__main">
       <h1 class="leads-header__title">Kohteet</h1>
       <p class="leads-header__sub">
-        {% if available_count %}
-        {{ available_count }} {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla. Siirrä kiinnostavat liideiksi.
+        {% if tab == 'need' %}
+        Taloyhtiöt, joilla remonttia ei ole vielä päätetty eikä suunniteltu: tarve näkyy iästä, lämmitystavasta tai
+        maininnasta. Hyviä yhteydenottoja ennen kuin hanke alkaa.
+        {% if waiting.queued %}Seuraavat {{ waiting.queued }} tulevat näkyviin, kun käsittelet näitä.{% endif %}
+        {% elif available_count %}
+        {{ available_count }} {{ 'kohde' if available_count == 1 else 'kohdetta' }} saatavilla{% if need_tab %}: remontti päätetty tai suunniteltu{% endif %}. Siirrä kiinnostavat liideiksi.
         {% if waiting.queued %}Seuraavat {{ waiting.queued }} parasta tulevat näkyviin, kun käsittelet näitä.{% endif %}
         {% else %}
         Hakuprofiiliisi osuvat taloyhtiöt näkyvät täällä. Siirrä kiinnostavat liideiksi.
@@ -37,7 +41,7 @@
       {% endif %}
     </div>
     <div class="leads-header__actions">
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.map_view', tab=(tab if is_hidden_tab else none), **dict(org_query, **current_params)) }}" title="Näytä nämä kohteet kartalla">Kartta</a>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('targets.map_view', tab=(tab if tab != 'available' else none), **dict(org_query, **current_params)) }}" title="Näytä nämä kohteet kartalla">Kartta</a>
       {% if can_edit_profiles %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('settings.search_profiles_list', **org_query) }}" title="Mistä urakoista kohteita haetaan">Urakat</a>
       {% endif %}
@@ -48,16 +52,21 @@
   <div class="leads-work">
     <div class="leads-toolbar" role="toolbar" aria-label="Kohdelistan työkalupalkki">
       <nav class="leads-opp-tabs" aria-label="Näkymä">
-        <a href="{{ tab_url('available') }}" class="leads-opp-tab{% if not is_hidden_tab %} is-active{% endif %}"{% if not is_hidden_tab %} aria-current="page"{% endif %}>
-          Saatavilla <span class="targets-tab-count">{{ available_count }}</span>
+        <a href="{{ tab_url('available') }}" class="leads-opp-tab{% if tab == 'available' %} is-active{% endif %}"{% if tab == 'available' %} aria-current="page"{% endif %}>
+          {{ 'Päätetyt ja suunnitellut' if need_tab else 'Saatavilla' }} <span class="targets-tab-count">{{ available_count }}</span>
         </a>
+        {% if need_tab %}
+        <a href="{{ tab_url('need') }}" class="leads-opp-tab{% if tab == 'need' %} is-active{% endif %}"{% if tab == 'need' %} aria-current="page"{% endif %} title="Taloyhtiöt, joilla remonttia ei ole päätetty eikä suunniteltu: ikäennusteet, öljylämmitys ja epämääräiset maininnat">
+          Tarve <span class="targets-tab-count">{{ need_count }}</span>
+        </a>
+        {% endif %}
         <a href="{{ tab_url('hidden') }}" class="leads-opp-tab{% if is_hidden_tab %} is-active{% endif %}"{% if is_hidden_tab %} aria-current="page"{% endif %}>
           Piilotetut <span class="targets-tab-count">{{ hidden_count }}</span>
         </a>
       </nav>
       <form method="get" class="leads-toolbar__tools" role="search" aria-label="Hae kohteita">
         {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
-        {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+        {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
         {% if profiles|length > 1 %}
         <select name="profile_id" class="form-input targets-profile-select" aria-label="Hakuprofiili" onchange="this.form.submit()">
           <option value="">Kaikki hakuprofiilit</option>
@@ -78,7 +87,7 @@
 
     {# Plain-language search: the text becomes the filters below (app/listings/nl_search.py). #}
     <form method="get" action="{{ url_for('targets.ask', **org_query) }}" class="targets-ask" role="search" aria-label="Kerro mitä etsit">
-      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
       <label class="targets-ask__label" for="targets-ask-input">Kerro mitä etsit</label>
       <input type="search" id="targets-ask-input" name="q" class="form-input targets-ask__input" maxlength="300"
@@ -149,7 +158,7 @@
     {%- endmacro %}
     <form method="get" class="targets-filters" aria-label="Rajaa kohteita">
       {% if org_query %}<input type="hidden" name="organization_id" value="{{ organization_id }}">{% endif %}
-      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
       {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
       {{ filter_select('renovation', 'Remontti', filter_options.renovations, 'Kaikki remontit') }}
@@ -225,7 +234,7 @@
     {% else %}
     <form method="post" id="targets-form" action="{{ url_for('targets.restore' if is_hidden_tab else 'targets.transfer', **org_query) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% if is_hidden_tab %}<input type="hidden" name="tab" value="hidden">{% endif %}
+      {% if tab != 'available' %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
       {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
       {% if profile_id %}<input type="hidden" name="profile_id" value="{{ profile_id }}">{% endif %}
       {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
@@ -293,7 +302,7 @@
                  data-has-phone="{{ '1' if (listing.isannoitsija_puh or '').strip() else '0' }}"
                  aria-label="Valitse {{ row.title }}">
           <div class="target-row__main">
-            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}{% if row.tier == 'A' %} <span class="target-row__tier" title="Kuuma kohde: vahva signaali, remontti alkaa kahden vuoden sisällä ja yhteystiedot ovat tiedossa">kuuma</span>{% endif %}{% if row.estimate %} <span class="target-row__estimate" title="Arvio julkisista rekistereistä (rakennusvuosi, lämmitys, luvat), ei ilmoituksesta tai taloyhtiöltä saatu tieto. Tarkista ennen tarjousta.">ennuste</span>{% endif %}</span>
+            <span class="target-row__name"><a href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Avaa taloyhtiön tiedot">{{ row.title }}</a>{% if row.match.id in new_ids %} <span class="target-row__new badge-new">uusi</span>{% endif %}{% if row.stage == 'decided' %} <span class="target-row__stage" title="Taloyhtiö on päättänyt remontista (yhtiökokous, kilpailutus, urakoitsija tai lupa)">päätetty</span>{% endif %}{% if row.tier == 'A' %} <span class="target-row__tier" title="Kuuma kohde: vahva signaali, remontti alkaa kahden vuoden sisällä ja yhteystiedot ovat tiedossa">kuuma</span>{% endif %}{% if row.estimate %} <span class="target-row__estimate" title="Arvio julkisista rekistereistä (rakennusvuosi, lämmitys, luvat), ei ilmoituksesta tai taloyhtiöltä saatu tieto. Tarkista ennen tarjousta.">ennuste</span>{% endif %}</span>
             <span class="target-row__meta">{{ [row.location, [listing.building_type|lower if listing.building_type else none, listing.build_year]|select|join(' ')]|select|join(' · ') }}{% if row.signal_count > 1 %} · <a class="target-row__signals" href="{{ url_for('insights.company_card', listing_id=listing.id, **org_query) }}" title="Saman taloyhtiön ilmoitukset ja lähteet koottuna yhteen">{{ row.signal_count }} {{ 'rakennusta' if row.all_estimates else 'ilmoitusta' }} samasta taloyhtiöstä</a>{% endif %}</span>
           </div>
           <div class="target-row__pts">{{ pts_cells(row.pts) }}</div>
@@ -343,7 +352,7 @@
             <dl class="target-row__facts">
               {% for item in row.renovations %}
               <dt>{{ item.remonttityyppi }}</dt>
-              <dd>{{ item.timing or 'aikataulu auki' }}, varmuus <span class="mono">{{ item.confidence }} %</span>{% if item.is_estimate %} · ennuste{% endif %}</dd>
+              <dd>{{ item.timing or 'aikataulu auki' }}, varmuus <span class="mono">{{ item.confidence }} %</span> · {{ renovation_stage_label(item)|lower }}{% if item.is_estimate %} · ennuste{% endif %}</dd>
               {% endfor %}
               {% if contact.has_contact %}
               <dt>Isännöitsijä</dt>

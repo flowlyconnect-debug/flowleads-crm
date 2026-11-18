@@ -33,15 +33,17 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   at the first block; never add bot-protection workarounds. Listings can come from any other source through
   `app/listings/import_services.py`: CSV upload on `/admin/catalogue` or `POST /api/v1/n8n/listings/import`.
   Rows with a renovation type are matched at once (targets on Kohteet); text-only rows go to the Analyzer (`fetch_detail: false`).
-- **Curated Kohteet** (18.11.2026; replaces "every match is visible at once"): each match is scored and classified when
-  found (`ListingMatch.score` / `tier`: A Kuuma = score ≥ 70 + renovation within 2 years + phone or email, B Hyvä ≥ 50,
-  C Seurattava; `housing.classify`, an estimate is never A). `target_services.release_targets` makes the best housing
-  companies of the allowed classes visible (`released_at`; NULL = waiting), at most `TARGETS_VISIBLE_LIMIT` (200) at a time,
-  classes down to `TARGETS_MIN_TIER` (B); per customer on `/admin/customers` (`Organization.targets_visible_limit`,
-  `targets_min_tier`). Moving to leads / hiding refills at once; a clearly better waiting company (better class or +10
-  points) replaces the weakest one visible ≥ `TARGETS_SWAP_AFTER_DAYS` (3) days, which goes back to the queue. "New" =
-  released after (digest, saved searches, the "uusi" badge). Kohteet says how many wait. `TestingConfig` turns the gate off
-  (limit 0, class C) for the older catalogue tests; `tests/test_target_release.py` tests it with production values.
+- **Curated Kohteet** (18.11.2026; replaces "every match is visible at once"): each renovation has a **stage**
+  (`app/listings/stages.py`, `ListingRenovation.stage`: decided / planned / need; the Analyzer's `vaihe`, else rules on the
+  evidence). Each match is scored (`housing.score_target`: stage 20, confidence 30, timing 20, contact 15, fresh 10,
+  signals 5) and classified when found (`ListingMatch.tier`: A Kuuma / B Hyvä / C Seurattava for decided or planned,
+  **T Tarve** for only a need; `housing.classify`, an estimate is never A). `target_services.release_targets` makes the best
+  housing companies visible (`released_at`; NULL = waiting) on two lists: the main list (at most `TARGETS_VISIBLE_LIMIT` 200,
+  classes down to `TARGETS_MIN_TIER` B; per customer on `/admin/customers`) and the **Tarve** tab (`TARGETS_NEED_LIMIT` 50,
+  -1 = no tab, needs then count as C). Moving to leads / hiding refills at once; a clearly better waiting company (better
+  class or +10 points) replaces the weakest one visible ≥ `TARGETS_SWAP_AFTER_DAYS` (3) days. "New" = released after.
+  `TestingConfig` turns the gate and the Tarve tab off for the older catalogue tests; `tests/test_target_release.py` and
+  `tests/test_renovation_stages.py` test them with production values. Full table: architecture doc "Kuratoidut kohteet".
 - **Target access switch** (`Organization.targets_enabled`, superadmin toggles it on `/admin/customers`;
   `app/billing/services.py::targets_locked`, also true when the contract has ended): a locked customer still
   sees the target count (Kohteet header, sidebar, dashboard) but `/targets` renders `targets/locked.html` (a sales page:

@@ -514,6 +514,14 @@ def _get_listing(listing_id: int) -> Listing:
     return listing
 
 
+# Analyzer "vaihe" (and the English API name) -> ListingRenovation.stage
+_ANALYZER_STAGES = {
+    "paatetty": "decided", "päätetty": "decided", "decided": "decided",
+    "suunniteltu": "planned", "planned": "planned",
+    "tarve": "need", "need": "need",
+}
+
+
 def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None) -> dict:
     now = now or _now()
     listing = _get_listing(listing_id)
@@ -576,6 +584,8 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
             timing=_clean(item.get("timing"), 100),
             timing_year=_parse_year(item.get("timing"), low=2000),
             evidence=_clean(item.get("evidence"), 2000),
+            # the Analyzer's own reading; without it the flush reads the evidence (app/listings/stages.py)
+            stage=_ANALYZER_STAGES.get(str(item.get("vaihe") or item.get("stage") or "").strip().lower()),
         )
     for renovation in best.values():
         listing.renovations.append(renovation)
@@ -1338,7 +1348,7 @@ def profile_match_stats(profile: SearchProfile, *, leads_only: bool = False) -> 
 
     # the same rule as the Kohteet page (one target per listing, not already a
     # lead or hidden through another profile, active listing)
-    available = _visible_match_ids(profile.organization_id, "pending", profile_id=profile.id).count()
+    available = _visible_match_ids(profile.organization_id, "pending", profile_id=profile.id, segment="main").count()
     return {
         "total": sum(counts.values()),
         "lead_created": counts.get("lead_created", 0),
