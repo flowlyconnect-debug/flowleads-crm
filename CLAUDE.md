@@ -101,6 +101,14 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   to the customers' admins or all users, all or chosen customers; `{yritys}` = customer name, test to self first, replies go
   to the sender, history in `CustomerAnnouncement`. Needs `EMAIL_SENDING_ENABLED` and `MAILGUN_FROM_EMAIL`.
   Tests: `tests/test_announcements.py`.
+- **Lead export limits** (`app/core/export_limits.py`): CSV / CRM file / CRM push only for admins, at most
+  `EXPORT_DAILY_ROWS` (200) rows a day per customer (`Organization.export_daily_limit` on `/admin/customers`, 0 = none);
+  refusals are audited (`export_blocked`). Daily `activity_alerts` job mails superadmins about customers turning
+  "Tarkista". Tests: `tests/test_export_limits.py`, `tests/test_customer_activity.py`.
+- **Off switches** (env, no deploy): `PROFILE_TIMING_WINDOW_ENABLED`, `USAGE_TRACKING_ENABLED`, `ACTIVITY_ALERTS_ENABLED`,
+  `EXPORT_LIMITS_ENABLED`, `ANNOUNCEMENTS_ENABLED`. After a deploy: `flask smoke-check` (read-only, `app/admin/smoke.py`)
+  and `python scripts/smoke_http.py <url>`. Browser tests: `tests/test_e2e_browser.py` (Playwright, CI installs it;
+  locally `pip install playwright==1.63.0`, here `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`).
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
   myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
   koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`

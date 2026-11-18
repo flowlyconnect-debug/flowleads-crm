@@ -957,6 +957,19 @@ def _siblings(match: ListingMatch) -> list[ListingMatch]:
     return same_listing + _company_matches(match, ("pending", "dismissed"))
 
 
+def _reassign_automatic_tasks(lead, user_id: int) -> None:
+    """The lead's automatic tasks (created by no one, e.g. "Ota yhteyttä")
+    follow the owner picked in the transfer, so its call lands on their list."""
+    from app.tasks.models import Task
+
+    db.session.flush()
+    Task.query.filter(
+        Task.lead_id == lead.id,
+        Task.created_by.is_(None),
+        Task.status.in_(("pending", "in_progress")),
+    ).update({Task.assigned_to: user_id}, synchronize_session=False)
+
+
 def transfer_targets(
     organization_id: int,
     match_ids,
@@ -983,6 +996,7 @@ def transfer_targets(
         result["created" if outcome == "created" else "merged"] += 1
         if outcome == "created" and assigned_to:
             lead.assigned_to = assigned_to  # the owner picked in the transfer bar
+            _reassign_automatic_tasks(lead, assigned_to)
         if outcome == "created":
             from app.leads.services import announce_new_lead
 

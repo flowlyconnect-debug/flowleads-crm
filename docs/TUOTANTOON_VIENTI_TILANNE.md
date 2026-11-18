@@ -432,6 +432,33 @@ tietää miksi ne näkyvät eikä joudu selaamaan. Muutokset:
   Vaatii `MAILGUN_FROM_EMAIL`:n ja `EMAIL_SENDING_ENABLED`:n Renderissä.
 - Migraatio `b1c2d3e4f5a6` (taulut `usage_daily`, `customer_announcements`).
 
+## Tehty 18.11.2026 (9): viennin turvaaminen
+
+- **Kytkimet** (Renderin ympäristömuuttujat, ei uutta versiota): `PROFILE_TIMING_WINDOW_ENABLED`, `USAGE_TRACKING_ENABLED`,
+  `ACTIVITY_ALERTS_ENABLED`, `EXPORT_LIMITS_ENABLED` (+ `EXPORT_DAILY_ROWS`, oletus 200), `ANNOUNCEMENTS_ENABLED`.
+  Kaikki oletuksena päällä; `false` kytkee osan pois. Ennakoi pois: `TARGETS_NEED_LIMIT=-1`.
+- **Vientirajat:** liidien vienti vain pääkäyttäjille, 200 riviä/päivä/asiakas, asiakaskohtainen raja asiakaslistalla.
+- **Hälytys:** ajastin `activity_alerts` (klo 8.10) mailaa superadmineille Tarkista-tilaan nousseet asiakkaat.
+- **Asiakastiedotteen luonnos:** `docs/ASIAKASTIEDOTE_KOHTEET_11-2026.md`.
+- **Selaintestit** `tests/test_e2e_browser.py` (CI:ssä), **savutesti** `flask smoke-check` ja `scripts/smoke_http.py`.
+- **Datakoe tuotannon datalla** (lukuoikeus, 18.11.): 1714 remonttia: 92 % suunniteltu, 6 % päätetty, 2 % tarve. Uusi
+  sääntö pienentää asiakkaiden listaa noin 15 % (esim. 152 → 130). Kaksi vaihesääntöä korjattu.
+- **Löydetty bugi:** myyjän siirtämän liidin puhelu meni soittolistalla liidin reitityksen käyttäjälle; korjattu.
+
+### Vientiharjoitus tuotannon datan kopiolla (18.11.)
+Koko tuotantokanta (54 taulua, 3913 riviä) luettiin lukuoikeudella ja palautettiin paikalliseen Postgresiin
+tuotannon migraatioversioon `e2f3a4b5c6d7`; rivimäärät täsmäsivät. Sen päälle: 9 migraatiota 1,2 s, ensimmäinen
+ajastinkierros 7 s (1083 ilmoitusta taloyhtiöiksi, 1080 ennustetta), `flask smoke-check` OK. Asiakkaiden kohteet:
+Esimerkki Sähkö 121 → 102 + Ennakoi 5, Nooa Haapala 152 → 128 + 4, Lämminkoti 188 → 146 + 17, Jopair 189 → 147 + 17.
+Kaikki 650 näkyvää osumaa pysyivät näkyvissä migraatiossa; ikkunan ulkopuoliset poistuvat ensimmäisessä täsmäyksessä.
+
+### Vientipäivän järjestys
+1. Varmuuskopio Renderistä (Postgres → Recovery → Export) ja palautuskoe.
+2. Renderiin: `MAILGUN_FROM_EMAIL`, `EMAIL_SENDING_ENABLED=true`.
+3. PR #42 yhdistetään → Render deployaa (migraatiot ajetaan käynnistyksessä).
+4. `python scripts/smoke_http.py https://flowleads-crm-zv0a.onrender.com` ja Render Shellissä `flask smoke-check`.
+5. Analyzer-workflow n8n:ään uudelleen; asiakastiedote lähetetään.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

@@ -153,6 +153,19 @@ def register_cli(app):
         if counts["fail"]:
             raise SystemExit(1)
 
+    @app.cli.command("smoke-check")
+    def smoke_check_command():
+        """Read-only check of the new code paths right after a deploy (app/admin/smoke.py)."""
+        from app.admin.smoke import run_smoke
+
+        results = run_smoke()
+        for item in results:
+            click.echo(f"  [{'OK  ' if item['ok'] else 'VIRHE'}] {item['name']}: {item['detail']}")
+        failed = sum(1 for item in results if not item["ok"])
+        click.echo(f"\n{failed} virhettä.")
+        if failed:
+            raise SystemExit(1)
+
     @app.cli.command("send-test-email")
     @click.argument("email")
     @with_appcontext
