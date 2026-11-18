@@ -649,6 +649,7 @@ def _best_renovation(
     if profile.timing_within_years is not None and current_app.config.get("PROFILE_TIMING_WINDOW_ENABLED", True):
         limit_year = now.year + int(profile.timing_within_years)
     from app.listings.housing import company_outlook
+    from app.listings.stages import too_old
 
     # the company's combined outlook (app/listings/forecast.py) decides what is
     # still coming: a type it dropped (done since, say) is no target any more
@@ -665,6 +666,8 @@ def _best_renovation(
             continue
         if limit_year is not None and renovation.timing_year is not None and renovation.timing_year > limit_year:
             continue
+        if too_old(renovation, now):
+            continue  # dated years back and not going on: most likely done
         if best is None or renovation.confidence > best.confidence:
             best = renovation
     return best
@@ -1543,6 +1546,22 @@ def catalogue_health(*, now: datetime | None = None) -> dict:
                 f"Analyysi (Analyzer) ei ole käsitellyt kohteita yli {hours} tuntiin, "
                 f"jonossa {analysis['pending']} kohdetta."
             )
+    # contacts are looked up only for listings a profile matched: those waiting
+    # with no lookup within the stale window mean the Enricher is not running
+    waiting_contacts = (
+        db.session.query(func.count(func.distinct(Listing.id)))
+        .join(ListingMatch, ListingMatch.listing_id == Listing.id)
+        .filter(Listing.is_active.is_(True), Listing.contact_status == "pending", ListingMatch.status == "pending")
+        .scalar()
+        or 0
+    )
+    last_contact = _aware(db.session.query(func.max(Listing.contact_claimed_at)).scalar())
+    if waiting_contacts and (last_contact is None or now - last_contact > stale_after):
+        problems.append(
+            f"Yhteystietohaku (Enricher) ei ole hakenut yhteystietoja yli {hours} tuntiin"
+            + (f" (viimeksi {_helsinki_label(last_contact)})" if last_contact else " (ei koskaan)")
+            + f", {waiting_contacts} asiakkaiden kohdetta odottaa."
+        )
     total_active = sum(counts.values())
     if total_active and analysis["failed"] > max(50, total_active // 10):
         problems.append(f"Analyysi on epäonnistunut {analysis['failed']} kohteelle.")

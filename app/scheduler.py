@@ -289,6 +289,15 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 from app.listings.text_types import backfill_text_types
 
                 backfill_text_types()  # renovation types read from the listing text
+                from app.listings.stages import clean_old_evidence
+
+                clean_old_evidence()  # the analyser's own reminders out of older evidence
+                from app.listings.stages import backfill_stages
+
+                backfill_stages()  # the stage stored on renovations saved before the column
+                from app.listings.normalize import normalize_old_contacts
+
+                normalize_old_contacts()  # phone numbers and e-mails of older listings in one form
                 from app.listings.housing_registry import resolve_listings
 
                 resolve_listings()  # each listing to its taloyhtiö (one company across sources)

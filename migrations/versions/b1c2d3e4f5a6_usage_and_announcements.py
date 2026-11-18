@@ -1,6 +1,7 @@
 """Asiakasseuranta (usage_daily: daily counters per customer user),
 Asiakastiedotteet (customer_announcements: e-mails sent to customers) and the
-per-customer daily export limit (organizations.export_daily_limit).
+per-customer daily export limit (organizations.export_daily_limit) and the
+contact normalisation mark (listings.contacts_normalized_at).
 
 Revision ID: b1c2d3e4f5a6
 Revises: a0b1c2d3e4f5
@@ -21,6 +22,8 @@ json_type = postgresql.JSONB().with_variant(sa.JSON(), "sqlite")
 def upgrade():
     with op.batch_alter_table("organizations") as batch:
         batch.add_column(sa.Column("export_daily_limit", sa.Integer(), nullable=True))
+    with op.batch_alter_table("listings") as batch:
+        batch.add_column(sa.Column("contacts_normalized_at", sa.DateTime(timezone=True), nullable=True))
     op.create_table(
         "usage_daily",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -51,5 +54,7 @@ def downgrade():
     op.drop_table("customer_announcements")
     op.drop_index("ix_usage_daily_org_day", table_name="usage_daily")
     op.drop_table("usage_daily")
+    with op.batch_alter_table("listings") as batch:
+        batch.drop_column("contacts_normalized_at")
     with op.batch_alter_table("organizations") as batch:
         batch.drop_column("export_daily_limit")

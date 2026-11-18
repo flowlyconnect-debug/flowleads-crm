@@ -371,7 +371,7 @@ Säännöt tuleville remonteille:
 - "Yläpohjan lisäeristys": yläpohjan tai ullakon lisäeristys.
 - "Huoneistoremontit": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.
 - confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.
-- evidence = lyhyt suora lainaus tekstistä. timing = esim. "2027", "suunnitteilla", "PTS 2026–2028" tai "".
+- evidence = lyhyt suora lainaus tekstistä, ei omia huomioita (älä kirjoita esim. "Tarkista onko jo tehty"). timing = esim. "2027", "suunnitteilla", "PTS 2026–2028" tai "".
 - vaihe = kuinka pitkällä remontti on: "paatetty" (yhtiökokous päättänyt, urakoitsija valittu tai kilpailutus käynnissä, työt alkaneet tai lupa myönnetty), "suunniteltu" (PTS:ssä tai suunnitelmassa, hankesuunnittelu tai kuntotutkimus tehty tai käynnissä, ei vielä päätetty) tai "tarve" (ei päätöstä eikä suunnitelmaa, esim. "edessä", "ajankohtainen lähivuosina"). Jos epävarma, valitse alempi vaihe.
 - Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.
 

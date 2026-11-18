@@ -1045,3 +1045,15 @@ def announcements_page():
         mail_from=f"{current_app.config.get('MAILGUN_FROM_NAME') or 'FlowLeads'} <{current_app.config.get('MAILGUN_FROM_EMAIL') or 'osoite puuttuu'}>",
         from_missing=not current_app.config.get("MAILGUN_FROM_EMAIL"),
     )
+
+
+@admin_bp.route("/data-quality")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def data_quality_page():
+    """Datan laatu: how complete and clean the catalogue is (app/listings/quality.py)."""
+    from app.listings.quality import data_quality
+    from app.listings.services import catalogue_health
+
+    return render_template("admin/data_quality.html", quality=data_quality(), problems=catalogue_health()["problems"])

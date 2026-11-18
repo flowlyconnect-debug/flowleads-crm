@@ -452,6 +452,17 @@ ajastinkierros 7 s (1083 ilmoitusta taloyhtiöiksi, 1080 ennustetta), `flask smo
 Esimerkki Sähkö 121 → 102 + Ennakoi 5, Nooa Haapala 152 → 128 + 4, Lämminkoti 188 → 146 + 17, Jopair 189 → 147 + 17.
 Kaikki 650 näkyvää osumaa pysyivät näkyvissä migraatiossa; ikkunan ulkopuoliset poistuvat ensimmäisessä täsmäyksessä.
 
+### Datan laatu (18.11., tuotannon datan kopiolla)
+- **Yhteystietohakua ei ole ajettu koskaan:** n8n:ssä Enricher, Analyzer ja Crawler ovat pois päältä (vanhat
+  "Lead Worker (Enriched)" ja "Job Dispatcher" ovat päällä). Asiakkaiden 362 kohteesta vain 82:ssa (23 %) on
+  yhteystieto; 280 odottaa. **Käyttäjän tehtävä:** ota "FlowLeads – Yhteystietohaku (Enricher)" käyttöön n8n:ssä ja
+  harkitse vanhojen Lead Worker / Job Dispatcher -workflowien pysäyttämistä (legacy, ei käytössä).
+- Taloyhtiön nimi puuttuu 60 %:lta, julkaisupäivä kaikilta (CSV-tuonnissa ei ollut saraketta).
+- Korjattu tässä paketissa: Datan laatu -sivu, Enricher-jumin hälytys, menneet vuodet ("mahdollisesti jo tehty", yli
+  vuoden vanhat pois), tekoälyn huomiot pois perusteista (71 riviä), puhelinnumerot yhteen muotoon (90 riviä),
+  isännöintitoimistot ryhmittyvät yhtiömuodosta riippumatta (193 → 183), vaiheet tallennettu vanhoille riveille.
+  Analyzer-workflow muuttui taas (ohje: ei omia huomioita perusteeseen).
+
 ### Vientipäivän järjestys
 1. Varmuuskopio Renderistä (Postgres → Recovery → Export) ja palautuskoe.
 2. Renderiin: `MAILGUN_FROM_EMAIL`, `EMAIL_SENDING_ENABLED=true`.

@@ -109,6 +109,15 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   `EXPORT_LIMITS_ENABLED`, `ANNOUNCEMENTS_ENABLED`. After a deploy: `flask smoke-check` (read-only, `app/admin/smoke.py`)
   and `python scripts/smoke_http.py <url>`. Browser tests: `tests/test_e2e_browser.py` (Playwright, CI installs it;
   locally `pip install playwright==1.63.0`, here `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`).
+- **Data quality** (superadmin `/admin/data-quality`, `app/listings/quality.py`): coverage of contacts (on customers'
+  targets), names, Y-tunnus, build year, publish date, renovation years / stages / "Muu remontti". `catalogue_health` also
+  flags an Enricher that has not claimed contacts for matched listings (mail via the catalogue alert). Rules from the
+  production data: a renovation dated in an earlier year without "going on" words is "mahdollisesti jo tehty" (timing 4 points,
+  reason says so), more than `PAST_YEARS_KEPT` (1) year back it is no target (`stages.possibly_done` / `too_old`); the
+  analyser's own notes ("Tarkista onko jo tehty") are stripped from evidence (`stages.clean_evidence`, model validator,
+  `clean_old_evidence()`); `backfill_stages()` stores stages of older rows; phones / e-mails are normalised on save
+  (`app/listings/normalize.py`, `normalize_old_contacts()`), offices group by `manager_key` (company form ignored).
+  Tests: `tests/test_data_quality_rules.py`.
 - Settings menu: `app/templates/_macros.html::settings_nav`. Sender + email templates are one page (`/settings/email`,
   myyjät keep the read-only `/settings/email-templates`), both daily digests are on `/settings/leads` ("Liidit ja
   koosteet"), Kalenteri shows only when Google/Outlook keys exist, the superadmin overview is `/admin/reports`

@@ -842,16 +842,21 @@ def why_line(renovations, contact) -> str:
 
     parts = []
     # the furthest along first: a decided renovation is the reason, not a need beside it
+    from app.listings.stages import possibly_done
+
     ordered = sorted(
         (r for r in renovations if r is not None),
-        key=lambda r: (STAGES.index(renovation_stage(r)) if renovation_stage(r) in STAGES else len(STAGES),
+        key=lambda r: (possibly_done(r),
+                       STAGES.index(renovation_stage(r)) if renovation_stage(r) in STAGES else len(STAGES),
                        -(r.confidence or 0) if hasattr(r, "confidence") else 0),
     )
     main = ordered[0] if ordered else None
     if main is not None:
         stage = renovation_stage(main)
         text = f"{main.remonttityyppi} {_WHY_STAGE.get(stage, '')}".strip()
-        if main.timing_year:
+        if main.timing_year and possibly_done(main):
+            text += f", merkitty vuodelle {main.timing_year}: mahdollisesti jo tehty"
+        elif main.timing_year:
             text += f", {'alkaa' if stage == 'decided' else 'arviolta'} {main.timing_year}"
         else:
             text += ", aikataulu auki"

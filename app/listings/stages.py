@@ -74,6 +74,88 @@ def classify_stage(evidence: str | None, timing: str | None, timing_year: int | 
     return "need"
 
 
+# words that a renovation dated in an earlier year is still going on
+_ONGOING = re.compile(r"\b(kaynnissa|aloitettu|alkanut|alkoi|jatkuu|jatketaan|kesken|etenee|parhaillaan|valmistuu)")
+# a year this far back without "going on" words is too old to be a target
+PAST_YEARS_KEPT = 1
+
+
+def is_ongoing(renovation) -> bool:
+    text = fold(" ".join(p for p in (getattr(renovation, "evidence", None), getattr(renovation, "timing", None)) if p))
+    return bool(_ONGOING.search(text))
+
+
+def possibly_done(renovation, now=None) -> bool:
+    """Dated in an earlier year with nothing saying it is still going on:
+    may well be done already ("mahdollisesti jo tehty")."""
+    from datetime import datetime, timezone
+
+    year = getattr(renovation, "timing_year", None)
+    current = (now or datetime.now(timezone.utc)).year
+    return bool(year and year < current and not is_ongoing(renovation))
+
+
+def too_old(renovation, now=None) -> bool:
+    """Dated more than PAST_YEARS_KEPT years back and not going on: no target."""
+    from datetime import datetime, timezone
+
+    year = getattr(renovation, "timing_year", None)
+    current = (now or datetime.now(timezone.utc)).year
+    return bool(year and year < current - PAST_YEARS_KEPT and not is_ongoing(renovation))
+
+
+# notes the AI wrote to itself ("Tarkista onko jo tehty."), not words of the listing
+_AI_NOTES = re.compile(
+    r"\s*\(?\b(tarkista|tarkistettava|varmista)\b[^.()]*?(onko|jo tehty|tehty|ajankohta|tieto|tilanne)[^.()]*[.)]?",
+    re.IGNORECASE,
+)
+
+
+def clean_evidence(text: str | None) -> str | None:
+    """The renovation's evidence without the analyser's own reminders."""
+    if not text:
+        return text
+    cleaned = re.sub(r"\s+([.,;])", r"\1", " ".join(_AI_NOTES.sub(" ", text).split())).strip()
+    return cleaned or text.strip()
+
+
+def backfill_stages(limit: int = 2000) -> int:
+    """Store the stage of renovations saved before the column (scheduler), so
+    reports and the Datan laatu page can count on it."""
+    from app.extensions import db
+    from app.listings.models import ListingRenovation
+
+    rows = ListingRenovation.query.filter(ListingRenovation.stage.is_(None)).limit(limit).all()
+    for row in rows:
+        row.stage = classify_stage(row.evidence, row.timing, row.timing_year)
+    if rows:
+        db.session.commit()
+    return len(rows)
+
+
+def clean_old_evidence(limit: int = 500) -> int:
+    """Rows saved before the cleaning (scheduler, `listing_matching`)."""
+    from app.extensions import db
+    from app.listings.models import ListingRenovation
+
+    rows = (
+        ListingRenovation.query.filter(
+            ListingRenovation.evidence.ilike("%tarkist%") | ListingRenovation.evidence.ilike("%varmista%")
+        )
+        .limit(limit)
+        .all()
+    )
+    changed = 0
+    for row in rows:
+        cleaned = clean_evidence(row.evidence)
+        if cleaned != row.evidence:
+            row.evidence = cleaned
+            changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
 def renovation_stage(renovation) -> str:
     """The stored stage, or read from the renovation when not stored yet."""
     stage = getattr(renovation, "stage", None)

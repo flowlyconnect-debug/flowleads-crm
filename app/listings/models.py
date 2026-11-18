@@ -26,7 +26,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.extensions import db
 
@@ -139,6 +139,20 @@ class Listing(db.Model):
     )
     # the taloyhtiö across sources and its combined outlook (housing_registry, forecast)
     housing: Mapped["HousingCompany | None"] = relationship("HousingCompany", foreign_keys=[housing_id])
+    # phone numbers and e-mails put in one form (app/listings/normalize.py); NULL = rows from before
+    contacts_normalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @validates("isannoitsija_puh", "hallitus_pj_puh", "huoltoyhtio_puh")
+    def _normalize_phone(self, _key, value):
+        from app.listings.normalize import normalize_phone
+
+        return normalize_phone(value)
+
+    @validates("isannoitsija_email", "hallitus_pj_email", "huoltoyhtio_email")
+    def _normalize_email(self, _key, value):
+        from app.listings.normalize import normalize_email
+
+        return normalize_email(value)
 
     @property
     def source_ref(self) -> str:
@@ -171,6 +185,12 @@ class ListingRenovation(db.Model):
     stage: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     listing: Mapped[Listing] = relationship("Listing", back_populates="renovations")
+
+    @validates("evidence")
+    def _clean_evidence(self, _key, value):
+        from app.listings.stages import clean_evidence
+
+        return clean_evidence(value)
 
     @property
     def is_estimate(self) -> bool:

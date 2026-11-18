@@ -25,6 +25,7 @@ from app.listings.housing import (
 )
 from app.listings.contacts import company_contacts, office_dict, office_key, offices_for
 from app.listings.models import Listing, ListingMatch
+from app.listings.normalize import manager_key
 from app.listings.services import _norm
 from app.listings.target_services import _visible_match_ids, organization_wanted_types
 
@@ -114,7 +115,7 @@ def _companies(organization_id: int, *, leads_only: bool = False) -> "OrderedDic
         if match.status == "pending":
             company["pending_match_ids"].append(match.id)
         if (listing.isannoitsija or "").strip():
-            company["managers"].setdefault(_norm(listing.isannoitsija), listing.isannoitsija.strip())
+            company["managers"].setdefault(manager_key(listing.isannoitsija), listing.isannoitsija.strip())
 
     leads = {}
     if lead_ids:
@@ -164,7 +165,7 @@ def list_managers(organization_id: int, search: str | None = None, *, leads_only
     managers: dict[str, dict] = {}
 
     def entry(name: str) -> dict:
-        key = _norm(name)
+        key = manager_key(name)
         return managers.setdefault(
             key,
             {
@@ -237,7 +238,7 @@ def list_managers(organization_id: int, search: str | None = None, *, leads_only
 
 
 def get_manager(organization_id: int, name: str, *, leads_only: bool = False) -> dict | None:
-    key = _norm(name)
+    key = manager_key(name)
     for manager in list_managers(organization_id, leads_only=leads_only):
         if manager["key"] == key:
             return manager
@@ -270,7 +271,7 @@ def _card(company: dict) -> dict:
     manager_contacts = []
     offices = offices_for(company["managers"].values())
     for key, name in company["managers"].items():
-        same = [l for l in listings if _norm(l.isannoitsija) == key]
+        same = [l for l in listings if manager_key(l.isannoitsija) == key]
         source = next((l for l in same if l.has_contact), same[0] if same else None)
         office = office_dict(offices.get(office_key(name)))
         manager_contacts.append(

@@ -120,7 +120,7 @@ def test_transfer_creates_lead_and_removes_target(app):
         lead = Lead.query.filter_by(organization_id=org.id).one()
         assert lead.id == result["lead_ids"][0]
         assert lead.source_ref == "oikotie-1"
-        assert lead.title == "Isännöitsijä: Isännöinti Oy" and lead.phone == "0401234567"
+        assert lead.title == "Isännöitsijä: Isännöinti Oy" and lead.phone == "040 123 4567"
         assert lead.company == db.session.get(ListingMatch, first.id).listing.taloyhtio
         assert db.session.get(ListingMatch, first.id).status == "lead_created"
         assert targets.count_targets(org.id) == 1

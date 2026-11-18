@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import settings_nav with context %}
+{% block title %}Datan laatu — Hallinta{% endblock %}
+{% set level_class = {'ok': 'badge-neutral', 'warn': 'badge-warning-alt', 'bad': 'badge-danger'} %}
+{% set level_label = {'ok': 'Hyvä', 'warn': 'Kohtalainen', 'bad': 'Heikko'} %}
+{% block content %}
+<div class="settings-page">
+  <div class="settings-layout">
+    {{ settings_nav('data_quality') }}
+    <div class="settings-content">
+      <div class="settings-panel settings-panel--wide">
+        <header class="settings-panel__header">
+          <h1 class="settings-panel__title">Datan laatu</h1>
+          <p class="settings-panel__subtitle">
+            Kuinka täydellistä ja siistiä kohdekatalogin data on. Yhteystiedot lasketaan asiakkaiden kohteista,
+            muu koko katalogista. Jokaisella rivillä lukee, miksi asia on tärkeä ja mikä sen korjaa.
+          </p>
+        </header>
+
+        {% if problems %}
+        <div class="announcement-warning" role="status">
+          <strong>Keruuputken ongelmat</strong> (näistä lähtee myös sähköpostihälytys):
+          <ul class="activity-rules">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+
+        <dl class="activity-stats">
+          <div><dt>Ilmoituksia</dt><dd>{{ quality.total }}</dd></div>
+          <div><dt>Asiakkaiden kohteissa</dt><dd>{{ quality.shown_total }}</dd></div>
+          <div><dt>Remontteja</dt><dd>{{ quality.renovation_total }}</dd></div>
+          <div><dt>Heikkoja kohtia</dt><dd>{{ quality.issues }}</dd></div>
+        </dl>
+        <p class="text-sm text-muted">
+          Lähteet: {% for source, count in quality.pipeline.sources %}{{ source }} {{ count }}{% if not loop.last %}, {% endif %}{% endfor %}.
+          Viimeisin analyysi {{ (quality.pipeline.last_analysis|helsinki).strftime('%d.%m.%Y %H.%M') if quality.pipeline.last_analysis else 'ei koskaan' }},
+          viimeisin yhteystietohaku {{ (quality.pipeline.last_contact|helsinki).strftime('%d.%m.%Y %H.%M') if quality.pipeline.last_contact else 'ei koskaan' }}.
+          Analyysijonossa {{ quality.pipeline.analysis_pending }}, epäonnistuneita {{ quality.pipeline.analysis_failed }}.
+        </p>
+
+        {% for section in quality.sections %}
+        <h2 class="form-section-title">{{ section.title }}</h2>
+        <div class="table-scroll">
+        <table class="activity-table">
+          <thead><tr><th>Mittari</th><th class="num">Määrä</th><th class="num">Osuus</th><th>Taso</th><th>Miksi ja mikä korjaa</th></tr></thead>
+          <tbody>
+            {% for row in section.rows %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td class="num mono">{{ row.count }}/{{ row.total }}</td>
+              <td class="num mono">{{ row.percent }} %</td>
+              <td><span class="badge {{ level_class[row.level] }}">{{ level_label[row.level] }}</span></td>
+              <td class="text-sm">{{ row.why }}{% if row.fix %} <span class="text-muted">Korjaus: {{ row.fix }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
