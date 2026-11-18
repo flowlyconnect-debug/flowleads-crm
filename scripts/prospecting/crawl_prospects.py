@@ -125,7 +125,7 @@ def domain_guesses(names: list[str]) -> list[str]:
                     d = c + tld
                     if d not in out:
                         out.append(d)
-    return out[:10]
+    return out[:8]
 
 
 def clean_phone(p: str) -> str:
@@ -255,8 +255,8 @@ class Crawler:
         self.last_hit = 0
         self.stale_clients: list[httpx.AsyncClient] = []
         self.dns_client = httpx.AsyncClient(timeout=httpx.Timeout(6),
-                                            limits=httpx.Limits(max_connections=20))
-        self.dns_sem = asyncio.Semaphore(20)
+                                            limits=httpx.Limits(max_connections=48))
+        self.dns_sem = asyncio.Semaphore(48)
         self.web_sem = asyncio.Semaphore(150)
 
     # ---------- PRH ----------
@@ -371,10 +371,8 @@ class Crawler:
             host = urlparse(url).hostname or ""
             hosts.append(host[4:] if host.startswith("www.") else host)
         checks = await asyncio.gather(*(self.resolves(h) for h in hosts))
-        www_checks = await asyncio.gather(*(self.resolves("www." + h) if not ok else asyncio.sleep(0, True)
-                                            for h, ok in zip(hosts, checks)))
-        for url, ok, wok in zip(cands, checks, www_checks):
-            if not (ok or wok):
+        for url, ok in zip(cands, checks):
+            if not ok:
                 continue
             got = await self.fetch(url) or await self.fetch(url.replace("https://", "https://www.", 1)) \
                 or await self.fetch(url.replace("https://", "http://", 1))
@@ -496,8 +494,8 @@ class Crawler:
         if True:
             try:
                 res = await asyncio.wait_for(self.scrape(co), timeout=60)
-            except RuntimeError:
-                return  # DNS-palvelu ei vastannut: ei merkitä käsitellyksi, yritetään seuraavalla ajolla
+            except (RuntimeError, asyncio.TimeoutError, TimeoutError):
+                return  # DNS ei vastannut / aikakatkaisu: ei merkitä käsitellyksi, yritetään seuraavalla ajolla
             except Exception:
                 res = None
             self.done.add(co["y_tunnus"])
