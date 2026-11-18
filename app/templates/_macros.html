@@ -42,7 +42,7 @@
   {{ plain_link('admin.registry_status', 'registry', 'Julkiset rekisterit') }}
   {{ plain_link('admin.housing_status', 'housing', 'Taloyhtiöt') }}
   {{ plain_link('admin.customer_activity_page', 'activity', 'Asiakasseuranta') }}
-  {{ plain_link('admin.announcements_page', 'announcements', 'Asiakastiedotteet') }}
+  {% if config.get('ANNOUNCEMENTS_ENABLED', True) %}{{ plain_link('admin.announcements_page', 'announcements', 'Asiakastiedotteet') }}{% endif %}
 
   {# Organization-scoped settings need a chosen organization. #}
   {% if use_org %}

@@ -49,6 +49,9 @@ class Organization(db.Model):
     # NULL = TARGETS_VISIBLE_LIMIT / TARGETS_MIN_TIER.
     targets_visible_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     targets_min_tier: Mapped[str | None] = mapped_column(String(1), nullable=True)
+    # lead rows the customer may export a day (app/core/export_limits.py);
+    # NULL = EXPORT_DAILY_ROWS, 0 = no limit
+    export_daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

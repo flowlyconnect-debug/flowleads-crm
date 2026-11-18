@@ -644,7 +644,9 @@ def _best_renovation(
     now = now or _now()
     wanted = set(profile.wanted_types)
     limit_year = None
-    if profile.timing_within_years is not None:
+    from flask import current_app
+
+    if profile.timing_within_years is not None and current_app.config.get("PROFILE_TIMING_WINDOW_ENABLED", True):
         limit_year = now.year + int(profile.timing_within_years)
     from app.listings.housing import company_outlook
 

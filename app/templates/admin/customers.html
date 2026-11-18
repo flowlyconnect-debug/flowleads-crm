@@ -90,6 +90,14 @@
                   </select>
                   <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
                 </form>
+                <form method="post" action="{{ url_for('admin.set_customer_export_limit_route', organization_id=row.org.id) }}" class="customer-sub-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="text-sm" for="export-{{ row.org.id }}">Vientiraja / päivä (tyhjä = {{ config.get('EXPORT_DAILY_ROWS', 200) }}, 0 = ei rajaa)</label>
+                  <input type="number" min="0" max="100000" step="50" name="export_limit" id="export-{{ row.org.id }}"
+                         value="{{ row.org.export_daily_limit if row.org.export_daily_limit is not none else '' }}"
+                         placeholder="{{ config.get('EXPORT_DAILY_ROWS', 200) }}" class="form-input form-input--compact" style="width:5.5rem;">
+                  <button type="submit" class="btn btn-secondary btn-sm">Tallenna</button>
+                </form>
                 <form method="post" action="{{ url_for('admin.set_customer_targets_route', organization_id=row.org.id) }}" class="customer-sub-form"
                       data-name="{{ row.org.name }}"
                       {% if row.org.targets_enabled %}onsubmit="return confirm('Otetaanko kohteiden käyttö pois asiakkaalta ' + this.dataset.name + '? Asiakas näkee kohteiden määrän, mutta ei pääse kohteisiin. Liidit säilyvät.');"{% endif %}>

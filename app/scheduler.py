@@ -372,6 +372,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 db.session.rollback()
                 logger.exception("Target digest failed")
 
+    def run_activity_alerts():
+        """Superadmins hear of customers that turned "Tarkista" on Asiakasseuranta."""
+        with app.app_context():
+            from app.admin.activity_services import send_activity_alerts
+            from app.extensions import db
+
+            try:
+                count = send_activity_alerts()
+                if count:
+                    logger.info("Activity alerts: %s customer(s) flagged", count)
+            except Exception:
+                db.session.rollback()
+                logger.exception("Activity alerts failed")
+
     def run_monthly_report():
         """Last month's results to each customer's admins (1st of the month)."""
         with app.app_context():
@@ -595,6 +609,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
         run_listing_retention,
         CronTrigger(hour=3, minute=30, timezone="UTC"),
         id="listing_retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_activity_alerts,
+        CronTrigger(hour=8, minute=10, timezone="Europe/Helsinki"),
+        id="activity_alerts",
         replace_existing=True,
     )
     scheduler.add_job(

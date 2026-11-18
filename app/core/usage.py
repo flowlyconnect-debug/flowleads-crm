@@ -60,7 +60,9 @@ def track(
     their organization (or `organization_id`, e.g. an API key's)."""
     from app.admin.models import UsageDaily
 
-    if metric not in METRICS or amount <= 0:
+    from flask import current_app
+
+    if metric not in METRICS or amount <= 0 or not current_app.config.get("USAGE_TRACKING_ENABLED", True):
         return
     user = _current_user()
     if user is not None and getattr(user, "is_superadmin", lambda: False)():

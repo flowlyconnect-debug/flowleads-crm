@@ -169,6 +169,12 @@ def export_file(provider: str):
     else:
         query = Lead.query.options(joinedload(Lead.stage))
         leads = LeadService._apply_filters(query, organization_id, _filters_from_request()).all()
+    from app.core.export_limits import check_export
+
+    reason = check_export(current_user, organization_id, len(leads), kind="crm_file")
+    if reason:
+        flash(reason, "warning")
+        return redirect(url_for("leads.list_leads", **org_query_suffix(organization_id)))
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     from app.core.usage import track
 
@@ -189,6 +195,12 @@ def export_file(provider: str):
 
 
 def _push(organization_id: int, provider: str, leads):
+    from app.core.export_limits import check_export
+
+    reason = check_export(current_user, organization_id, len(leads), kind="crm_push")
+    if reason:
+        flash(reason, "warning")
+        return None
     try:
         result = push_leads(organization_id, provider, leads)
     except CrmExportError as exc:

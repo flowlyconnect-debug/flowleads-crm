@@ -150,3 +150,62 @@ def test_activity_pages_are_superadmin_only(app, client):
     detail = client.get(f"/admin/activity/{org_id}").get_data(as_text=True)
     assert "Kohteet-sivu" in detail and "admin-sivu@test.com" in detail
     assert client.get("/admin/activity/999999").status_code == 404
+
+
+def test_tracking_switch(app):
+    with app.app_context():
+        org, user = _org("pois")
+        app.config["USAGE_TRACKING_ENABLED"] = False
+        try:
+            track("targets_view", organization_id=org.id, user_id=user.id)
+        finally:
+            app.config["USAGE_TRACKING_ENABLED"] = True
+        assert UsageDaily.query.filter_by(organization_id=org.id).count() == 0
+
+
+def _flag(org, user):
+    track("leads_exported", 80, organization_id=org.id, user_id=user.id)
+    track("company_card_view", 400, organization_id=org.id, user_id=user.id)
+
+
+def test_daily_alert_mails_superadmins_once(app):
+    from unittest.mock import patch
+
+    from app.admin.activity_services import send_activity_alerts
+    from app.users.models import AuditLog
+
+    with app.app_context():
+        org, user = _org("halytys")
+        calm, calm_user = _org("rauhallinen")
+        track("targets_view", 5, organization_id=calm.id, user_id=calm_user.id)
+        create_user("root-halytys@test.com", PASSWORD, role="superadmin")
+        db.session.commit()
+        _flag(org, user)
+        with patch("app.email.services._mailgun_send", return_value=(True, "<id>", None)) as send:
+            assert send_activity_alerts() == 1
+            to = {c.kwargs["to_email"] for c in send.call_args_list}
+            assert "root-halytys@test.com" in to and "admin-halytys@test.com" not in to
+            body = send.call_args.kwargs["body_text"]
+            assert "Asiakas halytys" in body and "Vie liidejä ulos" in body and "rauhallinen" not in body
+            # the same signals again: no second mail
+            send.reset_mock()
+            assert send_activity_alerts() == 0 and not send.called
+        assert AuditLog.query.filter_by(organization_id=org.id, action="activity_alert_sent").count() == 1
+
+
+def test_alert_switch(app):
+    from unittest.mock import patch
+
+    from app.admin.activity_services import send_activity_alerts
+
+    with app.app_context():
+        org, user = _org("halytyspois")
+        create_user("root-pois@test.com", PASSWORD, role="superadmin")
+        db.session.commit()
+        _flag(org, user)
+        app.config["ACTIVITY_ALERTS_ENABLED"] = False
+        try:
+            with patch("app.email.services._mailgun_send") as send:
+                assert send_activity_alerts() == 0 and not send.called
+        finally:
+            app.config["ACTIVITY_ALERTS_ENABLED"] = True

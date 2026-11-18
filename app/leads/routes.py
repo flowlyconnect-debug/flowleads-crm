@@ -27,6 +27,7 @@ from app.leads.permissions import (
     validate_assignment,
 )
 from app.leads.services import LeadService, LeadServiceError, get_default_stage, get_lead_for_org
+from app.core.tenant import org_query_suffix
 from app.tasks.forms import TaskForm
 from app.tasks.services import TaskService, TaskServiceError
 from app.users.models import User
@@ -267,6 +268,10 @@ def list_leads():
     filter_form.assigned_to.coerce = lambda v: int(v) if v not in (None, "", 0) else 0
 
     bulk_form = BulkActionForm()
+    from app.core.export_limits import user_may_export
+
+    if not user_may_export():
+        bulk_form.action.choices = [c for c in bulk_form.action.choices if c[0] != "export"]
     bulk_form.stage_id.choices = [(s.id, stage_label_fi(s.name)) for s in stages]
     bulk_form.assigned_to.choices = [(u.id, u.email) for u in users]
     # a seller only gets the actions the server accepts from them (assigning
@@ -1003,12 +1008,30 @@ def import_leads_template():
     )
 
 
+def _csv_rows(csv_data: str) -> int:
+    return max(0, len([line for line in (csv_data or "").splitlines() if line.strip()]) - 1)
+
+
+def _export_refused(organization_id: int, csv_data: str, kind: str):
+    """A redirect back to the lead list with the reason, when the export is
+    not allowed (admins only, daily limit: app/core/export_limits.py)."""
+    from app.core.export_limits import check_export
+
+    reason = check_export(current_user, organization_id, _csv_rows(csv_data), kind=kind)
+    if not reason:
+        return None
+    if request.is_json:
+        return json_error("export_limit", reason, 403)
+    flash(reason, "warning")
+    return redirect(url_for("leads.list_leads", **org_query_suffix(organization_id)))
+
+
 def _record_export(organization_id: int, csv_data: str, mode: str) -> None:
     """A CSV download of leads: counted for Asiakasseuranta and kept in the audit log."""
     from app.core.audit import log_audit
     from app.core.usage import track
 
-    rows = max(0, len([line for line in (csv_data or "").splitlines() if line.strip()]) - 1)
+    rows = _csv_rows(csv_data)
     log_audit(
         "leads_exported",
         user_id=current_user.id,
@@ -1025,6 +1048,9 @@ def export_leads():
     organization_id = resolve_organization_id()
     filters = _filters_from_request()
     csv_data = LeadService.export_csv(organization_id, filters)
+    refused = _export_refused(organization_id, csv_data, "csv")
+    if refused:
+        return refused
     _record_export(organization_id, csv_data, "filter")
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return Response(
@@ -1080,6 +1106,9 @@ def bulk_action():
     try:
         result = LeadService.bulk_action(action, lead_ids, organization_id, current_user.id, payload)
         if action == "export":
+            refused = _export_refused(organization_id, result["csv"], "csv")
+            if refused:
+                return refused
             _record_export(organization_id, result["csv"], "selected")
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             return Response(

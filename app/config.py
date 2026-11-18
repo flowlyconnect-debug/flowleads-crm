@@ -150,6 +150,19 @@ class Config:
     # Publish the signals as "Ennuste" targets (app/registry/publish.py). Even then only
     # organizations with the "registry_targets" module see them (/admin/customers).
     REGISTRY_TARGETS_PUBLISH = os.environ.get("REGISTRY_TARGETS_PUBLISH", "false").lower() in ("1", "true", "yes")
+    # Off switches for the 18.11.2026 release: each part turns off with one Render
+    # environment variable, no new deploy (docs/TUOTANTOON_VIENTI_TILANNE.md "Kytkimet").
+    # The profile's timing window ("alkaa viimeistään"); off = every year shows
+    PROFILE_TIMING_WINDOW_ENABLED = os.environ.get("PROFILE_TIMING_WINDOW_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Asiakasseuranta's counters (app/core/usage.py)
+    USAGE_TRACKING_ENABLED = os.environ.get("USAGE_TRACKING_ENABLED", "true").lower() in ("1", "true", "yes")
+    # the daily e-mail to superadmins when a customer turns "Tarkista"
+    ACTIVITY_ALERTS_ENABLED = os.environ.get("ACTIVITY_ALERTS_ENABLED", "true").lower() in ("1", "true", "yes")
+    # lead exports: admins only and at most this many rows a day per customer
+    EXPORT_LIMITS_ENABLED = os.environ.get("EXPORT_LIMITS_ENABLED", "true").lower() in ("1", "true", "yes")
+    EXPORT_DAILY_ROWS = int(os.environ.get("EXPORT_DAILY_ROWS", "200"))
+    # Asiakastiedotteet (superadmin e-mails to customers)
+    ANNOUNCEMENTS_ENABLED = os.environ.get("ANNOUNCEMENTS_ENABLED", "true").lower() in ("1", "true", "yes")
     # also publish buildings with no linked housing company (otherwise: permits only)
     REGISTRY_PUBLISH_UNLINKED = os.environ.get("REGISTRY_PUBLISH_UNLINKED", "false").lower() in ("1", "true", "yes")
     # Kohteet map (app/listings/geo.py). Tiles: any XYZ tile server; the default

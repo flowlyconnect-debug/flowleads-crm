@@ -236,7 +236,7 @@
         </div>
       </section>
 
-      {% set crm_connected = crm_providers_for(organization_id) %}
+      {% set crm_connected = crm_providers_for(organization_id) if can_export() else [] %}
       {% if crm_connected %}
       {% set crm_links = crm_links_for(lead.id) %}
       <section class="card mt-4 lead-crm-export" aria-label="Vienti omaan CRM:ään">

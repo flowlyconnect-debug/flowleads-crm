@@ -30,13 +30,16 @@ _PLANNING_UNDER_WAY = re.compile(
     r"\b((hanke)?suunnittelu|kuntotutkimu\w*|kuntoarvi\w*|(tarve|esi)?selvity\w*|suunnitelman laadinta)"
     r"( \w+){0,2} (on )?(kaynnissa|aloitettu|alkanut|tilattu|kaynnistetty|valmistuu)"
     # approving the design or a survey is not yet deciding the renovation
-    r"|\b(hyvaksyi|hyvaksytty|paatti|paatetty|paatettiin)( \w+){0,2} "
+    # ("paatti aloittaa parveke- ja ikkunaremontin suunnittelun", "valtuutti hallituksen tilaamaan kuntotutkimuksen")
+    r"|\b(hyvaksyi|hyvaksytty|paatti|paattanyt|paatetty|paatettiin|valtuutti|valtuuttanut)( [\w-]+){0,4} "
     r"((hanke)?suunnittelu|kuntotutkimukse|kuntoarvio|selvitykse|tilata)\w*"
 )
 _DECIDED = re.compile(
     r"\b("
     r"paatetty|paatti|paattanyt|paatos tehty|paatoksen|paatettiin|"
     r"hyvaksytty|hyvaksyi|hyvaksynyt|"
+    # the meeting gave the board the go-ahead to order the work
+    r"valtuutti|valtuuttanut|valtuutettu|"
     r"urakoitsija (on )?valittu|urakoitsijaksi valittiin|urakkasopimus|"
     r"kilpailutettu|kilpailutus (on )?kaynnissa|kilpailutetaan|tarjouspyynnot|"
     r"(\w*remontti|\w*korjaus|\w*saneeraus|tyot|urakka) (on |ovat )?(kaynnissa|alkanut|alkavat|alkaa|aloitettu|aloitetaan)|"

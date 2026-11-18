@@ -291,7 +291,7 @@ def customer_activity_detail(organization_id: int, *, days: int = 30, now: datet
     ]
     watched = (
         "login_success", "login_failed", "leads_exported", "crm_export", "crm_file_exported", "targets_transferred",
-        "gdpr_data_exported", "leads_imported", "crm_connected",
+        "gdpr_data_exported", "leads_imported", "crm_connected", "export_blocked",
     )
     events = (
         AuditLog.query.filter(AuditLog.organization_id == organization_id, AuditLog.action.in_(watched))
@@ -312,6 +312,7 @@ EVENT_LABELS = {
     "gdpr_data_exported": "Latasi organisaation tiedot",
     "leads_imported": "Toi liidejä",
     "crm_connected": "Yhdisti CRM:n",
+    "export_blocked": "Vienti estettiin (raja tai rooli)",
 }
 
 
@@ -324,3 +325,95 @@ def event_detail(event) -> str:
     if event.action == "crm_export":
         return f"{meta.get('provider', '')}: {meta.get('created', 0)} uutta, {meta.get('updated', 0)} päivitetty"
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Daily alert to superadmins (scheduler job `activity_alerts`)
+# ---------------------------------------------------------------------------
+
+ALERT_REPEAT_DAYS = 14  # the same signals of a customer are mailed again after this long
+
+
+def _last_alert_signals(organization_id: int, since: datetime) -> set[str] | None:
+    from app.users.models import AuditLog
+
+    last = (
+        AuditLog.query.filter(
+            AuditLog.organization_id == organization_id,
+            AuditLog.action == "activity_alert_sent",
+            AuditLog.created_at >= since,
+        )
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    return set((last.metadata_json or {}).get("signals") or []) if last is not None else None
+
+
+def send_activity_alerts(*, now: datetime | None = None) -> int:
+    """Mail every active superadmin about customers that turned "Tarkista"
+    (two or more signals over the last 30 days). A customer is mailed again
+    only when its signals change or after ALERT_REPEAT_DAYS. Returns the
+    customers in the e-mail."""
+    import html
+
+    from flask import current_app, url_for
+
+    from app.core.audit import log_audit
+    from app.email.services import _mailgun_send, email_sending_enabled
+    from app.users.models import User
+
+    if not current_app.config.get("ACTIVITY_ALERTS_ENABLED", True) or not email_sending_enabled():
+        return 0
+    now = now or datetime.now(timezone.utc)
+    flagged = []
+    for row in customer_activity(days=30, now=now):
+        if row["level"] != "check" or not row["org"].is_active:
+            continue
+        keys = {s.key for s in row["signals"]}
+        if _last_alert_signals(row["org"].id, now - timedelta(days=ALERT_REPEAT_DAYS)) == keys:
+            continue
+        flagged.append((row, keys))
+    if not flagged:
+        return 0
+    recipients = [u.email for u in User.query.filter_by(role="superadmin", is_active=True).all() if u.email]
+    if not recipients:
+        return 0
+    base = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+    items_html, items_text = [], []
+    for row, _keys in flagged:
+        link = f"{base}/admin/activity/{row['org'].id}" if base else f"/admin/activity/{row['org'].id}"
+        reasons = "".join(f"<li>{html.escape(s.title)}: {html.escape(s.detail)}</li>" for s in row["signals"])
+        items_html.append(f"<h3 style='margin:16px 0 4px;'>{html.escape(row['org'].name)}</h3><ul>{reasons}</ul>"
+                          f"<p><a href='{html.escape(link)}'>Avaa asiakasseuranta</a></p>")
+        items_text.append(row["org"].name + "\n" + "\n".join(f"- {s.title}: {s.detail}" for s in row["signals"]) + f"\n{link}")
+    count = len(flagged)
+    subject = f"FlowLeads: {count} {'asiakas' if count == 1 else 'asiakasta'} tarkistettavana asiakasseurannassa"
+    body_html = (
+        "<div style='font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#172033;max-width:640px;'>"
+        "<p>Näillä asiakkailla on asiakasseurannassa kaksi tai useampi merkki viimeisen 30 päivän ajalta. "
+        "Merkit ovat syitä katsoa tarkemmin, eivät tuomioita.</p>"
+        + "".join(items_html)
+        + "</div>"
+    )
+    body_text = "Tarkistettavat asiakkaat (30 pv):\n\n" + "\n\n".join(items_text)
+    from_name = current_app.config.get("MAILGUN_FROM_NAME") or "FlowLeads"
+    from_email = current_app.config.get("MAILGUN_FROM_EMAIL") or ""
+    sent = False
+    for email in recipients:
+        ok, _id, _error = _mailgun_send(
+            to_email=email, subject=subject, body_html=body_html, body_text=body_text,
+            from_name=from_name, from_email=from_email,
+        )
+        sent = sent or ok
+    if not sent:
+        return 0
+    for row, keys in flagged:
+        log_audit(
+            "activity_alert_sent",
+            organization_id=row["org"].id,
+            target_type="organization",
+            target_id=row["org"].id,
+            metadata={"signals": sorted(keys)},
+        )
+    db.session.commit()
+    return count

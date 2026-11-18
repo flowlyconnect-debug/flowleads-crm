@@ -173,3 +173,14 @@ def test_onboarding_gives_the_default_window(app):
             regions=["Uusimaa"], remonttityyppi=PIPE,
         )
         assert result.search_profile.timing_within_years == DEFAULT_TIMING_YEARS
+
+
+def test_the_window_switch_turns_the_window_off(app, production):
+    with app.app_context():
+        app.config["PROFILE_TIMING_WINDOW_ENABLED"] = False
+        try:
+            org, _ = _org("kytkin")
+            _target(1, "Yhtiökokous päätti putkiremontista.", NOW.year + DEFAULT_TIMING_YEARS + 3)
+            assert targets.count_targets(org.id) == 1
+        finally:
+            app.config["PROFILE_TIMING_WINDOW_ENABLED"] = True

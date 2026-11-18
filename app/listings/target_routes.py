@@ -346,7 +346,10 @@ def _profile_rule(profiles, wanted_types) -> dict:
 
     active = [p for p in profiles if p.is_active]
     windows = [p.timing_within_years for p in active]
-    until = None if not active or any(w is None for w in windows) else _now().year + max(windows)
+    from flask import current_app
+
+    window_on = current_app.config.get("PROFILE_TIMING_WINDOW_ENABLED", True)
+    until = None if not window_on or not active or any(w is None for w in windows) else _now().year + max(windows)
     return {"types": sorted(wanted_types or []), "until": until}
 
 

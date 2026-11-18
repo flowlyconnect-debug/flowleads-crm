@@ -92,6 +92,41 @@ def set_customer_targets_route(organization_id: int):
     return redirect(url_for("admin.customers_list"))
 
 
+@admin_bp.route("/customers/<int:organization_id>/export-limit", methods=["POST"])
+@login_required
+@require_role("superadmin")
+@require_2fa
+def set_customer_export_limit_route(organization_id: int):
+    """Lead rows the customer may export a day (app/core/export_limits.py);
+    empty = the default (EXPORT_DAILY_ROWS), 0 = no limit."""
+    from app.core.audit import log_audit
+    from app.users.models import Organization
+
+    organization = db.session.get(Organization, organization_id)
+    if organization is None:
+        abort(404)
+    raw = (request.form.get("export_limit") or "").strip()
+    try:
+        limit = None if raw == "" else max(0, min(100000, int(raw)))
+    except ValueError:
+        flash("Anna vientiraja numerona.", "danger")
+        return redirect(url_for("admin.customers_list"))
+    organization.export_daily_limit = limit
+    log_audit(
+        "customer_export_limit_changed",
+        user_id=current_user.id,
+        organization_id=organization.id,
+        target_type="organization",
+        target_id=organization.id,
+        metadata={"limit": limit},
+    )
+    db.session.commit()
+    default = current_app.config.get("EXPORT_DAILY_ROWS", 200)
+    shown = f"oletus {default}" if limit is None else ("ei rajaa" if limit == 0 else str(limit))
+    flash(f"{organization.name}: liidien vientiraja {shown} riviä päivässä.", "success")
+    return redirect(url_for("admin.customers_list"))
+
+
 @admin_bp.route("/customers/<int:organization_id>/targets-visibility", methods=["POST"])
 @login_required
 @require_role("superadmin")
@@ -256,6 +291,12 @@ AUDIT_ACTION_LABELS_FI = {
     "source_activated": "Hakuprofiili aktivoitu",
     "catalogue_import": "Kohteita tuotu katalogiin",
     "customer_targets_visibility_changed": "Asiakkaan näkyvät kohteet muutettu",
+    "customer_export_limit_changed": "Asiakkaan vientiraja muutettu",
+    "export_blocked": "Liidien vienti estetty (raja tai rooli)",
+    "leads_exported": "Liidejä viety CSV:nä",
+    "crm_file_exported": "CRM-tuontitiedosto ladattu",
+    "announcement_sent": "Asiakastiedote lähetetty",
+    "activity_alert_sent": "Asiakasseurannan hälytys lähetetty",
     "catalogue_offices_import": "Isännöintitoimistoja tuotu",
     "catalogue_alert_sent": "Katalogihälytys lähetetty",
     "account_email_sent": "Tiliviesti lähetetty (kutsu / salasana)",
@@ -952,6 +993,8 @@ def announcements_page():
     from app.email.services import email_sending_enabled
     from app.users.models import Organization
 
+    if not current_app.config.get("ANNOUNCEMENTS_ENABLED", True):
+        abort(404)
     form = {
         "subject": (request.form.get("subject") or "").strip(),
         "body": request.form.get("body") or "",

@@ -120,3 +120,16 @@ def test_a_customer_admin_cannot_send(app, client):
     with client.session_transaction() as session:
         session[TWO_FA_SESSION_KEY] = True
     assert client.get("/admin/announcements").status_code in (302, 403)
+
+
+def test_announcements_switch(app, client):
+    with app.app_context():
+        _setup()
+    client.post("/auth/login", data={"email": "root-tiedote@test.com", "password": PASSWORD})
+    with client.session_transaction() as session:
+        session[TWO_FA_SESSION_KEY] = True
+    app.config["ANNOUNCEMENTS_ENABLED"] = False
+    try:
+        assert client.get("/admin/announcements").status_code == 404
+    finally:
+        app.config["ANNOUNCEMENTS_ENABLED"] = True
