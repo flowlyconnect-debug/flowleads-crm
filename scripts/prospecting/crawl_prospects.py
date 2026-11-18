@@ -65,7 +65,7 @@ TITLE_RANK = {"toimitusjohtaja": 0, "ceo": 0, "yrittäjä": 1, "omistaja": 1, "o
 FREE_MAIL = ("gmail.com", "outlook.com", "hotmail.com", "luukku.com", "kolumbus.fi",
              "elisanet.fi", "netti.fi", "suomi24.fi", "yahoo.com", "live.com", "icloud.com",
              "saunalahti.fi", "pp.inet.fi", "welho.com", "dnainternet.net", "msn.com")
-BAD_EMAIL_PARTS = ("example", "sentry", "wixpress", "domain.", "yourname", "email.com",
+BAD_EMAIL_PARTS = ("example", "etunimi.etunimi", "firstname.firstname", "sentry", "wixpress", "domain.", "yourname", "email.com",
                    "@sentry", "noreply", "no-reply", ".png", ".jpg", ".webp", ".gif", ".svg")
 NAME_STOP = {"oy", "ab", "ky", "ltd", "oyj", "tmi", "ay", "osk", "ry", "finland", "suomi",
              "group", "the", "ja", "and"}
@@ -132,7 +132,7 @@ def clean_phone(p: str) -> str:
     digits = re.sub(r"[^\d+]", "", p)
     if digits.startswith("00358"):
         digits = "+358" + digits[5:]
-    if digits.startswith("+3580"):
+    while digits.startswith("+3580"):
         digits = "+358" + digits[5:]
     if digits.startswith("0"):
         digits = "+358" + digits[1:]
@@ -169,6 +169,42 @@ def person_from_email(e: str) -> str | None:
     if a in generic or b in generic:
         return None
     return f"{a.capitalize()} {b.capitalize()}"
+
+
+GENERIC_LOCAL = ("info", "myynti", "toimisto", "yhteys", "asiakaspalvelu", "tarjous", "tarjoukset",
+                 "palvelu", "posti", "office", "sales", "contact", "tilaukset")
+
+
+def validate_row(r: dict) -> dict | None:
+    """Final consistency checks; returns the (possibly corrected) row or None."""
+    email = r["sahkoposti"].lower()
+    contact0 = r["yhteyshenkilo"]
+    if email.split("@")[0] in ("etunimi.sukunimi", "firstname.lastname") and " " in contact0 \
+            and "etunimi" not in contact0.lower() and "firstname" not in contact0.lower():
+        fn, ln = (re.sub(r"[^a-z-]", "", norm(x)) for x in contact0.split(" ", 1))
+        email = f"{fn}.{ln}@{email.split('@')[1]}"
+        r["sahkoposti"] = email
+    if any(w in email or w in contact0.lower() for w in ("etunimi", "sukunimi", "firstname", "lastname")):
+        return None
+    if not ok_email(email) or not valid_phone(r["puhelin"]):
+        return None
+    r["puhelin"] = clean_phone(r["puhelin"])
+    contact = r["yhteyshenkilo"]
+    company_toks = set(name_tokens(r["nimi"])) | {t for n in str(r.get("aputoiminimet", "")).split(";")
+                                                  for t in name_tokens(n)}
+    if set(name_tokens(contact)) & company_toks and len(name_tokens(contact)) >= 2 \
+            and set(name_tokens(contact)) <= company_toks | {"oy"}:
+        return None  # "yhteyshenkilö" on yrityksen nimi
+    local = email.split("@")[0]
+    ep = person_from_email(email)
+    if ep and local not in GENERIC_LOCAL:
+        fn, ln = (norm(x) for x in contact.split(" ", 1)) if " " in contact else (norm(contact), "")
+        if not (fn in local and ln[:4] in local):
+            # osoite kuuluu eri henkilölle: käytetään osoitteen henkilöä yhteyshenkilönä
+            r["yhteyshenkilo"], r["titteli"] = ep, ""
+    elif not ep and local not in GENERIC_LOCAL and "@" in email and email.split("@")[1] not in FREE_MAIL:
+        pass
+    return r
 
 
 def page_text(soup: BeautifulSoup) -> str:
@@ -401,7 +437,7 @@ class Crawler:
             fn, ln = (norm(x) for x in contact.split(" ", 1))
             for e in emails:
                 loc = e.split("@")[0]
-                if fn in loc and (ln[:3] in loc or loc.startswith(fn)):
+                if fn in loc and ln[:4] in loc:
                     person_email = e
                     break
         if not contact:
@@ -412,7 +448,7 @@ class Crawler:
                     break
         if not contact:
             return None
-        email = person_email or next((e for e in emails if e.split("@")[0] in ("info", "myynti", "toimisto")), emails[0])
+        email = person_email or next((e for e in emails if e.split("@")[0] in GENERIC_LOCAL), emails[0])
         # puhelin: yhteyshenkilön lähellä oleva numero, muuten ensimmäinen (mieluiten matkapuhelin)
         phone = phones[0]
         idx = all_text.find(contact)
@@ -423,17 +459,17 @@ class Crawler:
                 phone = near[0]
         elif any(is_mobile(p) for p in phones):
             phone = next(p for p in phones if is_mobile(p))
-        return {
+        return validate_row({
             **{k: v for k, v in co.items() if not k.startswith("_")},
             "aputoiminimet": "; ".join(co["aputoiminimet"]),
             "yhteyshenkilo": contact, "titteli": title, "puhelin": phone, "sahkoposti": email,
             "muut_sahkopostit": "; ".join(e for e in emails if e != email)[:300],
             "muut_puhelimet": "; ".join(p for p in phones if p != phone)[:200],
             "verkkosivu": home_url, "domain": site_host,
-        }
+        })
 
     async def handle(self, co: dict) -> None:
-        async with self.sem:
+        if True:
             try:
                 res = await asyncio.wait_for(self.scrape(co), timeout=90)
             except Exception:
@@ -453,23 +489,49 @@ class Crawler:
         self.state["done"] = sorted(self.done)
         self.state_path.write_text(json.dumps(self.state))
 
-    async def run(self, target: int, max_pages: int, window: int = 6) -> None:
-        for line, label in BUSINESS_LINES:
-            page = 1
-            while page <= max_pages and len(self.results) < target:
-                datas = await asyncio.gather(*(self.prh_page(line, p) for p in range(page, page + window)))
-                comps = [c for d in datas for c in d.get("companies", [])]
-                if not comps:
-                    break
-                batch = [p for c in comps if (p := self.parse_company(c, label))
-                         and p["y_tunnus"] not in self.done]
-                await asyncio.gather(*(self.handle(c) for c in batch))
-                self.save_state()
-                print(f"[{label} s.{page}-{page + window - 1}] ehdokkaita {len(batch)}, "
-                      f"hyväksyttyjä yhteensä {len(self.results)}", flush=True)
-                page += window
-            if len(self.results) >= target:
-                break
+    async def run(self, target: int, max_pages: int, workers: int = 60) -> None:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=workers * 4)
+        stop = asyncio.Event()
+        seen = 0
+
+        async def worker() -> None:
+            while True:
+                co = await queue.get()
+                if co is None:
+                    queue.task_done()
+                    return
+                if not stop.is_set():
+                    await self.handle(co)
+                    if len(self.results) >= target:
+                        stop.set()
+                queue.task_done()
+
+        async def producer() -> None:
+            nonlocal seen
+            for line, label in BUSINESS_LINES:
+                for page in range(1, max_pages + 1):
+                    if stop.is_set():
+                        return
+                    data = await self.prh_page(line, page)
+                    comps = data.get("companies", [])
+                    if not comps:
+                        break
+                    for c in comps:
+                        p = self.parse_company(c, label)
+                        if p and p["y_tunnus"] not in self.done:
+                            seen += 1
+                            await queue.put(p)
+                    if page % 5 == 0:
+                        self.save_state()
+                        print(f"[{label} s.{page}] käsitelty {len(self.done)}, "
+                              f"hyväksyttyjä {len(self.results)}", flush=True)
+
+        tasks = [asyncio.create_task(worker()) for _ in range(workers)]
+        await producer()
+        for _ in tasks:
+            await queue.put(None)
+        await asyncio.gather(*tasks)
+        self.save_state()
         await self.client.aclose()
 
 
@@ -498,9 +560,10 @@ def main() -> None:
     if a.exclude and Path(a.exclude).exists():
         exclude = {l.strip().lower() for l in Path(a.exclude).read_text().splitlines() if l.strip()}
     c = Crawler(out, a.concurrency, exclude)
-    asyncio.run(c.run(a.target, a.max_pages))
-    write_csv(list(c.results.values()), out / "prospektit_kaikki.csv")
-    print(f"Valmis: {len(c.results)} prospektia -> {out / 'prospektit_kaikki.csv'}")
+    asyncio.run(c.run(a.target, a.max_pages, a.concurrency))
+    rows = [v for r in c.results.values() if (v := validate_row(dict(r)))]
+    write_csv(rows, out / "prospektit_kaikki.csv")
+    print(f"Valmis: {len(rows)} prospektia -> {out / 'prospektit_kaikki.csv'}")
 
 
 if __name__ == "__main__":
