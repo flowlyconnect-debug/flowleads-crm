@@ -38,20 +38,22 @@ PRH_URL = "https://avoindata.prh.fi/opendata-ytj-api/v3/companies"
 DOH_URL = "https://cloudflare-dns.com/dns-query"
 UA = "Mozilla/5.0 (compatible; FlowLeadsProspector/1.0)"
 
-# Toimialat (TOL 2008, 4 numeroa) tärkeysjärjestyksessä: FlowLeadsin remonttityypit.
+# Toimialat (PRH käyttää TOL 2025 -luokitusta 2026 alkaen; 4 ensimmäistä numeroa) tärkeysjärjestyksessä: FlowLeadsin remonttityypit.
 BUSINESS_LINES = [
     ("4322", "LVI / putkiremontti"),
     ("4321", "Sähkö"),
-    ("4391", "Katto"),
+    ("4341", "Katto"),
     ("4334", "Maalaus / julkisivu"),
-    ("4329", "Eristys / muu asennus"),
-    ("4399", "Muu erikoistunut rakentaminen"),
-    ("4339", "Muu viimeistely"),
-    ("4120", "Rakentaminen / saneeraus"),
-    ("4332", "Rakennuspuusepän asennus"),
+    ("4323", "Eristys"),
+    ("4324", "Muu rakennusasennus"),
+    ("4335", "Muu viimeistely"),
+    ("4342", "Muu erikoistunut talonrakentaminen"),
     ("4311", "Purku / asbesti"),
     ("4331", "Rappaus"),
     ("4333", "Lattia- ja seinäpäällysteet"),
+    ("4332", "Rakennuspuusepän asennus"),
+    ("4399", "Muu erikoistunut rakentaminen"),
+    ("4100", "Rakentaminen / saneeraus"),
     ("8122", "IV-puhdistus / rakennussiivous"),
 ]
 # 16 = Osakeyhtiö, 5 = Kommandiittiyhtiö, 4 = Avoin yhtiö, 14 = Osuuskunta

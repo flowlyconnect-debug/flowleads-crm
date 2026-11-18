@@ -5,9 +5,7 @@ nimen, Y-tunnuksen, yhteyshenkilön, puhelimen ja sähköpostin. Rivi hyväksyt�
 
 ## Mistä tiedot tulevat
 
-1. **PRH / YTJ avoin data** (`avoindata.prh.fi`): yritykset päätoimialan mukaan (LVI 4322, sähkö 4321,
-   katto 4391, maalaus 4334, eristys/muu asennus 4329, muu erikoistunut 4399, viimeistely 4339,
-   rakentaminen 4120, rakennuspuusepät 4332). Mukaan vain toimivat Oy/Ky/Ay/osuuskunnat, ei konkurssi- tai
+1. **PRH / YTJ avoin data** (`avoindata.prh.fi`): yritykset päätoimialan mukaan (TOL 2025: LVI 4322, sähkö 4321, katto 4341, maalaus 4334, eristys 4323, muu asennus 4324, viimeistely 4335/4342, purku 4311, rappaus 4331, lattiat 4333, puusepät 4332, muu erikoistunut 4399, rakentaminen 4100, IV-puhdistus 8122). Mukaan vain toimivat Oy/Ky/Ay/osuuskunnat, ei konkurssi- tai
    selvitystiloja. Toiminimet jätetään pois, koska toiminimi on luonnollinen henkilö ja sähköinen
    suoramarkkinointi hänelle vaatisi ennakkoluvan.
 2. **Verkkosivu**: PRH:n www-kenttä tai nimestä johdettu domain (`.fi`/`.com`), tarkistetaan DNS:stä.
