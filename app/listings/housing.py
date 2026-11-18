@@ -87,6 +87,47 @@ def plain_company_key(listing) -> str | None:
     return f"y:{ytunnus}" if ytunnus else None
 
 
+class OutlookRenovation:
+    """A row of a housing company's combined outlook (HousingRenovation, app/listings/forecast.py)
+    in the shape of a ListingRenovation, so scoring, the PTS strip and the target row read
+    either one."""
+
+    def __init__(self, row):
+        self.remonttityyppi = row.remonttityyppi
+        self.confidence = row.confidence
+        self.timing_year = row.year
+        self.timing = str(row.year) if row.year else None
+        self.stage = row.stage
+        self.is_estimate = bool(row.estimate)
+        self.sources = list(row.sources or [])
+        evidence = row.evidence or []
+        self.evidence = evidence[0]["text"] if evidence and evidence[0].get("text") else None
+        self.evidence_items = evidence
+
+
+def company_outlook(listings) -> list | None:
+    """The combined outlook of the housing company the listings belong to, or
+    None when they are not resolved to one company or its outlook has not
+    been computed yet (then the listings' own renovations count)."""
+    listings = [l for l in listings if l is not None]
+    ids = {getattr(l, "housing_id", None) for l in listings}
+    if len(ids) != 1 or None in ids:
+        return None
+    housing = getattr(listings[0], "housing", None)
+    if housing is None or housing.outlook_at is None:
+        return None
+    return [OutlookRenovation(row) for row in housing.outlook]
+
+
+def company_renovations(listings) -> list:
+    """What is coming at the company: its outlook when there is one, else every
+    renovation its listings mention."""
+    outlook = company_outlook(listings)
+    if outlook is not None:
+        return outlook
+    return [r for l in listings if l is not None for r in l.renovations]
+
+
 def company_group(listing) -> str:
     """The grouping value: the company key, or the listing alone."""
     return listing.company_key or f"l:{listing.id}"
@@ -113,12 +154,13 @@ def _refresh_keys(session, _flush_context, _instances) -> None:
                 # renamed or moved: resolve the taloyhtiö again (housing_registry.resolve_listings)
                 obj.housing_id = None
             obj.company_name_key = name
-        plain = plain_company_key(obj)
+        # resolved to a taloyhtiö across sources (housing_registry): that groups it
+        plain = f"h:{obj.housing_id}" if obj.housing_id else plain_company_key(obj)
         current = obj.company_key or ""
         if plain is None:
             if obj.company_key is not None:
                 obj.company_key = None
-        elif plain.startswith("y:") and current.startswith("n:"):
+        elif plain.startswith("y:") and current.startswith("n:") and not obj.housing_id:
             pass  # nameless listing joined to the named company of its Y-tunnus
         elif current != plain:
             obj.company_key = plain
@@ -242,12 +284,7 @@ def score_target(listings, wanted_types: set[str] | None = None, *, now: datetim
 
     now = now or datetime.now(timezone.utc)
     listings = [l for l in listings if l is not None]
-    renovations = [
-        r
-        for listing in listings
-        for r in listing.renovations
-        if not wanted_types or r.remonttityyppi in wanted_types
-    ]
+    renovations = [r for r in company_renovations(listings) if not wanted_types or r.remonttityyppi in wanted_types]
     best = max(renovations, key=lambda r: (r.confidence, -(r.timing_year or 9999)), default=None)
     parts = []
 
@@ -333,6 +370,14 @@ TIER_A_SCORE = 70
 TIER_B_SCORE = 50
 
 
+def is_estimate_company(listings, wanted_types=None) -> bool:
+    """Only register estimates behind what the organization wants here: never class A."""
+    renovations = [r for r in company_renovations(listings) if not wanted_types or r.remonttityyppi in wanted_types]
+    if renovations:
+        return all(getattr(r, "is_estimate", False) for r in renovations)
+    return all(getattr(l, "is_estimate", False) for l in listings)
+
+
 def classify(score: dict, *, estimate: bool = False) -> str:
     """The class of a scored housing company (score = score_target(...)).
     Only a need (stage "need") -> T. A needs a high score, a renovation within
@@ -382,7 +427,7 @@ def score_level(total: int) -> str:
 def org_company_listings(organization_id: int, groups: set[str]) -> dict:
     """{company group: [listings]} of the organization's matches for the
     given groups."""
-    from app.listings.models import Listing, ListingMatch
+    from app.listings.models import HousingCompany, Listing, ListingMatch
 
     if not groups:
         return {}
@@ -392,8 +437,8 @@ def org_company_listings(organization_id: int, groups: set[str]) -> dict:
         db.session.query(Listing)
         .join(ListingMatch, ListingMatch.listing_id == Listing.id)
         .filter(ListingMatch.organization_id == organization_id, Listing.is_active.is_(True))
-        # scoring reads every listing's renovations: one query, not one per listing
-        .options(selectinload(Listing.renovations))
+        # scoring reads every listing's renovations and its company's outlook: few queries
+        .options(selectinload(Listing.renovations), selectinload(Listing.housing).selectinload(HousingCompany.outlook))
     )
     criteria = []
     if keys:
@@ -414,12 +459,13 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
     the sort key of Kohteet "Sopivimmat ensin" and what release_targets lets
     through. Timing and freshness drift with time, so the scheduler runs this
     hourly. Returns how many changed."""
-    from app.listings.models import Listing, ListingMatch
+    from app.listings.models import HousingCompany, Listing, ListingMatch
     from app.listings.target_services import organization_wanted_types
 
     now = now or datetime.now(timezone.utc)
     query = ListingMatch.query.filter(ListingMatch.status == "pending").options(
-        joinedload(ListingMatch.listing).selectinload(Listing.renovations)
+        joinedload(ListingMatch.listing).selectinload(Listing.renovations),
+        joinedload(ListingMatch.listing).selectinload(Listing.housing).selectinload(HousingCompany.outlook),
     )
     if organization_id is not None:
         query = query.filter(ListingMatch.organization_id == organization_id)
@@ -435,7 +481,7 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
         for match in matches:
             company = listings.get(company_group(match.listing)) or [match.listing]
             score = score_target(company, wanted, now=now)
-            tier = classify(score, estimate=all(l.is_estimate for l in company))
+            tier = classify(score, estimate=is_estimate_company(company, wanted))
             if match.score != score["total"] or match.tier != tier:
                 match.score = score["total"]
                 match.tier = tier

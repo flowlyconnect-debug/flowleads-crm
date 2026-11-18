@@ -15,7 +15,7 @@ from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import aliased, contains_eager, joinedload
 
 from app.extensions import db
-from app.listings.housing import company_group, org_company_listings, score_label, score_level, score_target
+from app.listings.housing import company_group, company_outlook, org_company_listings, score_label, score_level, score_target
 from app.listings.models import Listing, ListingMatch, ListingRenovation, SavedTargetSearch
 from app.listings.pts import pts_strip
 from app.listings.stages import best_stage
@@ -772,6 +772,12 @@ def target_row(
         if best[renovation.remonttityyppi].confidence <= renovation.confidence:
             best[renovation.remonttityyppi] = renovation
         renovation = best[renovation.remonttityyppi]
+    outlook = company_outlook(company)
+    if outlook is not None:
+        # the company's combined outlook (every source, app/listings/forecast.py) replaces the mentions
+        best = {r.remonttityyppi: r for r in outlook if not wanted_types or r.remonttityyppi in wanted_types}
+        if renovation is not None:
+            renovation = best.get(renovation.remonttityyppi) or next(iter(best.values()), renovation)
     renovations = sorted(best.values(), key=lambda r: (r is not renovation, -r.confidence)) or (
         [renovation] if renovation else []
     )

@@ -137,6 +137,8 @@ class Listing(db.Model):
         back_populates="listing",
         cascade="all, delete-orphan",
     )
+    # the taloyhtiö across sources and its combined outlook (housing_registry, forecast)
+    housing: Mapped["HousingCompany | None"] = relationship("HousingCompany", foreign_keys=[housing_id])
 
     @property
     def source_ref(self) -> str:
@@ -330,6 +332,9 @@ class HousingCompany(db.Model):
 
     addresses: Mapped[list["HousingCompanyAddress"]] = relationship(
         "HousingCompanyAddress", back_populates="company", cascade="all, delete-orphan"
+    )
+    outlook: Mapped[list["HousingRenovation"]] = relationship(
+        "HousingRenovation", order_by="HousingRenovation.confidence.desc()", viewonly=True
     )
 
 

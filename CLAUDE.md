@@ -96,8 +96,10 @@ Full design: `docs/ARKKITEHTUURI_KOHDEKATALOGI.md`. In short:
   Listings, PRH companies and Ryhti buildings link via `housing_id`; a new source only needs an adapter that yields
   `Candidate`s. Phase 2: `app/listings/forecast.py` combines every source's observations into `HousingRenovation`
   (one row per type: stage, year, confidence; a done renovation cancels estimates, a permit decides a planned one,
-  listing + register agreement adds 10). Not used for grouping or matching yet (phase 3). Superadmin `/admin/housing`.
-  Tests: `tests/test_housing_registry.py`, `tests/test_forecast.py`.
+  listing + register agreement adds 10). Phase 3: a resolved listing's `company_key` is `h:<housing id>`, so every
+  "one taloyhtiö = one target" path groups across sources, and scoring, classes, the target row and matching read the
+  company outlook (`housing.company_outlook` / `company_renovations`) when it exists. Superadmin `/admin/housing`.
+  Tests: `tests/test_housing_registry.py`, `tests/test_forecast.py`, `tests/test_housing_targets.py`.
 - **Public registers, internal only** (`app/registry/`, superadmin `/admin/registry`): Ryhti buildings/permits/addresses and
   PRH asunto-osakeyhtiöt are synced (`flask registry-sync`, job `registry_sync` only with `REGISTRY_SYNC_ENABLED`), linked
   building → taloyhtiö and turned into `RegistrySignal`s (permit / oil heating / age). `app/registry/publish.py` turns them

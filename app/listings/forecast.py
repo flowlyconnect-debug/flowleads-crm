@@ -269,11 +269,16 @@ def compute_outlooks(*, company_ids: list[int] | None = None, limit: int = 5000,
             for r in HousingRenovation.query.filter(HousingRenovation.housing_id.in_(chunk))
         }
         wanted: set[tuple[int, str]] = set()
+        before = {cid: set() for cid in chunk}
+        for cid, rtype in existing:
+            before[cid].add(rtype)
+        after = {cid: set() for cid in chunk}
         for company_id in chunk:
             observations, done = inputs[company_id]
             for row in outlook(observations, done, now=now):
                 key = (company_id, row["remonttityyppi"])
                 wanted.add(key)
+                after[company_id].add(row["remonttityyppi"])
                 record = existing.get(key)
                 if record is None:
                     record = HousingRenovation(housing_id=company_id, remonttityyppi=row["remonttityyppi"])
@@ -289,5 +294,19 @@ def compute_outlooks(*, company_ids: list[int] | None = None, limit: int = 5000,
             {HousingCompany.outlook_at: _now()}, synchronize_session=False
         )
         db.session.commit()
+        changed = [cid for cid in chunk if before[cid] != after[cid]]
+        if changed:
+            _rematch(changed, now)
         done_count += len(chunk)
     return done_count
+
+
+def _rematch(company_ids: list[int], now: datetime) -> None:
+    """The renovation types of these companies changed (a done renovation
+    cancelled one, a new source added one): their listings' matches follow."""
+    from app.listings.services import match_listing
+
+    listings = Listing.query.filter(Listing.housing_id.in_(company_ids), Listing.analysis_status == "done").all()
+    for listing in listings:
+        match_listing(listing, now=now)
+    db.session.commit()

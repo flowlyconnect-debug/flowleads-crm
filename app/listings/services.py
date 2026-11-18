@@ -646,6 +646,13 @@ def _best_renovation(
     limit_year = None
     if profile.timing_within_years is not None:
         limit_year = now.year + int(profile.timing_within_years)
+    from app.listings.housing import company_outlook
+
+    # the company's combined outlook (app/listings/forecast.py) decides what is
+    # still coming: a type it dropped (done since, say) is no target any more
+    outlook = company_outlook([listing])
+    if outlook is not None:
+        wanted &= {r.remonttityyppi for r in outlook}
     best = None
     for renovation in listing.renovations:
         if renovation.remonttityyppi not in wanted:
@@ -1033,13 +1040,14 @@ def _initial_rating(organization_id: int, listing: Listing, now: datetime) -> tu
     """(score, class) of a new match with the organization's other listings
     of the same housing company, before anyone sees it: release_targets and
     Kohteet "Sopivimmat ensin" rely on them until the hourly refresh."""
-    from app.listings.housing import classify, company_group, org_company_listings, score_target
+    from app.listings.housing import classify, company_group, is_estimate_company, org_company_listings, score_target
     from app.listings.target_services import organization_wanted_types
 
     group = company_group(listing)
     company = [listing] + [l for l in org_company_listings(organization_id, {group}).get(group, []) if l.id != listing.id]
-    score = score_target(company, organization_wanted_types(organization_id), now=now)
-    return score["total"], classify(score, estimate=all(l.is_estimate for l in company))
+    wanted = organization_wanted_types(organization_id)
+    score = score_target(company, wanted, now=now)
+    return score["total"], classify(score, estimate=is_estimate_company(company, wanted))
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:

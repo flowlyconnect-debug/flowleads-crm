@@ -168,6 +168,8 @@ def merge_companies(keep: HousingCompany, drop: HousingCompany, *, now: datetime
         return keep
     for model in (Listing, RegistryHousingCompany, RegistryBuilding):
         model.query.filter_by(housing_id=drop.id).update({"housing_id": keep.id}, synchronize_session=False)
+    # listings are grouped by their taloyhtiö (housing._refresh_keys): follow the merge
+    Listing.query.filter_by(housing_id=keep.id).update({"company_key": f"h:{keep.id}"}, synchronize_session=False)
     bid = drop.business_id
     drop.business_id = None  # unique: free it before keep takes it
     db.session.flush()

@@ -283,7 +283,21 @@ Ajot: `compute_outlooks()` `listing_matching`-työssä muuttuneille (uusi tieto 
 laskennan jälkeen) ja rekisterihaun vaiheena `outlook` kaikille rekisteriin liittyville. Superadmin `/admin/housing`
 näyttää näkymän ja perusteet. Mitattu: 9 439 taloyhtiötä 1,3 sekunnissa. Testit: `tests/test_forecast.py`.
 
-Seuraavaksi: vaihe 3 (täsmäys ja ryhmittely taloyhtiötasolla, eli Kohteet lukee `HousingRenovation`-näkymää).
+Kun taloyhtiön remonttityypit muuttuvat (tehty remontti kumosi yhden, uusi lähde toi toisen), sen ilmoitukset
+täsmätään uudelleen (`forecast._rematch`).
+
+### Vaihe 3/3: Kohteet taloyhtiötasolla
+
+- **Ryhmittely:** tunnistetun ilmoituksen `company_key` on `h:<taloyhtiön id>` (`housing._refresh_keys`). Kaikki
+  "yksi taloyhtiö = yksi kohde" -logiikka (Kohteet, siirto, piilotus, liidiin yhdistäminen, taloyhtiökortti) toimii
+  siis lähteiden yli: Oikotie-ilmoitus, tuontirivi ja saman yhtiön rekisteriennuste ovat yksi kohde.
+  Yhdistäminen (`merge_companies`) päivittää avaimet. Tunnistamaton ilmoitus käyttää edelleen nimeä ja kaupunkia.
+- **Pisteet, luokka ja rivin remontit** luetaan taloyhtiön näkymästä (`housing.company_outlook` /
+  `company_renovations`, `OutlookRenovation`), kun se on laskettu: vaihe, vuosi, kahden lähteen varmuus, lähteet ja
+  perusteet. Muuten ilmoitusten omat remontit kuten ennen.
+- **Täsmäys:** `_best_renovation` hyväksyy vain remonttityypit, jotka ovat yhtiön näkymässä; tehty remontti poistaa
+  siis ennustekohteen asiakkaalta.
+- Testit: `tests/test_housing_targets.py`.
 
 ## Kuratoidut kohteet: laskenta, vaihe ja luokittelu ennen näkyvyyttä (18.11.2026)
 

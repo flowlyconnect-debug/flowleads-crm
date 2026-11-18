@@ -403,6 +403,13 @@ kaikki kerralla.
 `app/listings/forecast.py` yhdistää lähteiden havainnot taloyhtiön remonttinäkymäksi (`HousingRenovation`).
 Ei muuta asiakkaan näkymiä vielä. Migraatio `f9a0b1c2d3e4`.
 
+## Tehty 18.11.2026 (6): Kohteet taloyhtiötasolla (vaihe 3/3)
+
+Tunnistettu ilmoitus ryhmitellään taloyhtiön mukaan (`company_key` = `h:<id>`), ja pisteet, luokka, rivin remontit
+ja täsmäys lukevat taloyhtiön yhdistettyä remonttinäkymää. **Näkyy asiakkaalle:** saman taloyhtiön ilmoitukset ja
+rekisterikohteet ovat yksi kohde, ja tehty remontti poistaa ennustekohteen. Ensimmäinen ajo tuotannossa tunnistaa
+kaikki ilmoitukset 2000 kerrallaan 10 minuutin välein.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):
