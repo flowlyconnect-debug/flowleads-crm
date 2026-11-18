@@ -175,6 +175,9 @@ saavansa tarjouksia huonosti (Kiinteistöliiton barometri 11/2026): hyvä kapea 
 ## 6. Tekninen velka, skaalautuvuus ja tietoturva
 
 ### 6.1 Korjaa ennen asiakasmäärän kasvua (100k kohdetta / 50 asiakasta)
+
+**Tila 18.11.2026:** kohdat 1–3 ja 5 tehty (mittaukset `docs/TUOTANTOON_VIENTI_TILANNE.md`). Kohta 4
+(laskuri jokaisella sivulla) mitattiin nopeaksi (0,03 s 12 000 osumalla), joten sitä ei muutettu.
 1. `merge_into_existing_leads` (`app/listings/services.py:~1021`) lataa kaikki pending-osumat ja tekee kyselyn
    per osuma → yksi joukko-operaatio `company_key`-avaimella vain yhtiöille, joilla on liidi.
 2. `refresh_scores` (`housing.py:~346`) pisteyttää kaiken 10 min välein N+1:llä → kerran päivässä tai vain muuttuneet.

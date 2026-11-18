@@ -52,6 +52,17 @@ class Preferences:
     def evidence(self, feature: str, value) -> int:
         return self.transferred[feature][value] + self.dismissed[feature][value]
 
+    def bonus_upper_bound(self, types, region, build_year) -> float:
+        """The most the learned bonus can give a listing with these renovation
+        types, region and build year (learning_bonus uses one of the types).
+        The Kohteet sort uses it to skip targets that cannot reach a page."""
+        type_lean = max((self.lean("type", t) for t in types), default=0.0) if types else 0.0
+        return (
+            _WEIGHTS["type"] * type_lean
+            + _WEIGHTS["region"] * self.lean("region", region)
+            + _WEIGHTS["decade"] * self.lean("decade", _decade(build_year))
+        )
+
 
 def learn_preferences(organization_id: int, wanted_types: set[str] | None = None) -> Preferences:
     """Count the organization's earlier decisions on the Kohteet page."""
@@ -142,8 +153,9 @@ class ListPage:
     """The parts of Flask-SQLAlchemy's Pagination the Kohteet page uses, for a
     list sorted in Python."""
 
-    def __init__(self, items: list, page: int, per_page: int):
-        self.total = len(items)
+    def __init__(self, items: list, page: int, per_page: int, *, total: int | None = None):
+        # `items` may be only the best part of a longer list (`total` rows)
+        self.total = len(items) if total is None else total
         self.per_page = per_page
         self.pages = max(1, -(-self.total // per_page)) if self.total else 0
         self.page = max(1, page)

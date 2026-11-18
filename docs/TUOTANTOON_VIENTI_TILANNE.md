@@ -1,6 +1,6 @@
 # Tuotantoon vienti – tilanne ja jatko
 
-Päivitetty 17.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
+Päivitetty 18.11.2026. Tämä on jatkomuistio: kun käyttäjä sanoo
 **"Jatka FlowLeadsin tuotantoon vientiä"**, lue tämä tiedosto ja jatka kohdasta
 "Seuraavaksi". Päivitä tiedosto, kun kohtia valmistuu.
 
@@ -357,6 +357,24 @@ Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaiku
   blueprint-synkka ei ole käytössä).
 - Datakumppanien sähköpostiluonnokset: `docs/DATAKUMPPANIT_SAHKOPOSTILUONNOKSET.md` (käyttäjä lähettää).
 - Testit: `tests/test_registry.py`, `tests/test_registry_estimates.py`, `tests/test_week1_fixes.py`.
+
+## Tehty 18.11.2026: skaalautuvuus (40 000 kohdetta, 10 asiakasta)
+
+Mitattu paikallisella Postgresilla 40 000 kohteella ja 10 koko Suomen asiakkaalla (~12 000 osumaa kullakin):
+
+| | Ennen | Jälkeen |
+|---|---|---|
+| `listing_matching`-ajo (10 min välein) | yli 3 min | noin 2 s |
+| `merge_into_existing_leads` | 126 s, 158 000 kyselyä | 0,05 s, 1 kysely |
+| `refresh_scores` | 61 s joka ajossa | 13 s kerran tunnissa (oma työ `target_scores`) |
+| Kohteet-sivu (Sopivimmat ensin) | 3,9 s, 3 300 kyselyä | 1,5 s, 128 kyselyä |
+| Kojelauta | 3,2 s | 1,2 s |
+| `rematch_profile` ilman muutoksia | 5,1 s, 12 000 kyselyä | 1,3 s, 28 kyselyä |
+
+Muutokset: yhdistäminen yhdellä EXISTS-kyselyllä, remontit eräladattuna (`selectinload`), pisteiden päivitys omaksi
+tuntityökseen, "Sopivimmat ensin" pisteyttää vain sivulle mahtuvat ehdokkaat, indeksit
+`listing_matches(organization_id, status)` ja `listing_matches(lead_id)` (migraatio `b5c6d7e8f9a0`).
+Testit: `tests/test_scale_fixes.py`.
 
 ## Seuraavaksi
 

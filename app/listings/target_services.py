@@ -211,21 +211,63 @@ def list_targets(
     return query.paginate(page=max(1, page), per_page=per_page, error_out=False)
 
 
+# The Sopivuus is 0.9 x the target score plus the learned bonus, and the bonus
+# only depends on the renovation type, region and build decade, so the best
+# Sopivuus a target can reach is known from its stored score (refreshed hourly)
+# and those three values. Targets whose best is below the page's last row are
+# never scored. The slack covers a stored score that has drifted since the
+# refresh (freshness is worth 10 points) and a housing company whose listings
+# differ in region or decade.
+_FIT_SLACK = 12
+_FIT_BATCH = 400
+
+
 def _list_by_fit(organization_id: int, query, *, page: int, per_page: int):
-    """"Sopivimmat ensin": every visible target scored (app/listings/fit_services.py),
-    best first, newest first among equals."""
+    """"Sopivimmat ensin": targets by Sopivuus (app/listings/fit_services.py),
+    best first, newest first among equals. Only the targets that can still
+    reach the requested page are scored, in order of their best possible
+    Sopivuus; scoring stops once the next one cannot beat the page's last row."""
     from app.listings.fit_services import ListPage, learn_preferences, score_matches
 
-    matches = query.all()
+    base = query.enable_eagerloads(False).order_by(None)
+    rows = base.with_entities(ListingMatch.id, ListingMatch.score, Listing.id, Listing.maakunta, Listing.build_year).all()
     wanted = organization_wanted_types(organization_id)
     prefs = learn_preferences(organization_id, wanted)
-    scores = score_matches(matches, prefs, wanted_types=wanted)
+    types: dict[int, set[str]] = {}
+    if prefs.decisions:
+        for listing_id, rtype in db.session.query(ListingRenovation.listing_id, ListingRenovation.remonttityyppi).filter(
+            ListingRenovation.listing_id.in_(base.with_entities(Listing.id))
+        ):
+            if not wanted or rtype in wanted:
+                types.setdefault(listing_id, set()).add(rtype)
 
-    def key(match):
+    def best_possible(row) -> float:
+        if row[1] is None:
+            return float("inf")  # unknown score: has to be computed to be placed
+        bonus = prefs.bonus_upper_bound(types.get(row[2]), row[3], row[4]) if prefs.decisions else 0.0
+        return 0.9 * row[1] + bonus + _FIT_SLACK + 1  # +1: the Sopivuus is rounded
+
+    candidates = sorted(((best_possible(row), row[0]) for row in rows), key=lambda pair: (-pair[0], pair[1]))
+    needed = max(1, page) * per_page
+    scored: list[tuple[tuple, ListingMatch]] = []
+
+    def key(match, fit):
         seen = match.listing.published_at or match.listing.first_seen_at
-        return (-scores[match.id][0], -(seen.timestamp() if seen else 0), -match.id)
+        return (-fit, -(seen.timestamp() if seen else 0), -match.id)
 
-    return ListPage(sorted(matches, key=key), page, per_page)
+    position = 0
+    while position < len(candidates):
+        if len(scored) >= needed:
+            scored.sort(key=lambda pair: pair[0])
+            if candidates[position][0] < -scored[needed - 1][0][0]:
+                break
+        ids = [match_id for _, match_id in candidates[position : position + _FIT_BATCH]]
+        position += len(ids)
+        batch = query.filter(ListingMatch.id.in_(ids)).all()
+        fits = score_matches(batch, prefs, wanted_types=wanted)
+        scored.extend((key(match, fits[match.id][0]), match) for match in batch)
+    scored.sort(key=lambda pair: pair[0])
+    return ListPage([match for _, match in scored], page, per_page, total=len(candidates))
 
 
 # Query-string keys of the Kohteet filter bar (kept across actions and pages).

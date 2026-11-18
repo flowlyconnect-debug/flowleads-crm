@@ -170,7 +170,12 @@ Katalogi ei ole sidottu Oikotiehen: kohteen voi tuoda mistä tahansa lähteestä
 - **Pisteet 0–100** (`score_target`): varmuus 40, ajoitus 25, yhteystiedot 15, signaalit 10, tuoreus 10.
   Kohteet-sivun Sopivuus (`app/listings/fit_services.py::company_fit`) = pisteet × 0,9 + asiakkaan aiempien
   siirtojen ja piilotusten ±25; oletusjärjestys "Sopivimmat ensin". `listing_matches.score` tallentaa pohjapisteet
-  (`refresh_scores` `listing_matching`-ajossa). Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
+  (oma ajastintyö `target_scores` kerran tunnissa, uusille osumille heti: `rematch_profile` pisteyttää organisaation
+  yhdellä ajolla ja `match_listing` laskee alkupisteet saman taloyhtiön muiden kohteiden kanssa). "Sopivimmat ensin"
+  (`target_services._list_by_fit`) ei pisteytä kaikkia kohteita: se laskee jokaiselle parhaan mahdollisen Sopivuuden
+  tallennetuista pisteistä ja opitun bonuksen ylärajasta (tyyppi, maakunta, vuosikymmen, `Preferences.bonus_upper_bound`)
+  ja lopettaa, kun seuraava ei enää voi nousta sivulle (varmuusvara `_FIT_SLACK`). Järjestys on sama kuin kaikkien
+  pisteyttämällä (`tests/test_scale_fixes.py`). Ikäarviot (putket 50 v, katto 35 v ...) näytetään taloyhtiökortilla erikseen eivätkä
   vaikuta pisteisiin.
 - **Taloyhtiökortti**: pisteet, signaalien aikajana (ilmoitukset, remonttimaininnat, yhteystiedot, kohteen tila,
   liidin myyntityö) sekä hallituksen puheenjohtaja, huoltoyhtiö ja isännöintitoimiston tiedot.

@@ -283,7 +283,7 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             )
 
             try:
-                from app.listings.housing import backfill_company_keys, refresh_scores
+                from app.listings.housing import backfill_company_keys
 
                 backfill_company_keys()  # listings stored before housing-company keys
                 from app.listings.text_types import backfill_text_types
@@ -291,7 +291,6 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 backfill_text_types()  # renovation types read from the listing text
                 matched = rematch_profiles()
                 merge_into_existing_leads()
-                refresh_scores()  # timing and freshness change with time
                 from app.listings.target_services import notify_saved_searches
 
                 notify_saved_searches()
@@ -301,6 +300,20 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             except Exception:
                 db.session.rollback()
                 logger.exception("Listing matching failed")
+
+    def run_target_scores():
+        """Stored target scores (Kohteet "Sopivimmat ensin" reads them to skip
+        targets that cannot reach a page). Timing and freshness change by the
+        day, so hourly is plenty; a full pass is seconds of CPU per 10k targets."""
+        with app.app_context():
+            from app.extensions import db
+            from app.listings.housing import refresh_scores
+
+            try:
+                refresh_scores()
+            except Exception:
+                db.session.rollback()
+                logger.exception("Target score refresh failed")
 
     def run_geocode_listings():
         """Street-address positions for the Kohteet map (GEOCODING_ENABLED)."""
@@ -550,6 +563,12 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
             id="registry_sync",
             replace_existing=True,
         )
+    scheduler.add_job(
+        run_target_scores,
+        IntervalTrigger(hours=1),
+        id="target_scores",
+        replace_existing=True,
+    )
     if app.config.get("GEOCODING_ENABLED"):
         scheduler.add_job(
             run_geocode_listings,

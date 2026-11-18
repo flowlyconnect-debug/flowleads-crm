@@ -29,6 +29,7 @@ import unicodedata
 from datetime import datetime, timezone
 
 from sqlalchemy import event
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.extensions import db
 
@@ -328,6 +329,8 @@ def org_company_listings(organization_id: int, groups: set[str]) -> dict:
         db.session.query(Listing)
         .join(ListingMatch, ListingMatch.listing_id == Listing.id)
         .filter(ListingMatch.organization_id == organization_id, Listing.is_active.is_(True))
+        # scoring reads every listing's renovations: one query, not one per listing
+        .options(selectinload(Listing.renovations))
     )
     criteria = []
     if keys:
@@ -347,11 +350,13 @@ def refresh_scores(organization_id: int | None = None, *, now: datetime | None =
     """Recompute the stored score of every open (pending) match: the sort key
     of Kohteet "Parhaat ensin". Timing and freshness drift with time, so the
     scheduler runs this regularly. Returns how many scores changed."""
-    from app.listings.models import ListingMatch
+    from app.listings.models import Listing, ListingMatch
     from app.listings.target_services import organization_wanted_types
 
     now = now or datetime.now(timezone.utc)
-    query = ListingMatch.query.filter(ListingMatch.status == "pending")
+    query = ListingMatch.query.filter(ListingMatch.status == "pending").options(
+        joinedload(ListingMatch.listing).selectinload(Listing.renovations)
+    )
     if organization_id is not None:
         query = query.filter(ListingMatch.organization_id == organization_id)
     by_org: dict[int, list] = {}

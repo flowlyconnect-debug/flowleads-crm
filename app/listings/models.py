@@ -178,6 +178,10 @@ class ListingMatch(db.Model):
     __table_args__ = (
         UniqueConstraint("profile_id", "listing_id", name="uq_listing_match_profile_listing"),
         Index("ix_listing_matches_status", "status", "profile_id"),
+        # every Kohteet query filters by organization and status
+        Index("ix_listing_matches_org_status", "organization_id", "status"),
+        # FK with ON DELETE SET NULL, and same-taloyhtiö lead lookups
+        Index("ix_listing_matches_lead_id", "lead_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

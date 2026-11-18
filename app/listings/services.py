@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 from sqlalchemy import and_, func, or_, update
+from sqlalchemy.orm import aliased, selectinload
 
 from app.extensions import db
 from app.listings.models import CrawlState, Listing, ListingMatch, ListingRenovation
@@ -755,6 +756,7 @@ def wanted_listings(profile: SearchProfile, *, now: datetime | None = None) -> d
             sure_enough,
             fresh_enough,
         )
+        .options(selectinload(Listing.renovations))
         .distinct()
         .all()
     )
@@ -804,7 +806,7 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
                 confidence=conf,
                 created_at=now,
                 released_at=now,
-                score=_initial_score(profile.organization_id, listing, now),
+                score=None,  # scored for the whole organization below, in one pass
             )
         )
         _ensure_contact_queued(listing)
@@ -812,6 +814,10 @@ def rematch_profile(profile: SearchProfile, *, now: datetime | None = None) -> i
 
     profile.needs_rematch = False
     db.session.commit()
+    if added:
+        from app.listings.housing import refresh_scores
+
+        refresh_scores(profile.organization_id, now=now)
     return added
 
 
@@ -1004,12 +1010,15 @@ def _valid_email_or_none(value) -> str | None:
 
 
 def _initial_score(organization_id: int, listing: Listing, now: datetime) -> int:
-    """Score of a new match from its own listing; the scheduler refreshes it
-    with the rest of the housing company (housing.refresh_scores)."""
-    from app.listings.housing import score_target
+    """Score of a new match with the organization's other listings of the
+    same housing company: Kohteet "Sopivimmat ensin" relies on it until the
+    hourly refresh (housing.refresh_scores)."""
+    from app.listings.housing import company_group, org_company_listings, score_target
     from app.listings.target_services import organization_wanted_types
 
-    return score_target([listing], organization_wanted_types(organization_id), now=now)["total"]
+    group = company_group(listing)
+    company = [l for l in org_company_listings(organization_id, {group}).get(group, []) if l.id != listing.id]
+    return score_target([listing, *company], organization_wanted_types(organization_id), now=now)["total"]
 
 
 def _merge_into_lead(match: ListingMatch, listing: Listing, lead, now: datetime) -> None:
@@ -1052,10 +1061,26 @@ def merge_into_existing_leads(
     """Another apartment of a housing company that already has a lead joins
     that lead instead of waiting as a separate target. Creates no leads."""
     now = now or _now()
+    # only matches whose housing company already has a lead of the same
+    # organization: one query instead of one lookup per pending match
+    other_match = aliased(ListingMatch)
+    other_listing = aliased(Listing)
+    has_lead = (
+        db.session.query(other_match.id)
+        .join(other_listing, other_listing.id == other_match.listing_id)
+        .filter(
+            other_match.organization_id == ListingMatch.organization_id,
+            other_match.id != ListingMatch.id,
+            other_match.lead_id.isnot(None),
+            other_listing.company_key == Listing.company_key,
+        )
+        .exists()
+    )
     query = ListingMatch.query.join(Listing, Listing.id == ListingMatch.listing_id).filter(
         ListingMatch.status == "pending",
         Listing.is_active.is_(True),
         Listing.company_key.isnot(None),
+        has_lead,
     )
     if profile_ids:
         query = query.filter(ListingMatch.profile_id.in_(profile_ids))
