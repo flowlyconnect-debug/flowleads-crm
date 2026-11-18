@@ -133,3 +133,15 @@ def test_sellers_do_not_see_export_buttons(app, client):
     _login(client, "admin-napit@test.com")
     page = client.get("/leads/").get_data(as_text=True)
     assert "HubSpot-tuontitiedosto" in page and 'value="export"' in page
+
+
+def test_limit_fields_accept_any_number(app, client):
+    """step="50" made the browser refuse e.g. 120 without a word (found by hand)."""
+    with app.app_context():
+        _org("kentta")
+        root = create_user("root-kentta@test.com", PASSWORD, role="superadmin")
+        root.totp_enabled = True
+        db.session.commit()
+    _login(client, "root-kentta@test.com")
+    page = client.get("/admin/customers").get_data(as_text=True)
+    assert 'step="1" name="export_limit"' in page and 'step="1" name="limit"' in page
