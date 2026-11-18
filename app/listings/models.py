@@ -120,6 +120,11 @@ class Listing(db.Model):
     # (app/registry/publish.py, source "ryhti"). Shown as "Ennuste" everywhere
     # and matched only for organizations with the "registry_targets" module.
     is_estimate: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    # the taloyhtiö this listing is about (app/listings/housing_registry.py);
+    # NULL = not resolved yet, reset when the name, Y-tunnus or city changes
+    housing_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     contact_status: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     contact_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -289,3 +294,60 @@ class PropertyManagerOffice(db.Model):
     source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class HousingCompany(db.Model):
+    """One taloyhtiö, whatever the source: every catalogue listing and every
+    public-register row is resolved to one of these
+    (app/listings/housing_registry.py: Y-tunnus, then name and municipality,
+    then street address). A company may be nameless (known only by the
+    address of a register building) until a source names it."""
+
+    __tablename__ = "housing_companies"
+    __table_args__ = (
+        Index("ix_housing_companies_name", "name_key", "municipality_key"),
+        Index("ix_housing_companies_municipality", "municipality_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[str | None] = mapped_column(String(12), unique=True, nullable=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    name_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    municipality: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    municipality_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    build_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    building_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    apartments: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # every source that has told about this company ("oikotie", "import", "ryhti", "prh", ...)
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+    addresses: Mapped[list["HousingCompanyAddress"]] = relationship(
+        "HousingCompanyAddress", back_populates="company", cascade="all, delete-orphan"
+    )
+
+
+class HousingCompanyAddress(db.Model):
+    """A street address of a housing company ("koulukatu5", identity.street_key)
+    in a municipality: how a nameless register building and a listing find
+    the same company."""
+
+    __tablename__ = "housing_company_addresses"
+    __table_args__ = (
+        UniqueConstraint("housing_id", "address_key", name="uq_housing_company_address"),
+        Index("ix_housing_company_addresses_key", "address_key", "municipality_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    housing_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="CASCADE"), nullable=False
+    )
+    address_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    municipality_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    company: Mapped[HousingCompany] = relationship("HousingCompany", back_populates="addresses")
+

@@ -289,6 +289,9 @@ def register_scheduler_jobs(scheduler: BlockingScheduler, app) -> None:
                 from app.listings.text_types import backfill_text_types
 
                 backfill_text_types()  # renovation types read from the listing text
+                from app.listings.housing_registry import resolve_listings
+
+                resolve_listings()  # each listing to its taloyhtiö (one company across sources)
                 matched = rematch_profiles()
                 merge_into_existing_leads()
                 from app.listings.target_services import release_targets

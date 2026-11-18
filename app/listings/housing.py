@@ -109,6 +109,9 @@ def _refresh_keys(session, _flush_context, _instances) -> None:
         # "" = processed, no name (NULL marks rows stored before keys existed)
         name = name_key(obj.taloyhtio, obj.kaupunki) or ""
         if obj.company_name_key != name:
+            if obj.company_name_key is not None and obj.housing_id is not None:
+                # renamed or moved: resolve the taloyhtiö again (housing_registry.resolve_listings)
+                obj.housing_id = None
             obj.company_name_key = name
         plain = plain_company_key(obj)
         current = obj.company_key or ""

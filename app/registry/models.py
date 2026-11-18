@@ -48,6 +48,10 @@ class RegistryHousingCompany(db.Model):
     registration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     prh_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    # the shared taloyhtiö (app/listings/housing_registry.py)
+    housing_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     buildings = relationship("RegistryBuilding", back_populates="housing_company")
 
@@ -93,6 +97,11 @@ class RegistryBuilding(db.Model):
     )
     # "name" = street and number in the company name, "prh_address" = PRH address
     link_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # the shared taloyhtiö (app/listings/housing_registry.py): its company's, or
+    # a nameless one known by this building's address
+    housing_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("housing_companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     ryhti_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

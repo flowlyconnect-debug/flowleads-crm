@@ -20,6 +20,8 @@ from flask import current_app
 
 from app.extensions import db
 from app.listings.housing import fold, name_key
+from app.listings.identity import address_key
+from app.listings.identity import street_key as _street_key
 from app.registry.clients import PrhClient, RegistryFetchError, RyhtiClient
 from app.registry.models import (
     RegistryBuilding,
@@ -72,16 +74,6 @@ def _int(value) -> int | None:
 def _text(value, max_len: int) -> str | None:
     text = " ".join(str(value or "").split())
     return text[:max_len] or None
-
-
-def address_key(street, number) -> str | None:
-    """"Armas Lindgrenin tie", 19 -> "armaslindgrenintie19": spacing in street
-    names differs between registers and company names."""
-    street_part = fold(street).replace(" ", "")
-    number_part = str(number or "").strip()
-    if not street_part or not number_part.isdigit():
-        return None
-    return f"{street_part}{int(number_part)}"
 
 
 def state(name: str) -> RegistrySyncState:
@@ -648,12 +640,3 @@ def link_companies(*, now: datetime | None = None) -> int:
         db.session.bulk_update_mappings(RegistryBuilding, changes[start : start + 1000])
     db.session.commit()
     return len(assigned)
-
-
-# "Takojankatu 1c B" and "Sarvijaakonkatu 5b A" too: a letter may follow the number
-_STREET_NUMBER = re.compile(r"^(.*?[^\d\s])\s+(\d+)(?!\d)")
-
-
-def _street_key(street: str | None) -> str | None:
-    match = _STREET_NUMBER.match(street or "")
-    return address_key(match.group(1), match.group(2)) if match else None

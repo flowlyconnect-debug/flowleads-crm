@@ -391,6 +391,13 @@ Vaihe on pisteiden uusi osa (20). Kohteet, joilla on vain tarve (ikäennusteet, 
 omalla Tarve-välilehdellä (enintään 50), eivät päälistalla. Päätetyt merkitään rivillä. Migraatio `d7e8f9a0b1c2`.
 **Analyzer-workflow muuttui** (`n8n/workflows/flowleads-analyzer.json`): tuo se n8n:ään uudelleen.
 
+## Tehty 18.11.2026 (4): yksi taloyhtiö kaikista lähteistä (vaihe 1/3)
+
+Kaikki lähteet tunnistetaan samaan taloyhtiöön (`app/listings/housing_registry.py`, superadmin `/admin/housing`).
+Ei muuta asiakkaan näkymiä vielä. Migraatio `e8f9a0b1c2d3`. Pull request
+https://github.com/flowlyconnect-debug/flowleads-crm/pull/42 on luonnos; käyttäjä päättää tuotantoon viennin,
+kaikki kerralla.
+
 ## Seuraavaksi
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):

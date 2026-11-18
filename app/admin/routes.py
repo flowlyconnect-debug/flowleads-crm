@@ -679,6 +679,17 @@ def catalogue_status():
     )
 
 
+@admin_bp.route("/housing")
+@login_required
+@require_role("superadmin")
+@require_2fa
+def housing_status():
+    """Taloyhtiöt: one company across every source (internal, never shown to customers)."""
+    from app.listings.housing_registry import housing_overview
+
+    return render_template("admin/housing.html", overview=housing_overview(request.args.get("q")))
+
+
 @admin_bp.route("/registry")
 @login_required
 @require_role("superadmin")

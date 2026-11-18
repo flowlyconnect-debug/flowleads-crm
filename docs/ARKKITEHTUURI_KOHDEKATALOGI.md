@@ -244,6 +244,29 @@ Hakuprofiilin vanhat kentät `schedule_description` ja `crm_api_key` ovat käytt
 Käyttöönotto ei enää luo hakujobeja eikä n8n-API-avaimia.
 Kun katalogi on todettu tuotannossa toimivaksi, jobikoodin voi poistaa.
 
+## Yksi taloyhtiö kaikista lähteistä (vaihe 1/3, 18.11.2026)
+
+Tavoite: jokainen lähde (Oikotie, tuonnit, PRH, Ryhti ja myöhemmin esim. Hilma, Lupapiste, Varken avustukset)
+kulkee saman putken läpi: **tunnistus → ennuste → kategorisointi asiakkaiden profiileihin**. Vaihe 1 tunnistaa.
+
+- `HousingCompany` (`housing_companies`) on taloyhtiö lähteestä riippumatta; `HousingCompanyAddress` sen katuosoitteet
+  (`identity.street_key`, esim. `koulukatu5`) kunnittain. Linkit: `Listing.housing_id`,
+  `RegistryHousingCompany.housing_id`, `RegistryBuilding.housing_id`.
+- `housing_registry.resolve(Candidate)`: sama sääntö kaikille lähteille. 1) Y-tunnus, 2) normalisoitu nimi samassa
+  kunnassa (ei, jos Y-tunnukset eroavat), 3) katuosoite samassa kunnassa, kun nimet eivät ole ristiriidassa. Jos mikään
+  ei osu, syntyy uusi yhtiö. Kun rivi osoittaa kaksi yhtiötä samaksi (Y-tunnus löytää yhden, nimi toisen), ne yhdistetään
+  (`merge_companies`). Nimetön yhtiö (Ryhdin rakennus) saa nimen, kun ilmoitus samassa osoitteessa nimeää sen.
+- Tiedot täydentävät, eivät korvaa; rakennuksen fyysisissä tiedoissa (vuosi, asunnot, tyyppi, sijainti) Ryhti voittaa.
+- Ajot: `resolve_listings()` `listing_matching`-työssä (uudet ja uudelleennimetyt ilmoitukset; nimen tai kaupungin muutos
+  nollaa `housing_id`:n), `resolve_registry()` rekisterihaun vaiheena `resolve`. Uusi lähde tarvitsee vain sovittimen,
+  joka tekee riveistään `Candidate`-olioita.
+- Superadmin: `/admin/housing` (Taloyhtiöt): määrät lähteittäin, montako on sekä ilmoituksessa että rekisterissä, haku.
+- Mitattu Tampere, Nokia ja Pirkkala: 9 439 taloyhtiötä 32 sekunnissa; esittelyilmoitukset löysivät Ryhdin rakennuksen
+  osoitteella ja PRH:n yhtiön nimellä.
+- Seuraavaksi: vaihe 2 (havainnot ja ennustemoottori taloyhtiötä kohden: "remontti tehty" kumoaa ikäennusteen,
+  lupa nostaa vaiheen, useampi lähde nostaa varmuutta) ja vaihe 3 (täsmäys ja ryhmittely taloyhtiötasolla).
+- Testit: `tests/test_housing_registry.py`.
+
 ## Kuratoidut kohteet: laskenta, vaihe ja luokittelu ennen näkyvyyttä (18.11.2026)
 
 Asiakas ei näe jokaista osumaa. Osumat lasketaan ja luokitellaan ensin, ja Kohteet-sivulle päästetään vain parhaat.

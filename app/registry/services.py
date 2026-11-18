@@ -21,7 +21,7 @@ from app.registry.sync import fetch_addresses, link_companies, sync_buildings, s
 
 logger = logging.getLogger(__name__)
 
-STEPS = ("buildings", "permits", "addresses", "prh", "link", "signals", "publish")
+STEPS = ("buildings", "permits", "addresses", "prh", "link", "resolve", "signals", "publish")
 
 
 def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, now: datetime | None = None) -> dict:
@@ -39,6 +39,10 @@ def run_registry_sync(*, steps: tuple[str, ...] = STEPS, ryhti=None, prh=None, n
         result["prh"] = sync_prh(prh, now=now)
     if "link" in steps:
         result["linked"] = link_companies(now=now)
+    if "resolve" in steps:
+        from app.listings.housing_registry import resolve_registry
+
+        result["resolved"] = resolve_registry(now=now)  # the shared taloyhtiö of every row
     if "signals" in steps:
         result["signals"] = compute_signals(now=now)
     if "publish" in steps:
