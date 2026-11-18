@@ -247,7 +247,8 @@ class Crawler:
                 r = json.loads(line)
                 self.results[r["y_tunnus"]] = r
         self.client = httpx.AsyncClient(headers={"User-Agent": UA, "Accept-Language": "fi"},
-                                        timeout=httpx.Timeout(10, connect=6),
+                                        timeout=httpx.Timeout(8, connect=5),
+                                        limits=httpx.Limits(max_connections=500, max_keepalive_connections=100),
                                         follow_redirects=True, verify=True)
         self.dns_cache: dict[str, bool] = {}
 
@@ -347,10 +348,15 @@ class Crawler:
             cands.append(u if u.startswith("http") else "https://" + u.lstrip("/"))
         for d in domain_guesses([co["nimi"]] + co["aputoiminimet"]):
             cands.append("https://" + d)
+        hosts = []
         for url in cands:
             host = urlparse(url).hostname or ""
-            bare = host[4:] if host.startswith("www.") else host
-            if not (await self.resolves(bare) or await self.resolves("www." + bare)):
+            hosts.append(host[4:] if host.startswith("www.") else host)
+        checks = await asyncio.gather(*(self.resolves(h) for h in hosts))
+        www_checks = await asyncio.gather(*(self.resolves("www." + h) if not ok else asyncio.sleep(0, True)
+                                            for h, ok in zip(hosts, checks)))
+        for url, ok, wok in zip(cands, checks, www_checks):
+            if not (ok or wok):
                 continue
             got = await self.fetch(url) or await self.fetch(url.replace("https://", "https://www.", 1)) \
                 or await self.fetch(url.replace("https://", "http://", 1))
@@ -471,10 +477,12 @@ class Crawler:
     async def handle(self, co: dict) -> None:
         if True:
             try:
-                res = await asyncio.wait_for(self.scrape(co), timeout=90)
+                res = await asyncio.wait_for(self.scrape(co), timeout=60)
             except Exception:
                 res = None
             self.done.add(co["y_tunnus"])
+            if len(self.done) % 100 == 0:
+                print(f"  käsitelty {len(self.done)}, hyväksyttyjä {len(self.results)}", flush=True)
             if res:
                 d = res["domain"]
                 if d in self.exclude or res["sahkoposti"] in self.exclude:

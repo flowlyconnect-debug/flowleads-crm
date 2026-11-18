@@ -2,6 +2,7 @@
 
   python gmail_dedupe.py batches exports/prospektit [--size 25]
       -> tulostaa Gmail-hakukyselyt (domain-ryhmät), aja ne Gmailissa / Gmail-MCP:llä.
+      Jo tarkistetut avaimet (gmail_checked.txt) jätetään pois; osumat -> gmail_contacted.txt.
   python gmail_dedupe.py finalize exports/prospektit --contacted osumat.txt [--limit 1000]
       -> kirjoittaa prospektit_ei_kontaktoitu.csv ilman osumia (domain tai osoite per rivi).
 """
@@ -13,11 +14,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from crawl_prospects import FREE_MAIL, write_csv  # noqa: E402
+from crawl_prospects import FREE_MAIL, validate_row, write_csv  # noqa: E402
 
 
 def load(out: Path) -> list[dict]:
-    return [json.loads(l) for l in (out / "prospektit_raw.jsonl").read_text().splitlines() if l.strip()]
+    rows = [json.loads(l) for l in (out / "prospektit_raw.jsonl").read_text().splitlines() if l.strip()]
+    return [v for r in rows if (v := validate_row(r))]
 
 
 def key(r: dict) -> str:
@@ -35,12 +37,16 @@ def main() -> None:
     a = ap.parse_args()
     rows = load(Path(a.out))
     if a.cmd == "batches":
-        keys = list(dict.fromkeys(key(r) for r in rows))
+        checked_path = Path(a.out) / "gmail_checked.txt"
+        checked = set(checked_path.read_text().split()) if checked_path.exists() else set()
+        keys = [k for k in dict.fromkeys(key(r) for r in rows) if k not in checked]
         for i in range(0, len(keys), a.size):
             part = keys[i:i + a.size]
             print(" OR ".join(f"to:{k} OR from:{k}" for k in part))
         return
     contacted = set()
+    if not a.contacted and (Path(a.out) / "gmail_contacted.txt").exists():
+        a.contacted = str(Path(a.out) / "gmail_contacted.txt")
     if a.contacted:
         contacted = {l.strip().lower() for l in Path(a.contacted).read_text().splitlines() if l.strip()}
     keep = [r for r in rows if key(r).lower() not in contacted and r["domain"] not in contacted
