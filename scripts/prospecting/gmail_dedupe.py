@@ -49,6 +49,12 @@ def main() -> None:
         a.contacted = str(Path(a.out) / "gmail_contacted.txt")
     if a.contacted:
         contacted = {l.strip().lower() for l in Path(a.contacted).read_text().splitlines() if l.strip()}
+    checked_path = Path(a.out) / "gmail_checked.txt"
+    checked = {l.strip().lower() for l in checked_path.read_text().splitlines()} if checked_path.exists() else set()
+    unchecked = [r for r in rows if key(r).lower() not in checked]
+    rows = [r for r in rows if key(r).lower() in checked]
+    if unchecked:
+        print(f"{len(unchecked)} riviä odottaa Gmail-tarkistusta (ei mukana)")
     keep = [r for r in rows if key(r).lower() not in contacted and r["domain"] not in contacted
             and r["sahkoposti"].lower() not in contacted]
     write_csv(keep[: a.limit], Path(a.out) / "prospektit_ei_kontaktoitu.csv")
