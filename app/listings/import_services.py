@@ -37,7 +37,7 @@ from app.listings.services import (
     _parse_year,
     save_analysis,
 )
-from app.search.constants import REMONTTITYYPIT
+from app.search.constants import REMONTTITYYPIT, RENAMED_REMONTTITYYPIT
 
 MAX_IMPORT_ROWS = 2000
 MAX_TEXT_LENGTH = 20000
@@ -144,6 +144,8 @@ def _renovation_type(value) -> str | None:
             _TYPES_BY_KEY[_fold(name)] = name
             # "Lukkoremontti / kulunvalvonta" is also accepted as "Lukkoremontti"
             _TYPES_BY_KEY.setdefault(_fold(name.split("/")[0]), name)
+        for old, new in RENAMED_REMONTTITYYPIT.items():
+            _TYPES_BY_KEY.setdefault(_fold(old), new)
     return _TYPES_BY_KEY.get(_fold(value))
 
 

@@ -1,7 +1,7 @@
 """Renovation types found from a listing's own "tulevat remontit" text.
 
-The two types below are small jobs that the original eight types (and the
-import files made before 16.11.2026) folded into "Muu remontti" or mentioned
+The types below are jobs that the earlier types (and the import files made
+before they existed) folded into another type or "Muu remontti", or mentioned
 only inside another renovation's evidence. They are picked up from the text:
 the listing's summary of coming renovations and the evidence of its other
 renovations, both of which describe work that is still to come.
@@ -21,6 +21,12 @@ from app.listings.models import Listing, ListingRenovation
 
 VENTILATION = "Ilmanvaihdon puhdistus ja säätö"
 ATTIC_INSULATION = "Yläpohjan lisäeristys"
+# LVI types added 19.11.2026; earlier analyses put them in Putkiremontti,
+# Lämmitysjärjestelmän remontti (now Lämmitystaparemontti), Huoneistoremontit or Muu.
+WATER_FIXTURES = "Vesikalusteiden uusiminen / korjaaminen"
+HEATING_METHOD = "Lämmitystaparemontti"
+HEATING_DEVICES = "Lämmityslaiteasennus"
+HEATING_NETWORK = "Lämpöjohtoverkoston vianetsintä / tasapainotus"
 TEXT_TYPE_CONFIDENCE = 75
 
 # type -> alternatives; a type is found when every pattern of one alternative
@@ -42,11 +48,45 @@ _PATTERNS: dict[str, tuple[tuple[re.Pattern, ...], ...]] = {
             re.compile(r"erist"),
         ),
     ),
+    WATER_FIXTURES: (
+        (re.compile(r"vesikalust"),),
+        (
+            re.compile(r"hano|hanat|sekoittaj|wc-istu|vesimittar|sulkuventtiil|suihkukalust"),
+            re.compile(r"uusi|uusinta|vaihd|vaihto|korja|asenn"),
+        ),
+    ),
+    HEATING_METHOD: (
+        (re.compile(r"maalamp|lampokaiv|lammitystav|lammitysmuod|hybridilammit|ilma-vesilampopump|poistoilmalampopump"),),
+        (re.compile(r"kaukolampo|lampopump"), re.compile(r"siirty|vaihto|vaihdet|liity|liittym|hanke|selvit")),
+    ),
+    HEATING_DEVICES: (
+        (
+            re.compile(
+                r"lammonjakokesk|lammonsiirr|lammonvaihdin|lammonjakohuone|lammityskattil|lammityslait"
+                r"|kiertovesipump|termostaat|patteriventtiil|patterie|patterit"
+            ),
+            re.compile(r"uusi|uusinta|vaihd|vaihto|asenn|saneera|peruskorja"),
+        ),
+    ),
+    HEATING_NETWORK: (
+        (
+            re.compile(r"perussaa|linjasaa|tasapainot|saato|saado|vianets"),
+            re.compile(r"lammit|patteri|lampojohto|lammitysverk|lammitysputk"),
+        ),
+        (
+            re.compile(r"lampojohto|lammitysverkost|patteriverkost|lammitysputk"),
+            re.compile(r"vuot|vianets|korja|uusi|saneera"),
+        ),
+    ),
 }
 # SQL prefilter for the backfill (ILIKE, so accents as written)
 _SQL_HINTS: dict[str, tuple[str, ...]] = {
     VENTILATION: ("%ilmanvaih%", "%IV-%", "%ilmamäär%", "%poistoilma%"),
     ATTIC_INSULATION: ("%yläpohj%", "%ullak%", "%vint%"),
+    WATER_FIXTURES: ("%vesikalust%", "%hano%", "%hanat%", "%sekoittaj%", "%wc-istu%", "%vesimittar%", "%sulkuventtiil%"),
+    HEATING_METHOD: ("%maalämp%", "%lämpökaiv%", "%lämmitystap%", "%lämmitysmuod%", "%lämpöpump%", "%kaukolämpö%"),
+    HEATING_DEVICES: ("%lämmönjako%", "%lämmönsiirr%", "%lämmönvaihdin%", "%lämmityskattil%", "%lämmityslait%", "%kiertovesipump%", "%termostaat%", "%patteri%"),
+    HEATING_NETWORK: ("%perussää%", "%linjasää%", "%tasapainot%", "%lämpöjohto%", "%lämmitysverk%", "%lämmitysputk%", "%vianets%"),
 }
 _YEARS_RE = re.compile(r"(?<!\d)(20\d{2})(?:\s*[-–]\s*(20\d{2}))?(?!\d)")
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+|\s*[|\n]\s*")

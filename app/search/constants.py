@@ -5,8 +5,11 @@ from __future__ import annotations
 REMONTTITYYPIT: tuple[str, ...] = (
     "Lukkoremontti / kulunvalvonta",
     "Putkiremontti",
+    "Vesikalusteiden uusiminen / korjaaminen",
+    "Lämmitystaparemontti",
+    "Lämmityslaiteasennus",
+    "Lämpöjohtoverkoston vianetsintä / tasapainotus",
     "Sähkö- ja tietoliikennejärjestelmät",
-    "Lämmitysjärjestelmän remontti",
     "Julkisivuremontti",
     "Katto- ja vesikattoremontti",
     "Huoneistoremontit",
@@ -15,6 +18,12 @@ REMONTTITYYPIT: tuple[str, ...] = (
     "Yläpohjan lisäeristys",
     "Muu remontti",
 )
+
+# Old type names that were renamed; still accepted on CSV/API import and from
+# an Analyzer workflow that has not been re-imported yet.
+RENAMED_REMONTTITYYPIT: dict[str, str] = {
+    "Lämmitysjärjestelmän remontti": "Lämmitystaparemontti",
+}
 
 # Talotyypit, joihin kohde luokitellaan (Oikotien kortti / AI-analyysi).
 BUILDING_TYPES: tuple[str, ...] = (

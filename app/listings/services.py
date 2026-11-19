@@ -20,7 +20,13 @@ from sqlalchemy import and_, func, or_, update
 
 from app.extensions import db
 from app.listings.models import CrawlState, Listing, ListingMatch, ListingRenovation
-from app.search.constants import ALL_FINLAND_REGION, BUILDING_TYPES, FINNISH_REGIONS, REMONTTITYYPIT
+from app.search.constants import (
+    ALL_FINLAND_REGION,
+    BUILDING_TYPES,
+    FINNISH_REGIONS,
+    REMONTTITYYPIT,
+    RENAMED_REMONTTITYYPIT,
+)
 from app.search.models import SearchProfile
 
 logger = logging.getLogger(__name__)
@@ -561,6 +567,7 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
         if not isinstance(item, dict):
             continue
         rtype = _clean(item.get("remonttityyppi"))
+        rtype = RENAMED_REMONTTITYYPIT.get(rtype, rtype)
         if rtype not in REMONTTITYYPIT:
             continue
         try:
@@ -580,7 +587,7 @@ def save_analysis(listing_id: int, payload: dict, *, now: datetime | None = None
         listing.renovations.append(renovation)
     from app.listings.text_types import add_text_types
 
-    add_text_types(listing)  # ventilation cleaning / attic insulation mentioned in the text
+    add_text_types(listing)  # e.g. ventilation, attic insulation, LVI jobs mentioned in the text
 
     listing.analysis_status = "done"
     listing.analyzed_at = now

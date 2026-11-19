@@ -362,14 +362,17 @@ Säännöt tuleville remonteille:
 - ÄLÄ ota mukaan jo tehtyjä, valmistuneita tai aiemmin toteutettuja remontteja.
 - Luokittele jokainen tuleva remontti yhteen tyyppiin. Jos sopivaa tyyppiä ei ole, käytä "Muu remontti".
 - "Lukkoremontti / kulunvalvonta": lukitus, lukkojen tai avainten uusiminen, sarjoitus, sähkölukitus, iLOQ, kulunvalvonta tai kulkuoikeudet oviin ja sisäänkäynteihin. EI kameravalvontaa, murtohälytintä, paloilmoitinta eikä pelkkää ovipuhelinta.
-- "Putkiremontti": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus.
+- "Putkiremontti": linjasaneeraus, putkiremontti, viemärien, käyttövesi- tai vesijohtoputkien uusiminen tai sukitus, pystyviemärit, tonttiviemärit.
+- "Vesikalusteiden uusiminen / korjaaminen": hanojen, sekoittajien, WC-istuinten, suihkujen, altaiden, vesi- tai sulkuventtiilien tai huoneistokohtaisten vesimittareiden uusiminen tai korjaus ilman koko putkiremonttia. Jos kalusteet uusitaan osana linjasaneerausta, käytä "Putkiremontti".
 - "Sähkö- ja tietoliikennejärjestelmät": sähköverkon, sähköpääkeskuksen, nousujohtojen, antenni-, valokuitu- tai tietoliikenneverkon uusiminen.
-- "Lämmitysjärjestelmän remontti": lämmönjakohuone, maalämpö, kaukolämmön laitteet, patteriverkoston perussäätö tai uusiminen.
+- "Lämmitystaparemontti": lämmitystavan vaihto, esim. siirtyminen kaukolämmöstä, öljystä tai sähköstä maalämpöön, ilma-vesi- tai poistoilmalämpöpumppuun tai hybridiratkaisuun, lämpökaivojen poraus, maalämpöhanke.
+- "Lämmityslaiteasennus": lämmityslaitteiden uusiminen tai asennus ilman lämmitystavan vaihtoa: lämmönjakokeskus, lämmönsiirrin, kaukolämpölaitteet, lämmityskattila, kiertovesipumput, patterit, patteriventtiilit tai termostaatit, lämmönjakohuoneen laitteet.
+- "Lämpöjohtoverkoston vianetsintä / tasapainotus": patteriverkoston tai lämmitysverkoston perussäätö, linjasäätö, tasapainotus, lämpöjohtojen vuodot, vianetsintä, lämmitysverkoston korjaus tai uusiminen, epätasainen lämpö huoneistoissa.
 - "Julkisivuremontti": julkisivu, ikkunat, parvekkeet.
 - "Katto- ja vesikattoremontti": katto, vesikatto, yläpohja (ei pelkkä yläpohjan lisäeristys).
 - "Ilmanvaihdon puhdistus ja säätö": ilmanvaihtokanavien tai IV-hormien puhdistus tai nuohous, ilmamäärien mittaus, ilmanvaihdon säätö tai tasapainotus sekä ilmanvaihtokoneiden tai -järjestelmän uusiminen tai peruskorjaus.
 - "Yläpohjan lisäeristys": yläpohjan tai ullakon lisäeristys.
-- "Huoneistoremontit": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit.
+- "Huoneistoremontit": huoneistojen kylpyhuoneet, keittiöt tai muut huoneistokohtaiset remontit. Pelkkä vesikalusteiden vaihto on "Vesikalusteiden uusiminen / korjaaminen".
 - confidence 0–100 = kuinka varmasti teksti kertoo juuri tämän tyyppisestä TULEVASTA työstä.
 - evidence = lyhyt suora lainaus tekstistä. timing = esim. "2027", "suunnitteilla", "PTS 2026–2028" tai "".
 - Älä keksi mitään, mitä tekstissä ei lue. Jos tulevia remontteja ei ole, palauta tyhjä lista.
