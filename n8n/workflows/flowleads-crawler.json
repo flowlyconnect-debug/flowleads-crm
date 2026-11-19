@@ -18,7 +18,7 @@
         0,
         0
       ],
-      "id": "19fd7a52-70cf-4c53-9640-304cdfcf1761",
+      "id": "811daab3-1514-4dd3-88c5-57d8847b3de1",
       "name": "Every hour"
     },
     {
@@ -29,7 +29,7 @@
         0,
         200
       ],
-      "id": "b9f8755c-1631-4e20-b96c-7846cc75d9af",
+      "id": "bc2f9026-3183-4000-acd0-f045cf152bfc",
       "name": "Manual Trigger"
     },
     {
@@ -37,13 +37,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "1f9c9a69-42f0-42ff-b505-2342ae1122f3",
+              "id": "a5b1842e-3dd1-402f-90ae-9d143a1c2249",
               "name": "crm_base_url",
-              "value": "https://flowleads-crm-zv0a.onrender.com",
+              "value": "https://flowleads.flowly.fi",
               "type": "string"
             },
             {
-              "id": "6397f90d-3944-4e11-aa35-408a7ea9cc10",
+              "id": "8210f96a-14ac-497e-b8ac-34e3ec955309",
               "name": "n8n_secret",
               "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET",
               "type": "string"
@@ -58,7 +58,7 @@
         220,
         100
       ],
-      "id": "852be51f-167a-4ad1-97e2-8f841e4f1709",
+      "id": "8b69830c-0c40-46ab-89a8-339d3363d1fe",
       "name": "SET – Config",
       "notes": "CRM-osoite ja sama arvo kuin Renderin N8N_MASTER_SECRET. Sama asetus on jokaisessa kolmessa workflowssa."
     },
@@ -82,7 +82,7 @@
         440,
         100
       ],
-      "id": "a8c0e435-fff1-4c83-9402-abd85ea7977d",
+      "id": "aa67a12f-3c9f-4caa-8104-d0091b0e3f11",
       "name": "HTTP – Get Crawl Plan",
       "retryOnFail": true,
       "maxTries": 3,
@@ -98,7 +98,7 @@
         660,
         100
       ],
-      "id": "2a533574-656f-4082-94be-5b8063c698d7",
+      "id": "931fa783-7275-490e-b68a-c4e2084ebe83",
       "name": "CODE – Split Tasks"
     },
     {
@@ -111,7 +111,7 @@
         880,
         100
       ],
-      "id": "44184c7f-ec59-4e38-b7f7-568cb3120ef4",
+      "id": "9f8a0eb5-9c53-42da-bf7a-2d442d89d396",
       "name": "LOOP – Tasks",
       "notes": "Yksi tehtävä = yksi maakunta (incremental tai full-pass-viipale)."
     },
@@ -188,7 +188,7 @@
         1100,
         200
       ],
-      "id": "4a725708-eebe-4272-b9b2-03dd8ece6031",
+      "id": "a0b46e59-90dd-4e39-b839-69b53375b72e",
       "name": "HTTP – Fetch Oikotie Search Page",
       "onError": "continueRegularOutput"
     },
@@ -202,7 +202,7 @@
         1320,
         200
       ],
-      "id": "959fec50-1cf7-4002-b75d-3ed922f0920a",
+      "id": "0ab219c4-5d39-45ed-bfea-a80629d568b8",
       "name": "PARSE – Extract apiLocation"
     },
     {
@@ -243,7 +243,7 @@
         1540,
         200
       ],
-      "id": "7e49dfcf-4948-444e-9af9-692f57acaa40",
+      "id": "84fb6a59-fa29-4583-82a9-e2184f74cf5b",
       "name": "HTTP – Fetch Oikotie API Bootstrap",
       "onError": "continueRegularOutput"
     },
@@ -257,7 +257,7 @@
         1760,
         200
       ],
-      "id": "ef6d668c-9d1a-45ef-b4fa-3771dbe08436",
+      "id": "54ffbd1c-7c4a-4e1b-948e-bc0b61fd5789",
       "name": "TRANSFORM – Extract Session Cookie"
     },
     {
@@ -270,7 +270,7 @@
         1980,
         200
       ],
-      "id": "51fd4f4d-e9c7-41d0-823c-825929b3fefe",
+      "id": "3f7df77c-ab3e-4360-b268-3611152b7c4c",
       "name": "CODE – Page Context"
     },
     {
@@ -346,7 +346,7 @@
         2200,
         200
       ],
-      "id": "f0254a8c-2855-4f70-a44d-802355386b74",
+      "id": "33281436-0dad-4922-ad76-3ededb890e5d",
       "name": "HTTP – Fetch Oikotie Listings API",
       "onError": "continueRegularOutput",
       "retryOnFail": true,
@@ -363,7 +363,7 @@
         2420,
         200
       ],
-      "id": "6607c15c-fb71-4fe7-b96b-abf910c5d2bb",
+      "id": "67457dd8-b55d-477c-bbfa-bfc57ac309b3",
       "name": "CODE – Normalize Cards"
     },
     {
@@ -394,7 +394,7 @@
         2640,
         200
       ],
-      "id": "e07b8292-1f11-4e90-ac8b-3f98edbf697b",
+      "id": "f9d1b8c2-493e-4e1f-8512-556272cc516f",
       "name": "HTTP – CRM Ingest",
       "retryOnFail": true,
       "maxTries": 3,
@@ -411,7 +411,7 @@
         2860,
         200
       ],
-      "id": "1bcba17b-9f49-4f73-b4fe-1745fe087797",
+      "id": "326abd1b-f50d-4b51-8e29-c2008d1970b5",
       "name": "CODE – Next Page"
     },
     {
@@ -425,7 +425,7 @@
           },
           "conditions": [
             {
-              "id": "c08b7a7a-4665-4d95-9d76-9c7a7a86f241",
+              "id": "4fce0331-b2bb-4a17-b614-997356478752",
               "leftValue": "={{ $json.blocked }}",
               "rightValue": "",
               "operator": {
@@ -446,7 +446,7 @@
         3080,
         200
       ],
-      "id": "681db4b6-0d39-4648-b152-36914e2ce746",
+      "id": "6c3e3884-1410-49de-8e37-91fc4adb556f",
       "name": "IF – Oikotie Blocked"
     },
     {
@@ -460,7 +460,7 @@
           },
           "conditions": [
             {
-              "id": "3eb58d02-7011-407e-a545-5166f9accd54",
+              "id": "12f25b17-f4e8-4013-a4ee-78aa8ed8cd66",
               "leftValue": "={{ $json.more }}",
               "rightValue": "",
               "operator": {
@@ -481,7 +481,7 @@
         3300,
         200
       ],
-      "id": "81470d13-76b4-4e04-b098-3df558531fe3",
+      "id": "623fae2a-a3b4-4751-8335-a29ad29d77b0",
       "name": "IF – More Pages"
     },
     {
@@ -495,9 +495,9 @@
         3520,
         340
       ],
-      "id": "0914d41d-a1fa-40c4-ba13-18c006caa91c",
+      "id": "3073e7cc-e097-4cae-a3ae-bd9944b411bc",
       "name": "WAIT – Between Pages",
-      "webhookId": "64a61014-0fdf-4fc0-8290-5ab3135202b5"
+      "webhookId": "4de058b7-d461-4f8e-99a1-126e2ab2956d"
     }
   ],
   "pinData": {},

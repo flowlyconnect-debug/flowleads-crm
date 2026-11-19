@@ -10,7 +10,7 @@ Liidien tuonti (Oikotie / n8n / CSV) on rajattu tämän työn ulkopuolelle; se t
 
 | Osa | Nimi | Tunniste |
 |---|---|---|
-| Web | `flowleads-crm-zv0a` | `srv-dbpm5tuc6qcc73deuce0`, https://flowleads-crm-zv0a.onrender.com |
+| Web | `flowleads-crm-zv0a` | `srv-dbpm5tuc6qcc73deuce0`, https://flowleads.flowly.fi (oma domain 19.11.2026; vanha https://flowleads-crm-zv0a.onrender.com toimii yhä) |
 | Ajastin (worker) | `flowleads-scheduler` | `srv-dbpmkh8u01pc73dqmud0` |
 | Postgres 18 | `flowleads-db-zv0a` | `dpg-dbpm566c6qcc73derts0-a`, plan basic_256mb |
 | Workspace | Matias's workspace | `tea-dbpm0kuc6qcc73deds50` |

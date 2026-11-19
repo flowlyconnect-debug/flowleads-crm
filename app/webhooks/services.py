@@ -35,7 +35,7 @@ def crm_base_url() -> str:
         base = (current_app.config.get("APP_BASE_URL") or "").strip()
     except RuntimeError:
         base = ""
-    return base.rstrip("/") or "https://flowleads-crm-zv0a.onrender.com"
+    return base.rstrip("/") or "https://flowleads.flowly.fi"
 
 
 def _utc_now() -> datetime:

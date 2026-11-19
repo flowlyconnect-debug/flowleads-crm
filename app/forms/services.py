@@ -503,7 +503,7 @@ class WebFormService:
             try:
                 base = url_for("index", _external=True).rstrip("/")
             except RuntimeError:
-                base = "https://app.flowleads.fi"
+                base = "https://flowleads.flowly.fi"
         script_src = f"{base}/static/forms/embed.js"
         iframe_src = f"{base}/forms/{form.form_token}/embed"
         script_embed = (

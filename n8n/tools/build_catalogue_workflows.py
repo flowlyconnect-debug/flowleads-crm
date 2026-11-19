@@ -63,7 +63,7 @@ def config_node(pos):
         {
             "assignments": {
                 "assignments": [
-                    {"id": _id(), "name": "crm_base_url", "value": "https://flowleads-crm-zv0a.onrender.com", "type": "string"},
+                    {"id": _id(), "name": "crm_base_url", "value": "https://flowleads.flowly.fi", "type": "string"},
                     {"id": _id(), "name": "n8n_secret", "value": "VAIHDA_TAHAN_N8N_MASTER_SECRET", "type": "string"},
                 ]
             },
