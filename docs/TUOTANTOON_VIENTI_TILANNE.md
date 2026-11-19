@@ -358,6 +358,12 @@ Vanha migraatio `q2r3s4t5u6v7` ei peru Postgresissa (`downgrade base`); ei vaiku
 
 Käyttäjän tehtävät (vaativat tilejä ja avaimia):
 
+0. **Uusi domain `flowleads.flowly.fi` (19.11.2026).** Vaihda Renderin web-palvelun `APP_BASE_URL`
+   arvoon `https://flowleads.flowly.fi` (ajastin perii sen). Siitä tulevat sähköpostien linkit (koosteet,
+   sekvenssien peruutuslinkit, kuukausiraportti). Vaihda samalla Mailgunin webhook-osoite ja, jos
+   kalenteriavaimet on asetettu, `GOOGLE_REDIRECT_URI` / `MICROSOFT_REDIRECT_URI` sekä OAuth-sovellusten
+   osoitteet. Tuo n8n Cloudiin uudelleen generoidut työnkulut (CRM-osoite on nyt uusi domain). Vanha
+   https://flowleads-crm-zv0a.onrender.com toimii yhä, joten mikään ei ole rikki ennen vaihtoa.
 1. **Varmuuskopiot.** S3-yhteensopiva bucket (esim. Cloudflare R2 tai Backblaze B2) ja `BACKUP_S3_*`-muuttujat:
    kirjoitusavain vain ajastimelle, lukuavain webille (ks. `render.yaml`). Audit-lokissa on yksi
    `backup_failed` eikä yhtään onnistunutta; syytä ei saatu selville. Sen jälkeen testikopio ja palautuskoe.
