@@ -57,7 +57,8 @@ def test_ventilation_cleaning_is_found_with_its_year(text, timing):
     ],
 )
 def test_other_work_is_not_mistaken_for_the_new_types(text):
-    assert find_text_types(text) == {}
+    # (the heating text is an LVI job since 19.11.2026: tests/test_lvi_renovation_types.py)
+    assert not set(find_text_types(text)) & {VENTILATION, ATTIC_INSULATION}
 
 
 def test_attic_insulation_is_found():

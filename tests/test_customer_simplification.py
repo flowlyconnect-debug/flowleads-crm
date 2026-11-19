@@ -20,7 +20,7 @@ from app.search.models import SearchProfile
 from app.users.services import create_user
 
 PIPE = "Putkiremontti"
-HEAT = "Lämmitysjärjestelmän remontti"
+HEAT = "Lämmitystaparemontti"
 ROOF = "Katto- ja vesikattoremontti"
 PASSWORD = "temporarypassword1"
 

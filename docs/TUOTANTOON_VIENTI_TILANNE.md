@@ -306,6 +306,17 @@ myyjä voi viedä koko organisaation liidit CSV:nä (liiketoimintapäätös).
 - Takaisin päälle asiakaskohtaisesti: `/admin/customers` → "Toiminnot käytössä" → rasti ja Tallenna.
   Testit: `tests/test_optional_modules_off.py`.
 
+## Tehty 19.11.2026: LVI-urakkatyypit
+
+- Uudet tyypit: **Vesikalusteiden uusiminen / korjaaminen**, **Lämmityslaiteasennus** ja **Lämpöjohtoverkoston
+  vianetsintä / tasapainotus**. "Lämmitysjärjestelmän remontti" on nyt **Lämmitystaparemontti** (migraatio
+  `a7c8d9e0f1b2` nimeää profiilit, kutsut ja kohteiden remontit; vanha nimi hyväksytään yhä tuonnissa ja Analyzerilta).
+  Putkiremontti oli jo.
+- Tyypit poimitaan myös kohteen tekstistä (`app/listings/text_types.py`), joten ajastin lisää ne myös jo
+  analysoituihin kohteisiin ilman uutta AI-ajoa. PTS-merkit, vapaatekstihaku ja Analyzer-kehote päivitetty.
+- **Käyttäjän tehtävä:** tuo `n8n/workflows/flowleads-analyzer.json` n8n:ään uudelleen.
+  Testit: `tests/test_lvi_renovation_types.py`.
+
 ## Tehty 16.11.2026 (4): kaksi uutta urakkatyyppiä
 
 - **"Ilmanvaihdon puhdistus ja säätö"** (kanavien puhdistus/nuohous, ilmamäärien mittaus, säätö, tasapainotus

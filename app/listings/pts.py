@@ -14,8 +14,11 @@ PTS_SPAN = 5
 RENOVATION_MARKS: dict[str, tuple[str, str, str]] = {
     "Lukkoremontti / kulunvalvonta": ("Lu", "Lukot", "neutral"),
     "Putkiremontti": ("Pu", "Putket", "info"),
+    "Vesikalusteiden uusiminen / korjaaminen": ("Vk", "Vesikalusteet", "info"),
+    "Lämmitystaparemontti": ("Lä", "Lämmitystapa", "danger"),
+    "Lämmityslaiteasennus": ("Ll", "Lämmityslaitteet", "danger"),
+    "Lämpöjohtoverkoston vianetsintä / tasapainotus": ("Lj", "Lämpöverkosto", "danger"),
     "Sähkö- ja tietoliikennejärjestelmät": ("Sä", "Sähkö", "success"),
-    "Lämmitysjärjestelmän remontti": ("Lä", "Lämmitys", "danger"),
     "Julkisivuremontti": ("Ju", "Julkisivu", "warning"),
     "Katto- ja vesikattoremontti": ("Ka", "Katto", "accent"),
     "Huoneistoremontit": ("Hu", "Huoneistot", "neutral"),
